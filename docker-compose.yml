@@ -20,7 +20,7 @@ services:
     image: redis:7-alpine
     restart: always
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -37,7 +37,7 @@ services:
       - MAILDEV_SMTP_PORT=1025
     ports:
       - "8081:1080"
-      - "1025:1025"
+      - "1026:1025"
     logging:
       driver: "json-file"
       options:
@@ -51,10 +51,10 @@ services:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY_ID}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_ACCESS_KEY}
     volumes:
-      - ./.docker/minio-data:/data       # Локальная папка для хранения данных
+      - ./.docker/minio-data:/data
     ports:
-      - "9900:9000"              # S3 API (для SDK и CLI)
-      - "9901:9001"              # Web Console (UI)
+      - "9902:9000"
+      - "9903:9001"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
@@ -77,8 +77,8 @@ services:
   rabbitmq:
     image: rabbitmq:4.3-management-alpine
     ports:
-      - "5672:5672"   # AMQP protocol
-      - "15672:15672" # Management UI
+      - "5673:5672"
+      - "15673:15672"
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBIT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBIT_PASSWORD}
@@ -90,99 +90,37 @@ services:
       timeout: 5s
       retries: 5
 
-  # infinity:
-  #   image: michaelf34/infinity:latest-cpu
-  #   ports:
-  #     - "7997:7997"
-  #   volumes:
-  #     - ./hf_cache:/app/.cache
-  #   environment:
-  #     - HF_HOME=/app/.cache
-  #     - INFINITY_ANONYMOUS_USAGE=0
-  #   command: >
-  #     v2
-  #     --model-id openai/clip-vit-base-patch32
-  #     --port 7997
-  #     --engine torch
-  #     --device cpu
-  #     --batch-size 64
-  #   restart: unless-stopped
-
-  # text-embeddings:
-  #   image: ghcr.io/huggingface/text-embeddings-inference:1.7.2
-  #   pull_policy: always
-  #   ports:
-  #     - "8080:80"
-  #   volumes:
-  #     - hf_cache:/data
-  #   command: --model-id Qwen/Qwen3-Embedding-0.6B
-
-  # imgproxy:
-  #   image: ghcr.io/imgproxy/imgproxy:latest
-  #   restart: unless-stopped
-  #   ports:
-  #     - "8081:8080"
-  #   environment:
-  #     # --- Основные настройки ---
-  #     IMGPROXY_USE_S3: "true"
-  #     IMGPROXY_S3_ENDPOINT: "http://minio:9000"
-  #     IMGPROXY_S3_REGION: "us-east-1"
-  #     IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE: "true"
-  #     # --- Ключи доступа от MinIO ---
-  #     AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY_ID}
-  #     AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_ACCESS_KEY}
-  #     # --- Безопасность ---
-  #     IMGPROXY_KEY: ${IMGPROXY_KEY}
-  #     IMGPROXY_SALT: ${IMGPROXY_SALT}
-  #     # --- Дополнительные опции ---
-  #     IMGPROXY_MAX_SRC_RESOLUTION: "50"
-  #     IMGPROXY_MAX_SRC_FILE_SIZE: "0"
-  #     IMGPROXY_ENABLE_WEBP_DETECTION: "true"
-  #     IMGPROXY_ENABLE_AVIF: "true"
-  #     IMGPROXY_CONCURRENCY: "10"
-
-  #   depends_on:
-  #     - minio
-
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8001:8000"
     environment:
       SECRET_KEY: ${SECRET_KEY}
       FRONTEND_URL: ${FRONTEND_URL}
-      # --- Postgres ---
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      # --- MinIO ---
       MINIO_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY_ID}
       MINIO_SECRET_ACCESS_KEY: ${MINIO_SECRET_ACCESS_KEY}
-      # --- Redis ---
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
-      # --- Admin ---
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      # --- Yandex Cloud ---
       YANDEX_CLOUD_FOLDER_ID: ${YANDEX_CLOUD_FOLDER_ID}
       YANDEX_CLOUD_API_KEY: ${YANDEX_CLOUD_API_KEY}
       YANDEX_CLOUD_ACCESS_KEY_ID: ${YANDEX_CLOUD_ACCESS_KEY_ID}
       YANDEX_CLOUD_SECRET_ACCESS_KEY: ${YANDEX_CLOUD_SECRET_ACCESS_KEY}
-      # --- Language Tool ---
       LANGTOOL_HOST: ${LANGTOOL_HOST}
       LNAGTOOL_PORT: ${LANGTOOL_PORT}
     depends_on:
       postgres:
         condition: service_healthy
-      # maildev:
-      #   condition: service_healthy
       minio:
         condition: service_healthy
       languagetool:
@@ -215,7 +153,6 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - MINIO_ACCESS_KEY_ID=${MINIO_ACCESS_KEY_ID}
       - MINIO_SECRET_ACCESS_KEY=${MINIO_SECRET_ACCESS_KEY}
-      # Yandex Cloud credentials (можно взять из .env)
       - YANDEX_S3_BUCKET=backups
       - YANDEX_S3_ENDPOINT=https://storage.yandexcloud.net
     command: |
@@ -224,10 +161,6 @@ services:
       echo '0 2 * * * /app/backup.sh >> /var/log/backup.log 2>&1' | crontab -
       crond -f
       "
-  
-  # ============================================================================
-  # Мониторинг
-  # ============================================================================
 
   prometheus:
     image: prom/prometheus:latest
@@ -239,8 +172,8 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=15d'       # хранить метрики 15 дней
-      - '--web.enable-lifecycle'                  # возможность перезагрузки конфига без остановки
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
     ports:
       - "9091:9090"
     networks:
@@ -265,10 +198,6 @@ services:
     depends_on:
       - prometheus
       - loki
-
-  # ============================================================================
-  # Логирование и трассировка
-  # ============================================================================
 
   loki:
     image: grafana/loki:latest
