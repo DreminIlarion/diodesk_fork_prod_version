@@ -1,0 +1,143 @@
+from __future__ import annotations
+
+from typing import Self
+
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from uuid import UUID
+
+from .entities import Task
+from .exceptions import NotAllowedStatusTransitionError
+from .vo import TaskStatus
+
+TransitionAction = Callable[[Task, UUID], None] | Callable[[Task], None]
+
+
+@dataclass(frozen=True)
+class StatusTransition:
+    """
+    Переход из одного статуса задачи в другой.
+    """
+
+    from_status: TaskStatus
+    to_status: TaskStatus
+    actions: tuple[TransitionAction, ...]
+
+
+@dataclass
+class TaskWorkflow:
+    """
+    Управляет состоянием и переходами между статусами задачи.
+    """
+
+    transitions: dict[
+        tuple[TaskStatus, TaskStatus], tuple[TransitionAction, ...]
+    ] = field(default_factory=dict)
+
+    def allow(
+            self,
+            from_status: TaskStatus,
+            to_status: TaskStatus,
+            *actions: TransitionAction
+    ) -> Self:
+        transition = (from_status, to_status)
+        if transition not in self.transitions:
+            self.transitions[transition] = actions
+
+        return self
+
+    def resolve(self, old_status: TaskStatus, new_status: TaskStatus) -> StatusTransition:
+        transition = (old_status, new_status)
+        if transition not in self.transitions:
+            raise NotAllowedStatusTransitionError(
+                f"Not allowed status transition from {old_status} to {new_status}."
+            )
+
+        actions = self.transitions[transition]
+        return StatusTransition(from_status=old_status, to_status=new_status, actions=actions)
+
+task_workflow = (
+    TaskWorkflow()
+    # ===================
+    # Переходы из backlog
+    # ===================
+    .allow(
+        TaskStatus.BACKLOG, TaskStatus.TODO,
+        Task.start_work
+    )
+    .allow(
+        TaskStatus.BACKLOG, TaskStatus.CANCELLED,
+        Task.unassign, Task.reset_reviewer,
+    )
+    # ===============================
+    # Переходы из готовы к выполнению
+    # ===============================
+    .allow(
+        TaskStatus.TODO, TaskStatus.BACKLOG,
+        Task.unassign, Task.reset_reviewer,
+    )
+    .allow(
+        TaskStatus.TODO, TaskStatus.IN_PROGRESS,
+        Task.start_work,
+    )
+    .allow(
+        TaskStatus.TODO, TaskStatus.PAUSED,
+        Task.finish_work,
+    )
+    .allow(
+        TaskStatus.TODO, TaskStatus.CANCELLED,
+        Task.unassign, Task.reset_reviewer,
+    )
+    # ===============================
+    # Переходы из в работе
+    # ===============================
+    .allow(
+        TaskStatus.IN_PROGRESS, TaskStatus.TO_REVIEW,
+        Task.finish_work,
+    )
+    .allow(
+        TaskStatus.IN_PROGRESS, TaskStatus.PAUSED,
+        Task.finish_work,
+    )
+    .allow(
+        TaskStatus.IN_PROGRESS, TaskStatus.DONE,
+        Task.complete,
+    )
+    .allow(
+        TaskStatus.IN_PROGRESS, TaskStatus.CANCELLED,
+        Task.finish_work, Task.unassign, Task.reset_reviewer,
+    )
+    # ===============================
+    # Переходы из паузы
+    # ===============================
+    .allow(
+        TaskStatus.PAUSED, TaskStatus.IN_PROGRESS,
+        Task.start_work,
+    )
+    .allow(
+        TaskStatus.PAUSED, TaskStatus.CANCELLED,
+        Task.unassign, Task.reset_reviewer,
+    )
+    # ===============================
+    # Переходы из на ревью
+    # ===============================
+    .allow(
+        TaskStatus.TO_REVIEW, TaskStatus.IN_PROGRESS,
+        Task.start_work, Task.reset_reviewer,
+    )
+    .allow(
+        TaskStatus.TO_REVIEW, TaskStatus.DONE,
+        Task.complete,
+    )
+    .allow(
+        TaskStatus.TO_REVIEW, TaskStatus.CANCELLED,
+        Task.unassign, Task.reset_reviewer,
+    )
+    # ===============================
+    # Переходы из выполнено
+    # ===============================
+    .allow(
+        TaskStatus.DONE, TaskStatus.IN_PROGRESS,
+        Task.reopen, Task.start_work,
+    )
+)
