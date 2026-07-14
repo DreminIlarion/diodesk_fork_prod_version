@@ -1078,7 +1078,7 @@ export interface NotificationStreamPayload {
 function getNotificationStreamUrl() {
   return (
     import.meta.env.VITE_NOTIFICATIONS_STREAM_URL ||
-    'http://localhost:8000/notifications/stream'
+    'http://10.1.50.109:8001/notifications/stream'
   );
 }
 
