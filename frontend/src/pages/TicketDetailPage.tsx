@@ -738,7 +738,8 @@ const getAuthorName = useCallback((c: Comment) => {
                 <Archive className="w-4 h-4" /> Архив
               </span>
             )}
-            {!ticket.is_archived && (user?.user_id === ticket.created_by || user?.user_id === ticket.reporter_id) && (
+            {!ticket.is_archived && (user?.user_id === ticket.created_by || user?.user_id === ticket.reporter_id || isStaff) && (
+
               <button onClick={openEditModal}
                 className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-base
                               bg-[var(--hover-2)] hover:bg-[var(--hover-3)] border border-[var(--border-color)]

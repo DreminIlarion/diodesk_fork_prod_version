@@ -340,7 +340,7 @@ async def change_ticket_status(
         "closed": service.close,
         "cancelled": service.cancel,
         "rejected": service.reject,
-        "reopened": service.start_progress,
+        "reopened": service.reopen
         "waiting": service.wait,
     }
     
