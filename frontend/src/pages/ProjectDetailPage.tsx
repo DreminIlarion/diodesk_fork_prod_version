@@ -647,11 +647,25 @@ const loadMembers = useCallback(async () => {
   if (!project?.id) return;
   setLoadingMembers(true);
   try {
-    const data = await projectsApi.getMembers(project.id);
-    setMembers(data.map((m: any) => ({
+    const memberships = await projectsApi.getMembers(project.id);
+    
+    // Загружаем всех пользователей для сопоставления
+    const usersRes = await usersApi.getAllUsers(1, 100);
+    const userMap = new Map<string, SimpleUser>();
+    usersRes.items.forEach((u: SimpleUser) => userMap.set(u.id, u));
+    
+    // Если есть counterparty_id, загружаем клиентов
+    if (project.counterparty_id) {
+      try {
+        const customersRes = await counterpartiesApi.getCustomers(project.counterparty_id, 1, 100);
+        (customersRes.items ?? []).forEach((u: any) => userMap.set(u.id, u));
+      } catch {}
+    }
+    
+    setMembers(memberships.map((m: any) => ({
       user_id: m.user_id,
-      project_role: m.project_role || m.roles?.[0],
-      user: m.user || null,
+      project_role: m.roles?.[0] || m.project_role || 'contributor',
+      user: userMap.get(m.user_id) || null,
     })));
   } catch (e) {
     console.error('Failed to load members:', e);
@@ -659,7 +673,7 @@ const loadMembers = useCallback(async () => {
   } finally {
     setLoadingMembers(false);
   }
-}, [project?.id]);
+}, [project?.id, project?.counterparty_id]);
 
   const loadProject = useCallback(async () => {
     setLoading(true);
