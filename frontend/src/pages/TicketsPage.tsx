@@ -71,6 +71,7 @@ const TICKET_TYPES: { value: string; label: string; icon: ReactNode; color: stri
 
 function toShortName(fullName: string | null | undefined): string {
   if (!fullName) return '—';
+  if (fullName === 'ФИО не указано') return fullName; 
   const parts = fullName.trim().split(/\s+/);
   if (parts.length === 1) return parts[0];
   const [last, first, middle] = parts;
