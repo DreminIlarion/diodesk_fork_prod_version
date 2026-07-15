@@ -195,3 +195,11 @@ class SqlProjectMemberRepository(SqlAlchemyRepository[ProjectMember, ProjectMemb
         )
         results = await self.session.execute(stmt)
         return [self.model_mapper.to_entity(model) for model in results.scalars().all()]
+    async def list_by_project(self, project_id: UUID) -> list[ProjectMember]:
+        stmt = select(self.model).where(
+            self.model.project_id == project_id,
+            self.model.deleted_at.is_(None)
+        )
+        result = await self.session.execute(stmt)
+        models = result.scalars().all()
+        return [self.model_mapper.to_entity(m) for m in models]

@@ -9,6 +9,17 @@ from ..schemas import ProjectMemberCreate, ProjectMemberResponse
 
 router = APIRouter(prefix="/projects", tags=["Участники проекта"])
 
+@router.get(
+    path="/{project_id}/members",
+    status_code=status.HTTP_200_OK,
+    response_model=list[ProjectMemberResponse],
+    summary="Получить участников проекта"
+)
+async def get_project_members(
+        project_id: UUID,
+        service: ProjectMemberServiceDep,
+) -> list[ProjectMemberResponse]:
+    return await service.get_members(project_id)
 
 @router.post(
     path="/{project_id}/members",

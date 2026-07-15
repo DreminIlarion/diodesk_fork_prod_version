@@ -643,85 +643,23 @@ const isSupportOrHigher = user?.roles?.some(r =>
 
   // ── Загрузка участников ──────────────────────────────────────────────
 
-  const enrichMembers = useCallback(async (
-  memberships: Array<{ user_id: string; project_role: string }>,
-  counterpartyId: string | null | undefined,
-) => {
+const loadMembers = useCallback(async () => {
+  if (!project?.id) return;
   setLoadingMembers(true);
   try {
-    const userMap = new Map<string, CounterpartyCustomer | SimpleUser>();
-    
-    // 1. Загружаем сотрудников контрагента (если есть counterparty_id)
-    if (counterpartyId) {
-      try {
-        const res = await counterpartiesApi.getCustomers(counterpartyId, 1, 100); // ← увеличьте лимит, если нужно
-        (res.items ?? []).forEach((u: CounterpartyCustomer) => userMap.set(u.id, u));
-      } catch (e) {
-        console.error('Ошибка загрузки сотрудников контрагента:', e);
-      }
-    }
-    
-    // 2. Всегда добавляем текущего пользователя
-    if (user?.id && !userMap.has(user.id)) {
-      userMap.set(user.id, {
-        id: user.id,
-        email: user.email ?? '',
-        username: user.username ?? '',
-        full_name: user.full_name ?? '',
-        role: user?.roles?.[0] ?? '',
-        is_active: true,
-      } as CounterpartyCustomer);
-    }
-    
-    // 3. Для недостающих ID — загружаем через usersApi
-    const isCustomer = user?.roles?.some(r => r === 'customer' || r === 'customer_admin') ?? false;
-    
-    const missingIds = memberships
-      .map(m => m.user_id)
-      .filter(uid => !userMap.has(uid));
-    
-    if (missingIds.length > 0) {
-      try {
-        // Пробуем загрузить оставшихся пользователей
-        const res = await usersApi.getAllUsers(1, Math.max(missingIds.length, 100));
-        (res.items ?? []).forEach((u: SimpleUser) => {
-          if (missingIds.includes(u.id)) {
-            userMap.set(u.id, u);
-          }
-        });
-      } catch (e) {
-        console.error('Ошибка загрузки пользователей:', e);
-      }
-      
-      // 4. Для тех, кого так и не нашли — создаём заглушки
-      for (const uid of missingIds) {
-        if (!userMap.has(uid)) {
-          userMap.set(uid, {
-            id: uid,
-            email: '',
-            username: `user_${uid.slice(0, 8)}`,
-            full_name: `Пользователь ${uid.slice(0, 8)}`,
-            role: '',
-            is_active: true,
-          } as CounterpartyCustomer);
-        }
-      }
-    }
-    
-    // 5. Формируем результат
-    setMembers(
-      memberships.map(m => ({
-        user_id: m.user_id,
-        project_role: m.project_role,
-        user: userMap.get(m.user_id) ?? null,
-      }))
-    );
+    const data = await projectsApi.getMembers(project.id);
+    setMembers(data.map((m: any) => ({
+      user_id: m.user_id,
+      project_role: m.project_role || m.roles?.[0],
+      user: m.user || null,
+    })));
   } catch (e) {
-    console.error('enrichMembers error:', e);
+    console.error('Failed to load members:', e);
+    setMembers([]);
   } finally {
     setLoadingMembers(false);
   }
-}, [user]);
+}, [project?.id]);
 
   const loadProject = useCallback(async () => {
     setLoading(true);
@@ -730,13 +668,13 @@ const isSupportOrHigher = user?.roles?.some(r =>
       setProject(data);
       await Promise.all([
         data.counterparty_id ? counterpartiesApi.getById(data.counterparty_id).then(cp => setCounterparty(cp)).catch(() => {}) : Promise.resolve(),
-        enrichMembers(data.memberships ?? [], data.counterparty_id),
+        await loadMembers(),
       ]);
     } catch {
       toast({ title: 'Ошибка', description: 'Не удалось загрузить проект', variant: 'destructive' });
       navigate('/projects');
     } finally { setLoading(false); }
-  }, [id, enrichMembers, toast, navigate]);
+  }, [id, loadMembers, toast, navigate]);
 
   const loadTickets = useCallback(async () => {
     if (!project?.id) return;

@@ -49,4 +49,6 @@ class ProjectMemberRepository(Repository[ProjectMember]):
         Возвращает все членства пользователя во всех проектах.
         Используется для получения полного списка проектов пользователя
         (например, для построения селектора проектов или персональной панели).
-        """
+        """ 
+    async def list_by_project(self, project_id: UUID) -> list[ProjectMember]:
+        """Получить всех участников проекта."""

@@ -476,6 +476,12 @@ export const projectsApi = {
   },
 
 
+getMembers: async (projectId: string): Promise<ProjectMemberResponse[]> => {
+  const response = await api.get<ProjectMemberResponse[]>(
+    `/api/v1/projects/${projectId}/members`
+  );
+  return response.data;
+},
 
 // 🔥 НОВЫЙ API: добавление участника с массивом ролей
 addMember: async (projectId: string, userId: string, roles: string[]): Promise<any> => {

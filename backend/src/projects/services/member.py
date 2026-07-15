@@ -30,6 +30,11 @@ class ProjectMemberService:
         self.member_repo = member_repo
         self.authz_service = ProjectAuthZService(member_repo)
         self.event_publisher = event_publisher
+    
+    async def get_members(self, project_id: UUID) -> list[ProjectMemberResponse]:
+        """Получить всех участников проекта."""
+        members = await self.member_repo.list_by_project(project_id)
+        return [map_member_to_response(m) for m in members]
 
     async def add_member(
             self, project_id: UUID, data: ProjectMemberCreate, current_subject: Subject
