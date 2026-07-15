@@ -1070,10 +1070,15 @@ function CreateModal({
     };
   }, [pid]);
 
+  /* ═══════════════════════════════════════════════════════════════════
+     ИСПРАВЛЕННАЯ submit — ДВУХЭТАПНОЕ СОЗДАНИЕ
+     ═══════════════════════════════════════════════════════════════════ */
+
   const submit = async () => {
     if (!title.trim()) return;
     setSaving(true);
     try {
+      // ✅ Шаг 1: Создаём в backlog
       const payload: TaskCreateInput = {
         title: title.trim(),
         description: desc.trim() || null,
@@ -1083,11 +1088,20 @@ function CreateModal({
         story_points: sp ? parseInt(sp) : null,
         estimated_hours: eh ? parseFloat(eh) : null,
         due_date: dd || null,
-        mark_as_todo: todo,
+        mark_as_todo: false, // ← НЕ ставим todo при создании
         assignee_id: aid || null,
       };
       const t = await tasksApi.create(payload);
-      toast({ title: 'Задача создана', description: `${t.number} — ${t.title}` });
+      
+      // ✅ Шаг 2: Если нужно todo И есть исполнитель — меняем статус
+      if (todo && aid) {
+        await tasksApi.changeStatus(t.id, 'todo');
+      }
+      
+      toast({ 
+        title: 'Задача создана', 
+        description: `${t.number} — ${t.title}${todo && aid ? ' (переведена в «Готово к выполнению»)' : ''}` 
+      });
       onOk();
     } catch (err: any) {
       toast({ title: 'Ошибка', description: apiErr(err), variant: 'destructive' });
@@ -1119,13 +1133,12 @@ function CreateModal({
           </button>
         </div>
 
-        {/* Content — СЕКЦИОННАЯ СТРУКТУРА */}
+        {/* Content */}
         <div className="flex-1 min-h-0 overflow-y-auto p-6">
           <div className="grid lg:grid-cols-2 gap-6">
             
             {/* ЛЕВАЯ КОЛОНКА — Основное */}
             <div className="space-y-5">
-              {/* Название */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
                   Название <span className="text-[var(--accent)]">*</span>
@@ -1135,7 +1148,6 @@ function CreateModal({
                   className={INPUT_CLS} />
               </div>
 
-              {/* Описание */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Описание</label>
                 <textarea value={desc} onChange={e => setDesc(e.target.value)} 
@@ -1143,7 +1155,6 @@ function CreateModal({
                   className={`${INPUT_CLS} resize-none`} />
               </div>
 
-              {/* Приоритет — РУССКИЕ НАЗВАНИЯ */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-2">Приоритет</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1156,7 +1167,7 @@ function CreateModal({
                             ? `${pm.bg} ${pm.color} ${pm.border}`
                             : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'}`}>
                         <span className={`w-2 h-2 rounded-full ${pm.dot}`} />
-                        {p.label} {/* ✅ РУССКОЕ НАЗВАНИЕ */}
+                        {p.label}
                       </button>
                     );
                   })}
@@ -1166,21 +1177,18 @@ function CreateModal({
 
             {/* ПРАВАЯ КОЛОНКА — Детали */}
             <div className="space-y-5">
-              {/* Проект */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Проект</label>
                 <AsyncSelect value={pid} onChange={setPid} loadOptions={loadProjects} 
                   placeholder="Не выбран" icon={FolderOpen} />
               </div>
 
-              {/* Срок */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Срок выполнения</label>
                 <input type="date" value={dd} onChange={e => setDd(e.target.value)} 
                   min={new Date().toISOString().split('T')[0]} className={INPUT_CLS} />
               </div>
 
-              {/* Сложность и Оценка */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Сложность</label>
@@ -1194,25 +1202,22 @@ function CreateModal({
                 </div>
               </div>
 
-              {/* Исполнитель */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Исполнитель</label>
                 <AsyncSelect value={aid} onChange={setAid} loadOptions={loadUsers} 
                   placeholder="Не назначен" icon={UserCheck} />
               </div>
 
-              {/* Тикет (если не в режиме тикета) */}
               {context.type !== 'ticket' && (
                 <div>
-                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Заявка</label>
+                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Тикет</label>
                   <AsyncSelect value={tid} onChange={setTid} loadOptions={loadTickets} 
-                    placeholder="Без заявки" icon={Ticket} />
+                    placeholder="Без тикета" icon={Ticket} />
                 </div>
               )}
             </div>
           </div>
 
-          {/* Чекбокс "Готова к выполнению" */}
           <div className="mt-6 pt-5 border-t border-[var(--border-color)]">
             <button onClick={() => setTodo(v => !v)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-base
