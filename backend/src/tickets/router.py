@@ -2,7 +2,7 @@ from typing import Annotated
 
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Query, status
+from fastapi import APIRouter, Body, Depends, Query, status, HTTPException
 
 from src.activity_logs.dependencies import ActivityLogPaginatorFunc, get_activity_logs_paginator
 from src.activity_logs.schemas import ActivityLogResponse
@@ -318,6 +318,35 @@ async def get_comment_reactions(
 ) -> ReactionResponse:
     return await service.get_reactions_for_comment(comment_id, current_user)
 
+
+@router.patch(
+    path="/{ticket_id}/status",
+    status_code=status.HTTP_200_OK,
+    response_model=TicketResponse,
+    summary="Изменить статус тикета",
+)
+async def change_ticket_status(
+        ticket_id: UUID,
+        new_status: Annotated[str, Body(..., embed=True)],
+        current_subject: CurrentSubjectDep,
+        service: TicketServiceDep,
+) -> TicketResponse:
+    status_map = {
+        "open": service.start_progress,
+        "in_progress": service.start_progress,
+        "resolved": service.resolve,
+        "closed": service.close,
+        "cancelled": service.cancel,
+        "rejected": service.reject,
+        "reopened": service.start_progress,
+        "waiting": service.resolve,
+    }
+    
+    handler = status_map.get(new_status)
+    if handler is None:
+        raise HTTPException(status_code=400, detail=f"Unsupported status: {new_status}")
+    
+    return await handler(ticket_id, current_subject)
 
 @router.post(
     path="/predict",
