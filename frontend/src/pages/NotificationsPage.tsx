@@ -236,7 +236,7 @@ export default function NotificationsPage() {
   };
 
   const handleMarkAllRead = async () => {
-    const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
+    const unreadIds = (notifications || []).filter(n => !n.read).map(n => n.id);
     if (!unreadIds.length) return;
 
     setMarkingAll(true);
@@ -284,7 +284,7 @@ export default function NotificationsPage() {
     );
   }
 
-  const currentPageUnread = notifications.filter(n => !n.read).length;
+  const currentPageUnread = (notifications || []).filter(n => !n.read).length;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
