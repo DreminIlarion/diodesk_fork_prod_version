@@ -223,7 +223,7 @@ const CTX_TABS: {
   { id: 'internal', label: 'Все задачи', icon: Layers, staffOnly: true },
   { id: 'project', label: 'Проект', icon: FolderOpen },
   { id: 'assignee', label: 'Исполнитель', icon: UserCheck, staffOnly: true },
-  { id: 'ticket', label: 'Тикет', icon: Ticket, staffOnly: true },
+  { id: 'ticket', label: 'Заявка', icon: Ticket, staffOnly: true },
 ];
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -990,6 +990,10 @@ function AssignBeforeProgressModal({
    CREATE MODAL
    ═══════════════════════════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════════════════════════
+   CREATE MODAL — УЛУЧШЕННАЯ ВЕРСИЯ
+   ═══════════════════════════════════════════════════════════════════ */
+
 function CreateModal({
   initialStatus, context, userMap, onClose, onOk,
 }: {
@@ -1031,17 +1035,12 @@ function CreateModal({
   useEffect(() => { setTid(''); }, [pid]);
 
   const loadProjects = useCallback(async (search: string, page: number) => {
-    const res = staff
-      ? await projectsApi.getAll(page, 20)
-      : await projectsApi.getAll(page, 20);
+    const res = staff ? await projectsApi.getAll(page, 20) : await projectsApi.getAll(page, 20);
     const filtered = search
       ? res.items.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.key.toLowerCase().includes(search.toLowerCase()))
       : res.items;
     return {
-      items: filtered.map(p => ({
-        value: p.id, label: p.name, sublabel: p.key,
-        icon: <FolderOpen className="w-4 h-4 text-amber-400" />,
-      })),
+      items: filtered.map(p => ({ value: p.id, label: p.name, sublabel: p.key, icon: <FolderOpen className="w-4 h-4 text-amber-400" /> })),
       hasNext: res.items.length === 20,
     };
   }, [staff]);
@@ -1049,16 +1048,13 @@ function CreateModal({
   const loadUsers = useCallback(async (search: string, page: number) => {
     let items: (SimpleUser | CounterpartyCustomer)[] = [];
     try {
-      if (staff) items = (await usersApi.getAllUsers(page, 20)).items;
-      else items = (await usersApi.getAllUsers(page, 20)).items;
+      items = (await usersApi.getAllUsers(page, 20)).items;
     } catch { }
     const filtered = search
       ? items.filter(u => (u.full_name || '').toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()))
       : items;
     return {
-      items: filtered.map(u => ({
-        value: u.id, label: u.full_name || u.username || u.email, sublabel: u.email,
-      })),
+      items: filtered.map(u => ({ value: u.id, label: u.full_name || u.username || u.email, sublabel: u.email })),
       hasNext: items.length === 20,
     };
   }, [staff]);
@@ -1103,16 +1099,18 @@ function CreateModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !saving && onClose()} />
-      <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden"
+      <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden"
         style={{ boxShadow: 'var(--shadow-lg)' }} onClick={e => e.stopPropagation()}>
+        
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[var(--accent)]/15 flex items-center justify-center">
-              <Plus className="w-4 h-4 text-[var(--accent)]" />
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/15 flex items-center justify-center">
+              <Plus className="w-5 h-5 text-[var(--accent)]" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-[var(--text-primary)]">Новая задача</h2>
-              <p className="text-base text-[var(--text-primary)]/40">«{STATUS_LABELS[initialStatus]}»</p>
+              <h2 className="text-lg font-bold text-[var(--text-primary)]">Новая задача</h2>
+              <p className="text-sm text-[var(--text-primary)]/40">«{STATUS_LABELS[initialStatus]}»</p>
             </div>
           </div>
           <button onClick={() => !saving && onClose()}
@@ -1121,93 +1119,125 @@ function CreateModal({
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
-          <div>
-            <label className="block text-base font-medium text-[var(--text-primary)]/60 mb-1.5">
-              Название <span className="text-[var(--accent)]">*</span>
-            </label>
-            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Что нужно сделать?" autoFocus className={INPUT_CLS} />
-          </div>
+        {/* Content — СЕКЦИОННАЯ СТРУКТУРА */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-6">
+          <div className="grid lg:grid-cols-2 gap-6">
+            
+            {/* ЛЕВАЯ КОЛОНКА — Основное */}
+            <div className="space-y-5">
+              {/* Название */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
+                  Название <span className="text-[var(--accent)]">*</span>
+                </label>
+                <input value={title} onChange={e => setTitle(e.target.value)} 
+                  placeholder="Что нужно сделать?" autoFocus 
+                  className={INPUT_CLS} />
+              </div>
 
-          <div>
-            <label className="block text-base font-medium text-[var(--text-primary)]/60 mb-1.5">Описание</label>
-            <textarea value={desc} onChange={e => setDesc(e.target.value)} placeholder="Постановка задачи..." rows={3}
-              className={`${INPUT_CLS} resize-none`} />
-          </div>
+              {/* Описание */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Описание</label>
+                <textarea value={desc} onChange={e => setDesc(e.target.value)} 
+                  placeholder="Постановка задачи..." rows={4}
+                  className={`${INPUT_CLS} resize-none`} />
+              </div>
 
-          <div>
-            <label className="block text-base font-medium text-[var(--text-primary)]/60 mb-1.5">Проект</label>
-            <AsyncSelect value={pid} onChange={setPid} loadOptions={loadProjects} placeholder="Выберите проект" icon={FolderOpen} />
-          </div>
+              {/* Приоритет — РУССКИЕ НАЗВАНИЯ */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-2">Приоритет</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {PRIORITY_OPTIONS.map(p => {
+                    const pm = PRI[p.value];
+                    return (
+                      <button key={p.value} onClick={() => setPri(p.value)}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border
+                          ${pri === p.value
+                            ? `${pm.bg} ${pm.color} ${pm.border}`
+                            : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'}`}>
+                        <span className={`w-2 h-2 rounded-full ${pm.dot}`} />
+                        {p.label} {/* ✅ РУССКОЕ НАЗВАНИЕ */}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
 
-          <div>
-            <label className="block text-base font-medium text-[var(--text-primary)]/60 mb-2">Приоритет</label>
-            <div className="flex flex-wrap gap-1.5">
-              {TASK_PRIORITY_LIST.map(p => {
-                const pm = PRI[p];
-                return (
-                  <button key={p} onClick={() => setPri(p)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-base font-medium transition-all border
-                      ${pri === p
-                        ? `${pm.bg} ${pm.color} ${pm.border}`
-                        : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${pm.dot}`} />
-                    {p}
-                  </button>
-                );
-              })}
+            {/* ПРАВАЯ КОЛОНКА — Детали */}
+            <div className="space-y-5">
+              {/* Проект */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Проект</label>
+                <AsyncSelect value={pid} onChange={setPid} loadOptions={loadProjects} 
+                  placeholder="Не выбран" icon={FolderOpen} />
+              </div>
+
+              {/* Срок */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Срок выполнения</label>
+                <input type="date" value={dd} onChange={e => setDd(e.target.value)} 
+                  min={new Date().toISOString().split('T')[0]} className={INPUT_CLS} />
+              </div>
+
+              {/* Сложность и Оценка */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Сложность</label>
+                  <input type="number" min={1} max={21} value={sp} onChange={e => setSp(e.target.value)} 
+                    placeholder="1-21" className={INPUT_CLS} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Оценка, ч.</label>
+                  <input type="number" min={0} step={0.5} value={eh} onChange={e => setEh(e.target.value)} 
+                    placeholder="—" className={INPUT_CLS} />
+                </div>
+              </div>
+
+              {/* Исполнитель */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Исполнитель</label>
+                <AsyncSelect value={aid} onChange={setAid} loadOptions={loadUsers} 
+                  placeholder="Не назначен" icon={UserCheck} />
+              </div>
+
+              {/* Тикет (если не в режиме тикета) */}
+              {context.type !== 'ticket' && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Заявка</label>
+                  <AsyncSelect value={tid} onChange={setTid} loadOptions={loadTickets} 
+                    placeholder="Без заявки" icon={Ticket} />
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-base font-medium text-[var(--text-primary)]/60 mb-1.5">Сложность</label>
-              <input type="number" min={1} max={21} value={sp} onChange={e => setSp(e.target.value)} placeholder="Например: 3" className={INPUT_CLS} />
-            </div>
-            <div>
-              <label className="block text-base font-medium text-[var(--text-primary)]/60 mb-1.5">Оценка, ч.</label>
-              <input type="number" min={0} step={0.5} value={eh} onChange={e => setEh(e.target.value)} placeholder="—" className={INPUT_CLS} />
-            </div>
+          {/* Чекбокс "Готова к выполнению" */}
+          <div className="mt-6 pt-5 border-t border-[var(--border-color)]">
+            <button onClick={() => setTodo(v => !v)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-base
+                ${todo
+                  ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                  : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}>
+              <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 
+                ${todo ? 'bg-blue-500 border-blue-600' : 'border-[var(--border-color)]'}`}>
+                {todo && <Check className="w-4 h-4 text-white" />}
+              </div>
+              <span className="font-medium">Сразу готова к выполнению (перевести в «{STATUS_LABELS.todo}»)</span>
+            </button>
           </div>
-
-          <div>
-            <label className="block text-base font-medium text-[var(--text-primary)]/60 mb-1.5">Срок</label>
-            <input type="date" value={dd} onChange={e => setDd(e.target.value)} min={new Date().toISOString().split('T')[0]} className={INPUT_CLS} />
-          </div>
-
-          <div>
-            <label className="block text-base font-medium text-[var(--text-primary)]/60 mb-1.5">Исполнитель</label>
-            <AsyncSelect value={aid} onChange={setAid} loadOptions={loadUsers} placeholder="Не назначен" icon={UserCheck} />
-          </div>
-
-          {context.type !== 'ticket' && (
-            <div>
-              <label className="block text-base font-medium text-[var(--text-primary)]/60 mb-1.5">Тикет</label>
-              <AsyncSelect value={tid} onChange={setTid} loadOptions={loadTickets} placeholder="Без тикета" icon={Ticket} />
-            </div>
-          )}
-
-          <button onClick={() => setTodo(v => !v)}
-            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border transition-all text-base
-              ${todo
-                ? 'bg-blue-500/8 border-blue-500/25 text-blue-400'
-                : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}>
-            <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 ${todo ? 'bg-blue-500 border-blue-600' : 'border-[var(--border-color)]'}`}>
-              {todo && <Check className="w-4 h-4 text-white" />}
-            </div>
-            <span className="font-medium">Готова к выполнению</span>
-          </button>
         </div>
 
-        <div className="flex items-center justify-end gap-2.5 px-5 py-3.5 border-t border-[var(--border-color)] bg-[var(--hover-1)] flex-shrink-0">
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--hover-1)] flex-shrink-0">
           <button onClick={() => !saving && onClose()} disabled={saving}
-            className="px-4 py-2 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-base disabled:opacity-50">
+            className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-base disabled:opacity-50">
             Отмена
           </button>
           <button onClick={submit} disabled={!title.trim() || saving}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-base font-medium disabled:opacity-40 shadow-[var(--shadow-md)]">
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-base font-medium disabled:opacity-40 shadow-[var(--shadow-md)]">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            Создать
+            Создать задачу
           </button>
         </div>
       </div>
@@ -1550,7 +1580,7 @@ function DetailModal({
             <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)]">
               <Ticket className="w-4 h-4 text-[var(--text-primary)]/25 flex-shrink-0" />
               <span className="flex-1 text-base text-[var(--text-primary)]/40">
-                Тикет
+                Заявка
                 {(task as any).number && (
                   <span className="ml-1.5 text-[var(--text-primary)]/85  text-base">
                     #{(task as any).number.slice(0, -4)}
@@ -2037,7 +2067,7 @@ const [mode, setMode] = useState<ContextMode>(() => {
           <div className="flex items-center gap-1.5">
             <ChevronRight className="w-4 h-4 text-[var(--text-primary)]/15" />
             <div className="min-w-[200px]">
-              <AsyncSelect value={selTid} onChange={setSelTid} loadOptions={loadTicketsAsync} placeholder="Выберите тикет" icon={Ticket} />
+              <AsyncSelect value={selTid} onChange={setSelTid} loadOptions={loadTicketsAsync} placeholder="Выберите заявку" icon={Ticket} />
             </div>
           </div>
         )}
@@ -2068,7 +2098,7 @@ const [mode, setMode] = useState<ContextMode>(() => {
             <p className="text-base text-[var(--text-primary)]/40 mb-4">
               {mode === 'project' && !selPid ? 'Выберите проект'
                 : mode === 'assignee' && !selAid ? 'Выберите исполнителя'
-                  : mode === 'ticket' && !selTid ? 'Выберите тикет'
+                  : mode === 'ticket' && !selTid ? 'Выберите заявку'
                     : 'Задачи не найдены'}
             </p>
             <button onClick={() => fetchBoard()}
