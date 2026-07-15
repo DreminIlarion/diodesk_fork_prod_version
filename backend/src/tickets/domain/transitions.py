@@ -67,6 +67,12 @@ register_transition(
     to=TicketStatus.PENDING_APPROVAL,
 )
 
+# Переоткрытие тикета
+register_transition(
+    TicketStatus.REOPENED,
+    action=TicketAction.APPROVE,
+    to=TicketStatus.OPEN,
+)
 
 @transition(
     TicketStatus.OPEN,
