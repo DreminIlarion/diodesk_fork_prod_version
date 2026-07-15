@@ -24,6 +24,7 @@ class TicketAction(StrEnum):
     APPROVE = auto()
     SUBMIT_FOR_APPROVAL = auto()
     REJECT = auto()
+    WAIT = auto()  # ← добавить
 
 
 class TicketStatus(StrEnum):

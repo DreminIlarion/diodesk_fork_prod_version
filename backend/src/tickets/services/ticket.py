@@ -19,7 +19,7 @@ from src.shared.domain.vo import Tag
 from ..domain.authz import TicketAuthZService
 from ..domain.entities import Ticket
 from ..domain.repos import TicketRepository
-from ..domain.vo import ProjectKey, TicketNumber
+from ..domain.vo import ProjectKey, TicketNumber, TicketAction
 from ..mappers import map_ticket_to_response
 from ..schemas import TicketCreate, TicketEdit, TicketResponse
 
@@ -197,6 +197,16 @@ class TicketService:
         )
 
         return map_ticket_to_response(ticket)
+
+    async def wait(self, ticket_id: UUID, current_subject: Subject) -> TicketResponse:
+        """Ожидание ответа от клиента."""
+        
+        return await self._execute(
+            ticket_id=ticket_id,
+            current_subject=current_subject,
+            authz=self.ticket_authz_service.can_track_ticket,
+            action=lambda t: t._perform(TicketAction.WAIT, current_subject.id),
+        )
 
     async def _execute(
             self,

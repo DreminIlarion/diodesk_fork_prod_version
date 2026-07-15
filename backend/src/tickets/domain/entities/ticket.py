@@ -303,6 +303,7 @@ class Ticket(AggregateRoot):
             TicketResolved(
                 ticket_id=self.id,
                 number=self.number,
+                reporter_id=self.reporter_id,  # ← добавить
                 resolved_by=resolved_by,
             )
         )

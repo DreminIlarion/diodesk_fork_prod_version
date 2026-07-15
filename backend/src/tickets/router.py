@@ -341,6 +341,7 @@ async def change_ticket_status(
         "cancelled": service.cancel,
         "rejected": service.reject,
         "reopened": service.start_progress,
+        "waiting": service.wait,
     }
     
     handler = status_map.get(new_status)
