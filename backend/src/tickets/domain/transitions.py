@@ -55,13 +55,13 @@ register_transition(
     action=TicketAction.EDIT,
 )
 
-# Ожидание обратной связи клиента
-register_transition(
-    TicketStatus.IN_PROGRESS,
-    TicketStatus.PAUSED,
-    action=TicketAction.WAIT,
-    to=TicketStatus.WAITING,
-)
+# Ожидание обратной связи клиента - блок вызывает ошибку 
+# register_transition(
+#     TicketStatus.IN_PROGRESS,
+#     TicketStatus.PAUSED,
+#     action=TicketAction.WAIT,
+#     to=TicketStatus.WAITING,
+# )
 
 # Повторная отправка на согласование
 register_transition(
