@@ -56,8 +56,8 @@ function hasAnyRole(userRoles: string[] | undefined, targetRoles: string[]): boo
    ═══════════════════════════════════════════════════════════════════ */
 
 const STATUS_TRANSITIONS: Record<string, string[]> = {
-  'new': ['agreement', 'open'],
-  'agreement': ['open', 'rejected'],
+  'new': ['pending_approval', 'cancelled'],
+  'pending_approval': ['open', 'rejected'],
   'open': ['in_progress'],
   'in_progress': ['waiting', 'resolved'],
   'waiting': ['in_progress'],
@@ -69,7 +69,7 @@ const STATUS_TRANSITIONS: Record<string, string[]> = {
 
 const STATUS_LABELS: Record<string, string> = {
   'new': 'Новый',
-  'agreement': 'На согласовании',
+  'pending_approval': 'На согласовании',
   'open': 'Открыт',
   'in_progress': 'В работе',
   'waiting': 'Ожидает ответа',
@@ -81,7 +81,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_PERMISSIONS: Record<string, string[]> = {
   'new': ['admin', 'support_agent', 'support_manager'],
-  'agreement': ['admin', 'support_agent', 'support_manager'],
+  'pending_approval': ['admin', 'support_agent', 'support_manager'],
   'open': ['admin', 'support_agent', 'support_manager', 'executor'],
   'in_progress': ['admin', 'support_agent', 'support_manager', 'executor'],
   'waiting': ['admin', 'support_agent', 'support_manager', 'executor'],
@@ -93,7 +93,7 @@ const STATUS_PERMISSIONS: Record<string, string[]> = {
 
 const STATUS_DESCRIPTIONS: Record<string, string> = {
   'new': 'Тикет только создан, ожидает обработки',
-  'agreement': 'Тикет создан, но ещё не согласован',
+  'pending_approval': 'Тикет создан, но ещё не согласован',
   'open': 'Тикет согласован и готов к работе',
   'in_progress': 'Над тикетом активно работают',
   'waiting': 'Ждём ответа от клиента',
@@ -672,7 +672,7 @@ const getAuthorName = useCallback((c: Comment) => {
 
   const getStatusColor = useCallback((s: string) => {
     const map: Record<string, string> = {
-      'new': 'status-new', 'agreement': 'status-agreement', 'open': 'status-open',
+      'new': 'status-new', 'pending_approval': 'status-pending_approval', 'open': 'status-open',
       'in_progress': 'status-progress', 'waiting': 'status-waiting', 'resolved': 'status-resolved',
       'closed': 'status-closed', 'reopened': 'status-reopened', 'rejected': 'status-rejected',
     };
@@ -950,7 +950,7 @@ const getAuthorName = useCallback((c: Comment) => {
                     <div className="grid grid-cols-2 gap-4">
                       {availableStatuses.map(status => {
                         const statusBtnMap: Record<string, string> = {
-                          'new': 'status-new', 'agreement': 'status-agreement', 'open': 'status-open',
+                          'new': 'status-new', 'pending_approval': 'status-pending_approval', 'open': 'status-open',
                           'in_progress': 'status-progress', 'waiting': 'status-waiting', 'resolved': 'status-resolved',
                           'closed': 'status-closed', 'reopened': 'status-reopened', 'rejected': 'status-rejected',
                         };

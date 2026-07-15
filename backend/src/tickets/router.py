@@ -332,10 +332,9 @@ async def change_ticket_status(
         service: TicketServiceDep,
 ) -> TicketResponse:
     status_map = {
-        "agreement": service.submit_for_approval,  # new → pending_approval
-        "open": service.approve,  # pending_approval → open
+        "pending_approval": service.submit_for_approval,
+        "open": service.approve,
         "in_progress": service.start_progress,
-        "paused": service.start_progress,
         "waiting": service.start_progress,
         "resolved": service.resolve,
         "closed": service.close,
