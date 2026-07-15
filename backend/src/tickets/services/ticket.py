@@ -1,6 +1,7 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from uuid import UUID
+import inspect
 
 from src.activity_logs.recorder import ActivityLogRecorder
 from src.crm.domain.entities import Counterparty
