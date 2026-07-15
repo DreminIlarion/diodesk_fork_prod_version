@@ -65,7 +65,10 @@ def map_ticket_assigned_to_activity_log(event: TicketAssigned) -> ActivityLog:
         aggregate_id=event.ticket_id,
         action="ticket.assigned",
         actor_id=event.assigned_by,
-        changes={"old_assignee": event.old_assignee, "new_assignee": event.assignee_id},
+        changes={
+            "old_assignee": str(event.old_assignee) if event.old_assignee else None,
+            "new_assignee": str(event.assignee_id) if event.assignee_id else None,
+        },
         event_id=event.event_id,
     )
 
