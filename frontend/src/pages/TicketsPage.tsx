@@ -368,7 +368,7 @@ function TicketRow({ ticket, formatDate }: {
         {(ticket.assignee?.full_name || ticket.assignee?.username || ticket.assignee?.email) ? (
   <span className="flex items-center gap-1 text-[16px] text-[var(--text-primary)]/60 truncate">
     <UserCheck size={18} className="shrink-0 text-[var(--text-primary)]/40" />
-    <span className="truncate">{toShortName(ticket.assignee.full_name || ticket.assignee.username || ticket.assignee.email || 'ФИО не указано')}</span>
+    <span className="truncate">{toShortName(ticket.assignee.full_name || ticket.assignee.username || 'ФИО не указано')}</span>
   </span>
 ) : (
   <span className="text-[16px] text-[var(--text-primary)]/20">—</span>
@@ -376,7 +376,7 @@ function TicketRow({ ticket, formatDate }: {
         {(ticket.reporter?.full_name || ticket.reporter?.username || ticket.reporter?.email) ? (
           <span className="flex items-center gap-1 text-[16px] text-[var(--text-primary)]/35 mt-0.5 truncate">
             <User size={18} className="shrink-0" />
-            <span className="truncate">{toShortName(ticket.reporter.full_name || ticket.reporter.username || ticket.reporter.email || 'ФИО не указано')}</span>
+            <span className="truncate">{toShortName(ticket.reporter.full_name || ticket.reporter.username || 'ФИО не указано')}</span>
           </span>
         ) : (
           <span className="text-[16px] text-[var(--text-primary)]/20">—</span>
@@ -414,9 +414,9 @@ function TicketRow({ ticket, formatDate }: {
 
 function TableHeader() {
   const cols: { label: ReactNode; align?: string }[] = [
-    { label: <><span>Тема</span><br /><span className="text-[10px]">Номер</span></> },
-    { label: <><span>Контрагент</span><br /><span className="text-[10px]">Проект</span></> },
-    { label: <><span>Исполнитель</span><br /><span className="text-[10px]">Автор</span></> },
+    { label: <><span>Тема /</span><br /><span >Номер</span></> },
+    { label: <><span>Контрагент /</span><br /><span >Проект</span></> },
+    { label: <><span>Исполнитель /</span><br /><span >Автор</span></> },
     { label: 'Статус' },
     { label: 'Приоритет' },
     { label: 'Дата', align: 'text-right' },

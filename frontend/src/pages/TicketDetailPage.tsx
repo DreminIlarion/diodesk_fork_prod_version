@@ -84,6 +84,7 @@ const STATUS_LABELS: Record<string, string> = {
   'closed': 'Закрыт',
   'reopened': 'Переоткрыт',
   'rejected': 'Отклонён',
+  'cancelled': 'Отменён', // ✅ Добавлено
 };
 
 const STATUS_PERMISSIONS: Record<string, string[]> = {
@@ -98,6 +99,7 @@ const STATUS_PERMISSIONS: Record<string, string[]> = {
   'rejected': ['admin', 'support_agent', 'support_manager'],
 };
 
+
 const STATUS_DESCRIPTIONS: Record<string, string> = {
   'new': 'Тикет только создан, ожидает обработки',
   'pending_approval': 'Тикет создан, но ещё не согласован',
@@ -108,6 +110,7 @@ const STATUS_DESCRIPTIONS: Record<string, string> = {
   'closed': 'Тикет закрыт',
   'reopened': 'Тикет переоткрыт',
   'rejected': 'Тикет отклонён',
+  'cancelled': 'Тикет отменён', // ✅ Добавлено
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -679,10 +682,16 @@ const getAuthorName = useCallback((c: Comment) => {
 
 const getStatusColor = useCallback((s: string) => {
     const map: Record<string, string> = {
-      'new': 'status-new', 'pending_approval': 'status-pending_approval', 'open': 'status-open',
-      'in_progress': 'status-progress', 'waiting': 'status-waiting', 'resolved': 'status-resolved',
-      'closed': 'status-closed', 'reopened': 'status-reopened', 'rejected': 'status-rejected',
-      'cancelled': 'status-closed',  // ← добавить
+      'new': 'status-new', 
+      'pending_approval': 'status-agreement', // ✅ Изменено на status-agreement
+      'open': 'status-open',
+      'in_progress': 'status-progress', 
+      'waiting': 'status-waiting', 
+      'resolved': 'status-resolved',
+      'closed': 'status-closed', 
+      'reopened': 'status-reopened', 
+      'rejected': 'status-rejected',
+      'cancelled': 'status-closed',  // ✅ Используем стиль закрытого/нейтрального
     };
     return map[s] || 'status-closed';
 }, []);
@@ -957,22 +966,28 @@ const getStatusColor = useCallback((s: string) => {
                     <div className="bg-[var(--hover-1)] rounded-xl p-8 text-center"><p className="text-[var(--text-primary)]/50 text-lg">Нет доступных переходов</p></div>
                   ) : (
                     <div className="grid grid-cols-2 gap-4">
-                      {availableStatuses.map(status => {
-                        const statusBtnMap: Record<string, string> = {
-                          'new': 'status-new', 'pending_approval': 'status-pending_approval', 'open': 'status-open',
-                          'in_progress': 'status-progress', 'waiting': 'status-waiting', 'resolved': 'status-resolved',
-                          'closed': 'status-closed', 'reopened': 'status-reopened', 'rejected': 'status-rejected',
-                          'cancelled': 'status-closed',  // ← добавить
-                        };
-                        const cls = statusBtnMap[status] || 'bg-[var(--hover-1)] text-[var(--text-primary)]';
-                        return (
-                          <button key={status} onClick={() => handleStatusChange(status)} disabled={updatingStatus}
-                            className={`flex items-center justify-center gap-3 px-5 py-3 rounded-xl font-medium transition-all border ${cls} hover:brightness-145 disabled:opacity-50 text-base`}>
-                            {updatingStatus ? <Loader2 className="w-5 h-5 animate-spin" /> : STATUS_LABELS[status] || status}
-                          </button>
-                        );
-                      })}
-                    </div>
+  {availableStatuses.map(status => {
+    const statusBtnMap: Record<string, string> = {
+      'new': 'status-new', 
+      'pending_approval': 'status-agreement', // ✅ Изменено на status-agreement
+      'open': 'status-open',
+      'in_progress': 'status-progress', 
+      'waiting': 'status-waiting', 
+      'resolved': 'status-resolved',
+      'closed': 'status-closed', 
+      'reopened': 'status-reopened', 
+      'rejected': 'status-rejected',
+      'cancelled': 'status-closed',  // ✅ Используем стиль закрытого
+    };
+    const cls = statusBtnMap[status] || 'bg-[var(--hover-1)] text-[var(--text-primary)]';
+    return (
+      <button key={status} onClick={() => handleStatusChange(status)} disabled={updatingStatus}
+        className={`flex items-center justify-center gap-3 px-5 py-3 rounded-xl font-medium transition-all border ${cls} hover:brightness-145 disabled:opacity-50 text-base`}>
+        {updatingStatus ? <Loader2 className="w-5 h-5 animate-spin" /> : STATUS_LABELS[status] || status}
+      </button>
+    );
+  })}
+</div>
                   )}
                 </div>
 
