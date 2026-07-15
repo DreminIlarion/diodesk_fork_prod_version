@@ -190,7 +190,7 @@ const canInvite = user?.roles?.some(r => ['support_agent', 'support_manager', 'e
           </div>
           {(!isCollapsed || isMobile) && (
             <div className="min-w-0 overflow-hidden">
-              <h1 className="text-[var(--text-primary)] text-xl font-bold truncate">ДИО Деск</h1>
+              <h1 className="text-[var(--text-primary)] text-xl font-bold truncate">ДИО Деск v2.0</h1>
             </div>
           )}
         </NavLink>

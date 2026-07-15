@@ -247,6 +247,26 @@ class TicketService:
 
         return map_ticket_to_response(ticket)
 
+    async def submit_for_approval(self, ticket_id: UUID, current_subject: Subject) -> TicketResponse:
+        """Отправить тикет на согласование."""
+
+        return await self._execute(
+            ticket_id=ticket_id,
+            current_subject=current_subject,
+            authz=self.ticket_authz_service.can_edit_ticket,
+            action=lambda t: t.submit_for_approval(current_subject.id),
+        )
+
+    async def approve(self, ticket_id: UUID, current_subject: Subject) -> TicketResponse:
+        """Согласовать тикет."""
+
+        return await self._execute(
+            ticket_id=ticket_id,
+            current_subject=current_subject,
+            authz=self.ticket_authz_service.can_edit_ticket,
+            action=lambda t: t.approve(current_subject.id),
+        )
+
     async def start_progress(self, ticket_id: UUID, current_subject: Subject) -> TicketResponse:
         """Взять тикет в работу."""
 
