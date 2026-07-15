@@ -1,7 +1,4 @@
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .entities import Ticket
+from .entities import Ticket
 
 from uuid import UUID
 
