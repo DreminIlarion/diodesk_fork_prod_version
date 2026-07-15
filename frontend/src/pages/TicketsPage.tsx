@@ -19,13 +19,15 @@ import type { TicketListItem, Counterparty, Project, SimpleUser } from '../types
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   'new': { label: 'Новый', color: 'status-new' },
-  'agreement': { label: 'На согласовании', color: 'status-agreement' },
+  'pending_approval': { label: 'На согласовании', color: 'status-agreement' },
   'open': { label: 'Открыт', color: 'status-open' },
   'in_progress': { label: 'В работе', color: 'status-progress' },
   'waiting': { label: 'Ожидает ответа', color: 'status-waiting' },
   'resolved': { label: 'Решён', color: 'status-resolved' },
   'closed': { label: 'Закрыт', color: 'status-closed' },
   'reopened': { label: 'Переоткрыт', color: 'status-reopened' },
+  'rejected': { label: 'Отклонён', color: 'status-rejected' },
+  'cancelled': { label: 'Отменён', color: 'status-closed' },
 };
 
 const STATUS_OPTIONS = Object.entries(STATUS_MAP).map(([value, { label, color }]) => ({
@@ -363,19 +365,21 @@ function TicketRow({ ticket, formatDate }: {
       </div>
 
       <div className="min-w-0 pr-2 self-center">
-        {ticket.assignee?.full_name ? (
-          <span className="flex items-center gap-1 text-[16px] text-[var(--text-primary)]/60 truncate">
-            <UserCheck size={18} className="shrink-0 text-[var(--text-primary)]/40" />
-            <span className="truncate">{toShortName(ticket.assignee.full_name)}</span>
+        {(ticket.assignee?.full_name || ticket.assignee?.username || ticket.assignee?.email) ? (
+  <span className="flex items-center gap-1 text-[16px] text-[var(--text-primary)]/60 truncate">
+    <UserCheck size={18} className="shrink-0 text-[var(--text-primary)]/40" />
+    <span className="truncate">{toShortName(ticket.assignee.full_name || ticket.assignee.username || ticket.assignee.email || 'ФИО не указано')}</span>
+  </span>
+) : (
+  <span className="text-[16px] text-[var(--text-primary)]/20">—</span>
+)}
+        {(ticket.reporter?.full_name || ticket.reporter?.username || ticket.reporter?.email) ? (
+          <span className="flex items-center gap-1 text-[16px] text-[var(--text-primary)]/35 mt-0.5 truncate">
+            <User size={18} className="shrink-0" />
+            <span className="truncate">{toShortName(ticket.reporter.full_name || ticket.reporter.username || ticket.reporter.email || 'ФИО не указано')}</span>
           </span>
         ) : (
           <span className="text-[16px] text-[var(--text-primary)]/20">—</span>
-        )}
-        {ticket.reporter?.full_name && (
-          <span className="flex items-center gap-1 text-[16px] text-[var(--text-primary)]/35 mt-0.5 truncate">
-            <User size={18} className="shrink-0" />
-            <span className="truncate">{toShortName(ticket.reporter.full_name)}</span>
-          </span>
         )}
       </div>
 
@@ -409,10 +413,10 @@ function TicketRow({ ticket, formatDate }: {
 }
 
 function TableHeader() {
-  const cols: { label: string; align?: string }[] = [
-    { label: 'Тема / Номер' },
-    { label: 'Контрагент / Проект' },
-    { label: 'Исполнитель / Автор' },
+  const cols: { label: ReactNode; align?: string }[] = [
+    { label: <><span>Тема</span><br /><span className="text-[10px]">Номер</span></> },
+    { label: <><span>Контрагент</span><br /><span className="text-[10px]">Проект</span></> },
+    { label: <><span>Исполнитель</span><br /><span className="text-[10px]">Автор</span></> },
     { label: 'Статус' },
     { label: 'Приоритет' },
     { label: 'Дата', align: 'text-right' },

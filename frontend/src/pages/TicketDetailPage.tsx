@@ -27,6 +27,13 @@ import {
    РУСИФИКАЦИЯ РОЛЕЙ
    ═══════════════════════════════════════════════════════════════════ */
 
+const PRIORITY_LABELS: Record<string, string> = {
+  'low': 'Низкий',
+  'medium': 'Средний',
+  'high': 'Высокий',
+  'critical': 'Критический',
+};
+
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Администратор',
   support_manager: 'Менеджер поддержки',
@@ -670,14 +677,15 @@ const getAuthorName = useCallback((c: Comment) => {
   const formatFileSize = useCallback((b: number) => b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(1)} MB`, []);
   const getFileIcon = useCallback((m: string) => m.startsWith('image/') ? <Image className="w-6 h-6" /> : <File className="w-6 h-6" />, []);
 
-  const getStatusColor = useCallback((s: string) => {
+const getStatusColor = useCallback((s: string) => {
     const map: Record<string, string> = {
       'new': 'status-new', 'pending_approval': 'status-pending_approval', 'open': 'status-open',
       'in_progress': 'status-progress', 'waiting': 'status-waiting', 'resolved': 'status-resolved',
       'closed': 'status-closed', 'reopened': 'status-reopened', 'rejected': 'status-rejected',
+      'cancelled': 'status-closed',  // ← добавить
     };
     return map[s] || 'status-closed';
-  }, []);
+}, []);
 
   const getPriorityColor = useCallback((p: string) => {
     const map: Record<string, string> = {
@@ -954,6 +962,7 @@ const getAuthorName = useCallback((c: Comment) => {
                           'new': 'status-new', 'pending_approval': 'status-pending_approval', 'open': 'status-open',
                           'in_progress': 'status-progress', 'waiting': 'status-waiting', 'resolved': 'status-resolved',
                           'closed': 'status-closed', 'reopened': 'status-reopened', 'rejected': 'status-rejected',
+                          'cancelled': 'status-closed',  // ← добавить
                         };
                         const cls = statusBtnMap[status] || 'bg-[var(--hover-1)] text-[var(--text-primary)]';
                         return (
@@ -1098,7 +1107,7 @@ const getAuthorName = useCallback((c: Comment) => {
                 { label: 'Номер', value: <span className="font-mono">{ticket.number || '—'}</span> },
                 { label: 'Тип', value: <span className={`px-3 py-1 rounded-lg text-base font-medium border ${getTypeColor(ticket.type)}`}>{ticket.type}</span> },
                 { label: 'Статус', value: <span className={`px-3 py-1 rounded-lg text-base font-medium border ${getStatusColor(ticket.status || '')}`}>{STATUS_LABELS[ticket.status || ''] || ticket.status}</span> },
-                { label: 'Приоритет', value: <span className={`px-3 py-1 rounded-lg text-base font-medium border ${getPriorityColor(ticket.priority)}`}>{ticket.priority}</span> },
+                { label: 'Приоритет', value: <span className={`px-3 py-1 rounded-lg text-base font-medium border ${getPriorityColor(ticket.priority)}`}>{PRIORITY_LABELS[ticket.priority] || ticket.priority}</span> },
               ].map(r => (
                 <div key={r.label} className="flex justify-between items-center py-2 border-b border-[var(--border-color)]">
                   <span className="text-[var(--text-primary)]/50 text-base">{r.label}</span>{r.value}
