@@ -806,7 +806,7 @@ getAllWithFilters: async (
   // Изменить статус тикета
   updateTicketStatus: async (ticketId: string, status: TicketStatus): Promise<Ticket> => {
     const response = await api.patch<Ticket>(`/api/v1/tickets/${ticketId}/status`, {
-      status
+      new_status: status
     });
     return response.data;
   },
