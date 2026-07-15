@@ -201,12 +201,14 @@ class TicketService:
             self,
             ticket_id: UUID,
             current_subject: Subject,
-            authz: Callable[[Subject, Ticket], Awaitable[PermissionResult]],
+            authz: Callable,
             action: Callable[[Ticket], None],
     ) -> TicketResponse:
         ticket = await get_or_raise_404(self.ticket_repo.read, ticket_id, Ticket)
 
-        permission = await authz(current_subject, ticket)
+        result = authz(current_subject, ticket)
+        permission = await result if inspect.isawaitable(result) else result
+        
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
 
