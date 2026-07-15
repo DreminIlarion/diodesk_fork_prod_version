@@ -100,6 +100,7 @@ class Ticket(AggregateRoot):
         self.register_event(
             TicketStatusChanged(
                 ticket_id=self.id,
+                number=self.number,  # ← добавить
                 old_status=old_status,
                 new_status=self.status,
                 changed_by=actor_id,
