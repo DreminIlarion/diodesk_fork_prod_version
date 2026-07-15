@@ -324,8 +324,8 @@ class Ticket(AggregateRoot):
             )
         )
 
-    def cancel(self, cancelled_by: UUID) -> None:
-        self._perform(TicketAction.CANCEL, cancelled_by)
+    def cancel(self, canceled_by: UUID) -> None:
+        self._perform(TicketAction.CANCEL, canceled_by)
 
         self.register_event(
             TicketCanceled(
@@ -333,7 +333,7 @@ class Ticket(AggregateRoot):
                 number=self.number,
                 reporter_id=self.reporter_id,
                 assignee_id=self.assignee_id,
-                cancelled_by=cancelled_by,
+                canceled_by=canceled_by,
             )
         )
 
