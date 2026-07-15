@@ -254,7 +254,7 @@ class Ticket(AggregateRoot):
             TicketApprovalSubmitted(
                 ticket_id=self.id,
                 number=self.number,
-                request_by=submitted_by,
+                submitted_by=submitted_by,
                 counterparty_id=self.counterparty_id,
             )
         )
