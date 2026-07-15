@@ -22,7 +22,7 @@ register_transition(
 )
 
 # Пере-открытие тикета
-register_transition(TicketStatus.RESOLVED, action=TicketAction.REOPEN, to=TicketStatus.REOPENED)
+# register_transition(TicketStatus.RESOLVED, action=TicketAction.REOPEN, to=TicketStatus.REOPENED)
 
 # Поставить тикет на паузу
 register_transition(TicketStatus.IN_PROGRESS, action=TicketAction.PAUSE, to=TicketStatus.PAUSED)
