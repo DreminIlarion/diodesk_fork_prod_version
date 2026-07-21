@@ -262,22 +262,22 @@ export default function NotificationsPage() {
     }
   };
 
-  const handleNotificationClick = (n: Notification) => {
-    if (!n.read) {
-      handleMarkRead(n.id);
-    }
+ const handleNotificationClick = (n: Notification) => {
+  if (!n.read) {
+    handleMarkRead(n.id);
+  }
 
-    const ticketNumber = n.data?.ticket_number;
-    if (ticketNumber) {
-      navigate(`/tickets/${ticketNumber}`);
-      return;
-    }
+  const ticketNumber = n.data?.number;  // ← исправлено с ticket_number на number
+  if (ticketNumber) {
+    navigate(`/tickets/${ticketNumber}`);
+    return;
+  }
 
-    const ticketId = n.data?.ticket_id;
-    if (ticketId) {
-      navigate(`/tickets/${ticketId}`);
-    }
-  };
+  const ticketId = n.data?.ticket_id;
+  if (ticketId) {
+    navigate(`/tickets/${ticketId}`);
+  }
+};
 
   if (initialLoad) {
     return (
