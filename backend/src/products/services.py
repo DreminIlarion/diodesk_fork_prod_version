@@ -22,7 +22,7 @@ class ProductService:
         """Создание программного продукта"""
 
         # 1. Проверка прав и валидация
-        if not created_by_role.is_support():
+        if created_by_role not in (UserRole.ADMIN.value, UserRole.SUPPORT_AGENT.value, UserRole.SUPPORT_MANAGER.value):
             raise PermissionDeniedError("Only support staff can create products")
 
         if data.status not in {ProductStatus.ACTIVE, ProductStatus.BETA}:
