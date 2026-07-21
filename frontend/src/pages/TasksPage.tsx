@@ -11,7 +11,7 @@ import {
   RefreshCw, Archive, FolderOpen, Ticket, Zap,
   Star, User, ChevronRight, Layers, UserCheck,
   GitPullRequest, ThumbsUp, ThumbsDown, Pencil, Save,
-  Milestone, AlertTriangle,
+  Milestone, AlertTriangle, ChevronLeft,
 } from 'lucide-react';
 import { tasksApi, projectsApi, ticketsApi, usersApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
@@ -696,6 +696,162 @@ function SPBadge({ v }: { v: number }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   QUICK STATUS PANEL
+   ═══════════════════════════════════════════════════════════════════ */
+
+function QuickStatusPanel({
+  task,
+  onDrop,
+}: {
+  task: { id: string; from: TaskStatus; title: string; number: string } | null;
+  onDrop: (e: React.DragEvent, to: TaskStatus) => void;
+}) {
+  const [hoveredStatus, setHoveredStatus] = useState<TaskStatus | null>(null);
+
+  if (!task) return null;
+
+  const allowed = ALLOWED_TRANSITIONS[task.from];
+  if (!allowed.length) return null;
+
+  return createPortal(
+    <motion.div
+      initial={{ x: '100%', opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: '100%', opacity: 0 }}
+      transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+      className="fixed right-4 top-0 h-full z-[100] flex items-center"
+      style={{ pointerEvents: 'none' }}
+    >
+      <div
+        className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-[var(--shadow-lg)] overflow-hidden"
+        style={{ pointerEvents: 'all', width: '220px' }}
+      >
+        {/* Заголовок */}
+        <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
+          <p className="text-[11px] uppercase tracking-widest text-[var(--text-primary)]/40 mb-0.5">
+            Перетащить в
+          </p>
+          <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
+            #{task.number} — {task.title}
+          </p>
+        </div>
+
+        {/* Статусы-мишени */}
+        <div className="p-2 space-y-1">
+          {allowed.map(status => {
+            const cm = COL[status];
+            const Icon = cm.icon;
+            const isHovered = hoveredStatus === status;
+
+            return (
+              <div
+                key={status}
+                onDragOver={e => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  setHoveredStatus(status);
+                }}
+                onDragLeave={() => setHoveredStatus(null)}
+                onDrop={e => {
+                  setHoveredStatus(null);
+                  onDrop(e, status);
+                }}
+                className={`
+                  flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 transition-all
+                  ${isHovered
+                    ? `${cm.border} bg-[var(--accent-soft)] scale-[1.02]`
+                    : 'border-transparent hover:bg-[var(--hover-2)]'
+                  }
+                `}
+              >
+                <div className={`w-1 h-8 rounded-full flex-shrink-0 ${cm.dot}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${cm.textColor}`} />
+                    <span className={`text-sm font-medium truncate ${isHovered ? cm.textColor : 'text-[var(--text-primary)]/70'}`}>
+                      {STATUS_LABELS[status]}
+                    </span>
+                  </div>
+                </div>
+                <AnimatePresence>
+                  {isHovered && (
+                    <motion.div
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0, opacity: 0 }}
+                      className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${cm.dot}`}
+                    >
+                      <Check className="w-3 h-3 text-white" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Подсказка */}
+        <div className="px-4 py-2.5 border-t border-[var(--border-color)] bg-[var(--hover-1)]">
+          <p className="text-[11px] text-[var(--text-primary)]/30 text-center">
+            Отпустите карточку здесь
+          </p>
+        </div>
+      </div>
+    </motion.div>,
+    document.body
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   QUICK MOVE BUTTONS
+   ═══════════════════════════════════════════════════════════════════ */
+
+function QuickMoveButtons({
+  task,
+  onMove,
+}: {
+  task: TaskKanbanItem;
+  onMove: (id: string, from: TaskStatus, to: TaskStatus) => void;
+}) {
+  const allowed = ALLOWED_TRANSITIONS[task.status];
+  if (!allowed.length) return null;
+
+  const currentIdx = COLUMN_ORDER.indexOf(task.status);
+  const nextStatus = allowed.find(s => COLUMN_ORDER.indexOf(s) > currentIdx);
+  const prevStatus = allowed.find(s => COLUMN_ORDER.indexOf(s) < currentIdx);
+
+  return (
+    <div className="flex items-center gap-1 flex-shrink-0">
+      {prevStatus && (
+        <button
+          onClick={e => {
+            e.stopPropagation();
+            onMove(task.id, task.status, prevStatus);
+          }}
+          title={`← ${STATUS_LABELS[prevStatus]}`}
+          className="p-1 rounded-lg transition-all opacity-0 group-hover:opacity-100 hover:bg-[var(--hover-3)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/70"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+        </button>
+      )}
+      {nextStatus && (
+        <button
+          onClick={e => {
+            e.stopPropagation();
+            onMove(task.id, task.status, nextStatus);
+          }}
+          title={`→ ${STATUS_LABELS[nextStatus]}`}
+          className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all opacity-0 group-hover:opacity-100 border ${COL[nextStatus].chip}`}
+        >
+          <span className="truncate max-w-[80px]">{STATUS_LABELS[nextStatus]}</span>
+          <ChevronRight className="w-3 h-3 flex-shrink-0" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    TASK CARD
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -706,6 +862,7 @@ function TaskCard({
   onDragStart,
   onDragEnd,
   onView,
+  onQuickMove,
 }: {
   task: TaskKanbanItem;
   userMap: Map<string, SimpleUser | CounterpartyCustomer>;
@@ -713,6 +870,7 @@ function TaskCard({
   onDragStart: (id: string, from: TaskStatus) => void;
   onDragEnd: () => void;
   onView: (t: TaskKanbanItem) => void;
+  onQuickMove: (id: string, from: TaskStatus, to: TaskStatus) => void;
 }) {
   const od = isOverdue(task.due_date);
   const a = task.assignee_id ? userMap.get(task.assignee_id) : null;
@@ -723,27 +881,37 @@ function TaskCard({
     <motion.div
       layout
       draggable
-      onDragStart={(e) => {
+      onDragStart={e => {
         (e as unknown as React.DragEvent).dataTransfer.effectAllowed = 'move';
         onDragStart(task.id, task.status);
       }}
       onDragEnd={onDragEnd}
-      
       onClick={() => onView(task)}
-      className={`bg-[var(--bg-card)] border rounded-xl p-3.5 cursor-pointer transition-all hover:bg-[var(--hover-1)]
-                  ${isDragging ? 'opacity-50 rotate-2' : ''}
-                  ${cardBorder}`}
+      className={`
+        group bg-[var(--bg-card)] border rounded-xl p-3.5 cursor-pointer
+        transition-all hover:bg-[var(--hover-1)]
+        ${isDragging ? 'opacity-50 rotate-2 scale-105' : ''}
+        ${cardBorder}
+      `}
       style={{ boxShadow: 'var(--shadow-md)' }}
     >
+      {/* Верхняя строка */}
       <div className="flex items-start justify-between gap-2 mb-2">
-        <span className="px-1.5 py-0.5 rounded text-[13px] font-mono bg-[var(--hover-2)] text-[var(--text-primary)]/70 border border-[var(--border-color)]">
-          #{task.number}
-        </span>
-        {od && (
-          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[13px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30">
-            <AlertTriangle className="w-2.5 h-2.5" /> Просрочена
+        <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
+          <span className="px-1.5 py-0.5 rounded text-[13px] font-mono bg-[var(--hover-2)] text-[var(--text-primary)]/70 border border-[var(--border-color)] flex-shrink-0">
+            #{task.number}
           </span>
-        )}
+          {od && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[13px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30 flex-shrink-0">
+              <AlertTriangle className="w-2.5 h-2.5" /> Просрочена
+            </span>
+          )}
+        </div>
+
+        {/* Кнопки быстрого перемещения */}
+        <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
+          <QuickMoveButtons task={task} onMove={onQuickMove} />
+        </div>
       </div>
 
       <h4 className="text-base font-semibold text-[var(--text-primary)] mb-2 leading-snug line-clamp-2">
@@ -775,10 +943,8 @@ function TaskCard({
 
         <div className="flex items-center gap-2">
           {task.project_id && (
-                <FolderOpen className="w-5 h-5 text-[var(--text-primary)]/40 flex-shrink-0" />
-                
-              
-            )}
+            <FolderOpen className="w-5 h-5 text-[var(--text-primary)]/40 flex-shrink-0" />
+          )}
           {task.ticket_id && <Ticket className="w-5 h-5 text-[var(--text-primary)]/40 flex-shrink-0" />}
           {task.due_date && (
             <span className={`inline-flex items-center gap-1 text-[11px] font-medium whitespace-nowrap ${od ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'}`}>
@@ -810,6 +976,7 @@ function KColumn({
   onAdd,
   onView,
   onMore,
+  onQuickMove,
 }: {
   column: TaskKanbanColumn;
   userMap: Map<string, SimpleUser | CounterpartyCustomer>;
@@ -824,6 +991,7 @@ function KColumn({
   onAdd: (s: TaskStatus) => void;
   onView: (t: TaskKanbanItem) => void;
   onMore: (s: TaskStatus) => void;
+  onQuickMove: (id: string, from: TaskStatus, to: TaskStatus) => void;
 }) {
   const m = COL[column.status];
   const Icon = m.icon;
@@ -871,6 +1039,7 @@ function KColumn({
                 onDragStart={onDragStart}
                 onDragEnd={onDragEnd}
                 onView={onView}
+                onQuickMove={onQuickMove}
               />
             ))}
           </AnimatePresence>
@@ -990,10 +1159,6 @@ function AssignBeforeProgressModal({
    CREATE MODAL
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ═══════════════════════════════════════════════════════════════════
-   CREATE MODAL — УЛУЧШЕННАЯ ВЕРСИЯ
-   ═══════════════════════════════════════════════════════════════════ */
-
 function CreateModal({
   initialStatus, context, userMap, onClose, onOk,
 }: {
@@ -1010,7 +1175,7 @@ function CreateModal({
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
   const [pri, setPri] = useState<TaskPriority>('medium');
-  const [sp, setSp] = useState(''); 
+  const [sp, setSp] = useState('');
   const [eh, setEh] = useState('');
   const [dd, setDd] = useState('');
   const [todo, setTodo] = useState(initialStatus === 'todo');
@@ -1035,7 +1200,7 @@ function CreateModal({
   useEffect(() => { setTid(''); }, [pid]);
 
   const loadProjects = useCallback(async (search: string, page: number) => {
-    const res = staff ? await projectsApi.getAll(page, 20) : await projectsApi.getAll(page, 20);
+    const res = await projectsApi.getAll(page, 20);
     const filtered = search
       ? res.items.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.key.toLowerCase().includes(search.toLowerCase()))
       : res.items;
@@ -1043,7 +1208,7 @@ function CreateModal({
       items: filtered.map(p => ({ value: p.id, label: p.name, sublabel: p.key, icon: <FolderOpen className="w-4 h-4 text-amber-400" /> })),
       hasNext: res.items.length === 20,
     };
-  }, [staff]);
+  }, []);
 
   const loadUsers = useCallback(async (search: string, page: number) => {
     let items: (SimpleUser | CounterpartyCustomer)[] = [];
@@ -1057,7 +1222,7 @@ function CreateModal({
       items: filtered.map(u => ({ value: u.id, label: u.full_name || u.username || u.email, sublabel: u.email })),
       hasNext: items.length === 20,
     };
-  }, [staff]);
+  }, []);
 
   const loadTickets = useCallback(async (search: string, page: number) => {
     const res = await ticketsApi.getAllWithFilters(page, 20, { project_id: pid || undefined });
@@ -1070,15 +1235,10 @@ function CreateModal({
     };
   }, [pid]);
 
-  /* ═══════════════════════════════════════════════════════════════════
-     ИСПРАВЛЕННАЯ submit — ДВУХЭТАПНОЕ СОЗДАНИЕ
-     ═══════════════════════════════════════════════════════════════════ */
-
   const submit = async () => {
     if (!title.trim()) return;
     setSaving(true);
     try {
-      // ✅ Шаг 1: Создаём в backlog
       const payload: TaskCreateInput = {
         title: title.trim(),
         description: desc.trim() || null,
@@ -1088,19 +1248,18 @@ function CreateModal({
         story_points: sp ? parseInt(sp) : null,
         estimated_hours: eh ? parseFloat(eh) : null,
         due_date: dd || null,
-        mark_as_todo: false, // ← НЕ ставим todo при создании
+        mark_as_todo: false,
         assignee_id: aid || null,
       };
       const t = await tasksApi.create(payload);
-      
-      // ✅ Шаг 2: Если нужно todo И есть исполнитель — меняем статус
+
       if (todo && aid) {
         await tasksApi.changeStatus(t.id, 'todo');
       }
-      
-      toast({ 
-        title: 'Задача создана', 
-        description: `${t.number} — ${t.title}${todo && aid ? ' (переведена в «Готово к выполнению»)' : ''}` 
+
+      toast({
+        title: 'Задача создана',
+        description: `${t.number} — ${t.title}${todo && aid ? ' (переведена в «Готово к выполнению»)' : ''}`,
       });
       onOk();
     } catch (err: any) {
@@ -1115,7 +1274,7 @@ function CreateModal({
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !saving && onClose()} />
       <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden"
         style={{ boxShadow: 'var(--shadow-lg)' }} onClick={e => e.stopPropagation()}>
-        
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -1136,21 +1295,21 @@ function CreateModal({
         {/* Content */}
         <div className="flex-1 min-h-0 overflow-y-auto p-6">
           <div className="grid lg:grid-cols-2 gap-6">
-            
-            {/* ЛЕВАЯ КОЛОНКА — Основное */}
+
+            {/* ЛЕВАЯ КОЛОНКА */}
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
                   Название <span className="text-[var(--accent)]">*</span>
                 </label>
-                <input value={title} onChange={e => setTitle(e.target.value)} 
-                  placeholder="Что нужно сделать?" autoFocus 
+                <input value={title} onChange={e => setTitle(e.target.value)}
+                  placeholder="Что нужно сделать?" autoFocus
                   className={INPUT_CLS} />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Описание</label>
-                <textarea value={desc} onChange={e => setDesc(e.target.value)} 
+                <textarea value={desc} onChange={e => setDesc(e.target.value)}
                   placeholder="Постановка задачи..." rows={4}
                   className={`${INPUT_CLS} resize-none`} />
               </div>
@@ -1175,43 +1334,43 @@ function CreateModal({
               </div>
             </div>
 
-            {/* ПРАВАЯ КОЛОНКА — Детали */}
+            {/* ПРАВАЯ КОЛОНКА */}
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Проект</label>
-                <AsyncSelect value={pid} onChange={setPid} loadOptions={loadProjects} 
+                <AsyncSelect value={pid} onChange={setPid} loadOptions={loadProjects}
                   placeholder="Не выбран" icon={FolderOpen} />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Срок выполнения</label>
-                <input type="date" value={dd} onChange={e => setDd(e.target.value)} 
+                <input type="date" value={dd} onChange={e => setDd(e.target.value)}
                   min={new Date().toISOString().split('T')[0]} className={INPUT_CLS} />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Сложность</label>
-                  <input type="number" min={1} max={21} value={sp} onChange={e => setSp(e.target.value)} 
+                  <input type="number" min={1} max={21} value={sp} onChange={e => setSp(e.target.value)}
                     placeholder="1-21" className={INPUT_CLS} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Оценка, ч.</label>
-                  <input type="number" min={0} step={0.5} value={eh} onChange={e => setEh(e.target.value)} 
+                  <input type="number" min={0} step={0.5} value={eh} onChange={e => setEh(e.target.value)}
                     placeholder="—" className={INPUT_CLS} />
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Исполнитель</label>
-                <AsyncSelect value={aid} onChange={setAid} loadOptions={loadUsers} 
+                <AsyncSelect value={aid} onChange={setAid} loadOptions={loadUsers}
                   placeholder="Не назначен" icon={UserCheck} />
               </div>
 
               {context.type !== 'ticket' && (
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Тикет</label>
-                  <AsyncSelect value={tid} onChange={setTid} loadOptions={loadTickets} 
+                  <AsyncSelect value={tid} onChange={setTid} loadOptions={loadTickets}
                     placeholder="Без тикета" icon={Ticket} />
                 </div>
               )}
@@ -1224,7 +1383,7 @@ function CreateModal({
                 ${todo
                   ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
                   : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}>
-              <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 
+              <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0
                 ${todo ? 'bg-blue-500 border-blue-600' : 'border-[var(--border-color)]'}`}>
                 {todo && <Check className="w-4 h-4 text-white" />}
               </div>
@@ -1267,7 +1426,6 @@ function DetailModal({
   const { user } = useAuthStore();
 
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
-
   const [showStatus, setShowStatus] = useState(false);
   const [busy, setBusy] = useState('');
   const canEdit = ALLOWED_EDIT_STATUSES.has(task.status);
@@ -1527,7 +1685,7 @@ function DetailModal({
                   <CustomSelect value={assignId} onChange={setAssignId} options={userOpts} placeholder="Выберите исполнителя" icon={UserCheck} searchable />
                   <button onClick={() => act('assign', () => tasksApi.assign(task.id, { assignee_id: assignId }), 'Исполнитель назначен')}
                     disabled={!assignId || busy === 'assign'}
-                    className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] active:scale-[0.98] transition-all duration-200 text-white text-base font-medium disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[var(--accent)] shadow-[var(--shadow-sm)]">
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] active:scale-[0.98] transition-all duration-200 text-white text-base font-medium disabled:opacity-40 disabled:cursor-not-allowed shadow-[var(--shadow-sm)]">
                     {busy === 'assign' ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
                     Назначить
                   </button>
@@ -1565,13 +1723,13 @@ function DetailModal({
                 <Eye className="w-4 h-4 text-violet-400" /> Ревью
               </p>
               <div className="flex gap-2">
-                <button onClick={() => act('review', () => tasksApi.review(task.id, { decision: 'done' }) , 'Принято')}
+                <button onClick={() => act('review', () => tasksApi.review(task.id, { decision: 'done' }), 'Принято')}
                   disabled={busy === 'review'}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--success)]/10 border border-emerald-500/30 text-[var(--success)] text-base font-medium disabled:opacity-50">
                   {busy === 'review' ? <Loader2 className="w-4 h-4 animate-spin" /> : <ThumbsUp className="w-4 h-4" />}
                   Принять
                 </button>
-                <button onClick={() => act('review', () => tasksApi.review(task.id, { decision: 'to_fix' }) , 'На доработку')}
+                <button onClick={() => act('review', () => tasksApi.review(task.id, { decision: 'to_fix' }), 'На доработку')}
                   disabled={busy === 'review'}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/30 text-[var(--accent)] text-base font-medium disabled:opacity-50">
                   {busy === 'review' ? <Loader2 className="w-4 h-4 animate-spin" /> : <ThumbsDown className="w-4 h-4" />}
@@ -1587,7 +1745,7 @@ function DetailModal({
               <span className="flex-1 text-base text-[var(--text-primary)]/40">
                 Заявка
                 {(task as any).number && (
-                  <span className="ml-1.5 text-[var(--text-primary)]/85  text-base">
+                  <span className="ml-1.5 text-[var(--text-primary)]/85 text-base">
                     #{(task as any).number.slice(0, -4)}
                   </span>
                 )}
@@ -1613,35 +1771,41 @@ function DetailModal({
 
         <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-t border-[var(--border-color)] bg-[var(--hover-1)] flex-shrink-0">
           <button onClick={() => setShowArchiveConfirm(true)}
-  disabled={busy === 'archive'}
-  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/20 text-[var(--text-primary)] text-base font-medium disabled:opacity-50">
-  {busy === 'archive' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
-  Архив
-</button>
+            disabled={busy === 'archive'}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/20 text-[var(--text-primary)] text-base font-medium disabled:opacity-50">
+            {busy === 'archive' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+            Архив
+          </button>
           <button onClick={onClose}
             className="px-4 py-2 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-base">
             Закрыть
           </button>
         </div>
       </div>
+
       {showArchiveConfirm && (
-  <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowArchiveConfirm(false)} />
-    <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden" style={{ boxShadow: 'var(--shadow-lg)' }}>
-      <div className="p-6 text-center">
-        <Archive className="w-10 h-10 text-[var(--accent)] mx-auto mb-3" />
-        <h3 className="text-base font-bold text-[var(--text-primary)] mb-1">Архивировать задачу</h3>
-        <p className="text-base text-[var(--text-primary)]/50">Задача «{task.title}» будет перемещена в архив.</p>
-      </div>
-      <div className="flex border-t border-[var(--border-color)]">
-        <button onClick={() => setShowArchiveConfirm(false)} className="flex-1 py-3 text-base text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]">Отмена</button>
-        <button onClick={() => { setShowArchiveConfirm(false); act('archive', () => tasksApi.archive(task.id), 'Архивировано'); }} className="flex-1 py-3 text-base font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10 border-l border-[var(--border-color)]">
-          {busy === 'archive' ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Архивировать'}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowArchiveConfirm(false)} />
+          <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden"
+            style={{ boxShadow: 'var(--shadow-lg)' }}>
+            <div className="p-6 text-center">
+              <Archive className="w-10 h-10 text-[var(--accent)] mx-auto mb-3" />
+              <h3 className="text-base font-bold text-[var(--text-primary)] mb-1">Архивировать задачу</h3>
+              <p className="text-base text-[var(--text-primary)]/50">Задача «{task.title}» будет перемещена в архив.</p>
+            </div>
+            <div className="flex border-t border-[var(--border-color)]">
+              <button onClick={() => setShowArchiveConfirm(false)}
+                className="flex-1 py-3 text-base text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]">
+                Отмена
+              </button>
+              <button onClick={() => { setShowArchiveConfirm(false); act('archive', () => tasksApi.archive(task.id), 'Архивировано'); }}
+                className="flex-1 py-3 text-base font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10 border-l border-[var(--border-color)]">
+                {busy === 'archive' ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Архивировать'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1657,18 +1821,17 @@ export default function TasksPage() {
 
   const up = sp.get('project_id');
   const ua = sp.get('assignee_id');
-
-  const ut = sp.get('ticket_id'); // ✅
+  const ut = sp.get('ticket_id');
 
   const userRole = user?.roles ?? '';
   const staff = userRole.some(r => ['admin', 'support_manager', 'support_agent', 'executor'].includes(r));
 
-const [mode, setMode] = useState<ContextMode>(() => {
-  if (up) return 'project';
-  if (ua) return 'assignee';
-  if (ut) return 'ticket'; // ✅
-  return staff ? 'internal' : 'my';
-});
+  const [mode, setMode] = useState<ContextMode>(() => {
+    if (up) return 'project';
+    if (ua) return 'assignee';
+    if (ut) return 'ticket';
+    return staff ? 'internal' : 'my';
+  });
 
   const [selPid, setSelPid] = useState(up ?? '');
   const [selAid, setSelAid] = useState(ua ?? '');
@@ -1697,12 +1860,12 @@ const [mode, setMode] = useState<ContextMode>(() => {
   fpRef.current = fp;
   foRef.current = fo;
 
- useEffect(() => {
-  if (up) { setMode('project'); return; }
-  if (ua) { setMode('assignee'); return; }
-  if (ut) { setMode('ticket'); return; } // ✅
-  setMode(prev => (prev === 'project' || prev === 'assignee' || prev === 'ticket') ? prev : (staff ? 'internal' : 'my'));
-}, [up, ua, ut, staff]); // ✅ ut в зависимостях
+  useEffect(() => {
+    if (up) { setMode('project'); return; }
+    if (ua) { setMode('assignee'); return; }
+    if (ut) { setMode('ticket'); return; }
+    setMode(prev => (prev === 'project' || prev === 'assignee' || prev === 'ticket') ? prev : (staff ? 'internal' : 'my'));
+  }, [up, ua, ut, staff]);
 
   const ctx = useCallback((): TaskKanbanContext => {
     if (mode === 'project' && selPid) return { type: 'project', project_id: selPid };
@@ -1710,34 +1873,29 @@ const [mode, setMode] = useState<ContextMode>(() => {
     if (mode === 'assignee' && selAid) return { type: 'assignee', assignee_id: selAid };
     if (mode === 'internal') return { type: 'internal' };
     if (mode === 'my') return { type: 'my' };
-    // Если режим требует выбора, но ничего не выбрано — возвращаем заглушку
-    return { type: 'my' }; // fallback
-}, [mode, selPid, selAid, selTid]);
+    return { type: 'my' };
+  }, [mode, selPid, selAid, selTid]);
 
   const loadU = useCallback(async () => {
     const m = new Map<string, SimpleUser | CounterpartyCustomer>();
     try {
-      if (staff) (await usersApi.getAllUsers(1, 100)).items.forEach(u => m.set(u.id, u));
-      else (await usersApi.getAllUsers(1, 100)).items.forEach(u => m.set(u.id, u));
-      if (user?.counterparty_id) (await usersApi.getAllUsers(1, 100)).items.forEach(u => m.set(u.id, u));
+      (await usersApi.getAllUsers(1, 100)).items.forEach(u => m.set(u.id, u));
     } catch { }
     setUmap(m);
-  }, [staff, user]);
+  }, []);
 
   const loadP = useCallback(async () => {
     setLpj(true);
     try {
-      setProjects((staff ? await projectsApi.getAll(1, 100) : await projectsApi.getAll(1, 100)).items);
+      setProjects((await projectsApi.getAll(1, 100)).items);
     } catch { setProjects([]); }
     finally { setLpj(false); }
-  }, [staff]);
+  }, []);
 
   const fetchBoard = useCallback(async (silent = false) => {
-    
-    // Не загружаем, если нужен выбор, но ничего не выбрано
-    if ((mode === 'project' && !selPid) || 
-        (mode === 'ticket' && !selTid) || 
-        (mode === 'assignee' && !selAid)) {
+    if ((mode === 'project' && !selPid) ||
+      (mode === 'ticket' && !selTid) ||
+      (mode === 'assignee' && !selAid)) {
       setLoading(false);
       return;
     }
@@ -1786,6 +1944,60 @@ const [mode, setMode] = useState<ContextMode>(() => {
     } finally { setMoreCol(null); }
   }, [cols, ctx, toast]);
 
+  /* ─── Quick Move (inline кнопки на карточке) ─── */
+  const handleQuickMove = useCallback(async (
+    id: string,
+    from: TaskStatus,
+    to: TaskStatus,
+  ) => {
+    const srcCol = cols.find(c => c.status === from);
+    const task = srcCol?.tasks.items.find(t => t.id === id);
+    if (!task) return;
+
+    // Спецкейс: в работу без исполнителя
+    if (to === 'in_progress' && !task.assignee_id) {
+      setAssignBeforeTask(task);
+      return;
+    }
+
+    const snapshot = cloneColumnsSnapshot(cols);
+    let movedTask: TaskKanbanItem | undefined;
+
+    // Оптимистичное обновление UI
+    setCols(prev => {
+      const next = prev.map(c => {
+        if (c.status === from) {
+          const items = c.tasks.items.filter(t => {
+            if (t.id === id) { movedTask = t; return false; }
+            return true;
+          });
+          return { ...c, tasks: { ...c.tasks, items, total_items: c.tasks.total_items - 1 } };
+        }
+        return c;
+      });
+      if (!movedTask) return prev;
+      const updated = { ...movedTask, status: to };
+      return next.map(c =>
+        c.status === to
+          ? { ...c, tasks: { ...c.tasks, items: [updated, ...c.tasks.items], total_items: c.tasks.total_items + 1 } }
+          : c
+      );
+    });
+
+    try {
+      await tasksApi.changeStatus(id, to);
+      toast({
+        title: 'Статус обновлён',
+        description: `Задача переведена в «${STATUS_LABELS[to]}»`,
+      });
+    } catch (e: any) {
+      setCols(snapshot);
+      const msg = getStatusChangeError(e, task, to);
+      toast({ title: msg.title, description: msg.description, variant: 'destructive' });
+    }
+  }, [cols, toast]);
+
+  /* ─── Assign + Progress ─── */
   const handleAssignAndProgress = useCallback(async (assigneeId: string) => {
     if (!assignBeforeTask) return;
     setAssignBeforeLoading(true);
@@ -1804,6 +2016,7 @@ const [mode, setMode] = useState<ContextMode>(() => {
     }
   }, [assignBeforeTask, fetchBoard, toast]);
 
+  /* ─── Drag & Drop ─── */
   const onDragStart = useCallback((id: string, from: TaskStatus) => {
     setDrag({ id, from });
   }, []);
@@ -1885,6 +2098,7 @@ const [mode, setMode] = useState<ContextMode>(() => {
     }
   }, [drag, cols, toast]);
 
+  /* ─── Filtered display ─── */
   const disp = cols.map(c => {
     if (!q) return c;
     const s = q.toLowerCase();
@@ -1903,7 +2117,7 @@ const [mode, setMode] = useState<ContextMode>(() => {
   const done = cols.find(c => c.status === 'done')?.tasks.total_items ?? 0;
   const tabs = CTX_TABS.filter(t => !t.staffOnly || staff);
 
-  // ✅ ИСПРАВЛЕНО: Теперь передаём project_id при загрузке тикетов
+  /* ─── Async loaders ─── */
   const loadTicketsAsync = useCallback(async (search: string, page: number) => {
     const res = await ticketsApi.getAllWithFilters(page, 20, { project_id: selPid || undefined });
     const filtered = search
@@ -1934,8 +2148,7 @@ const [mode, setMode] = useState<ContextMode>(() => {
   const loadAssigneesAsync = useCallback(async (search: string, page: number) => {
     let items: (SimpleUser | CounterpartyCustomer)[] = [];
     try {
-      if (staff) items = (await usersApi.getAllUsers(page, 20)).items;
-      else items = (await usersApi.getAllUsers(page, 20)).items;
+      items = (await usersApi.getAllUsers(page, 20)).items;
     } catch { }
     const filtered = search
       ? items.filter(u => (u.full_name || '').toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()))
@@ -1946,7 +2159,15 @@ const [mode, setMode] = useState<ContextMode>(() => {
       })),
       hasNext: items.length === 20,
     };
-  }, [staff]);
+  }, []);
+
+  /* ─── Drag info для QuickStatusPanel ─── */
+  const dragTaskInfo = drag
+    ? (() => {
+        const t = cols.flatMap(c => c.tasks.items).find(x => x.id === drag.id);
+        return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null;
+      })()
+    : null;
 
   return (
     <div className="space-y-4 animate-in fade-in duration-500" onDragEnd={onDragEnd}>
@@ -1999,16 +2220,16 @@ const [mode, setMode] = useState<ContextMode>(() => {
                       <p className="px-1 pb-1 text-[13px] uppercase tracking-widest text-[var(--text-primary)]/25">Приоритет</p>
                       <div className="flex flex-wrap gap-1 px-0.5">
                         {PRIORITY_OPTIONS.map(p => {
-  const pm = PRI[p.value];
-  return (
-    <button key={p.value} onClick={() => setFp(v => v.includes(p.value) ? v.filter(x => x !== p.value) : [...v, p.value])}
-      className={`flex items-center gap-1 px-2 py-1 rounded-lg text-base font-medium border transition-all
-        ${fp.includes(p.value) ? `${pm.bg} ${pm.color} ${pm.border}` : 'bg-[var(--hover-1)] text-[var(--text-primary)]/40 border-[var(--border-color)]'}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${pm.dot}`} />
-      {p.label}
-    </button>
-  );
-})}
+                          const pm = PRI[p.value];
+                          return (
+                            <button key={p.value} onClick={() => setFp(v => v.includes(p.value) ? v.filter(x => x !== p.value) : [...v, p.value])}
+                              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-base font-medium border transition-all
+                                ${fp.includes(p.value) ? `${pm.bg} ${pm.color} ${pm.border}` : 'bg-[var(--hover-1)] text-[var(--text-primary)]/40 border-[var(--border-color)]'}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${pm.dot}`} />
+                              {p.label}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                     <div className="border-t border-[var(--border-color)] pt-2 px-0.5">
@@ -2076,7 +2297,6 @@ const [mode, setMode] = useState<ContextMode>(() => {
             </div>
           </div>
         )}
-
         {mode === 'assignee' && (
           <div className="flex items-center gap-1.5">
             <ChevronRight className="w-4 h-4 text-[var(--text-primary)]/15" />
@@ -2136,11 +2356,22 @@ const [mode, setMode] = useState<ContextMode>(() => {
                 onAdd={setCreate}
                 onView={setView}
                 onMore={more}
+                onQuickMove={handleQuickMove}
               />
             ))}
           </div>
         </motion.div>
       )}
+
+      {/* Quick Status Panel (drag helper) */}
+      <AnimatePresence>
+        {dragTaskInfo && (
+          <QuickStatusPanel
+            task={dragTaskInfo}
+            onDrop={onDrop}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Modals */}
       {view && (
