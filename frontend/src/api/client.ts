@@ -1200,3 +1200,68 @@ export const notificationsApi = {
     });
   },
 };
+
+// ═══════════════════════════════════════════════════════════════
+// FEEDBACKS API
+// ═══════════════════════════════════════════════════════════════
+
+export interface Feedback {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  ticket_id: string;
+  author_id: string;
+  rating: number;
+  comment: string;
+}
+
+export interface FeedbackCreateInput {
+  ticket_id: string;
+  rating: number;
+  comment: string;
+}
+
+export interface FeedbackUpdateInput {
+  rating?: number;
+  comment?: string;
+}
+
+export interface FeedbackListResponse {
+  page: number;
+  size: number;
+  total_items: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+  items: Feedback[];
+}
+
+export const feedbacksApi = {
+  create: async (data: FeedbackCreateInput): Promise<Feedback> => {
+    const res = await api.post('/feedbacks', data);
+    return res.data;
+  },
+
+  getAll: async (
+    page = 1,
+    size = 10,
+    filters?: { rating?: number; ticketId?: string; author_id?: string }
+  ): Promise<FeedbackListResponse> => {
+    const params: Record<string, any> = { page, size };
+    if (filters?.rating) params.rating = filters.rating;
+    if (filters?.ticketId) params.ticketId = filters.ticketId;
+    if (filters?.author_id) params.author_id = filters.author_id;
+    const res = await api.get('/feedbacks', { params });
+    return res.data;
+  },
+
+  update: async (id: string, data: FeedbackUpdateInput): Promise<Feedback> => {
+    const res = await api.patch(`/feedbacks/${id}`, data);
+    return res.data;
+  },
+
+  delete: async (id: string): Promise<Feedback> => {
+    const res = await api.delete(`/feedbacks/${id}`);
+    return res.data;
+  },
+};

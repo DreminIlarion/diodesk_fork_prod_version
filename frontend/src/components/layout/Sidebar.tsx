@@ -12,7 +12,7 @@ import {
   Building,
   FolderOpen,
   Package,
-  ChevronLeft,
+  ChevronLeft,Star
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useNotifications } from '../../contexts/NotificationsContext';
@@ -50,6 +50,7 @@ const canInvite = user?.roles?.some(r => ['support_agent', 'support_manager', 'e
   const mainNavItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Главная' },
     { to: '/tickets', icon: Ticket, label: 'Заявки' },
+    { to: '/feedbacks', icon: Star, label: 'Отзывы' },
     ...(isCustomer
       ? [{ to: '/my-company', icon: Building, label: 'Моя компания' }]
       : [{ to: '/counterparties', icon: Building2, label: 'Контрагенты' }]

@@ -37,6 +37,9 @@ const ProductsTab = lazy(() => import('./pages/ProductsPage'));
 const CreateProductPage = lazy(() => import('./pages/CreateProductPage'));
 const TasksPage = lazy(() => import('./pages/TasksPage'));
 const LurvDetailPage = lazy(() => import('./pages/LurvDetailPage'));
+const FeedbacksPage  = lazy(() => import('./pages/FeedbacksPage'));
+
+
 export default function App() {
   return (
     <NotificationsProvider>
@@ -66,6 +69,9 @@ export default function App() {
             <Route path="/products/new" element={<LazyRoute><ProtectedRoute><CreateProductPage /></ProtectedRoute></LazyRoute>} />
             <Route path="/notifications" element={<LazyRoute><NotificationsPage /></LazyRoute>} />
             <Route path="/profile" element={<LazyRoute><ProfilePage /></LazyRoute>} />
+
+
+            <Route path="/feedbacks" element={<LazyRoute><FeedbacksPage /></LazyRoute>} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Route>
         </Routes>
