@@ -20,7 +20,7 @@ class NotificationFactory:
                 type=NotificationType.TICKET_CREATED,
                 data={
                     "ticket_id": f"{event.ticket_id}",
-                    "number": event.number,
+                    "number": str(event.number),
                     "title": event.title,
                     "ticket_title": event.title,
                     "ticket_url": f"{settings.frontend_url}/tickets/{event.number}",
@@ -42,15 +42,15 @@ class NotificationFactory:
                 message=f"Тикет #{event.number} «{event.title}» был {action}.",
                 type=NotificationType.TICKET_ASSIGNED,
                 data={
-                    "ticket_id": f"{event.ticket_id}",
-                    "number": event.number,
+                    "ticket_id": str(event.ticket_id),
+                    "number": str(event.number),  # ← Исправить здесь
                     "title": event.title,
                     "ticket_title": event.title,
                     "ticket_url": f"{settings.frontend_url}/tickets/{event.number}",
-                    "assigned_by": f"{event.assigned_by}",
-                    "assignee_id": f"{event.assignee_id}",
+                    "assigned_by": str(event.assigned_by),
+                    "assignee_id": str(event.assignee_id),
                     "old_assignee": (
-                        None if event.old_assignee is None else f"{event.old_assignee}"
+                        None if event.old_assignee is None else str(event.old_assignee)
                     ),
                     "app_name": settings.app.name,
                     "support_email": settings.mail.support_email,
