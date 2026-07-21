@@ -486,7 +486,7 @@ function CreateModal({ initialStatus, context, userMap, onClose, onOk }: {
           </div>
           <div className="mt-6 pt-5 border-t border-[var(--border-color)]">
             <button onClick={() => setTodo(v => !v)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-base ${todo ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}>
-              <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 ${todo ? 'bg-blue-500 border-blue-600' : 'border-[var(--border-color)]'}`}>{todo && <Check className="w-4 h-4 text-white" /></div>
+              <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 ${todo ? 'bg-blue-500 border-blue-600' : 'border-[var(--border-color)]'}`}>{todo && <Check className="w-4 h-4 text-white" />}</div>
               <span className="font-medium">Сразу готова к выполнению (перевести в «{STATUS_LABELS.todo}»)</span>
             </button>
           </div>
