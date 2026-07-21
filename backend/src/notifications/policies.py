@@ -3,7 +3,7 @@ from typing import Protocol
 from uuid import UUID
 
 from ..iam.domain.constants import SUPPORT_TEAM
-from ..iam.domain.repos import UserRepository
+from ..iam.domain.repos import UserFilters, UserRepository  # ← UserFilters
 from ..projects.domain.repos import ProjectMemberRepository
 from ..projects.domain.vo import MemberRole
 from ..shared.domain.events import Event
@@ -58,7 +58,7 @@ class TicketCreatedPolicy:
 
         # 4. Иначе - уведомляем всех сотрудников поддержки
         else:
-            async for supports in iterate_batches(self.user_repo, include_roles=[*SUPPORT_TEAM]):
+            async for supports in iterate_batches(self.user_repo, filters=UserFilters(roles=set(SUPPORT_TEAM))):
                 targets.update({support.id for support in supports})
 
         return list(targets)
