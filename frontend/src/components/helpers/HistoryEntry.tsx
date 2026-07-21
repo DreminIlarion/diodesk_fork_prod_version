@@ -4,7 +4,7 @@ import {
   Clock, Image as ImageIcon, FileText, Plus, Minus,
   RefreshCw, UserPlus, UserMinus, Tag, Archive,
   MessageSquare, Edit, Trash2, UserCheck,
-  Building2, FolderOpen, CheckCircle,
+  Building2, FolderOpen, CheckCircle, X
 } from 'lucide-react';
 
 interface HistoryEntryProps {
