@@ -36,7 +36,7 @@ async def create_feedback(
 @router.get(
     path="",
     status_code=status.HTTP_200_OK,
-    response_model=FeedbackResponse | Page[FeedbackResponse],
+    response_model=list[FeedbackResponse] | Page[FeedbackResponse],
     summary="Получить отзыв или список отзывов",
 )
 async def get_feedbacks(
@@ -44,7 +44,7 @@ async def get_feedbacks(
     filters: FeedbackFiltersDep,
     current_subject: CurrentSubjectDep,
     service: FeedbackServiceDep,
-) -> FeedbackResponse | Page[FeedbackResponse]:
+) -> list[FeedbackResponse] | Page[FeedbackResponse]:
     if filters.ticket_id is not None:
         return await service.get_by_ticket(
             ticket_id=filters.ticket_id,

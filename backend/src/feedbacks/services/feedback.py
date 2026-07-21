@@ -68,28 +68,25 @@ class FeedbackService:
         await finalize(self.uow, feedback, event_publisher=self.event_publisher)
 
         return map_feedback_to_response(feedback)
-    
+
     async def get_by_ticket(
             self,
             ticket_id: UUID,
             current_subject: Subject,
-    ) -> FeedbackResponse:
+    ) -> list[FeedbackResponse]:
+
         """
         Получить активный отзыв по тикету.
         """
 
-        feedback = await self.feedback_repo.get_by_ticket(ticket_id)
-        if feedback is None:
-            raise NotFoundError(f"Feedback for ticket {ticket_id} not found")
-        
-        permission = self.authz_service.can_view_feedback(
-            subject=current_subject,
-            feedback=feedback,
-        )
+        feedbacks = await self.feedback_repo.get_by_ticket(ticket_id)
+        # Проверяем права на просмотр (достаточно один раз для поддержки)
+        permission = self.authz_service.can_view_feedback(current_subject)
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
-        
-        return map_feedback_to_response(feedback)
+        return [map_feedback_to_response(f) for f in feedbacks]
+    
+    
     
     async def get_feedbacks(
             self,

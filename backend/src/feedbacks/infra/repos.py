@@ -51,18 +51,21 @@ class SqlFeedbackRepository(SqlAlchemyRepository[Feedback, FeedbackOrm]):
     model = FeedbackOrm
     model_mapper = FeedbackMapper
 
-    async def get_by_ticket(self, ticket_id: UUID) -> Feedback | None:
+    async def get_by_ticket(self, ticket_id: UUID) -> list[Feedback]:
         """
         Получить активный отзыв по тикету.
         """
 
+
         stmt = select(self.model).where(
             self.model.ticket_id == ticket_id,
             self.model.deleted_at.is_(None),
-        )
+        ).order_by(self.model.created_at.desc())
         result = await self.session.execute(stmt)
-        model = result.scalar_one_or_none()
-        return None if model is None else self.model_mapper.to_entity(model)
+        models = result.scalars().all()
+        return [self.model_mapper.from_orm(m) for m in models]
+
+
     
     async def paginate(
             self,
