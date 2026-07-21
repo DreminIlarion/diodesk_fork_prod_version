@@ -80,7 +80,7 @@ export const tokenStorage = {
     localStorage.setItem(TOKEN_KEYS.ACCESS, accessToken);
     localStorage.setItem(TOKEN_KEYS.REFRESH, refreshToken);
     localStorage.setItem(TOKEN_KEYS.EXPIRES_AT, expiresAt.toString());
-    
+
     // Уведомляем подписчиков об обновлении токена
     tokenEventTarget.dispatchEvent(new Event('tokenRefreshed'));
   },
@@ -476,38 +476,38 @@ export const projectsApi = {
   },
 
 
-getMembers: async (projectId: string): Promise<ProjectMemberResponse[]> => {
-  const response = await api.get<ProjectMemberResponse[]>(
-    `/api/v1/projects/${projectId}/members`
-  );
-  return response.data;
-},
+  getMembers: async (projectId: string): Promise<ProjectMemberResponse[]> => {
+    const response = await api.get<ProjectMemberResponse[]>(
+      `/api/v1/projects/${projectId}/members`
+    );
+    return response.data;
+  },
 
-// 🔥 НОВЫЙ API: добавление участника с массивом ролей
-addMember: async (projectId: string, userId: string, roles: string[]): Promise<any> => {
-  const response = await api.post(`/api/v1/projects/${projectId}/members`, {
-    user_id: userId,
-    project_roles: roles,
-  });
-  return response.data;
-},
+  // 🔥 НОВЫЙ API: добавление участника с массивом ролей
+  addMember: async (projectId: string, userId: string, roles: string[]): Promise<any> => {
+    const response = await api.post(`/api/v1/projects/${projectId}/members`, {
+      user_id: userId,
+      project_roles: roles,
+    });
+    return response.data;
+  },
 
-// 🔥 НОВЫЙ API: добавление нескольких участников
-addMembers: async (projectId: string, members: Array<{ user_id: string; project_roles: string[] }>): Promise<void> => {
-  await Promise.all(
-    members.map(member =>
-      api.post(`/api/v1/projects/${projectId}/members`, {
-        user_id: member.user_id,
-        project_roles: member.project_roles,
-      })
-    )
-  );
-},
+  // 🔥 НОВЫЙ API: добавление нескольких участников
+  addMembers: async (projectId: string, members: Array<{ user_id: string; project_roles: string[] }>): Promise<void> => {
+    await Promise.all(
+      members.map(member =>
+        api.post(`/api/v1/projects/${projectId}/members`, {
+          user_id: member.user_id,
+          project_roles: member.project_roles,
+        })
+      )
+    );
+  },
 
-// 🔥 НОВЫЙ API: удаление участника
-removeMember: async (projectId: string, userId: string): Promise<void> => {
-  await api.delete(`/api/v1/projects/${projectId}/members/${userId}`);
-},
+  // 🔥 НОВЫЙ API: удаление участника
+  removeMember: async (projectId: string, userId: string): Promise<void> => {
+    await api.delete(`/api/v1/projects/${projectId}/members/${userId}`);
+  },
 
   // Получить мои проекты (для customer)
   getMyProjects: async (
@@ -546,7 +546,7 @@ removeMember: async (projectId: string, userId: string): Promise<void> => {
     return response.data;
   },
 
-    // Создать этап (возвращает проект)
+  // Создать этап (возвращает проект)
   createStage: async (projectId: string, payload: StageCreatePayload): Promise<Project> => {
     const response = await api.post<Project>(`/api/v1/projects/${projectId}/stages`, payload);
     return response.data;
@@ -554,12 +554,12 @@ removeMember: async (projectId: string, userId: string): Promise<void> => {
 
   // Обновить этап (возвращает этап)
   updateStage: async (projectId: string, stageId: string, payload: StageUpdatePayload): Promise<ProjectStageResponse> => {
-  const response = await api.patch<ProjectStageResponse>(
-    `/api/v1/projects/${projectId}/stages/${stageId}`,
-    payload
-  );
-  return response.data;
-},
+    const response = await api.patch<ProjectStageResponse>(
+      `/api/v1/projects/${projectId}/stages/${stageId}`,
+      payload
+    );
+    return response.data;
+  },
 
   // Удалить этап (возвращает проект)
   deleteStage: async (projectId: string, stageId: string): Promise<Project> => {
@@ -626,80 +626,80 @@ export const ticketsApi = {
   },
 
   // Получить все заявки (для support и выше)
-// Получить все заявки с фильтрацией (единый метод)
-getAll: async (
-  page: number = 1,
-  size: number = 10,
-  filters?: {
-    status?: TicketStatus | TicketStatus[];  // ✅ Поддержка массива
-    priority?: TicketPriority;
-    ticket_type?: string;
-    tags?: string[];
-    query?: string;
-    counterparty_id?: string;                // ✅ Добавлено
-    project_ids?: string[];                  // ✅ Добавлено
-    assignee_id?: string;                    // ✅ Добавлено
-    reporter_id?: string;                    // ✅ Добавлено
-    created_after?: string;
-    created_before?: string;
-  }
-): Promise<PaginatedResponse<TicketListItem>> => {
-  const response = await api.post<PaginatedResponse<TicketListItem>>(
-    '/api/v1/tickets/search',
-    {
-      // ✅ Статусы (массив или одиночное значение)
-      statuses: filters?.status 
-        ? (Array.isArray(filters.status) ? filters.status : [filters.status])
-        : undefined,
-      
-      // ✅ Приоритет
-      priorities: filters?.priority || undefined,
-      
-      // ✅ Тип
-      type: filters?.ticket_type || undefined,
-      
-      // ✅ Теги
-      tags: filters?.tags || undefined,
-      
-      // ✅ Поиск
-      search_query: filters?.query || undefined,
-      
-      // ✅ Контрагент
-      counterparty_id: filters?.counterparty_id || undefined,
-      
-      // ✅ Проекты (массив)
-      project_ids: filters?.project_ids || undefined,
-      
-      // ✅ Акторы (исполнитель и автор)
-      actors: (filters?.assignee_id || filters?.reporter_id) ? {
-        assignee_id: filters?.assignee_id || undefined,
-        reporter_id: filters?.reporter_id || undefined,
-      } : undefined,
-      
-      // ✅ Даты
-      created_after: filters?.created_after || undefined,
-      created_before: filters?.created_before || undefined,
-    },
-    { params: { page, size } }
-  );
-  return response.data;
-},
+  // Получить все заявки с фильтрацией (единый метод)
+  getAll: async (
+    page: number = 1,
+    size: number = 10,
+    filters?: {
+      status?: TicketStatus | TicketStatus[];  // ✅ Поддержка массива
+      priority?: TicketPriority;
+      ticket_type?: string;
+      tags?: string[];
+      query?: string;
+      counterparty_id?: string;                // ✅ Добавлено
+      project_ids?: string[];                  // ✅ Добавлено
+      assignee_id?: string;                    // ✅ Добавлено
+      reporter_id?: string;                    // ✅ Добавлено
+      created_after?: string;
+      created_before?: string;
+    }
+  ): Promise<PaginatedResponse<TicketListItem>> => {
+    const response = await api.post<PaginatedResponse<TicketListItem>>(
+      '/api/v1/tickets/search',
+      {
+        // ✅ Статусы (массив или одиночное значение)
+        statuses: filters?.status
+          ? (Array.isArray(filters.status) ? filters.status : [filters.status])
+          : undefined,
 
-// Оставляем getAllWithFilters как алиас для обратной совместимости
-// (можно удалить после рефакторинга TicketsPage)
-getAllWithFilters: async (
-  page: number = 1,
-  size: number = 10,
-  filters?: {
-    status?: TicketStatus;
-    priority?: TicketPriority;
-    ticket_type?: string;
-    query?: string;
-    tags?: string[];
-  }
-): Promise<PaginatedResponse<TicketListItem>> => {
-  return ticketsApi.getAll(page, size, filters);
-},
+        // ✅ Приоритет
+        priorities: filters?.priority || undefined,
+
+        // ✅ Тип
+        type: filters?.ticket_type || undefined,
+
+        // ✅ Теги
+        tags: filters?.tags || undefined,
+
+        // ✅ Поиск
+        search_query: filters?.query || undefined,
+
+        // ✅ Контрагент
+        counterparty_id: filters?.counterparty_id || undefined,
+
+        // ✅ Проекты (массив)
+        project_ids: filters?.project_ids || undefined,
+
+        // ✅ Акторы (исполнитель и автор)
+        actors: (filters?.assignee_id || filters?.reporter_id) ? {
+          assignee_id: filters?.assignee_id || undefined,
+          reporter_id: filters?.reporter_id || undefined,
+        } : undefined,
+
+        // ✅ Даты
+        created_after: filters?.created_after || undefined,
+        created_before: filters?.created_before || undefined,
+      },
+      { params: { page, size } }
+    );
+    return response.data;
+  },
+
+  // Оставляем getAllWithFilters как алиас для обратной совместимости
+  // (можно удалить после рефакторинга TicketsPage)
+  getAllWithFilters: async (
+    page: number = 1,
+    size: number = 10,
+    filters?: {
+      status?: TicketStatus;
+      priority?: TicketPriority;
+      ticket_type?: string;
+      query?: string;
+      tags?: string[];
+    }
+  ): Promise<PaginatedResponse<TicketListItem>> => {
+    return ticketsApi.getAll(page, size, filters);
+  },
 
   // Получить заявку по ID
   getById: async (id: string): Promise<Ticket> => {
@@ -888,6 +888,14 @@ getAllWithFilters: async (
 
   archiveTicket: (ticketId: string) =>
     api.delete(`/api/v1/tickets/${ticketId}`).then(r => r.data),
+
+  getHistory: async (ticketId: string, page = 1, size = 50) => {
+    const response = await api.get(`/api/v1/tickets/${ticketId}/history`, {
+      params: { page, size },
+    });
+    return response.data;
+  },
+
 
 };
 

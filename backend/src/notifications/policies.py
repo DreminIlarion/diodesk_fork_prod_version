@@ -59,6 +59,7 @@ class TicketCreatedPolicy:
         # 4. Иначе - уведомляем всех сотрудников поддержки
         else:
             async for supports in iterate_batches(self.user_repo, filters=UserFilters(roles=set(SUPPORT_TEAM))):
+                logger.warning(f"Got {len(supports)} support users: {[s.email.value for s in supports]}")
                 targets.update({support.id for support in supports})
 
         return list(targets)

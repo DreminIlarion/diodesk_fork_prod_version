@@ -220,11 +220,11 @@ export default function TicketDetailPage() {
     );
   }, [normalizedComments, commentSortOrder]);
 
-  const sortedHistory = useMemo(() => {
-    return [...(ticket?.history || [])].sort((a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-  }, [ticket?.history]);
+const sortedHistory = useMemo(() => {
+  return [...(ticket?.history || [])].sort((a, b) =>
+    new Date(b.occurred_on).getTime() - new Date(a.occurred_on).getTime()
+  );
+}, [ticket?.history]);
 
   const availableStatuses = (ticket?.status && STATUS_TRANSITIONS[ticket.status]) || [];
 
@@ -430,45 +430,67 @@ const getAuthorName = useCallback((c: Comment) => {
   }, [hasMoreComments, loadingMoreComments, loadMoreComments]);
 
   const loadTicketByNumber = useCallback(async (number: string) => {
-    setLoading(true);
-    try {
-      // ✅ ЗАГРУЖАЕМ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ ДЛЯ КЭША ИМЁН
-      if (!userNamesCache) {
-        userNamesCache = new Map();
-        try {
-          const usersResp = await usersApi.getAllUsers(1, 100);
-          usersResp.items.forEach((u: any) => {
-            const name = u.full_name || u.username || u.email || 'Без имени';
-            userNamesCache!.set(u.id, name);
-          });
-        } catch (e) {
-          console.error('Failed to load all users:', e);
-        }
+  setLoading(true);
+  try {
+    // ЗАГРУЖАЕМ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ ДЛЯ КЭША ИМЁН
+    if (!userNamesCache) {
+      userNamesCache = new Map();
+      try {
+        const usersResp = await usersApi.getAllUsers(1, 100);
+        usersResp.items.forEach((u: any) => {
+          const name = u.full_name || u.username || u.email || 'Без имени';
+          userNamesCache!.set(u.id, name);
+        });
+      } catch (e) {
+        console.error('Failed to load all users:', e);
       }
+    }
 
-      await initCache();
-      const tid = ticketNumberToIdCache?.get(number);
-      if (tid) {
-        const data = await ticketsApi.getById(tid);
-        setTicket(data);
-        if (data.history?.length || data.reporter_id || data.created_by || data.assignee_id) {
-          await loadActorNames(data.history || [], data.counterparty_id);
-        }
-        if (data.counterparty_id) { try { setCounterparty(await counterpartiesApi.getById(data.counterparty_id)); } catch { setCounterparty(null); } }
-        else setCounterparty(null);
-        await loadComments(tid, 1, false);
-      } else {
-        const sr = await ticketsApi.getAll(1, 100);
-        const found = sr.items.find((t: any) => t.number === number);
-        if (found) {
-          const data = await ticketsApi.getById(found.id);
-          setTicket(data); ticketNumberToIdCache?.set(number, found.id);
-          await loadComments(found.id, 1, false);
-        } else { toast({ title: 'Ошибка', description: 'Заявка не найдена', variant: 'destructive' }); navigate('/tickets'); }
+    await initCache();
+    const tid = ticketNumberToIdCache?.get(number);
+    if (tid) {
+      // 🔥 Загружаем тикет и историю параллельно
+      const [data, historyData] = await Promise.all([
+        ticketsApi.getById(tid),
+        ticketsApi.getHistory(tid, 1, 50).catch(() => ({ items: [] })),
+      ]);
+      
+      // Добавляем историю в объект тикета
+      data.history = historyData.items || [];
+      
+      setTicket(data);
+      
+      if (data.history?.length || data.reporter_id || data.created_by || data.assignee_id) {
+        await loadActorNames(data.history || [], data.counterparty_id);
       }
-    } catch { toast({ title: 'Ошибка', description: 'Не удалось загрузить заявку', variant: 'destructive' }); navigate('/tickets'); }
-    finally { setLoading(false); }
-  }, [initCache, loadComments, loadActorNames, toast, navigate]);
+      if (data.counterparty_id) { try { setCounterparty(await counterpartiesApi.getById(data.counterparty_id)); } catch { setCounterparty(null); } }
+      else setCounterparty(null);
+      await loadComments(tid, 1, false);
+    } else {
+      const sr = await ticketsApi.getAll(1, 100);
+      const found = sr.items.find((t: any) => t.number === number);
+      if (found) {
+        const [data, historyData] = await Promise.all([
+          ticketsApi.getById(found.id),
+          ticketsApi.getHistory(found.id, 1, 50).catch(() => ({ items: [] })),
+        ]);
+        data.history = historyData.items || [];
+        setTicket(data);
+        ticketNumberToIdCache?.set(number, found.id);
+        await loadComments(found.id, 1, false);
+      } else {
+        toast({ title: 'Ошибка', description: 'Заявка не найдена', variant: 'destructive' });
+        navigate('/tickets');
+      }
+    }
+  } catch {
+    toast({ title: 'Ошибка', description: 'Не удалось загрузить заявку', variant: 'destructive' });
+    navigate('/tickets');
+  } finally {
+    setLoading(false);
+  }
+}, [initCache, loadComments, loadActorNames, toast, navigate]);
+
 
   /* ═══════════════════════════════════════════════════════════════════
      HANDLERS
