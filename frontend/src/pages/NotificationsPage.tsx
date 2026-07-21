@@ -194,11 +194,14 @@ export default function NotificationsPage() {
     setLoading(true);
     try {
       const response = await notificationsApi.getAll(page, 20, unreadOnly);
-      setNotifications(response.items);
-      setTotalPages(response.total_pages);
-      setTotalItems(response.total_items);
+      setNotifications(response.items || []);
+      setTotalPages(response.total_pages || 1);
+      setTotalItems(response.total_items || 0);
     } catch (err) {
       console.error('Failed to load notifications:', err);
+      setNotifications([]);  // ← добавить
+      setTotalPages(1);
+      setTotalItems(0);
     } finally {
       setLoading(false);
       setInitialLoad(false);
