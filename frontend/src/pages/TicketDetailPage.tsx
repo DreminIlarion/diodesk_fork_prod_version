@@ -7,9 +7,9 @@ import {
   Calendar, UserPlus, UserCheck, CheckCircle2, X, Plus,
   Search, Settings, AlertCircle, RefreshCw, Tag, Edit,
   Paperclip as PaperclipIcon, MessageCircle, Building2, Phone, Mail,
-  Archive,
+  Archive, Star, Check,
 } from 'lucide-react';
-import { ticketsApi, usersApi, counterpartiesApi } from '../api/client';
+import { ticketsApi, usersApi, counterpartiesApi, feedbacksApi } from '../api/client';
 import { attachmentsApi } from '../api/attachments';
 import { useAuthStore } from '../stores/authStore';
 import { useToast } from '../components/ui/use-toast';
@@ -22,6 +22,7 @@ import { TicketDescriptionContent } from '../components/helpers/TicketDescriptio
 import {
   TicketEditor, serializeBlocks, deserializeToBlocks, type DescriptionBlock,
 } from '../components/helpers/TicketEditor';
+import { motion, AnimatePresence } from 'framer-motion';
 
 /* ═══════════════════════════════════════════════════════════════════
    РУСИФИКАЦИЯ РОЛЕЙ
@@ -84,7 +85,7 @@ const STATUS_LABELS: Record<string, string> = {
   'closed': 'Закрыт',
   'reopened': 'Переоткрыт',
   'rejected': 'Отклонён',
-  'cancelled': 'Отменён', // ✅ Добавлено
+  'cancelled': 'Отменён',
 };
 
 const STATUS_PERMISSIONS: Record<string, string[]> = {
@@ -99,7 +100,6 @@ const STATUS_PERMISSIONS: Record<string, string[]> = {
   'rejected': ['admin', 'support_agent', 'support_manager'],
 };
 
-
 const STATUS_DESCRIPTIONS: Record<string, string> = {
   'new': 'Тикет только создан, ожидает обработки',
   'pending_approval': 'Тикет создан, но ещё не согласован',
@@ -110,7 +110,7 @@ const STATUS_DESCRIPTIONS: Record<string, string> = {
   'closed': 'Тикет закрыт',
   'reopened': 'Тикет переоткрыт',
   'rejected': 'Тикет отклонён',
-  'cancelled': 'Тикет отменён', // ✅ Добавлено
+  'cancelled': 'Тикет отменён',
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -125,6 +125,84 @@ interface NormalizedComments {
   byId: Map<string, Comment>;
   byParent: Map<string, string[]>;
   rootIds: string[];
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RATING LABELS
+   ═══════════════════════════════════════════════════════════════════ */
+
+const FEEDBACK_RATING_LABELS: Record<number, string> = {
+  1: 'Очень плохо',
+  2: 'Плохо',
+  3: 'Нормально',
+  4: 'Хорошо',
+  5: 'Отлично',
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   INLINE STAR RATING (для баннера)
+   ═══════════════════════════════════════════════════════════════════ */
+
+function InlineStarRating({
+  value,
+  hovered,
+  onChange,
+  onHover,
+  onLeave,
+  size = 28,
+  readonly = false,
+}: {
+  value: number;
+  hovered?: number;
+  onChange?: (v: number) => void;
+  onHover?: (v: number) => void;
+  onLeave?: () => void;
+  size?: number;
+  readonly?: boolean;
+}) {
+  const display = hovered || value;
+
+  return (
+    <div className="inline-flex items-center gap-1.5">
+      {[1, 2, 3, 4, 5].map(star => {
+        if (readonly) {
+          return (
+            <Star
+              key={star}
+              width={size}
+              height={size}
+              className={`transition-colors ${
+                star <= display
+                  ? 'text-emerald-500 fill-emerald-500'
+                  : 'text-[var(--text-primary)]/15'
+              }`}
+            />
+          );
+        }
+        return (
+          <button
+            key={star}
+            type="button"
+            onClick={() => onChange?.(star)}
+            onMouseEnter={() => onHover?.(star)}
+            onMouseLeave={onLeave}
+            className="transition-transform hover:scale-110 active:scale-95"
+            style={{ lineHeight: 0 }}
+          >
+            <Star
+              width={size}
+              height={size}
+              className={`transition-colors ${
+                star <= display
+                  ? 'text-emerald-500 fill-emerald-500'
+                  : 'text-[var(--text-primary)]/15'
+              }`}
+            />
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -169,10 +247,21 @@ export default function TicketDetailPage() {
   const [archiving, setArchiving] = useState(false);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
-  // ✅ Работа с ролями как с массивом
+  // ── Feedback banner ─────────────────────────────────────────────
+  const [feedbackBannerState, setFeedbackBannerState] = useState<
+    'idle' | 'loading' | 'show' | 'hidden'
+  >('idle');
+  const [existingFeedback, setExistingFeedback] = useState<any | null>(null);
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [feedbackHovered, setFeedbackHovered] = useState(0);
+  const [savingFeedback, setSavingFeedback] = useState(false);
+
+  // Roles
   const userRoles = user?.roles ?? [];
   const isStaff = hasAnyRole(userRoles, ['admin', 'support_agent', 'support_manager']);
-  const canChangeStatus = hasRole(userRoles, 'admin') || 
+  const canChangeStatus = hasRole(userRoles, 'admin') ||
     (ticket?.status && STATUS_PERMISSIONS[ticket.status]?.some(role => hasRole(userRoles, role))) || false;
   const canShowManage = isStaff;
 
@@ -220,14 +309,13 @@ export default function TicketDetailPage() {
     );
   }, [normalizedComments, commentSortOrder]);
 
-const sortedHistory = useMemo(() => {
-  return [...(ticket?.history || [])].sort((a, b) =>
-    new Date(b.occurred_on).getTime() - new Date(a.occurred_on).getTime()
-  );
-}, [ticket?.history]);
+  const sortedHistory = useMemo(() => {
+    return [...(ticket?.history || [])].sort((a, b) =>
+      new Date(b.occurred_on).getTime() - new Date(a.occurred_on).getTime()
+    );
+  }, [ticket?.history]);
 
   const availableStatuses = (ticket?.status && STATUS_TRANSITIONS[ticket.status]) || [];
-
   const canWriteInternal = isStaff;
 
   const tabs = useMemo(() => {
@@ -243,27 +331,25 @@ const sortedHistory = useMemo(() => {
   }, [commentsTotalItems, ticket?.history?.length, canShowManage]);
 
   /* ═══════════════════════════════════════════════════════════════════
-     LOADERS — ИСПРАВЛЕНО: getAllUsers с counterparty_id
+     LOADERS
      ═══════════════════════════════════════════════════════════════════ */
 
   const loadSupportUsers = useCallback(async () => {
     setLoadingSupports(true);
     try {
       const r = await usersApi.getAllUsers(1, 100);
-      const staff = r.items.filter(u => 
+      const staff = r.items.filter(u =>
         hasAnyRole(u.roles, ['admin', 'support_agent', 'support_manager', 'executor'])
       );
       setSupportUsers(staff);
-      
-      // ✅ Заполняем кэш ВСЕМИ пользователями, не только staff
       if (!userNamesCache) userNamesCache = new Map();
-      r.items.forEach((u: SimpleUser) => { 
-        userNamesCache!.set(u.id, u.full_name || u.username || u.email || 'Без имени'); 
+      r.items.forEach((u: SimpleUser) => {
+        userNamesCache!.set(u.id, u.full_name || u.username || u.email || 'Без имени');
       });
-    } catch { 
-      toast({ title: 'Ошибка', description: 'Не удалось загрузить исполнителей', variant: 'destructive' }); 
-    } finally { 
-      setLoadingSupports(false); 
+    } catch {
+      toast({ title: 'Ошибка', description: 'Не удалось загрузить исполнителей', variant: 'destructive' });
+    } finally {
+      setLoadingSupports(false);
     }
   }, [toast]);
 
@@ -274,11 +360,11 @@ const sortedHistory = useMemo(() => {
     const fromSupport = supportUsers.find(u => u.id === ticket.assignee_id);
     if (fromSupport) {
       const name = fromSupport.full_name || fromSupport.username || fromSupport.email;
-      return name === "None" ? "ФИО Не указано" : name;
+      return name === 'None' ? 'ФИО Не указано' : name;
     }
     if (user?.user_id === ticket.assignee_id) {
       const name = user.full_name || user.username || user.email;
-      return name === "None" ? "ФИО Не указано" : name;
+      return name === 'None' ? 'ФИО Не указано' : name;
     }
     if (userNamesCache?.has(ticket.assignee_id)) {
       return userNamesCache.get(ticket.assignee_id);
@@ -311,35 +397,26 @@ const sortedHistory = useMemo(() => {
     return 'from-gray-600 to-gray-700';
   }, []);
 
-const getAuthorName = useCallback((c: Comment) => {
-    // Сначала ищем в кэше имён (который загружается через getAllUsers)
+  const getAuthorName = useCallback((c: Comment) => {
     const nameFromCache = userNamesCache?.get(c.author_id);
-    if (nameFromCache && nameFromCache !== "None") return nameFromCache;
-    
-    // Если текущий пользователь — автор
+    if (nameFromCache && nameFromCache !== 'None') return nameFromCache;
     if (user?.user_id === c.author_id) {
       const name = user?.full_name || user?.username || user?.email;
-      return name === "None" ? "ФИО не указано" : name;
+      return name === 'None' ? 'ФИО не указано' : name;
     }
-    
-    // Если есть в supportUsers
     const fromSupport = supportUsers.find(u => u.id === c.author_id);
     if (fromSupport) {
       const name = fromSupport.full_name || fromSupport.username || fromSupport.email;
-      return name === "None" ? "ФИО не указано" : name;
+      return name === 'None' ? 'ФИО не указано' : name;
     }
-    
-    // Если есть в actorNames
     const actorName = actorNames.get(c.author_id);
     if (actorName) return actorName;
-    
-    // Запасной вариант — роль (как было раньше)
     const roleMap: Record<string, string> = {
       admin: 'Поддержка', support_agent: 'Агент поддержки', support_manager: 'Менеджер',
       customer_admin: 'Администратор контрагента', executor: 'Исполнитель',
     };
     return roleMap[c.author_role] || 'Клиент';
-  }, [userNamesCache, user, supportUsers, actorNames]);
+  }, [user, supportUsers, actorNames]);
 
   const initCache = useCallback(async () => {
     if (ticketNumberToIdCache) return;
@@ -357,10 +434,6 @@ const getAuthorName = useCallback((c: Comment) => {
     })();
     return cacheLoadingPromise;
   }, []);
-  
-  /* ═══════════════════════════════════════════════════════════════════
-     ЗАГРУЗКА ИМЁН — ИСПРАВЛЕНО: getAllUsers с counterparty_id
-     ═══════════════════════════════════════════════════════════════════ */
 
   const loadActorNames = useCallback(async (history: any[], counterpartyId?: string) => {
     const actorIds = [...new Set(history.map(e => e.actor_id).filter(Boolean))];
@@ -372,7 +445,6 @@ const getAuthorName = useCallback((c: Comment) => {
     const names = new Map<string, string>();
     if (user?.user_id) names.set(user.user_id, user.full_name || user.username || 'Вы');
 
-    // ✅ Загружаем пользователей контрагента если есть counterparty_id
     if (counterpartyId) {
       try {
         const r = await usersApi.getAllUsers(1, 100, { counterparty_id: counterpartyId });
@@ -380,7 +452,6 @@ const getAuthorName = useCallback((c: Comment) => {
       } catch { }
     }
 
-    // ✅ Загружаем остальных (support, admin)
     const missing = actorIds.filter(id => !names.has(id));
     if (missing.length) {
       try {
@@ -414,9 +485,15 @@ const getAuthorName = useCallback((c: Comment) => {
           return { byId: nb, byParent: np, rootIds: nr };
         });
       } else { setNormalizedComments({ byId, byParent, rootIds }); }
-      setCommentsTotalItems(r.total_items); setCommentsPage(r.page); setHasMoreComments(r.page < r.total_pages);
-    } catch { toast({ title: 'Ошибка', description: 'Не удалось загрузить комментарии', variant: 'destructive' }); }
-    finally { setLoadingComments(false); setLoadingMoreComments(false); }
+      setCommentsTotalItems(r.total_items);
+      setCommentsPage(r.page);
+      setHasMoreComments(r.page < r.total_pages);
+    } catch {
+      toast({ title: 'Ошибка', description: 'Не удалось загрузить комментарии', variant: 'destructive' });
+    } finally {
+      setLoadingComments(false);
+      setLoadingMoreComments(false);
+    }
   }, [canWriteInternal, toast]);
 
   const loadMoreComments = useCallback(async () => {
@@ -430,67 +507,100 @@ const getAuthorName = useCallback((c: Comment) => {
   }, [hasMoreComments, loadingMoreComments, loadMoreComments]);
 
   const loadTicketByNumber = useCallback(async (number: string) => {
-  setLoading(true);
-  try {
-    // ЗАГРУЖАЕМ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ ДЛЯ КЭША ИМЁН
-    if (!userNamesCache) {
-      userNamesCache = new Map();
-      try {
-        const usersResp = await usersApi.getAllUsers(1, 100);
-        usersResp.items.forEach((u: any) => {
-          const name = u.full_name || u.username || u.email || 'Без имени';
-          userNamesCache!.set(u.id, name);
-        });
-      } catch (e) {
-        console.error('Failed to load all users:', e);
+    setLoading(true);
+    try {
+      if (!userNamesCache) {
+        userNamesCache = new Map();
+        try {
+          const usersResp = await usersApi.getAllUsers(1, 100);
+          usersResp.items.forEach((u: any) => {
+            const name = u.full_name || u.username || u.email || 'Без имени';
+            userNamesCache!.set(u.id, name);
+          });
+        } catch { }
       }
-    }
 
-    await initCache();
-    const tid = ticketNumberToIdCache?.get(number);
-    if (tid) {
-      // 🔥 Загружаем тикет и историю параллельно
-      const [data, historyData] = await Promise.all([
-        ticketsApi.getById(tid),
-        ticketsApi.getHistory(tid, 1, 50).catch(() => ({ items: [] })),
-      ]);
-      
-      // Добавляем историю в объект тикета
-      data.history = historyData.items || [];
-      
-      setTicket(data);
-      
-      if (data.history?.length || data.reporter_id || data.created_by || data.assignee_id) {
-        await loadActorNames(data.history || [], data.counterparty_id);
-      }
-      if (data.counterparty_id) { try { setCounterparty(await counterpartiesApi.getById(data.counterparty_id)); } catch { setCounterparty(null); } }
-      else setCounterparty(null);
-      await loadComments(tid, 1, false);
-    } else {
-      const sr = await ticketsApi.getAll(1, 100);
-      const found = sr.items.find((t: any) => t.number === number);
-      if (found) {
+      await initCache();
+      const tid = ticketNumberToIdCache?.get(number);
+      if (tid) {
         const [data, historyData] = await Promise.all([
-          ticketsApi.getById(found.id),
-          ticketsApi.getHistory(found.id, 1, 50).catch(() => ({ items: [] })),
+          ticketsApi.getById(tid),
+          ticketsApi.getHistory(tid, 1, 50).catch(() => ({ items: [] })),
         ]);
         data.history = historyData.items || [];
         setTicket(data);
-        ticketNumberToIdCache?.set(number, found.id);
-        await loadComments(found.id, 1, false);
+        if (data.history?.length || data.reporter_id || data.created_by || data.assignee_id) {
+          await loadActorNames(data.history || [], data.counterparty_id);
+        }
+        if (data.counterparty_id) {
+          try { setCounterparty(await counterpartiesApi.getById(data.counterparty_id)); }
+          catch { setCounterparty(null); }
+        } else setCounterparty(null);
+        await loadComments(tid, 1, false);
       } else {
-        toast({ title: 'Ошибка', description: 'Заявка не найдена', variant: 'destructive' });
-        navigate('/tickets');
+        const sr = await ticketsApi.getAll(1, 100);
+        const found = sr.items.find((t: any) => t.number === number);
+        if (found) {
+          const [data, historyData] = await Promise.all([
+            ticketsApi.getById(found.id),
+            ticketsApi.getHistory(found.id, 1, 50).catch(() => ({ items: [] })),
+          ]);
+          data.history = historyData.items || [];
+          setTicket(data);
+          ticketNumberToIdCache?.set(number, found.id);
+          await loadComments(found.id, 1, false);
+        } else {
+          toast({ title: 'Ошибка', description: 'Заявка не найдена', variant: 'destructive' });
+          navigate('/tickets');
+        }
       }
+    } catch {
+      toast({ title: 'Ошибка', description: 'Не удалось загрузить заявку', variant: 'destructive' });
+      navigate('/tickets');
+    } finally {
+      setLoading(false);
     }
-  } catch {
-    toast({ title: 'Ошибка', description: 'Не удалось загрузить заявку', variant: 'destructive' });
-    navigate('/tickets');
-  } finally {
-    setLoading(false);
-  }
-}, [initCache, loadComments, loadActorNames, toast, navigate]);
+  }, [initCache, loadComments, loadActorNames, toast, navigate]);
 
+  /* ═══════════════════════════════════════════════════════════════════
+     FEEDBACK BANNER LOGIC
+     ═══════════════════════════════════════════════════════════════════ */
+
+  useEffect(() => {
+    if (!ticket || !user) return;
+    if (ticket.status !== 'closed') {
+      setFeedbackBannerState('hidden');
+      return;
+    }
+
+    // Только клиент видит баннер, стафф — нет
+    const isClient = !hasAnyRole(userRoles, ['admin', 'support_manager', 'support_agent', 'executor']);
+    if (!isClient) {
+      setFeedbackBannerState('hidden');
+      return;
+    }
+
+    // Только автор тикета
+    const isAuthor = user.user_id === ticket.created_by || user.user_id === ticket.reporter_id;
+    if (!isAuthor) {
+      setFeedbackBannerState('hidden');
+      return;
+    }
+
+    setFeedbackBannerState('loading');
+
+    feedbacksApi.getAll(1, 10, {
+      ticketId: ticket.id,
+      author_id: user.user_id,
+    }).then(res => {
+      if (res.items.length > 0) {
+        setExistingFeedback(res.items[0]);
+      }
+      setFeedbackBannerState('show');
+    }).catch(() => {
+      setFeedbackBannerState('hidden');
+    });
+  }, [ticket?.id, ticket?.status, user?.user_id]);
 
   /* ═══════════════════════════════════════════════════════════════════
      HANDLERS
@@ -509,9 +619,15 @@ const getAuthorName = useCallback((c: Comment) => {
         const nr = [...prev.rootIds]; if (!nc.parent_comment_id) nr.unshift(nc.id);
         return { ...prev, byId: nb, rootIds: nr };
       });
-      setCommentsTotalItems(p => p + 1); setMessage(''); return nc.id;
-    } catch { toast({ title: 'Ошибка', description: 'Не удалось отправить', variant: 'destructive' }); return null; }
-    finally { setSending(false); }
+      setCommentsTotalItems(p => p + 1);
+      setMessage('');
+      return nc.id;
+    } catch {
+      toast({ title: 'Ошибка', description: 'Не удалось отправить', variant: 'destructive' });
+      return null;
+    } finally {
+      setSending(false);
+    }
   }, [message, ticket?.id, messageType, toast]);
 
   const handleEditComment = useCallback(async (cid: string, newText: string) => {
@@ -555,30 +671,49 @@ const getAuthorName = useCallback((c: Comment) => {
         const np = new Map(prev.byParent); np.set(pid, [...(prev.byParent.get(pid) || []), nr.id]);
         return { ...prev, byId: nb, byParent: np };
       });
-      setCommentsTotalItems(p => p + 1); setReplyText(''); setReplyingTo(null); return nr;
-    } catch { toast({ title: 'Ошибка', variant: 'destructive' }); return null; }
+      setCommentsTotalItems(p => p + 1);
+      setReplyText('');
+      setReplyingTo(null);
+      return nr;
+    } catch {
+      toast({ title: 'Ошибка', variant: 'destructive' });
+      return null;
+    }
   }, [ticket?.id, messageType, toast]);
 
-  const handleReply = useCallback((cid: string) => { setReplyingTo(p => p === cid ? null : cid); setReplyText(''); }, []);
+  const handleReply = useCallback((cid: string) => {
+    setReplyingTo(p => p === cid ? null : cid);
+    setReplyText('');
+  }, []);
+
   const handleReactionUpdated = useCallback((cid: string, r: any) => {
-    setNormalizedComments(prev => { const nb = new Map(prev.byId); const ex = nb.get(cid); if (ex) nb.set(cid, { ...ex, ...r }); return { ...prev, byId: nb }; });
+    setNormalizedComments(prev => {
+      const nb = new Map(prev.byId);
+      const ex = nb.get(cid);
+      if (ex) nb.set(cid, { ...ex, ...r });
+      return { ...prev, byId: nb };
+    });
   }, []);
 
   const handleDownload = useCallback(async (aid: string) => {
     setDownloadingId(aid);
-    try { await attachmentsApi.downloadAttachment(aid); } catch { toast({ title: 'Ошибка', variant: 'destructive' }); }
+    try { await attachmentsApi.downloadAttachment(aid); }
+    catch { toast({ title: 'Ошибка', variant: 'destructive' }); }
     finally { setDownloadingId(null); }
   }, [toast]);
 
   const handleStatusChange = useCallback(async (s: string) => {
     if (!canChangeStatus || !ticket) return;
     setUpdatingStatus(true);
-    try { 
+    try {
       const updated = await ticketsApi.updateTicketStatus(ticket.id, s as any);
       setTicket(updated);
       toast({ title: 'Успешно', description: `Статус: ${STATUS_LABELS[s] || s}` });
-    } catch (e: any) { toast({ title: 'Ошибка', description: e.response?.status === 403 ? 'Нет прав' : 'Ошибка', variant: 'destructive' }); }
-    finally { setUpdatingStatus(false); }
+    } catch (e: any) {
+      toast({ title: 'Ошибка', description: e.response?.status === 403 ? 'Нет прав' : 'Ошибка', variant: 'destructive' });
+    } finally {
+      setUpdatingStatus(false);
+    }
   }, [canChangeStatus, ticket, toast]);
 
   const handleAssign = useCallback(async (aid: string | null) => {
@@ -598,16 +733,25 @@ const getAuthorName = useCallback((c: Comment) => {
       setShowAssigneeModal(false);
       setSearchUser('');
       toast({ title: 'Успешно', description: aid ? 'Исполнитель назначен' : 'Исполнитель снят' });
-    } catch { toast({ title: 'Ошибка', variant: 'destructive' }); }
-    finally { setUpdatingAssignee(false); }
+    } catch {
+      toast({ title: 'Ошибка', variant: 'destructive' });
+    } finally {
+      setUpdatingAssignee(false);
+    }
   }, [ticket, supportUsers, loadActorNames, toast]);
 
   const handleArchive = useCallback(async () => {
     if (!ticket) return;
     setArchiving(true);
-    try { setTicket(await ticketsApi.archiveTicket(ticket.id)); toast({ title: 'Архивировано' }); setShowArchiveConfirm(false); }
-    catch (e: any) { toast({ title: 'Ошибка', description: e?.response?.status === 403 ? 'Нет прав' : 'Ошибка', variant: 'destructive' }); }
-    finally { setArchiving(false); }
+    try {
+      setTicket(await ticketsApi.archiveTicket(ticket.id));
+      toast({ title: 'Архивировано' });
+      setShowArchiveConfirm(false);
+    } catch (e: any) {
+      toast({ title: 'Ошибка', description: e?.response?.status === 403 ? 'Нет прав' : 'Ошибка', variant: 'destructive' });
+    } finally {
+      setArchiving(false);
+    }
   }, [ticket, toast]);
 
   const openEditModal = useCallback(() => {
@@ -639,7 +783,7 @@ const getAuthorName = useCallback((c: Comment) => {
         try {
           const att = await attachmentsApi.uploadAttachment(block.localFile!, 'ticket', ticket.id);
           uploadMap[block.id] = att.id;
-        } catch (e) { failedUploads.push(block.id); }
+        } catch { failedUploads.push(block.id); }
       }
       if (failedUploads.length > 0) {
         toast({ title: 'Ошибка загрузки', description: `Не удалось загрузить ${failedUploads.length} изображение(й).`, variant: 'destructive' });
@@ -666,8 +810,40 @@ const getAuthorName = useCallback((c: Comment) => {
       toast({ title: 'Сохранено' });
     } catch (e: any) {
       toast({ title: 'Ошибка', description: e?.message || 'Не удалось сохранить', variant: 'destructive' });
-    } finally { setSavingEdit(false); }
+    } finally {
+      setSavingEdit(false);
+    }
   }, [ticket, editTitle, editDescBlocks, editPriority, editTags, toast]);
+
+  /* ═══════════════════════════════════════════════════════════════════
+     FEEDBACK SUBMIT
+     ═══════════════════════════════════════════════════════════════════ */
+
+  const handleSubmitFeedback = useCallback(async () => {
+    if (!feedbackRating || !ticket?.id) return;
+    setSavingFeedback(true);
+    try {
+      const fb = await feedbacksApi.create({
+        ticket_id: ticket.id,
+        rating: feedbackRating,
+        comment: feedbackComment.trim(),
+      });
+      setExistingFeedback(fb);
+      setShowFeedbackForm(false);
+      toast({
+        title: 'Спасибо за оценку!',
+        description: `${feedbackRating}/5 — отзыв сохранён`,
+      });
+    } catch {
+      toast({ title: 'Ошибка', description: 'Не удалось сохранить отзыв', variant: 'destructive' });
+    } finally {
+      setSavingFeedback(false);
+    }
+  }, [feedbackRating, feedbackComment, ticket?.id, toast]);
+
+  /* ═══════════════════════════════════════════════════════════════════
+     EFFECTS
+     ═══════════════════════════════════════════════════════════════════ */
 
   useEffect(() => {
     if (activeTab !== 'details' || previewsLoaded || !ticket?.attachments) return;
@@ -702,21 +878,21 @@ const getAuthorName = useCallback((c: Comment) => {
   const formatFileSize = useCallback((b: number) => b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(1)} MB`, []);
   const getFileIcon = useCallback((m: string) => m.startsWith('image/') ? <Image className="w-6 h-6" /> : <File className="w-6 h-6" />, []);
 
-const getStatusColor = useCallback((s: string) => {
+  const getStatusColor = useCallback((s: string) => {
     const map: Record<string, string> = {
-      'new': 'status-new', 
-      'pending_approval': 'status-agreement', // ✅ Изменено на status-agreement
+      'new': 'status-new',
+      'pending_approval': 'status-agreement',
       'open': 'status-open',
-      'in_progress': 'status-progress', 
-      'waiting': 'status-waiting', 
+      'in_progress': 'status-progress',
+      'waiting': 'status-waiting',
       'resolved': 'status-resolved',
-      'closed': 'status-closed', 
-      'reopened': 'status-reopened', 
+      'closed': 'status-closed',
+      'reopened': 'status-reopened',
       'rejected': 'status-rejected',
-      'cancelled': 'status-closed',  // ✅ Используем стиль закрытого/нейтрального
+      'cancelled': 'status-closed',
     };
     return map[s] || 'status-closed';
-}, []);
+  }, []);
 
   const getPriorityColor = useCallback((p: string) => {
     const map: Record<string, string> = {
@@ -748,15 +924,28 @@ const getStatusColor = useCallback((s: string) => {
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
   }, []);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-12 h-12 text-[var(--accent)] animate-spin" /></div>;
+  /* ═══════════════════════════════════════════════════════════════════
+     RENDER GUARDS
+     ═══════════════════════════════════════════════════════════════════ */
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="w-12 h-12 text-[var(--accent)] animate-spin" />
+    </div>
+  );
+
   if (!ticket) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
         <p className="text-[var(--text-primary)]/50 text-base mb-4">Заявка не найдена</p>
-        <Link to="/tickets" className="px-6 py-3 bg-[var(--hover-1)] hover:bg-[var(--hover-1)] rounded-xl text-[var(--text-primary)]">Вернуться</Link>
+        <Link to="/tickets" className="px-6 py-3 bg-[var(--hover-1)] rounded-xl text-[var(--text-primary)]">Вернуться</Link>
       </div>
     </div>
   );
+
+  /* ═══════════════════════════════════════════════════════════════════
+     JSX
+     ═══════════════════════════════════════════════════════════════════ */
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -778,11 +967,8 @@ const getStatusColor = useCallback((s: string) => {
               </span>
             )}
             {!ticket.is_archived && (user?.user_id === ticket.created_by || user?.user_id === ticket.reporter_id || isStaff) && (
-
               <button onClick={openEditModal}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-base
-                              bg-[var(--hover-2)] hover:bg-[var(--hover-3)] border border-[var(--border-color)]
-                              text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] transition-colors">
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-base bg-[var(--hover-2)] hover:bg-[var(--hover-3)] border border-[var(--border-color)] text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] transition-colors">
                 <Edit className="w-4 h-4" /> Редактировать
               </button>
             )}
@@ -795,6 +981,174 @@ const getStatusColor = useCallback((s: string) => {
         </div>
       </div>
 
+      {/* ── Feedback Banner ── */}
+      {feedbackBannerState === 'show' && (
+        <AnimatePresence mode="wait">
+          {/* Форма оценки */}
+          {!existingFeedback && showFeedbackForm && (
+            <motion.div
+              key="feedback-form"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-5 py-5"
+            >
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    Оцените работу по заявке
+                  </p>
+                  <p className="text-xs text-[var(--text-primary)]/40 mt-0.5">#{ticket.number}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowFeedbackForm(false);
+                    setFeedbackRating(0);
+                    setFeedbackComment('');
+                    setFeedbackHovered(0);
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/25 hover:text-[var(--text-primary)]/55"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Stars */}
+                <div className="flex flex-col items-start gap-1.5">
+                  <InlineStarRating
+                    value={feedbackRating}
+                    hovered={feedbackHovered}
+                    onChange={setFeedbackRating}
+                    onHover={setFeedbackHovered}
+                    onLeave={() => setFeedbackHovered(0)}
+                    size={32}
+                  />
+                  {(feedbackHovered || feedbackRating) > 0 && (
+                    <span className="text-xs text-emerald-500/70 font-medium">
+                      {FEEDBACK_RATING_LABELS[(feedbackHovered || feedbackRating) as keyof typeof FEEDBACK_RATING_LABELS]}
+                    </span>
+                  )}
+                </div>
+
+                {/* Comment */}
+                <textarea
+                  value={feedbackComment}
+                  onChange={e => setFeedbackComment(e.target.value)}
+                  placeholder="Комментарий (необязательно)..."
+                  rows={2}
+                  className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-emerald-500/30 focus:ring-2 focus:ring-emerald-500/10 resize-none transition-all"
+                />
+
+                {/* Actions */}
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => {
+                      setShowFeedbackForm(false);
+                      setFeedbackRating(0);
+                      setFeedbackComment('');
+                    }}
+                    className="px-4 py-2 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/55 text-sm transition-colors"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    disabled={!feedbackRating || savingFeedback}
+                    onClick={handleSubmitFeedback}
+                    className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-40 transition-colors"
+                  >
+                    {savingFeedback
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Check className="w-3.5 h-3.5" />
+                    }
+                    Отправить
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Приглашение оценить */}
+          {!existingFeedback && !showFeedbackForm && (
+            <motion.div
+              key="feedback-prompt"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-5 py-4"
+            >
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                    <Star className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">
+                      Как вам обслуживание по этой заявке?
+                    </p>
+                    <p className="text-xs text-[var(--text-primary)]/40 mt-0.5">
+                      Тикет закрыт — оставьте оценку, это займёт меньше минуты
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => setShowFeedbackForm(true)}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
+                  >
+                    <Star className="w-3.5 h-3.5" />
+                    Оценить
+                  </button>
+                  <button
+                    onClick={() => setFeedbackBannerState('hidden')}
+                    className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/25 hover:text-[var(--text-primary)]/55 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Уже оценено */}
+          {existingFeedback && (
+            <motion.div
+              key="feedback-done"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-5 py-3.5"
+            >
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <InlineStarRating
+                    value={existingFeedback.rating}
+                    readonly
+                    size={16}
+                  />
+                  <span className="text-sm text-[var(--text-primary)]/50">
+                    Вы оценили эту заявку на {existingFeedback.rating}/5
+                  </span>
+                  {existingFeedback.comment && (
+                    <span className="text-sm text-[var(--text-primary)]/35 truncate max-w-[200px] hidden md:block">
+                      — {existingFeedback.comment}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setFeedbackBannerState('hidden')}
+                  className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/20 hover:text-[var(--text-primary)]/45 flex-shrink-0 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
+
       {/* Main grid */}
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
@@ -802,16 +1156,22 @@ const getStatusColor = useCallback((s: string) => {
           <div className="flex gap-2 border-b border-[var(--border-color)] overflow-x-auto">
             {tabs.map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-6 py-3 rounded-t-xl transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-[var(--accent)]/50 text-white border-b-2 border-[var(--accent)] ' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-1)]'
-                  }`}>
+                className={`flex items-center gap-2 px-6 py-3 rounded-t-xl transition-all whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'bg-[var(--accent)]/50 text-white border-b-2 border-[var(--accent)]'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-1)]'
+                }`}>
                 <tab.icon className="w-5 h-5" />
                 <span className="text-base font-medium">{tab.label}</span>
-                {tab.count !== undefined && tab.count > 0 && <span className="ml-1 px-2 py-0.5 rounded-full bg-[var(--hover-1)] text-base">{tab.count}</span>}
+                {tab.count !== undefined && tab.count > 0 && (
+                  <span className="ml-1 px-2 py-0.5 rounded-full bg-[var(--hover-1)] text-base">{tab.count}</span>
+                )}
               </button>
             ))}
           </div>
 
           <div className="bg-[var(--hover-1)] backdrop-blur-sm rounded-xl border border-[var(--border-color)]">
+            {/* Chat */}
             {activeTab === 'chat' && (
               <div className="flex flex-col">
                 <div className="px-6 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
@@ -826,38 +1186,74 @@ const getStatusColor = useCallback((s: string) => {
                       <div className="flex gap-1 bg-[var(--hover-1)] rounded-lg p-0.5">
                         {(['newest', 'oldest'] as const).map(order => (
                           <button key={order} onClick={() => setCommentSortOrder(order)}
-                            className={`px-3 py-1.5 text-base rounded-md transition-colors ${commentSortOrder === order ? 'bg-[var(--accent)]/50 text-white' : 'text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60'
-                              }`}>
+                            className={`px-3 py-1.5 text-base rounded-md transition-colors ${
+                              commentSortOrder === order
+                                ? 'bg-[var(--accent)]/50 text-white'
+                                : 'text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60'
+                            }`}>
                             {order === 'newest' ? 'Сначала новые' : 'Сначала старые'}
                           </button>
                         ))}
                       </div>
-                      {canWriteInternal && <span className="text-base text-[var(--text-primary)]/40">Внутренние видны только сотрудникам</span>}
+                      {canWriteInternal && (
+                        <span className="text-base text-[var(--text-primary)]/40">Внутренние видны только сотрудникам</span>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 <div className="p-5 border-b border-[var(--border-color)]">
-                  <CommentForm message={message} setMessage={setMessage} onSend={handleSendMessage} sending={sending}
-                    messageType={messageType} setMessageType={setMessageType} canWriteInternal={canWriteInternal}
-                    onSuccess={() => { if (ticket?.id) loadComments(ticket.id, 1, false); }} />
+                  <CommentForm
+                    message={message}
+                    setMessage={setMessage}
+                    onSend={handleSendMessage}
+                    sending={sending}
+                    messageType={messageType}
+                    setMessageType={setMessageType}
+                    canWriteInternal={canWriteInternal}
+                    onSuccess={() => { if (ticket?.id) loadComments(ticket.id, 1, false); }}
+                  />
                 </div>
 
                 <div ref={chatContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-6 space-y-5 max-h-[500px]">
                   {loadingComments && sortedRootComments.length === 0 ? (
-                    <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 text-[var(--text-primary)]/40 animate-spin" /></div>
+                    <div className="flex justify-center py-10">
+                      <Loader2 className="w-8 h-8 text-[var(--text-primary)]/40 animate-spin" />
+                    </div>
                   ) : sortedRootComments.length > 0 ? (
                     <>
-                      {loadingMoreComments && <div className="flex justify-center py-2"><Loader2 className="w-6 h-6 text-[var(--text-primary)]/40 animate-spin" /></div>}
+                      {loadingMoreComments && (
+                        <div className="flex justify-center py-2">
+                          <Loader2 className="w-6 h-6 text-[var(--text-primary)]/40 animate-spin" />
+                        </div>
+                      )}
                       {sortedRootComments.map(comment => (
-                        <CommentItem key={comment.id} comment={comment} isReplying={replyingTo === comment.id}
-                          onReply={handleReply} onSendReply={handleSendReply} onEditComment={handleEditComment}
+                        <CommentItem
+                          key={comment.id}
+                          comment={comment}
+                          isReplying={replyingTo === comment.id}
+                          onReply={handleReply}
+                          onSendReply={handleSendReply}
+                          onEditComment={handleEditComment}
                           onDeleteComment={() => { setCommentToDelete(comment.id); setShowDeleteConfirm(true); }}
-                          replyText={replyText} setReplyText={setReplyText} replyingTo={replyingTo} setReplyingTo={setReplyingTo}
-                          getAuthorName={getAuthorName} formatRelativeTime={formatRelativeTime} getAvatarColor={getAvatarColor}
-                          handleDownload={handleDownload} ticketId={ticket.id} currentUser={user} onReactionUpdated={handleReactionUpdated} />
+                          replyText={replyText}
+                          setReplyText={setReplyText}
+                          replyingTo={replyingTo}
+                          setReplyingTo={setReplyingTo}
+                          getAuthorName={getAuthorName}
+                          formatRelativeTime={formatRelativeTime}
+                          getAvatarColor={getAvatarColor}
+                          handleDownload={handleDownload}
+                          ticketId={ticket.id}
+                          currentUser={user}
+                          onReactionUpdated={handleReactionUpdated}
+                        />
                       ))}
-                      {!hasMoreComments && <div className="text-center py-4 text-base text-[var(--text-primary)]/40">Все комментарии загружены</div>}
+                      {!hasMoreComments && (
+                        <div className="text-center py-4 text-base text-[var(--text-primary)]/40">
+                          Все комментарии загружены
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div className="text-center py-16">
@@ -870,6 +1266,7 @@ const getStatusColor = useCallback((s: string) => {
               </div>
             )}
 
+            {/* Details */}
             {activeTab === 'details' && (
               <div className="p-6 space-y-8">
                 <div>
@@ -877,7 +1274,10 @@ const getStatusColor = useCallback((s: string) => {
                     <FileText className="w-5 h-5 text-[var(--text-primary)]/60" /> Описание
                   </h3>
                   <div className="p-6">
-                    <TicketDescriptionContent text={ticket.description || 'Описание отсутствует'} className="text-[var(--text-primary)] text-base leading-relaxed" />
+                    <TicketDescriptionContent
+                      text={ticket.description || 'Описание отсутствует'}
+                      className="text-[var(--text-primary)] text-base leading-relaxed"
+                    />
                   </div>
                 </div>
 
@@ -916,7 +1316,8 @@ const getStatusColor = useCallback((s: string) => {
                             <div className="h-52 bg-zinc-950 flex items-center justify-center relative overflow-hidden">
                               {isImage && imagePreviews[file.id]
                                 ? <img src={imagePreviews[file.id]} alt={file.original_filename} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                                : isImage ? <Loader2 className="w-8 h-8 text-[var(--text-primary)]/40 animate-spin" />
+                                : isImage
+                                  ? <Loader2 className="w-8 h-8 text-[var(--text-primary)]/40 animate-spin" />
                                   : <div className="text-6xl text-[var(--text-primary)]/40">{getFileIcon(file.mime_type)}</div>
                               }
                               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
@@ -939,6 +1340,7 @@ const getStatusColor = useCallback((s: string) => {
               </div>
             )}
 
+            {/* History */}
             {activeTab === 'history' && (
               <div className="p-6">
                 <div className="space-y-5">
@@ -948,7 +1350,10 @@ const getStatusColor = useCallback((s: string) => {
                   {sortedHistory.length > 5 && (
                     <button onClick={() => setExpandedHistory(!expandedHistory)}
                       className="flex items-center gap-2 text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 text-base mt-4">
-                      {expandedHistory ? <>Скрыть <ChevronUp className="w-4 h-4" /></> : <>Показать все ({sortedHistory.length}) <ChevronDown className="w-4 h-4" /></>}
+                      {expandedHistory
+                        ? <><ChevronUp className="w-4 h-4" /> Скрыть</>
+                        : <><ChevronDown className="w-4 h-4" /> Показать все ({sortedHistory.length})</>
+                      }
                     </button>
                   )}
                   {sortedHistory.length === 0 && (
@@ -961,6 +1366,7 @@ const getStatusColor = useCallback((s: string) => {
               </div>
             )}
 
+            {/* Manage */}
             {activeTab === 'manage' && canShowManage && (
               <div className="p-6 space-y-8">
                 <div className="bg-[var(--hover-1)] rounded-xl p-6">
@@ -985,31 +1391,36 @@ const getStatusColor = useCallback((s: string) => {
                       <p className="text-[var(--warning)]/80 text-base">У вас нет прав</p>
                     </div>
                   ) : availableStatuses.length === 0 ? (
-                    <div className="bg-[var(--hover-1)] rounded-xl p-8 text-center"><p className="text-[var(--text-primary)]/50 text-lg">Нет доступных переходов</p></div>
+                    <div className="bg-[var(--hover-1)] rounded-xl p-8 text-center">
+                      <p className="text-[var(--text-primary)]/50 text-lg">Нет доступных переходов</p>
+                    </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-4">
-  {availableStatuses.map(status => {
-    const statusBtnMap: Record<string, string> = {
-      'new': 'status-new', 
-      'pending_approval': 'status-agreement', // ✅ Изменено на status-agreement
-      'open': 'status-open',
-      'in_progress': 'status-progress', 
-      'waiting': 'status-waiting', 
-      'resolved': 'status-resolved',
-      'closed': 'status-closed', 
-      'reopened': 'status-reopened', 
-      'rejected': 'status-rejected',
-      'cancelled': 'status-closed',  // ✅ Используем стиль закрытого
-    };
-    const cls = statusBtnMap[status] || 'bg-[var(--hover-1)] text-[var(--text-primary)]';
-    return (
-      <button key={status} onClick={() => handleStatusChange(status)} disabled={updatingStatus}
-        className={`flex items-center justify-center gap-3 px-5 py-3 rounded-xl font-medium transition-all border ${cls} hover:brightness-145 disabled:opacity-50 text-base`}>
-        {updatingStatus ? <Loader2 className="w-5 h-5 animate-spin" /> : STATUS_LABELS[status] || status}
-      </button>
-    );
-  })}
-</div>
+                      {availableStatuses.map(status => {
+                        const statusBtnMap: Record<string, string> = {
+                          'new': 'status-new',
+                          'pending_approval': 'status-agreement',
+                          'open': 'status-open',
+                          'in_progress': 'status-progress',
+                          'waiting': 'status-waiting',
+                          'resolved': 'status-resolved',
+                          'closed': 'status-closed',
+                          'reopened': 'status-reopened',
+                          'rejected': 'status-rejected',
+                          'cancelled': 'status-closed',
+                        };
+                        const cls = statusBtnMap[status] || 'bg-[var(--hover-1)] text-[var(--text-primary)]';
+                        return (
+                          <button key={status} onClick={() => handleStatusChange(status)} disabled={updatingStatus}
+                            className={`flex items-center justify-center gap-3 px-5 py-3 rounded-xl font-medium transition-all border ${cls} hover:brightness-145 disabled:opacity-50 text-base`}>
+                            {updatingStatus
+                              ? <Loader2 className="w-5 h-5 animate-spin" />
+                              : STATUS_LABELS[status] || status
+                            }
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
 
@@ -1031,7 +1442,7 @@ const getStatusColor = useCallback((s: string) => {
                             </div>
                           </div>
                           <button onClick={() => { loadSupportUsers(); setShowAssigneeModal(true); }}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] border border-[var(--border-color)] hover:border-[var(--border-hover)] transition-all duration-200">
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] border border-[var(--border-color)] transition-all">
                             Изменить
                           </button>
                         </div>
@@ -1039,8 +1450,8 @@ const getStatusColor = useCallback((s: string) => {
                         <div className="text-center py-5">
                           <p className="text-[var(--text-primary)]/50 text-lg mb-4">Не назначен</p>
                           <button onClick={() => { loadSupportUsers(); setShowAssigneeModal(true); }}
-                            className=" px-4 py-2 rounded-lg text-sm font-medium bg-[var(--accent)]/40 hover:bg-[var(--accent)]/60 text-[var(--text-primary)]/80 hover:text-[var(--text-primary)] border border-[var(--accent)]/20 hover:border-[var(--accent)]/40 transition-all duration-200">
-                            <UserPlus className="w-5 h-5 inline mr-2 " />Назначить
+                            className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--accent)]/40 hover:bg-[var(--accent)]/60 text-[var(--text-primary)]/80 hover:text-[var(--text-primary)] border border-[var(--accent)]/20 transition-all">
+                            <UserPlus className="w-5 h-5 inline mr-2" />Назначить
                           </button>
                         </div>
                       )}
@@ -1056,7 +1467,10 @@ const getStatusColor = useCallback((s: string) => {
                     {ticket.is_archived ? (
                       <div className="flex items-center justify-between gap-4">
                         <div>
-                          <div className="flex items-center gap-2 mb-1"><Archive className="w-5 h-5 text-amber-400" /><span className="text-base font-semibold text-[var(--text-primary)]">В архиве</span></div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Archive className="w-5 h-5 text-amber-400" />
+                            <span className="text-base font-semibold text-[var(--text-primary)]">В архиве</span>
+                          </div>
                           <p className="text-base text-[var(--text-primary)]/40">Доступна только для чтения</p>
                         </div>
                         <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-base font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
@@ -1066,7 +1480,10 @@ const getStatusColor = useCallback((s: string) => {
                     ) : canArchive() ? (
                       <div className="flex items-center justify-between gap-6">
                         <div>
-                          <div className="flex items-center gap-2 mb-1"><Archive className="w-5 h-5 text-[var(--text-primary)]/60" /><span className="text-base font-semibold text-[var(--text-primary)] hover:brightness-125">Архивировать</span></div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Archive className="w-5 h-5 text-[var(--text-primary)]/60" />
+                            <span className="text-base font-semibold text-[var(--text-primary)]">Архивировать</span>
+                          </div>
                           <p className="text-base text-[var(--text-primary)]/40">Скроется из основного списка</p>
                         </div>
                         <button onClick={() => setShowArchiveConfirm(true)} disabled={archiving}
@@ -1101,15 +1518,13 @@ const getStatusColor = useCallback((s: string) => {
                     <User className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <p className="font-semibold text-[var(--text-primary)] text-base">
-                      {getAssigneeName() || 'Исполнитель'}
-                    </p>
+                    <p className="font-semibold text-[var(--text-primary)] text-base">{getAssigneeName() || 'Исполнитель'}</p>
                     <p className="text-sm text-[var(--text-primary)]/40">Текущий исполнитель</p>
                   </div>
                 </div>
                 {canAssign && (
                   <button onClick={() => { loadSupportUsers(); setShowAssigneeModal(true); }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] border border-[var(--border-color)] hover:border-[var(--border-hover)] transition-all duration-200">
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] border border-[var(--border-color)] transition-all">
                     Изменить
                   </button>
                 )}
@@ -1120,21 +1535,18 @@ const getStatusColor = useCallback((s: string) => {
                   <div className="w-12 h-12 rounded-xl bg-[var(--hover-2)] border border-dashed border-[var(--border-color)] flex items-center justify-center">
                     <User className="w-6 h-6 text-[var(--text-primary)]/40" />
                   </div>
-                  <div>
-                    <p className="text-[var(--text-primary)]/40 text-base">Не назначен</p>
-                  </div>
+                  <p className="text-[var(--text-primary)]/40 text-base">Не назначен</p>
                 </div>
                 {canAssign && (
                   <button onClick={() => { loadSupportUsers(); setShowAssigneeModal(true); }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[var(--accent)]/40 hover:bg-[var(--accent)]/60 text-[var(--text-primary)]/80 hover:text-[var(--text-primary)] border border-[var(--accent)]/20 hover:border-[var(--accent)]/40 transition-all duration-200 ">
-                    <UserPlus className="w-4 h-4" />
-                    Назначить
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[var(--accent)]/40 hover:bg-[var(--accent)]/60 text-[var(--text-primary)]/80 hover:text-[var(--text-primary)] border border-[var(--accent)]/20 transition-all">
+                    <UserPlus className="w-4 h-4" /> Назначить
                   </button>
                 )}
               </div>
             )}
           </div>
-         
+
           <div className="bg-[var(--hover-1)] backdrop-blur-sm rounded-xl border border-[var(--border-color)] p-6">
             <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-5 flex items-center gap-3">
               <FileText className="w-5 h-5 text-[var(--text-primary)]/60" /> Информация
@@ -1147,21 +1559,28 @@ const getStatusColor = useCallback((s: string) => {
                 { label: 'Приоритет', value: <span className={`px-3 py-1 rounded-lg text-base font-medium border ${getPriorityColor(ticket.priority)}`}>{PRIORITY_LABELS[ticket.priority] || ticket.priority}</span> },
               ].map(r => (
                 <div key={r.label} className="flex justify-between items-center py-2 border-b border-[var(--border-color)]">
-                  <span className="text-[var(--text-primary)]/50 text-base">{r.label}</span>{r.value}
+                  <span className="text-[var(--text-primary)]/50 text-base">{r.label}</span>
+                  {r.value}
                 </div>
               ))}
               {ticket.is_archived && (
                 <div className="flex justify-between items-center py-2 border-b border-[var(--border-color)]">
                   <span className="text-[var(--text-primary)]/50 text-base">Архив</span>
-                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-base font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30"><Archive className="w-3.5 h-3.5" /> Да</span>
+                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-base font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                    <Archive className="w-3.5 h-3.5" /> Да
+                  </span>
                 </div>
               )}
               <div className="pt-3 space-y-3">
-                {[{ label: 'Создана', value: formatDate(ticket.created_at) },
-                ...(ticket.closed_at ? [{ label: 'Закрыта', value: formatDate(ticket.closed_at) }] : []),
-                { label: 'Обновлена', value: formatDate(ticket.updated_at) },
+                {[
+                  { label: 'Создана', value: formatDate(ticket.created_at) },
+                  ...(ticket.closed_at ? [{ label: 'Закрыта', value: formatDate(ticket.closed_at) }] : []),
+                  { label: 'Обновлена', value: formatDate(ticket.updated_at) },
                 ].map(r => (
-                  <div key={r.label}><span className="text-[var(--text-primary)]/50 text-base block mb-1">{r.label}</span><span className="text-[var(--text-primary)] text-base">{r.value}</span></div>
+                  <div key={r.label}>
+                    <span className="text-[var(--text-primary)]/50 text-base block mb-1">{r.label}</span>
+                    <span className="text-[var(--text-primary)] text-base">{r.value}</span>
+                  </div>
                 ))}
               </div>
             </div>
@@ -1176,8 +1595,16 @@ const getStatusColor = useCallback((s: string) => {
                 <p className="text-[var(--text-primary)] font-semibold text-lg">{counterparty.name}</p>
                 <p className="text-[var(--text-primary)]/50 text-base">{counterparty.legal_name}</p>
                 {counterparty.inn && <p className="text-[var(--text-primary)]/40 text-base">ИНН: {counterparty.inn}</p>}
-                {counterparty.phone && <a href={`tel:${counterparty.phone}`} className="flex items-center gap-2 text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 text-base"><Phone className="w-4 h-4" />{counterparty.phone}</a>}
-                {counterparty.email && <a href={`mailto:${counterparty.email}`} className="flex items-center gap-2 text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 text-base break-all"><Mail className="w-4 h-4" />{counterparty.email}</a>}
+                {counterparty.phone && (
+                  <a href={`tel:${counterparty.phone}`} className="flex items-center gap-2 text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 text-base">
+                    <Phone className="w-4 h-4" />{counterparty.phone}
+                  </a>
+                )}
+                {counterparty.email && (
+                  <a href={`mailto:${counterparty.email}`} className="flex items-center gap-2 text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 text-base break-all">
+                    <Mail className="w-4 h-4" />{counterparty.email}
+                  </a>
+                )}
               </div>
             ) : <p className="text-[var(--text-primary)]/50 text-base">Не указан</p>}
           </div>
@@ -1197,7 +1624,7 @@ const getStatusColor = useCallback((s: string) => {
                   customer: 'Клиент', customer_admin: 'Администратор клиента',
                   support_agent: 'Агент', support_manager: 'Менеджер', admin: 'Администратор',
                 };
-                const userRoleLabel = reporter.roles && reporter.roles.length > 0 
+                const userRoleLabel = reporter.roles && reporter.roles.length > 0
                   ? reporter.roles.map(r => roleLabels[r] || r).join(', ')
                   : 'Пользователь';
                 return (
@@ -1275,7 +1702,6 @@ const getStatusColor = useCallback((s: string) => {
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowAssigneeModal(false)} />
           <div className="relative w-full max-w-lg max-h-[80vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden"
             style={{ boxShadow: 'var(--shadow-lg)' }}>
-
             <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border-color)] bg-[var(--hover-1)] flex-shrink-0">
               <div>
                 <h2 className="text-lg font-bold text-[var(--text-primary)]">
@@ -1284,7 +1710,9 @@ const getStatusColor = useCallback((s: string) => {
                 <p className="text-sm text-[var(--text-primary)]/40 mt-0.5">#{ticket.number}</p>
               </div>
               <button onClick={() => setShowAssigneeModal(false)} disabled={updatingAssignee}
-                className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"><X size={20} /></button>
+                className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]">
+                <X size={20} />
+              </button>
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto p-6">
@@ -1310,11 +1738,8 @@ const getStatusColor = useCallback((s: string) => {
               ) : (
                 <div className="space-y-2">
                   {filteredUsers.map(emp => (
-                    <button
-                      key={emp.id}
-                      onClick={() => handleAssign(emp.id)}
-                      className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-[var(--hover-1)] border border-[var(--border-color)] transition-colors text-left"
-                    >
+                    <button key={emp.id} onClick={() => handleAssign(emp.id)}
+                      className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-[var(--hover-1)] border border-[var(--border-color)] transition-colors text-left">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-700 to-red-800 flex items-center justify-center flex-shrink-0">
                         <User className="w-5 h-5 text-white" />
                       </div>
@@ -1339,11 +1764,8 @@ const getStatusColor = useCallback((s: string) => {
             </div>
 
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--hover-1)] flex-shrink-0">
-              <button
-                onClick={() => setShowAssigneeModal(false)}
-                disabled={updatingAssignee}
-                className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-base"
-              >
+              <button onClick={() => setShowAssigneeModal(false)} disabled={updatingAssignee}
+                className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-base">
                 Отмена
               </button>
             </div>
@@ -1363,18 +1785,25 @@ const getStatusColor = useCallback((s: string) => {
                 <p className="text-sm text-[var(--text-primary)]/40 mt-0.5">#{ticket.number}</p>
               </div>
               <button onClick={() => setShowEditModal(false)} disabled={savingEdit}
-                className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"><X size={20} /></button>
+                className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]">
+                <X size={20} />
+              </button>
             </div>
+
             <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6">
               <div>
-                <label className="block text-base font-medium text-[var(--text-primary)]/70 mb-2">Тема <span className="text-[var(--accent)]">*</span></label>
+                <label className="block text-base font-medium text-[var(--text-primary)]/70 mb-2">
+                  Тема <span className="text-[var(--accent)]">*</span>
+                </label>
                 <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)}
                   className="w-full px-4 py-3 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-base focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)]" />
               </div>
+
               <div>
                 <label className="block text-base font-medium text-[var(--text-primary)]/70 mb-2">Описание</label>
                 <TicketEditor blocks={editDescBlocks} onChange={setEditDescBlocks} />
               </div>
+
               <div>
                 <label className="block text-base font-medium text-[var(--text-primary)]/70 mb-3">Приоритет</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1385,11 +1814,17 @@ const getStatusColor = useCallback((s: string) => {
                     { value: 'critical', label: 'Критический', cls: 'priority-critical' },
                   ].map(p => (
                     <button key={p.value} type="button" onClick={() => setEditPriority(p.value)}
-                      className={`px-3 py-2.5 rounded-xl text-base font-medium border transition-all ${editPriority === p.value ? p.cls : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--hover-2)]'
-                        }`}>{p.label}</button>
+                      className={`px-3 py-2.5 rounded-xl text-base font-medium border transition-all ${
+                        editPriority === p.value
+                          ? p.cls
+                          : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--hover-2)]'
+                      }`}>
+                      {p.label}
+                    </button>
                   ))}
                 </div>
               </div>
+
               <div>
                 <label className="block text-base font-medium text-[var(--text-primary)]/70 mb-3">Теги</label>
                 <div className="flex flex-wrap gap-2 mb-3">
@@ -1397,7 +1832,10 @@ const getStatusColor = useCallback((s: string) => {
                     <span key={tag.name} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-base font-medium"
                       style={{ backgroundColor: (tag.color || '#64748b') + '25', color: tag.color || '#94a3b8' }}>
                       {tag.name}
-                      <button type="button" onClick={() => setEditTags(p => p.filter(t => t.name !== tag.name))} className="text-[var(--text-primary)]/40 hover:text-[var(--accent)]"><X size={13} /></button>
+                      <button type="button" onClick={() => setEditTags(p => p.filter(t => t.name !== tag.name))}
+                        className="text-[var(--text-primary)]/40 hover:text-[var(--accent)]">
+                        <X size={13} />
+                      </button>
                     </span>
                   ))}
                 </div>
@@ -1405,20 +1843,37 @@ const getStatusColor = useCallback((s: string) => {
                   <input value={editNewTag} onChange={e => setEditNewTag(e.target.value)}
                     onKeyDown={e => {
                       if (e.key === 'Enter') {
-                        e.preventDefault(); const n = editNewTag.trim();
-                        if (n && !editTags.some(t => t.name.toLowerCase() === n.toLowerCase())) { setEditTags(p => [...p, { name: n, color: '#64748b' }]); setEditNewTag(''); }
+                        e.preventDefault();
+                        const n = editNewTag.trim();
+                        if (n && !editTags.some(t => t.name.toLowerCase() === n.toLowerCase())) {
+                          setEditTags(p => [...p, { name: n, color: '#64748b' }]);
+                          setEditNewTag('');
+                        }
                       }
                     }}
-                    placeholder="Новый тег (Enter)" className="flex-1 px-4 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-base placeholder-[var(--text-muted)] focus:outline-none" />
+                    placeholder="Новый тег (Enter)"
+                    className="flex-1 px-4 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-base placeholder-[var(--text-muted)] focus:outline-none"
+                  />
                   <button type="button" disabled={!editNewTag.trim()}
-                    onClick={() => { const n = editNewTag.trim(); if (n && !editTags.some(t => t.name.toLowerCase() === n.toLowerCase())) { setEditTags(p => [...p, { name: n, color: '#64748b' }]); setEditNewTag(''); } }}
-                    className="px-4 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/60 disabled:opacity-30"><Plus className="w-4 h-4" /></button>
+                    onClick={() => {
+                      const n = editNewTag.trim();
+                      if (n && !editTags.some(t => t.name.toLowerCase() === n.toLowerCase())) {
+                        setEditTags(p => [...p, { name: n, color: '#64748b' }]);
+                        setEditNewTag('');
+                      }
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/60 disabled:opacity-30">
+                    <Plus className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             </div>
+
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--hover-1)] flex-shrink-0">
               <button onClick={() => setShowEditModal(false)} disabled={savingEdit}
-                className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-base">Отмена</button>
+                className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-base">
+                Отмена
+              </button>
               <button onClick={handleSaveEdit} disabled={savingEdit || !editTitle.trim()}
                 className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent)] text-white text-base font-medium disabled:opacity-40 shadow-[var(--shadow-md)]">
                 {savingEdit && <Loader2 size={16} className="animate-spin" />}
@@ -1430,18 +1885,28 @@ const getStatusColor = useCallback((s: string) => {
       )}
 
       {/* Подтверждение удаления комментария */}
-      <ConfirmModal isOpen={showDeleteConfirm}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
         onClose={() => { setShowDeleteConfirm(false); setCommentToDelete(null); }}
         onConfirm={() => { if (commentToDelete) handleDeleteComment(commentToDelete); setShowDeleteConfirm(false); setCommentToDelete(null); }}
-        title="Удалить комментарий" message="Это действие нельзя отменить."
-        confirmText="Удалить" cancelText="Отмена" type="danger" />
+        title="Удалить комментарий"
+        message="Это действие нельзя отменить."
+        confirmText="Удалить"
+        cancelText="Отмена"
+        type="danger"
+      />
 
       {/* Подтверждение архивирования */}
-      <ConfirmModal isOpen={showArchiveConfirm}
+      <ConfirmModal
+        isOpen={showArchiveConfirm}
         onClose={() => setShowArchiveConfirm(false)}
         onConfirm={handleArchive}
-        title="Архивировать заявку" message={`Заявка «${ticket.title}» будет перемещена в архив.`}
-        confirmText={archiving ? 'Архивируем...' : 'Архивировать'} cancelText="Отмена" type="warning" />
+        title="Архивировать заявку"
+        message={`Заявка «${ticket.title}» будет перемещена в архив.`}
+        confirmText={archiving ? 'Архивируем...' : 'Архивировать'}
+        cancelText="Отмена"
+        type="warning"
+      />
     </div>
   );
 }
