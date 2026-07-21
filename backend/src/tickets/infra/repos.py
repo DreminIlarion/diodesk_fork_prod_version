@@ -65,10 +65,19 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
             tag_conditions = [self.model.tags.contains([{"name": tag}]) for tag in filters.tags]
             stmt = stmt.where(or_(*tag_conditions))
 
+        # фильтр по проектам
+        if filters.project_ids:
+            stmt = stmt.where(self.model.project_id.in_(filters.project_ids))
+
+        # фильтр по контрагенту
+        if filters.counterparty_id:
+            stmt = stmt.where(self.model.counterparty_id == filters.counterparty_id)
+
         if filters.search_query:
             stmt = stmt.where(
                 self.model.search_vector.op("@@")(
                     func.plainto_tsquery("russian", filters.search_query)
+                    
                 )
             )
 

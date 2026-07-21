@@ -492,6 +492,9 @@ export default function TicketsPage() {
   const [projectFilter, setProjectFilter] = useState<string[]>([]);
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [reporterFilter, setReporterFilter] = useState('');
+
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   
   const [showFilters, setShowFilters] = useState(false);
 
@@ -539,6 +542,8 @@ export default function TicketsPage() {
         project_ids: projectFilter.length > 0 ? projectFilter : undefined,
         assignee_id: assigneeFilter || undefined,
         reporter_id: reporterFilter || undefined,
+        created_after: dateFrom || undefined,
+        created_before: dateTo || undefined,
       });
       setTickets(response.items);
       setTotalPages(response.total_pages);
@@ -549,7 +554,7 @@ export default function TicketsPage() {
       setLoading(false);
       setInitialLoad(false);
     }
-  }, [statusFilter, priorityFilter, typeFilter, counterpartyFilter, projectFilter, assigneeFilter, reporterFilter, debouncedSearch]);
+    }, [statusFilter, priorityFilter, typeFilter, counterpartyFilter, projectFilter, assigneeFilter, reporterFilter, debouncedSearch, dateFrom, dateTo]);
 
   /* ── Вызов loadTickets при изменении фильтров ── */
   useEffect(() => {
@@ -570,6 +575,8 @@ export default function TicketsPage() {
         project_ids: projectFilter.length > 0 ? projectFilter : undefined,
         assignee_id: assigneeFilter || undefined,
         reporter_id: reporterFilter || undefined,
+        created_after: dateFrom || undefined,
+        created_before: dateTo || undefined,
       });
       setTickets(response.items);
       setTotalPages(response.total_pages);
@@ -593,11 +600,13 @@ export default function TicketsPage() {
     setSearch('');
     setDebouncedSearch('');
     setPage(1);
+    setDateFrom('');
+    setDateTo('');
   };
 
-  const hasFilters = !!(statusFilter.length || priorityFilter || typeFilter || counterpartyFilter || projectFilter.length || assigneeFilter || reporterFilter);
+  const hasFilters = !!(statusFilter.length || priorityFilter || typeFilter || counterpartyFilter || projectFilter.length || assigneeFilter || reporterFilter || dateFrom || dateTo);
+  const activeFiltersCount = [statusFilter.length, priorityFilter, typeFilter, counterpartyFilter, projectFilter.length, assigneeFilter, reporterFilter, dateFrom, dateTo].filter(Boolean).length;
   const hasActiveFilters = !!(hasFilters || debouncedSearch);
-  const activeFiltersCount = [statusFilter.length, priorityFilter, typeFilter, counterpartyFilter, projectFilter.length, assigneeFilter, reporterFilter].filter(Boolean).length;
 
   const getStatusColor = (s: string) => STATUS_MAP[s]?.color || 'status-closed';
   const getPriorityColor = (p: string) => PRIORITY_MAP[p]?.color || 'priority-medium';
@@ -708,6 +717,26 @@ export default function TicketsPage() {
             <FilterDropdown label="Проект" options={projectOptions} value={projectFilter} onChange={v => setProjectFilter(Array.isArray(v) ? v : [v])} placeholder="Все проекты" searchable multiple loading={loadingProjects} />
             <FilterDropdown label="Исполнитель" options={userOptions} value={assigneeFilter} onChange={v => setAssigneeFilter(v as string)} placeholder="Все исполнители" searchable loading={loadingUsers} />
             <FilterDropdown label="Автор" options={userOptions} value={reporterFilter} onChange={v => setReporterFilter(v as string)} placeholder="Все авторы" searchable loading={loadingUsers} />
+              <div>
+  <label className="text-sm text-[var(--text-primary)]/50 mb-1.5 block font-medium">Дата создания</label>
+  <div className="flex items-center gap-2">
+    <input 
+      type="date" 
+      value={dateFrom} 
+      onChange={e => setDateFrom(e.target.value)}
+      placeholder="С"
+      className="flex-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--accent)]/40" 
+    />
+    <span className="text-[var(--text-muted)] text-sm">—</span>
+    <input 
+      type="date" 
+      value={dateTo} 
+      onChange={e => setDateTo(e.target.value)}
+      placeholder="По"
+      className="flex-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--accent)]/40" 
+    />
+  </div>
+</div>
           </div>
         </div>
       )}
@@ -730,6 +759,19 @@ export default function TicketsPage() {
           ))}
           {assigneeFilter && <FilterTag label={users.find(u => u.id === assigneeFilter)?.full_name || 'Исполнитель'} onRemove={() => setAssigneeFilter('')} />}
           {reporterFilter && <FilterTag label={users.find(u => u.id === reporterFilter)?.full_name || 'Автор'} onRemove={() => setReporterFilter('')} />}
+            {dateFrom && dateTo && (
+          <FilterTag 
+            label={`${new Date(dateFrom).toLocaleDateString('ru-RU')} — ${new Date(dateTo).toLocaleDateString('ru-RU')}`} 
+            icon={<Calendar size={12} />} 
+            onRemove={() => { setDateFrom(''); setDateTo(''); }} 
+          />
+        )}
+        {dateFrom && !dateTo && (
+          <FilterTag label={`С ${new Date(dateFrom).toLocaleDateString('ru-RU')}`} icon={<Calendar size={12} />} onRemove={() => setDateFrom('')} />
+        )}
+        {!dateFrom && dateTo && (
+          <FilterTag label={`По ${new Date(dateTo).toLocaleDateString('ru-RU')}`} icon={<Calendar size={12} />} onRemove={() => setDateTo('')} />
+        )}
           <button onClick={resetFilters} className="text-base text-[var(--accent)]/60 hover:text-[var(--accent)] transition-colors ml-1">Сбросить</button>
         </div>
       )}
