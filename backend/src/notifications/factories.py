@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from src.core.settings import settings
-from src.tickets.domain.events import TicketAssigned, TicketCreated
+from src.tickets.domain.events import TicketAssigned, TicketCreated, TicketStatusChanged
 
 from .domain.entities import Notification
 from .domain.vo import NotificationType
@@ -52,6 +52,31 @@ class NotificationFactory:
                     "old_assignee": (
                         None if event.old_assignee is None else f"{event.old_assignee}"
                     ),
+                    "app_name": settings.app.name,
+                    "support_email": settings.mail.support_email,
+                },
+            )
+            for target in targets
+        ]
+
+    @staticmethod
+    def from_ticket_status_changed(event: TicketStatusChanged, targets: list[UUID]) -> list[Notification]:
+        status_label = event.new_status.value.replace("_", " ").capitalize()
+        
+        return [
+            Notification(
+                user_id=target,
+                title="Статус тикета изменён",
+                message=f"Статус тикета #{event.number} изменён на «{status_label}».",
+                type=NotificationType.TICKET_STATUS_CHANGED,
+                data={
+                    "ticket_id": f"{event.ticket_id}",
+                    "number": str(event.number),
+                    "ticket_title": f"Ticket #{event.number}",
+                    "ticket_url": f"{settings.frontend_url}/tickets/{event.number}",
+                    "old_status": event.old_status.value,
+                    "new_status": event.new_status.value,
+                    "changed_by": f"{event.changed_by}",
                     "app_name": settings.app.name,
                     "support_email": settings.mail.support_email,
                 },

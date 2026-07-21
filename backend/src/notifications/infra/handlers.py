@@ -10,6 +10,7 @@ from ..dependencies import get_notification_service, get_target_resolver
 from ..factories import NotificationFactory
 from ..resolvers import TargetResolver
 from ..services import NotificationService
+from ...tickets.domain.events import TicketStatusChanged
 
 router = RabbitRouter(settings.rabbit.url)
 
@@ -22,6 +23,17 @@ async def on_ticket_created(
 ) -> None:
     targets = await target_resolver.get_targets(event)
     notifications = NotificationFactory.from_ticket_created(event, targets)
+    for notification in notifications:
+        await service.notify(notification)
+
+@router.subscriber(queue=RabbitQueue("tickets.status_changed", durable=True))
+async def on_ticket_status_changed(
+        event: TicketStatusChanged,
+        target_resolver: Annotated[TargetResolver, Depends(get_target_resolver)],
+        service: Annotated[NotificationService, Depends(get_notification_service)],
+) -> None:
+    targets = await target_resolver.get_targets(event)
+    notifications = NotificationFactory.from_ticket_status_changed(event, targets)
     for notification in notifications:
         await service.notify(notification)
 
