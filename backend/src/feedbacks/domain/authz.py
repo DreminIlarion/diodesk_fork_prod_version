@@ -27,7 +27,6 @@ class FeedbackAuthZService:
         """
 
         policy = AllOf(
-            IsCustomerRule(subject),
             IsTicketReporterRule(subject, ticket),
             IsTicketClosedRule(ticket),
         )

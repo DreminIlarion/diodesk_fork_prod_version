@@ -28,7 +28,7 @@ async def create_product(
         current_user: CurrentUserDep, data: ProductCreate, service: ProductServiceDep
 ) -> ProductResponse:
     return await service.create(
-        data, created_by=current_user.id, created_by_role=current_user.role
+        data, created_by=current_user.id, created_by_role=current_user.roles[0] if current_user.roles else None
     )
 
 
