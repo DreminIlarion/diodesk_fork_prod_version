@@ -11,14 +11,28 @@ interface HistoryEntryProps {
   entry: {
     action: string;
     actor_id: string;
-    occurred_on: string;        // ← вместо created_at
-    changes: Record<string, any>; // ← вместо old_value/new_value
+    occurred_on: string;
+    changes: Record<string, any>;
     meta?: Record<string, any>;
     event_id?: string;
   };
   formatDate: (date: string) => string;
   actorNames: Map<string, string>;
 }
+
+// ─── Русификация статусов ──────
+const STATUS_LABELS: Record<string, string> = {
+  'new': 'Новый',
+  'pending_approval': 'На согласовании',
+  'open': 'Открыт',
+  'in_progress': 'В работе',
+  'waiting': 'Ожидает ответа',
+  'resolved': 'Решён',
+  'closed': 'Закрыт',
+  'reopened': 'Переоткрыт',
+  'rejected': 'Отклонён',
+  'cancelled': 'Отменён',
+};
 
 // Маппинг старых названий в новые
 const ACTION_MAP: Record<string, string> = {
@@ -31,6 +45,10 @@ const ACTION_MAP: Record<string, string> = {
   'ticket.reopened': 'reopened',
   'ticket.resolved': 'resolved',
   'ticket.archived': 'archived',
+  'ticket.approved': 'approved',
+  'ticket.approval_submitted': 'approval_submitted',
+  'ticket.paused': 'paused',
+  'ticket.canceled': 'canceled',
 };
 
 // ─── Хелперы ──────
@@ -88,7 +106,6 @@ interface EntryAnalysis {
 function analyzeEntry(changes: Record<string, any> | undefined): EntryAnalysis | null {
   if (!changes) return null;
   
-  // Для description_edited: changes = { description: [oldText, newText] }
   const oldVal = changes.description?.[0] || '';
   const newVal = changes.description?.[1] || '';
   
@@ -131,9 +148,9 @@ const ACTION_CONFIG: Record<string, {
     icon: <RefreshCw className="w-4.5 h-4.5" />,
     color: 'bg-yellow-500/15 text-yellow-400',
     getChangesText: (changes) => {
-      if (changes.old_status && changes.new_status) {
-        return `${changes.old_status} → ${changes.new_status}`;
-      }
+      const old = STATUS_LABELS[changes.old_status] || changes.old_status || 'Неизвестно';
+      const newS = STATUS_LABELS[changes.new_status] || changes.new_status || 'Неизвестно';
+      if (old && newS) return `${old} → ${newS}`;
       return null;
     },
   },
@@ -191,6 +208,31 @@ const ACTION_CONFIG: Record<string, {
     icon: <RefreshCw className="w-4.5 h-4.5" />,
     color: 'bg-orange-500/15 text-orange-400',
   },
+  resolved: {
+    label: 'Решил заявку',
+    icon: <CheckCircle className="w-4.5 h-4.5" />,
+    color: 'bg-green-500/15 text-green-400',
+  },
+  approved: {
+    label: 'Согласовал заявку',
+    icon: <CheckCircle className="w-4.5 h-4.5" />,
+    color: 'bg-green-500/15 text-green-400',
+  },
+  approval_submitted: {
+    label: 'Отправил на согласование',
+    icon: <FileText className="w-4.5 h-4.5" />,
+    color: 'bg-blue-500/15 text-blue-400',
+  },
+  paused: {
+    label: 'Приостановил заявку',
+    icon: <Clock className="w-4.5 h-4.5" />,
+    color: 'bg-amber-500/15 text-amber-400',
+  },
+  canceled: {
+    label: 'Отменил заявку',
+    icon: <X className="w-4.5 h-4.5" />,
+    color: 'bg-red-500/15 text-red-400',
+  },
 };
 
 const DEFAULT_ACTION_CONFIG = {
@@ -201,11 +243,9 @@ const DEFAULT_ACTION_CONFIG = {
 
 // ─── Компонент ────
 export const HistoryEntry = ({ entry, formatDate, actorNames }: HistoryEntryProps) => {
-  // Маппим действие
   const mappedAction = ACTION_MAP[entry.action] || entry.action;
   const isDescEdit = mappedAction === 'description_edited';
   
-  // Анализируем changes (новый формат)
   const changes = entry.changes || {};
   const analysis = isDescEdit ? analyzeEntry(changes) : null;
 
@@ -223,8 +263,6 @@ export const HistoryEntry = ({ entry, formatDate, actorNames }: HistoryEntryProp
   }
 
   const hasMediaChanges = !!analysis && (analysis.imagesAdded > 0 || analysis.imagesRemoved > 0);
-
-  // Текстовое представление изменений (для статуса, приоритета, исполнителя)
   const changesText = config.getChangesText?.(changes, actorNames);
 
   return (
@@ -244,14 +282,12 @@ export const HistoryEntry = ({ entry, formatDate, actorNames }: HistoryEntryProp
           {formatDate(entry.occurred_on)}
         </p>
 
-        {/* Текст изменений (статус, приоритет, исполнитель) */}
         {changesText && (
           <div className="mt-2 text-sm">
             <span className="text-[var(--text-primary)]/60">{changesText}</span>
           </div>
         )}
 
-        {/* Плашка про картинки */}
         {isDescEdit && hasMediaChanges && (
           <div className="mt-2 flex flex-wrap gap-2">
             {analysis!.imagesAdded > 0 && (
@@ -269,7 +305,6 @@ export const HistoryEntry = ({ entry, formatDate, actorNames }: HistoryEntryProp
           </div>
         )}
 
-        {/* Текстовый diff для описания */}
         {isDescEdit && analysis?.textChanged && (
           <div className="mt-2 space-y-1.5 text-sm">
             {analysis.oldText && (
