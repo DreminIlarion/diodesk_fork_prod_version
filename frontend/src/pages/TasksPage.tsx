@@ -7,7 +7,7 @@ import {
   Plus, Search, Filter, Calendar, Loader2, X, Check, Circle, Timer, Eye,
   ChevronDown, Flag, AlertCircle, CheckCircle2, Ban, RotateCcw, RefreshCw,
   Archive, FolderOpen, Ticket, Zap, Star, User, ChevronRight, Layers, UserCheck,
-  GitPullRequest, ThumbsUp, ThumbsDown, Pencil, Save, Milestone,
+  GitPullRequest, ThumbsUp, ThumbsDown, Pencil, Save, Milestone, ArrowUpRight,
 } from 'lucide-react';
 import { tasksApi, projectsApi, ticketsApi, usersApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
@@ -18,6 +18,12 @@ import type {
   SimpleUser, CounterpartyCustomer, Project,
 } from '../types';
 import { TASK_PRIORITY_LIST } from '../types';
+
+/* ═══════════════════════════════════════════════════════════════════
+   TYPES
+   ═══════════════════════════════════════════════════════════════════ */
+
+type ContextMode = 'my' | 'internal' | 'project' | 'assignee' | 'ticket';
 
 /* ═══════════════════════════════════════════════════════════════════
    CONSTANTS
@@ -193,8 +199,7 @@ function AsyncSelect({ value, onChange, loadOptions, placeholder, icon: LeadIcon
   }, [open]);
 
   const doLoad = useCallback(async (q: string, p: number, append = false) => {
-    if (append) setLoading(true);
-    else setLoading(true);
+    setLoading(true);
     try {
       const res = await loadOptions(q, p);
       setOptions(prev => append ? [...prev, ...res.items] : res.items);
@@ -332,7 +337,7 @@ function TaskCard({ task, userMap, isDragging, onDragStart, onDragEnd, onView }:
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   KANBAN COLUMN — ✅ ПУСТЫЕ КОЛОНКИ УЖЕ (220px)
+   KANBAN COLUMN
    ═══════════════════════════════════════════════════════════════════ */
 
 function KColumn({ column, userMap, isDragOver, draggedId, loadingMore, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop, onAdd, onView, onMore }: {
@@ -486,7 +491,7 @@ function CreateModal({ initialStatus, context, userMap, onClose, onOk }: {
           </div>
           <div className="mt-6 pt-5 border-t border-[var(--border-color)]">
             <button onClick={() => setTodo(v => !v)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-base ${todo ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}>
-              <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 ${todo ? 'bg-blue-500 border-blue-600' : 'border-[var(--border-color)]'}`}>{todo && <Check className="w-4 h-4 text-white" />}</div>
+              <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 ${todo ? 'bg-blue-500 border-blue-600' : 'border-[var(--border-color)]'}`}>{todo && <Check className="w-4 h-4 text-white" /></div>
               <span className="font-medium">Сразу готова к выполнению (перевести в «{STATUS_LABELS.todo}»)</span>
             </button>
           </div>
@@ -656,8 +661,8 @@ export default function TasksPage() {
 
   const loadProjectsAsync = useCallback(async (search: string, page: number) => {
     const res = await projectsApi.getAll(page, 20);
-    const items = search ? res.items.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.key.toLowerCase().includes(search.toLowerCase())) : res.items;
-    return { items: items.map(p => ({ value: p.id, label: p.name, sublabel: p.key, icon: <FolderOpen className="w-4 h-4 text-amber-400" /> })), hasNext: res.items.length === 20 };
+    const filtered = search ? res.items.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.key.toLowerCase().includes(search.toLowerCase())) : res.items;
+    return { items: filtered.map(p => ({ value: p.id, label: p.name, sublabel: p.key, icon: <FolderOpen className="w-4 h-4 text-amber-400" /> })), hasNext: res.items.length === 20 };
   }, []);
 
   const loadTicketsAsync = useCallback(async (search: string, page: number) => {
@@ -772,7 +777,7 @@ export default function TasksPage() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   DETAIL & ASSIGN MODALS (сокращённые)
+   DETAIL & ASSIGN MODALS
    ═══════════════════════════════════════════════════════════════════ */
 
 function DetailModal({ task, userMap, onClose, onRefresh, onNeedAssign }: {
