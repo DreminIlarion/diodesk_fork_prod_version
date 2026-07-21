@@ -1,11 +1,10 @@
 from typing import override
 
 from sqlalchemy import Select, cast, select
-from sqlalchemy.dialects.postgresql import JSONB, array
+from sqlalchemy.dialects.postgresql import JSONB, array, ARRAY, VARCHAR
 from src.shared.infra.repos import ModelMapper, SqlAlchemyRepository
 from src.shared.schemas import Page, Pagination
-
-from sqlalchemy import type_coerce
+from sqlalchemy import type_coerce, literal
 
 from ..domain.entities import Invitation, User
 from ..domain.repos import UserFilters
@@ -57,7 +56,9 @@ class SqlUserRepository(SqlAlchemyRepository[User, UserOrm]):
         if filters.roles is not None and filters.roles:
             roles_as_strings: list[str] = [role.value for role in filters.roles]
             stmt = stmt.where(
-                type_coerce(self.model.roles, JSONB).op('?|')(roles_as_strings)
+                type_coerce(self.model.roles, JSONB).op('?|')(
+                    cast(literal(roles_as_strings), ARRAY(VARCHAR))
+                )
             )
 
         if filters.counterparty_id is not None:
