@@ -2,9 +2,10 @@ from typing import override
 
 from sqlalchemy import Select, cast, select
 from sqlalchemy.dialects.postgresql import ARRAY, VARCHAR
-
 from src.shared.infra.repos import ModelMapper, SqlAlchemyRepository
 from src.shared.schemas import Page, Pagination
+
+from sqlalchemy.dialects.postgresql import array 
 
 from ..domain.entities import Invitation, User
 from ..domain.repos import UserFilters
@@ -55,7 +56,9 @@ class SqlUserRepository(SqlAlchemyRepository[User, UserOrm]):
     ) -> Select[tuple[UserOrm]]:
         if filters.roles is not None and filters.roles:
             roles_as_strings: list[str] = [role.value for role in filters.roles]
-            stmt = stmt.where(cast(self.model.roles, ARRAY(VARCHAR)).has_any(roles_as_strings))
+            stmt = stmt.where(
+                cast(self.model.roles, ARRAY(VARCHAR)).overlap(cast(roles_as_strings, ARRAY(VARCHAR)))
+            )
 
         if filters.counterparty_id is not None:
             stmt = stmt.where(self.model.counterparty_id == filters.counterparty_id)
