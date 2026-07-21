@@ -631,15 +631,15 @@ export const ticketsApi = {
     page: number = 1,
     size: number = 10,
     filters?: {
-      status?: TicketStatus | TicketStatus[];  // ✅ Поддержка массива
+      status?: TicketStatus | TicketStatus[];  //  Поддержка массива
       priority?: TicketPriority;
       ticket_type?: string;
       tags?: string[];
       query?: string;
-      counterparty_id?: string;                // ✅ Добавлено
-      project_ids?: string[];                  // ✅ Добавлено
-      assignee_id?: string;                    // ✅ Добавлено
-      reporter_id?: string;                    // ✅ Добавлено
+      counterparty_id?: string;                //  Добавлено
+      project_ids?: string[];                  //  Добавлено
+      assignee_id?: string;                    //  Добавлено
+      reporter_id?: string;                    //  Добавлено
       created_after?: string;
       created_before?: string;
     }
@@ -647,40 +647,40 @@ export const ticketsApi = {
     const response = await api.post<PaginatedResponse<TicketListItem>>(
       '/api/v1/tickets/search',
       {
-        // ✅ Статусы (массив или одиночное значение)
+        //  Статусы (массив или одиночное значение)
         statuses: filters?.status
           ? (Array.isArray(filters.status) ? filters.status : [filters.status])
           : undefined,
 
-        // ✅ Приоритет
+        //  Приоритет
         priorities: filters?.priority || undefined,
 
-        // ✅ Тип
+        //  Тип
         type: filters?.ticket_type || undefined,
 
-        // ✅ Теги
+        //  Теги
         tags: filters?.tags || undefined,
 
-        // ✅ Поиск
+        //  Поиск
         search_query: filters?.query || undefined,
 
-        // ✅ Контрагент
+        //  Контрагент
         counterparty_id: filters?.counterparty_id || undefined,
 
-        // ✅ Проекты (массив)
+        //  Проекты (массив)
         project_ids: filters?.project_ids || undefined,
 
-        // ✅ Акторы (исполнитель и автор)
+        //  Акторы (исполнитель и автор)
         actors: (filters?.assignee_id || filters?.reporter_id) ? {
           assignee_id: filters?.assignee_id || undefined,
           reporter_id: filters?.reporter_id || undefined,
         } : undefined,
 
-        // ✅ Даты
-        created_after: filters?.created_after || undefined,
-        created_before: filters?.created_before || undefined,
+        
       },
-      { params: { page, size } }
+      { params: { page, size, 
+        created_after: filters?.created_after || undefined,
+        created_before: filters?.created_before || undefined,} }
     );
     return response.data;
   },
