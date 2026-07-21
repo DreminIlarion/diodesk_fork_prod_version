@@ -1238,7 +1238,7 @@ export interface FeedbackListResponse {
 
 export const feedbacksApi = {
   create: async (data: FeedbackCreateInput): Promise<Feedback> => {
-    const res = await api.post('/feedbacks', data);
+    const res = await api.post('/api/v1/feedbacks', data);
     return res.data;
   },
 
@@ -1251,17 +1251,17 @@ export const feedbacksApi = {
     if (filters?.rating) params.rating = filters.rating;
     if (filters?.ticketId) params.ticketId = filters.ticketId;
     if (filters?.author_id) params.author_id = filters.author_id;
-    const res = await api.get('/feedbacks', { params });
+    const res = await api.get('/api/v1/feedbacks', { params });
     return res.data;
   },
 
   update: async (id: string, data: FeedbackUpdateInput): Promise<Feedback> => {
-    const res = await api.patch(`/feedbacks/${id}`, data);
+    const res = await api.patch(`/api/v1/feedbacks/${id}`, data);
     return res.data;
   },
 
   delete: async (id: string): Promise<Feedback> => {
-    const res = await api.delete(`/feedbacks/${id}`);
+    const res = await api.delete(`/api/v1/feedbacks/${id}`);
     return res.data;
   },
 };
