@@ -55,9 +55,7 @@ class FeedbackService:
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
         
-        existing_feedback = await self.feedback_repo.get_by_ticket(ticket_id)
-        if existing_feedback is not None:
-            raise AlreadyExistsError(f"Feedback for ticket {ticket_id} already exists")
+        
         
         feedback = Feedback.create(
             ticket_id=ticket_id,
