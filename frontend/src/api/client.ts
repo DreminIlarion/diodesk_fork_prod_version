@@ -1118,29 +1118,23 @@ function parseNotificationStreamData(raw: string): NotificationStreamPayload | n
     return null;
   }
 }
+const NOTIFICATIONS_BASE = 'http://10.1.50.109:8001';
 
 export const notificationsApi = {
-  // Получить уведомления
-  getAll: async (
-    page: number = 1,
-    size: number = 20,
-    unreadOnly: boolean = false
-  ): Promise<PaginatedResponse<Notification>> => {
-    const response = await api.get<PaginatedResponse<Notification>>('/notifications', {
+  getAll: async (page = 1, size = 20, unreadOnly = false) => {
+    const response = await api.get(`${NOTIFICATIONS_BASE}/notifications`, {
       params: { page, size, unread_only: unreadOnly },
     });
     return response.data;
   },
 
-  // Количество непрочитанных
-  getUnreadCount: async (): Promise<number> => {
-    const response = await api.get<UnreadCountResponse>('/notifications/unread-count');
+  getUnreadCount: async () => {
+    const response = await api.get(`${NOTIFICATIONS_BASE}/notifications/unread-count`);
     return response.data.unread_count;
   },
 
-  // Пометить как прочитанное
-  markAsRead: async (notificationId: string): Promise<Notification> => {
-    const response = await api.patch<Notification>(`/notifications/${notificationId}/read`);
+  markAsRead: async (notificationId: string) => {
+    const response = await api.patch(`${NOTIFICATIONS_BASE}/notifications/${notificationId}/read`);
     return response.data;
   },
 
