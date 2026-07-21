@@ -7,7 +7,7 @@ import {
   Plus, Search, Filter, Calendar, Loader2, X, Check, Circle, Timer, Eye,
   ChevronDown, Flag, AlertCircle, CheckCircle2, Ban, RotateCcw, RefreshCw,
   Archive, FolderOpen, Ticket, Zap, Star, User, ChevronRight, Layers, UserCheck,
-  GitPullRequest, ThumbsUp, ThumbsDown, Pencil, Save, Milestone, ArrowUpRight,
+  GitPullRequest, ThumbsUp, ThumbsDown, Pencil, Save, Milestone, ArrowUpRight,AlertTriangle,
 } from 'lucide-react';
 import { tasksApi, projectsApi, ticketsApi, usersApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
