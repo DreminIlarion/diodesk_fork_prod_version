@@ -901,17 +901,10 @@ function TaskCard({
           <span className="px-1.5 py-0.5 rounded text-[13px] font-mono bg-[var(--hover-2)] text-[var(--text-primary)]/70 border border-[var(--border-color)] flex-shrink-0">
             #{task.number}
           </span>
-          {od && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[13px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30 flex-shrink-0">
-              <AlertTriangle className="w-2.5 h-2.5" /> Просрочена
-            </span>
-          )}
+          
         </div>
 
-        {/* Кнопки быстрого перемещения */}
-        <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
-          <QuickMoveButtons task={task} onMove={onQuickMove} />
-        </div>
+        
       </div>
 
       <h4 className="text-base font-semibold text-[var(--text-primary)] mb-2 leading-snug line-clamp-2">
