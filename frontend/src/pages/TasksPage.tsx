@@ -711,9 +711,12 @@ export default function TasksPage() {
                     ); })}</div>
                   </div>
                   <div className="border-t border-[var(--border-color)] pt-2 px-0.5">
-                    <button onClick={() => setFo(v => !v)} className={`w-full flex items-center gap-2 py-1.5 px-1 rounded-lg text-base transition-colors ${fo ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/50'}`}>
-                      <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 ${fo ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'}`}>{fo && <Check className="w-2 h-2 text-white" /></div>Просроченные
-                    </button>
+                    <button onClick={() => setFo(v => !v)} className={fo ? 'w-full flex items-center gap-2 py-1.5 px-1 rounded-lg text-base transition-colors text-[var(--accent)]' : 'w-full flex items-center gap-2 py-1.5 px-1 rounded-lg text-base transition-colors text-[var(--text-primary)]/50'}>
+  <div className={fo ? 'w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 bg-[var(--accent)] border-[var(--accent)]' : 'w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 border-[var(--border-color)]'}>
+    {fo && <Check className="w-2 h-2 text-white" />}
+  </div>
+  Просроченные
+</button>
                   </div>
                   {hf && <div className="border-t border-[var(--border-color)] pt-1.5"><button onClick={() => { setFp([]); setFo(false); }} className="w-full text-center text-base text-[var(--accent)] py-1">Сбросить</button></div>}
                 </div>
