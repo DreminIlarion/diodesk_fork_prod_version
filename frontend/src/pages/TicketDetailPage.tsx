@@ -163,40 +163,54 @@ function InlineStarRating({
   const display = hovered || value;
 
   return (
-    <div className="inline-flex items-center gap-1.5">
+    <div
+      className="inline-flex items-center gap-0.5"
+      onMouseLeave={() => onLeave?.()}
+      style={{ height: size, lineHeight: 0 }}
+    >
       {[1, 2, 3, 4, 5].map(star => {
+        const isActive = star <= display;
+
         if (readonly) {
           return (
-            <Star
+            <span
               key={star}
-              width={size}
-              height={size}
-              className={`transition-colors ${
-                star <= display
-                  ? 'text-emerald-500 fill-emerald-500'
-                  : 'text-[var(--text-primary)]/15'
-              }`}
-            />
+              className="flex items-center justify-center"
+              style={{ width: size, height: size }}
+            >
+              <Star
+                width={size}
+                height={size}
+                className={`transition-colors duration-150 ${
+                  isActive
+                    ? 'text-amber-400 fill-amber-400'
+                    : 'text-[var(--text-primary)]/10'
+                }`}
+                style={{ display: 'block' }}
+              />
+            </span>
           );
         }
+
         return (
           <button
             key={star}
             type="button"
             onClick={() => onChange?.(star)}
             onMouseEnter={() => onHover?.(star)}
-            onMouseLeave={onLeave}
-            className="transition-transform hover:scale-110 active:scale-95"
-            style={{ lineHeight: 0 }}
+            className="flex items-center justify-center transition-transform duration-100
+                       hover:scale-110 active:scale-95 outline-none"
+            style={{ width: size + 4, height: size + 4, lineHeight: 0 }}
           >
             <Star
               width={size}
               height={size}
-              className={`transition-colors ${
-                star <= display
-                  ? 'text-emerald-500 fill-emerald-500'
-                  : 'text-[var(--text-primary)]/15'
+              className={`transition-all duration-150 ${
+                isActive
+                  ? 'text-amber-400 fill-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.4)]'
+                  : 'text-[var(--text-primary)]/15 hover:text-amber-400/30'
               }`}
+              style={{ display: 'block' }}
             />
           </button>
         );
@@ -590,6 +604,8 @@ export default function TicketDetailPage() {
 
     setFeedbackBannerState('loading');
 
+
+
     feedbacksApi.getAll(1, 10, {
       ticketId: ticket.id,
       author_id: user.id,
@@ -982,25 +998,34 @@ export default function TicketDetailPage() {
         </div>
       </div>
 
-      {/* ── Feedback Banner ── */}
-      {feedbackBannerState === 'show' && (
+          {/* ── Feedback Banner ── */}
+      {feedbackBannerState === 'show' && !existingFeedback && (
         <AnimatePresence mode="wait">
-          {/* Форма оценки */}
-          {!existingFeedback && showFeedbackForm && (
+          {/* ─── Развёрнутая форма оценки ─── */}
+          {showFeedbackForm ? (
             <motion.div
               key="feedback-form"
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.2 }}
-              className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-5 py-5"
+              initial={{ opacity: 0, y: -8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.98 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/[0.06] to-emerald-500/[0.02]
+                         backdrop-blur-sm overflow-hidden"
             >
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div>
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">
-                    Оцените работу по заявке
-                  </p>
-                  <p className="text-xs text-[var(--text-primary)]/40 mt-0.5">#{ticket.number}</p>
+              {/* Шапка */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-emerald-500/10">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                    <Star className="w-4.5 h-4.5 text-emerald-500" />
+                  </div>
+                  <div>
+                    <p className="text-base font-semibold text-[var(--text-primary)]">
+                      Оцените работу по заявке
+                    </p>
+                    <p className="text-xs text-[var(--text-primary)]/35 mt-0.5">
+                      Ваш отзыв поможет нам стать лучше
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => {
@@ -1009,141 +1034,125 @@ export default function TicketDetailPage() {
                     setFeedbackComment('');
                     setFeedbackHovered(0);
                   }}
-                  className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/25 hover:text-[var(--text-primary)]/55"
+                  className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/25
+                             hover:text-[var(--text-primary)]/55 transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="space-y-4">
-                {/* Stars */}
-                <div className="flex flex-col items-start gap-1.5">
+              {/* Тело формы */}
+              <div className="px-6 py-5 space-y-5">
+                {/* Звёзды + подпись */}
+                <div className="flex items-center gap-4">
                   <InlineStarRating
                     value={feedbackRating}
                     hovered={feedbackHovered}
                     onChange={setFeedbackRating}
                     onHover={setFeedbackHovered}
                     onLeave={() => setFeedbackHovered(0)}
-                    size={32}
+                    size={36}
                   />
-                  {(feedbackHovered || feedbackRating) > 0 && (
-                    <span className="text-xs text-emerald-500/70 font-medium">
-                      {FEEDBACK_RATING_LABELS[(feedbackHovered || feedbackRating) as keyof typeof FEEDBACK_RATING_LABELS]}
-                    </span>
-                  )}
+                  <AnimatePresence mode="wait">
+                    {(feedbackHovered || feedbackRating) > 0 && (
+                      <motion.span
+                        key={feedbackHovered || feedbackRating}
+                        initial={{ opacity: 0, x: -4 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 4 }}
+                        transition={{ duration: 0.15 }}
+                        className="text-sm font-medium text-amber-400/80"
+                      >
+                        {FEEDBACK_RATING_LABELS[(feedbackHovered || feedbackRating) as keyof typeof FEEDBACK_RATING_LABELS]}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
                 </div>
 
-                {/* Comment */}
+                {/* Комментарий */}
                 <textarea
                   value={feedbackComment}
                   onChange={e => setFeedbackComment(e.target.value)}
-                  placeholder="Комментарий (необязательно)..."
-                  rows={2}
-                  className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-emerald-500/30 focus:ring-2 focus:ring-emerald-500/10 resize-none transition-all"
+                  placeholder="Расскажите подробнее (необязательно)..."
+                  rows={3}
+                  className="w-full px-4 py-3 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl
+                             text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/20
+                             focus:outline-none focus:border-emerald-500/30 focus:ring-2 focus:ring-emerald-500/10
+                             resize-none transition-all"
                 />
 
-                {/* Actions */}
-                <div className="flex items-center justify-end gap-2">
+                {/* Кнопки */}
+                <div className="flex items-center justify-end gap-2.5">
                   <button
                     onClick={() => {
                       setShowFeedbackForm(false);
                       setFeedbackRating(0);
                       setFeedbackComment('');
                     }}
-                    className="px-4 py-2 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/55 text-sm transition-colors"
+                    className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)]
+                               text-[var(--text-primary)]/50 text-sm font-medium transition-colors"
                   >
                     Отмена
                   </button>
                   <button
                     disabled={!feedbackRating || savingFeedback}
                     onClick={handleSubmitFeedback}
-                    className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-40 transition-colors"
+                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl
+                               bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold
+                               disabled:opacity-35 disabled:cursor-not-allowed
+                               shadow-lg shadow-emerald-500/20 transition-all"
                   >
                     {savingFeedback
-                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      : <Check className="w-3.5 h-3.5" />
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <Check className="w-4 h-4" />
                     }
-                    Отправить
+                    Отправить оценку
                   </button>
                 </div>
               </div>
             </motion.div>
-          )}
-
-          {/* Приглашение оценить */}
-          {!existingFeedback && !showFeedbackForm && (
+          ) : (
+            /* ─── Компактный баннер-приглашение ─── */
             <motion.div
               key="feedback-prompt"
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.2 }}
-              className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-5 py-4"
+              className="rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.04] px-5 py-4"
             >
               <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-                    <Star className="w-4 h-4 text-emerald-500" />
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                    <Star className="w-5 h-5 text-emerald-500" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-[var(--text-primary)]">
-                      Как вам обслуживание по этой заявке?
+                      Как вам обслуживание?
                     </p>
-                    <p className="text-xs text-[var(--text-primary)]/40 mt-0.5">
-                      Тикет закрыт — оставьте оценку, это займёт меньше минуты
+                    <p className="text-xs text-[var(--text-primary)]/35 mt-0.5">
+                      Заявка закрыта — оцените качество работы
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2.5 flex-shrink-0">
                   <button
                     onClick={() => setShowFeedbackForm(true)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl
+                               bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold
+                               shadow-lg shadow-emerald-500/20 transition-all"
                   >
-                    <Star className="w-3.5 h-3.5" />
+                    <Star className="w-4 h-4" />
                     Оценить
                   </button>
                   <button
                     onClick={() => setFeedbackBannerState('hidden')}
-                    className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/25 hover:text-[var(--text-primary)]/55 transition-colors"
+                    className="p-2.5 rounded-xl hover:bg-[var(--hover-2)]
+                               text-[var(--text-primary)]/20 hover:text-[var(--text-primary)]/50 transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Уже оценено */}
-          {existingFeedback && (
-            <motion.div
-              key="feedback-done"
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-              className="rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-5 py-3.5"
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <InlineStarRating
-                    value={existingFeedback.rating}
-                    readonly
-                    size={16}
-                  />
-                  <span className="text-sm text-[var(--text-primary)]/50">
-                    Вы оценили эту заявку на {existingFeedback.rating}/5
-                  </span>
-                  {existingFeedback.comment && (
-                    <span className="text-sm text-[var(--text-primary)]/35 truncate max-w-[200px] hidden md:block">
-                      — {existingFeedback.comment}
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={() => setFeedbackBannerState('hidden')}
-                  className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/20 hover:text-[var(--text-primary)]/45 flex-shrink-0 transition-colors"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
               </div>
             </motion.div>
           )}
