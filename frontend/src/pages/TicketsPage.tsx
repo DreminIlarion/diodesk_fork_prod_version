@@ -124,7 +124,8 @@ interface FilterDropdownProps {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   FILTER DROPDOWN
+   FILTER DROPDOWN — ИСПРАВЛЕННЫЙ
+   Ключевое: убран w-max, добавлен max-w и right-0 fallback
    ═══════════════════════════════════════════════════════════════════ */
 
 function FilterDropdown({
@@ -139,7 +140,8 @@ function FilterDropdown({
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false); setQuery('');
+        setOpen(false);
+        setQuery('');
       }
     };
     document.addEventListener('mousedown', handler);
@@ -172,8 +174,8 @@ function FilterDropdown({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl border
-          text-base transition-all whitespace-nowrap cursor-pointer
+        className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5
+          rounded-xl border text-base transition-all whitespace-nowrap cursor-pointer
           ${open
             ? 'bg-[var(--hover-2)] border-[var(--accent)]/40 text-[var(--text-primary)]'
             : hasValue
@@ -225,7 +227,8 @@ function FilterDropdown({
           <Loader2 size={18} className="text-[var(--text-primary)]/40 animate-spin flex-shrink-0" />
         ) : hasValue ? (
           <span
-            role="button" tabIndex={0}
+            role="button"
+            tabIndex={0}
             onClick={e => { e.stopPropagation(); onChange(multiple ? [] : ''); setOpen(false); }}
             onKeyDown={e => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -238,36 +241,49 @@ function FilterDropdown({
             <X size={18} />
           </span>
         ) : (
-          <ChevronDown size={18}
+          <ChevronDown
+            size={18}
             className={`text-[var(--text-primary)]/40 transition-transform duration-200 flex-shrink-0
-                        ${open ? 'rotate-180' : ''}`} />
+                        ${open ? 'rotate-180' : ''}`}
+          />
         )}
       </button>
 
+      {/* ▼ DROPDOWN MENU — фиксированная ширина, не вылезает ▼ */}
       {open && (
-        <div className="absolute z-[100] min-w-[220px] w-max top-full mt-2 left-0
-                        bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden"
-          style={{ boxShadow: 'var(--shadow-lg)' }}>
+        <div
+          className="absolute z-[100] top-full mt-2 left-0 w-[280px]
+                     bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl
+                     overflow-hidden"
+          style={{ boxShadow: 'var(--shadow-lg)' }}
+        >
           {searchable && (
             <div className="p-2 border-b border-[var(--border-color)]">
               <div className="relative">
                 <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-                <input ref={inputRef} value={query} onChange={e => setQuery(e.target.value)}
+                <input
+                  ref={inputRef}
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
                   placeholder="Поиск..."
-                  className="w-full pl-7 pr-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] border
-                             border-[var(--border-color)] text-base text-[var(--text-primary)]
-                             placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-hover)]" />
+                  className="w-full pl-7 pr-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)]
+                             border border-[var(--border-color)] text-base text-[var(--text-primary)]
+                             placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-hover)]"
+                />
               </div>
             </div>
           )}
           <div className="py-1.5 max-h-[300px] overflow-y-auto">
             {!multiple && (
-              <button type="button"
+              <button
+                type="button"
                 onClick={() => { onChange(''); setOpen(false); setQuery(''); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-left text-base transition-colors
                   ${!value
                     ? 'bg-[var(--accent)]/10 text-[var(--text-primary)]'
-                    : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)]'}`}>
+                    : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)]'
+                  }`}
+              >
                 {!value
                   ? <Check size={18} className="text-[var(--accent)] flex-shrink-0" />
                   : <span className="w-4 flex-shrink-0" />}
@@ -280,17 +296,23 @@ function FilterDropdown({
                 <Loader2 size={18} className="animate-spin mx-auto mb-2" /> Загрузка...
               </div>
             ) : filtered.length === 0 ? (
-              <div className="px-4 py-6 text-center text-base text-[var(--text-muted)]">Ничего не найдено</div>
+              <div className="px-4 py-6 text-center text-base text-[var(--text-muted)]">
+                Ничего не найдено
+              </div>
             ) : filtered.map(option => {
               const isSelected = selectedValues.includes(option.value);
               return (
-                <button type="button" key={option.value}
+                <button
+                  type="button"
+                  key={option.value}
                   onClick={() => {
                     if (multiple) {
                       const current = Array.isArray(value) ? value : [];
-                      onChange(current.includes(option.value)
-                        ? current.filter(v => v !== option.value)
-                        : [...current, option.value]);
+                      onChange(
+                        current.includes(option.value)
+                          ? current.filter(v => v !== option.value)
+                          : [...current, option.value]
+                      );
                     } else {
                       onChange(option.value);
                       setOpen(false);
@@ -300,7 +322,9 @@ function FilterDropdown({
                   className={`w-full flex items-center gap-3 px-4 py-3 text-left text-base transition-colors
                     ${isSelected
                       ? 'bg-[var(--accent)]/10 text-[var(--text-primary)]'
-                      : 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)]'}`}>
+                      : 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)]'
+                    }`}
+                >
                   {isSelected
                     ? <Check size={18} className="text-[var(--accent)] flex-shrink-0" />
                     : <span className="w-4 flex-shrink-0" />}
@@ -309,10 +333,12 @@ function FilterDropdown({
                       {option.label}
                     </span>
                   ) : (
-                    <div className="min-w-0">
+                    <div className="min-w-0 overflow-hidden">
                       <span className="block truncate">{option.label}</span>
                       {option.sublabel && (
-                        <span className="block text-base text-[var(--text-muted)] truncate">{option.sublabel}</span>
+                        <span className="block text-base text-[var(--text-muted)] truncate">
+                          {option.sublabel}
+                        </span>
                       )}
                     </div>
                   )}
@@ -368,7 +394,7 @@ function FilterTag({ label, icon, colorClass, onRemove }: {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   TICKET ROW (desktop)
+   TICKET ROW
    ═══════════════════════════════════════════════════════════════════ */
 
 function TicketRow({ ticket, showAssignee, showReporter }: {
@@ -389,7 +415,6 @@ function TicketRow({ ticket, showAssignee, showReporter }: {
                  transition-colors duration-100 group"
       style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) 160px 120px 110px 20px' }}
     >
-      {/* Тема / Номер */}
       <div className="min-w-0 pr-3">
         <span className="text-[17px] font-semibold text-[var(--text-primary)] block leading-snug
                          group-hover:text-[var(--accent-light)] transition-colors line-clamp-1">
@@ -400,7 +425,6 @@ function TicketRow({ ticket, showAssignee, showReporter }: {
         </span>
       </div>
 
-      {/* Контрагент / Проект */}
       <div className="min-w-0 pr-2 self-center">
         {ticket.counterparty?.name ? (
           <span className="flex items-center gap-1 text-[16px] text-[var(--text-primary)]/60 truncate">
@@ -418,7 +442,6 @@ function TicketRow({ ticket, showAssignee, showReporter }: {
         )}
       </div>
 
-      {/* Исполнитель / Автор */}
       <div className="min-w-0 pr-2 self-center">
         {showAssignee && (
           (ticket.assignee?.full_name || ticket.assignee?.username) ? (
@@ -447,7 +470,6 @@ function TicketRow({ ticket, showAssignee, showReporter }: {
         )}
       </div>
 
-      {/* Статус */}
       <div className="self-center">
         <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[16px] font-semibold
                          border whitespace-nowrap ${statusColor}`}>
@@ -455,7 +477,6 @@ function TicketRow({ ticket, showAssignee, showReporter }: {
         </span>
       </div>
 
-      {/* Приоритет */}
       <div className="self-center">
         <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[16px] font-semibold
                          border whitespace-nowrap ${priorityColor}`}>
@@ -463,7 +484,6 @@ function TicketRow({ ticket, showAssignee, showReporter }: {
         </span>
       </div>
 
-      {/* Дата */}
       <div className="self-center text-right">
         <span className="text-[15px] text-[var(--text-primary)]/45 whitespace-nowrap">
           {formatDate(ticket.created_at)}
@@ -494,9 +514,11 @@ function TableHeader({ showAssigneeCol }: { showAssigneeCol: boolean }) {
     { label: '' },
   ];
   return (
-    <div className="hidden lg:grid px-4 py-2 text-[13px] uppercase tracking-widest
-                    font-semibold text-[var(--text-primary)]/25 border-b border-[var(--border-color)]"
-      style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) 160px 120px 110px 20px' }}>
+    <div
+      className="hidden lg:grid px-4 py-2 text-[13px] uppercase tracking-widest
+                 font-semibold text-[var(--text-primary)]/25 border-b border-[var(--border-color)]"
+      style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) 160px 120px 110px 20px' }}
+    >
       {cols.map((c, i) => (
         <div key={i} className={c.align || ''}>{c.label}</div>
       ))}
@@ -548,12 +570,22 @@ export default function TicketsPage() {
   const isCustomerAdmin = roles.includes('customer_admin');
   const isClientUser = isCustomer || isCustomerAdmin;
 
-  /* Что показываем клиентам */
-  const showCounterpartyFilter = !isClientUser;               // скрыть для customer + customer_admin
-  const showAssigneeFilter = !isClientUser;               // скрыть для customer + customer_admin
-  const showReporterFilter = !isCustomer;                 // только customer_admin + остальные
-  const showAssigneeCol = !isClientUser;               // колонка исполнитель
-  const showReporterCol = !isCustomer;                 // колонка автор
+  /*
+    Видимость фильтров:
+    ┌──────────────────┬──────────┬────────────────┬──────────────┐
+    │ Фильтр           │ customer │ customer_admin │ остальные    │
+    ├──────────────────┼──────────┼────────────────┼──────────────┤
+    │ Контрагент       │ ❌       │ ❌             │ ✅           │
+    │ Исполнитель      │ ❌       │ ❌             │ ✅           │
+    │ Автор            │ ❌       │ ✅             │ ✅           │
+    │ Проект           │ ✅ (свои)│ ✅ (свои)      │ ✅ (все)     │
+    └──────────────────┴──────────┴────────────────┴──────────────┘
+  */
+  const showCounterpartyFilter = !isClientUser;
+  const showAssigneeFilter = !isClientUser;
+  const showReporterFilter = !isCustomer;  // customer_admin + остальные
+  const showAssigneeCol = !isClientUser;
+  const showReporterCol = !isCustomer;
 
   /* ── State ── */
   const initialSearch = searchParams.get('search') || '';
@@ -587,43 +619,26 @@ export default function TicketsPage() {
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
-  /* Флаг: клиентские проекты уже загружены и можно делать запрос тикетов */
-  const [clientProjectsReady, setClientProjectsReady] = useState(!isClientUser);
-
   /* ── Debounce поиска ── */
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 500);
     return () => clearTimeout(t);
   }, [search]);
 
-  /* ── Для клиентов грузим getMyProjects() СРАЗУ, до открытия фильтров ── */
+  /* ── Загрузка проектов для клиентов (getMyProjects) ── */
   useEffect(() => {
-    if (!isClientUser) {
-      setClientProjectsReady(true);
-      return;
-    }
+    if (!isClientUser) return;
     setLoadingProjects(true);
-    setClientProjectsReady(false);
-
     projectsApi.getMyProjects()
-      .then((res: any) => {
-        setProjects(toItems<Project>(res));
-      })
-      .catch((err: any) => {
-        console.error('getMyProjects error:', err);
-        setProjects([]);
-      })
-      .finally(() => {
-        setLoadingProjects(false);
-        setClientProjectsReady(true);
-      });
+      .then((res: any) => setProjects(toItems<Project>(res)))
+      .catch(() => setProjects([]))
+      .finally(() => setLoadingProjects(false));
   }, [isClientUser]);
 
-  /* ── При открытии фильтров грузим справочники для не-клиентов ── */
+  /* ── Загрузка справочников при открытии фильтров ── */
   useEffect(() => {
     if (!showFilters) return;
 
-    // Контрагенты — только для не-клиентов
     if (showCounterpartyFilter && counterparties.length === 0) {
       setLoadingCounterparties(true);
       counterpartiesApi.getAll(1, 100)
@@ -631,7 +646,7 @@ export default function TicketsPage() {
         .finally(() => setLoadingCounterparties(false));
     }
 
-    // Проекты — для не-клиентов (клиенты уже загрузили выше)
+    // Проекты для не-клиентов (у клиентов уже загружены выше)
     if (!isClientUser && projects.length === 0) {
       setLoadingProjects(true);
       projectsApi.getAll(1, 100)
@@ -639,72 +654,43 @@ export default function TicketsPage() {
         .finally(() => setLoadingProjects(false));
     }
 
-    // Пользователи — для не-клиентов и customer_admin (видят фильтр "Автор")
     if ((showAssigneeFilter || showReporterFilter) && users.length === 0) {
       setLoadingUsers(true);
       usersApi.getAllUsers(1, 100)
         .then(res => setUsers(toItems<SimpleUser>(res)))
         .finally(() => setLoadingUsers(false));
     }
-  }, [
-    showFilters,
-    isClientUser,
-    showCounterpartyFilter,
-    showAssigneeFilter,
-    showReporterFilter,
-    counterparties.length,
-    projects.length,
-    users.length,
-  ]);
+  }, [showFilters]);
 
-  /* ── Вычисляем effective project_ids с учётом ролей ── */
-  const getEffectiveProjectIds = useCallback((): string[] | undefined => {
-    if (!isClientUser) {
-      return projectFilter.length > 0 ? projectFilter : undefined;
-    }
-    // Для клиентов — только их проекты
-    const allowed = projects.map(p => p.id);
-    if (allowed.length === 0) return [];           // нет доступных проектов
-    if (projectFilter.length > 0) {
-      const intersect = projectFilter.filter(id => allowed.includes(id));
-      return intersect.length > 0 ? intersect : allowed;
-    }
-    return allowed;
-  }, [isClientUser, projects, projectFilter]);
+  /* ── Сборка параметров фильтрации ──
+     Для клиентов НЕ передаём project_ids принудительно.
+     Бэкенд сам фильтрует по контрагенту текущего пользователя.
+     Фронт передаёт project_ids ТОЛЬКО если пользователь явно выбрал проект в фильтре.
+  */
+  const buildFilters = useCallback(() => ({
+    query: debouncedSearch || undefined,
+    status: statusFilter.length > 0 ? statusFilter : undefined,
+    priority: priorityFilter || undefined,
+    ticket_type: typeFilter || undefined,
+    counterparty_id: showCounterpartyFilter && counterpartyFilter ? counterpartyFilter : undefined,
+    project_ids: projectFilter.length > 0 ? projectFilter : undefined,
+    assignee_id: showAssigneeFilter && assigneeFilter ? assigneeFilter : undefined,
+    reporter_id: showReporterFilter && reporterFilter ? reporterFilter : undefined,
+    created_after: dateFrom || undefined,
+    created_before: dateTo || undefined,
+  }), [
+    debouncedSearch, statusFilter, priorityFilter, typeFilter,
+    counterpartyFilter, projectFilter, assigneeFilter, reporterFilter,
+    dateFrom, dateTo,
+    showCounterpartyFilter, showAssigneeFilter, showReporterFilter,
+  ]);
 
   /* ── Загрузка тикетов ── */
   const loadTickets = useCallback(async () => {
-    // Ждём готовности проектов для клиентов
-    if (isClientUser && !clientProjectsReady) return;
-
-    const effectiveProjectIds = getEffectiveProjectIds();
-
-    // Если у клиента нет проектов — показываем пусто
-    if (isClientUser && Array.isArray(effectiveProjectIds) && effectiveProjectIds.length === 0) {
-      setTickets([]);
-      setTotalPages(1);
-      setTotalItems(0);
-      setLoading(false);
-      setInitialLoad(false);
-      setPage(1);
-      return;
-    }
-
     setLoading(true);
     setPage(1);
     try {
-      const response = await ticketsApi.getAll(1, 9, {
-        query: debouncedSearch || undefined,
-        status: statusFilter.length > 0 ? statusFilter : undefined,
-        priority: priorityFilter || undefined,
-        ticket_type: typeFilter || undefined,
-        counterparty_id: showCounterpartyFilter ? (counterpartyFilter || undefined) : undefined,
-        project_ids: effectiveProjectIds,
-        assignee_id: showAssigneeFilter ? (assigneeFilter || undefined) : undefined,
-        reporter_id: showReporterFilter ? (reporterFilter || undefined) : undefined,
-        created_after: dateFrom || undefined,
-        created_before: dateTo || undefined,
-      });
+      const response = await ticketsApi.getAll(1, 9, buildFilters());
       setTickets(response.items);
       setTotalPages(response.total_pages);
       setTotalItems(response.total_items);
@@ -714,23 +700,7 @@ export default function TicketsPage() {
       setLoading(false);
       setInitialLoad(false);
     }
-  }, [
-    isClientUser,
-    clientProjectsReady,
-    getEffectiveProjectIds,
-    debouncedSearch,
-    statusFilter,
-    priorityFilter,
-    typeFilter,
-    counterpartyFilter,
-    assigneeFilter,
-    reporterFilter,
-    dateFrom,
-    dateTo,
-    showCounterpartyFilter,
-    showAssigneeFilter,
-    showReporterFilter,
-  ]);
+  }, [buildFilters]);
 
   useEffect(() => {
     loadTickets();
@@ -738,29 +708,10 @@ export default function TicketsPage() {
 
   /* ── Пагинация ── */
   const handlePageChange = async (pageNum: number) => {
-    if (isClientUser && !clientProjectsReady) return;
-
-    const effectiveProjectIds = getEffectiveProjectIds();
-    if (isClientUser && Array.isArray(effectiveProjectIds) && effectiveProjectIds.length === 0) {
-      setTickets([]); setTotalPages(1); setTotalItems(0); setPage(1);
-      return;
-    }
-
     setPage(pageNum);
     setLoading(true);
     try {
-      const response = await ticketsApi.getAll(pageNum, 9, {
-        query: debouncedSearch || undefined,
-        status: statusFilter.length > 0 ? statusFilter : undefined,
-        priority: priorityFilter || undefined,
-        ticket_type: typeFilter || undefined,
-        counterparty_id: showCounterpartyFilter ? (counterpartyFilter || undefined) : undefined,
-        project_ids: effectiveProjectIds,
-        assignee_id: showAssigneeFilter ? (assigneeFilter || undefined) : undefined,
-        reporter_id: showReporterFilter ? (reporterFilter || undefined) : undefined,
-        created_after: dateFrom || undefined,
-        created_before: dateTo || undefined,
-      });
+      const response = await ticketsApi.getAll(pageNum, 9, buildFilters());
       setTickets(response.items);
       setTotalPages(response.total_pages);
       setTotalItems(response.total_items);
@@ -787,7 +738,7 @@ export default function TicketsPage() {
     setPage(1);
   };
 
-  /* ── Активные фильтры ── */
+  /* ── Счётчики ── */
   const hasFilters = !!(
     statusFilter.length || priorityFilter || typeFilter ||
     (showCounterpartyFilter && counterpartyFilter) ||
@@ -817,7 +768,6 @@ export default function TicketsPage() {
   const getStatusLabel = (s: string) => STATUS_MAP[s]?.label || s;
   const getPriorityLabel = (p: string) => PRIORITY_MAP[p]?.label || p;
 
-  /* ── Options ── */
   const counterpartyOptions: DropdownOption[] = counterparties.map(c => ({
     value: c.id,
     label: c.name || c.legal_name || c.inn || 'Без названия',
@@ -860,29 +810,36 @@ export default function TicketsPage() {
           <p className="text-base text-[var(--text-primary)]/50">
             Управление обращениями
             {totalItems > 0 && (
-              <span className="ml-2 px-2 py-0.5 rounded-full bg-[var(--hover-1)] text-[var(--text-secondary)] text-base">
+              <span className="ml-2 px-2 py-0.5 rounded-full bg-[var(--hover-1)]
+                               text-[var(--text-secondary)] text-base">
                 {totalItems}
               </span>
             )}
           </p>
         </div>
-        <button onClick={() => navigate('/tickets/new')} className="btn-primary py-4 px-8 text-base font-semibold">
+        <button onClick={() => navigate('/tickets/new')}
+          className="btn-primary py-4 px-8 text-base font-semibold">
           <Plus size={18} /> Создать заявку
         </button>
       </div>
 
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Всего" value={totalItems} icon={Ticket} color="text-[var(--text-secondary)]" bg="bg-[var(--hover-1)]" />
-        <StatCard label="Новых" value={tickets.filter(t => t.status === 'new').length} icon={Clock} color="text-[var(--status-new-text)]" bg="bg-[var(--status-new-bg)]" />
-        <StatCard label="В работе" value={tickets.filter(t => t.status === 'in_progress' || t.status === 'open').length} icon={CheckCircle2} color="text-[var(--status-progress-text)]" bg="bg-[var(--status-progress-bg)]" />
-        <StatCard label="Критических" value={tickets.filter(t => t.priority === 'critical').length} icon={AlertTriangle} color="text-[var(--priority-critical-text)]" bg="bg-[var(--priority-critical-bg)]" />
+        <StatCard label="Всего" value={totalItems}
+          icon={Ticket} color="text-[var(--text-secondary)]" bg="bg-[var(--hover-1)]" />
+        <StatCard label="Новых" value={tickets.filter(t => t.status === 'new').length}
+          icon={Clock} color="text-[var(--status-new-text)]" bg="bg-[var(--status-new-bg)]" />
+        <StatCard label="В работе" value={tickets.filter(t => t.status === 'in_progress' || t.status === 'open').length}
+          icon={CheckCircle2} color="text-[var(--status-progress-text)]" bg="bg-[var(--status-progress-bg)]" />
+        <StatCard label="Критических" value={tickets.filter(t => t.priority === 'critical').length}
+          icon={AlertTriangle} color="text-[var(--priority-critical-text)]" bg="bg-[var(--priority-critical-bg)]" />
       </div>
 
       {/* ── Search + Filters toggle ── */}
       <div className="flex flex-wrap items-center gap-2.5">
         <div className="relative flex-1 min-w-[220px]">
-          <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/40 pointer-events-none" />
+          <Search size={18}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/40 pointer-events-none" />
           <input
             type="text"
             placeholder="Поиск по теме, номеру..."
@@ -911,13 +868,16 @@ export default function TicketsPage() {
             ${showFilters || activeFiltersCount > 0
               ? 'bg-[var(--accent)]/10 border-[var(--accent)]/40 text-[var(--text-primary)]'
               : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70'
-            }`}>
+            }`}
+        >
           <SlidersHorizontal size={18}
-            className={showFilters || activeFiltersCount > 0 ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'} />
+            className={showFilters || activeFiltersCount > 0
+              ? 'text-[var(--accent)]'
+              : 'text-[var(--text-primary)]/40'} />
           <span>Фильтры</span>
           {activeFiltersCount > 0 && (
-            <span className="w-5 h-5 rounded-full bg-[var(--accent)] text-white text-[15px] font-bold
-                             flex items-center justify-center">
+            <span className="w-5 h-5 rounded-full bg-[var(--accent)] text-white text-[15px]
+                             font-bold flex items-center justify-center">
               {activeFiltersCount}
             </span>
           )}
@@ -927,9 +887,10 @@ export default function TicketsPage() {
       {/* ── Filters Panel ── */}
       {showFilters && (
         <div className="rounded-xl border border-[var(--border-color)] p-3.5 space-y-3
-                        animate-in fade-in slide-in-from-top-1 duration-200 overflow-visible">
+                        animate-in fade-in slide-in-from-top-1 duration-200">
           <div className="flex items-center justify-between">
-            <span className="text-base font-semibold text-[var(--text-primary)]/40 uppercase tracking-widest">
+            <span className="text-base font-semibold text-[var(--text-primary)]/40
+                             uppercase tracking-widest">
               Фильтрация
             </span>
             {hasActiveFilters && (
@@ -941,107 +902,84 @@ export default function TicketsPage() {
             )}
           </div>
 
-          {/*
-            flex-wrap: каждый фильтр тянется на свою ширину.
-            Блок "Дата" — w-full, поэтому всегда на отдельной строке и не вылезает за границы.
-          */}
-          <div className="flex flex-wrap gap-2.5">
+          {/* Сетка фильтров — overflow-visible чтобы dropdown не обрезался,
+              но контейнер не расширяется за пределы страницы */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 items-start">
 
-            {/* Статус */}
-            <div className="flex-1 min-w-[180px]">
-              <FilterDropdown
-                label="Статус"
-                options={STATUS_OPTIONS}
-                value={statusFilter}
-                onChange={v => setStatusFilter(Array.isArray(v) ? v : [v])}
-                placeholder="Все статусы"
-                multiple
-              />
-            </div>
+            <FilterDropdown
+              label="Статус"
+              options={STATUS_OPTIONS}
+              value={statusFilter}
+              onChange={v => setStatusFilter(Array.isArray(v) ? v : [v])}
+              placeholder="Все статусы"
+              multiple
+            />
 
-            {/* Приоритет */}
-            <div className="flex-1 min-w-[180px]">
-              <FilterDropdown
-                label="Приоритет"
-                options={PRIORITY_OPTIONS}
-                value={priorityFilter}
-                onChange={v => setPriorityFilter(v as string)}
-                placeholder="Все приоритеты"
-              />
-            </div>
+            <FilterDropdown
+              label="Приоритет"
+              options={PRIORITY_OPTIONS}
+              value={priorityFilter}
+              onChange={v => setPriorityFilter(v as string)}
+              placeholder="Все приоритеты"
+            />
 
-            {/* Тип */}
-            <div className="flex-1 min-w-[180px]">
-              <FilterDropdown
-                label="Тип заявки"
-                options={TICKET_TYPES.map(t => ({ value: t.value, label: t.label }))}
-                value={typeFilter}
-                onChange={v => setTypeFilter(v as string)}
-                placeholder="Все типы"
-              />
-            </div>
+            <FilterDropdown
+              label="Тип заявки"
+              options={TICKET_TYPES.map(t => ({ value: t.value, label: t.label }))}
+              value={typeFilter}
+              onChange={v => setTypeFilter(v as string)}
+              placeholder="Все типы"
+            />
 
-            {/* Контрагент — только для не-клиентов */}
             {showCounterpartyFilter && (
-              <div className="flex-1 min-w-[180px]">
-                <FilterDropdown
-                  label="Контрагент"
-                  options={counterpartyOptions}
-                  value={counterpartyFilter}
-                  onChange={v => setCounterpartyFilter(v as string)}
-                  placeholder="Все контрагенты"
-                  searchable
-                  loading={loadingCounterparties}
-                />
-              </div>
-            )}
-
-            {/* Проект */}
-            <div className="flex-1 min-w-[180px]">
               <FilterDropdown
-                label="Проект"
-                options={projectOptions}
-                value={projectFilter}
-                onChange={v => setProjectFilter(Array.isArray(v) ? v : [v])}
-                placeholder="Все проекты"
+                label="Контрагент"
+                options={counterpartyOptions}
+                value={counterpartyFilter}
+                onChange={v => setCounterpartyFilter(v as string)}
+                placeholder="Все контрагенты"
                 searchable
-                multiple
-                loading={loadingProjects}
+                loading={loadingCounterparties}
               />
-            </div>
+            )}
 
-            {/* Исполнитель — только для не-клиентов */}
+            <FilterDropdown
+              label="Проект"
+              options={projectOptions}
+              value={projectFilter}
+              onChange={v => setProjectFilter(Array.isArray(v) ? v : [v])}
+              placeholder="Все проекты"
+              searchable
+              multiple
+              loading={loadingProjects}
+            />
+
             {showAssigneeFilter && (
-              <div className="flex-1 min-w-[180px]">
-                <FilterDropdown
-                  label="Исполнитель"
-                  options={userOptions}
-                  value={assigneeFilter}
-                  onChange={v => setAssigneeFilter(v as string)}
-                  placeholder="Все исполнители"
-                  searchable
-                  loading={loadingUsers}
-                />
-              </div>
+              <FilterDropdown
+                label="Исполнитель"
+                options={userOptions}
+                value={assigneeFilter}
+                onChange={v => setAssigneeFilter(v as string)}
+                placeholder="Все исполнители"
+                searchable
+                loading={loadingUsers}
+              />
             )}
 
-            {/* Автор — customer_admin + не-клиенты */}
             {showReporterFilter && (
-              <div className="flex-1 min-w-[180px]">
-                <FilterDropdown
-                  label="Автор"
-                  options={userOptions}
-                  value={reporterFilter}
-                  onChange={v => setReporterFilter(v as string)}
-                  placeholder="Все авторы"
-                  searchable
-                  loading={loadingUsers}
-                />
-              </div>
+              <FilterDropdown
+                label="Автор"
+                options={userOptions}
+                value={reporterFilter}
+                onChange={v => setReporterFilter(v as string)}
+                placeholder="Все авторы"
+                searchable
+                loading={loadingUsers}
+              />
             )}
 
-            {/* Дата создания — всегда на отдельной строке (w-full) */}
-            <div className="w-full">
+            {/* Дата — занимает 2 колонки на sm+ */}
+            <div className="sm:col-span-2 xl:col-span-2">
               <label className="text-sm text-[var(--text-primary)]/50 mb-1.5 block font-medium">
                 Дата создания
               </label>
@@ -1080,46 +1018,41 @@ export default function TicketsPage() {
             <FilterTag label={`«${debouncedSearch}»`} icon={<Search size={12} />}
               onRemove={() => { setSearch(''); setDebouncedSearch(''); }} />
           )}
-
           {statusFilter.map(s => (
-            <FilterTag key={s} label={getStatusLabel(s)} colorClass={`${getStatusColor(s)} border`}
+            <FilterTag key={s} label={getStatusLabel(s)}
+              colorClass={`${getStatusColor(s)} border`}
               onRemove={() => setStatusFilter(statusFilter.filter(f => f !== s))} />
           ))}
-
           {priorityFilter && (
-            <FilterTag label={getPriorityLabel(priorityFilter)} colorClass={`${getPriorityColor(priorityFilter)} border`}
+            <FilterTag label={getPriorityLabel(priorityFilter)}
+              colorClass={`${getPriorityColor(priorityFilter)} border`}
               onRemove={() => setPriorityFilter('')} />
           )}
-
           {typeFilter && (
-            <FilterTag label={typeFilter} colorClass={`${getTypeColor(typeFilter)} border`}
+            <FilterTag label={typeFilter}
+              colorClass={`${getTypeColor(typeFilter)} border`}
               onRemove={() => setTypeFilter('')} />
           )}
-
           {showCounterpartyFilter && counterpartyFilter && (
             <FilterTag
               label={counterparties.find(c => c.id === counterpartyFilter)?.name || 'Контрагент'}
               onRemove={() => setCounterpartyFilter('')} />
           )}
-
           {projectFilter.map(p => (
             <FilterTag key={p}
               label={projects.find(proj => proj.id === p)?.name || 'Проект'}
               onRemove={() => setProjectFilter(projectFilter.filter(f => f !== p))} />
           ))}
-
           {showAssigneeFilter && assigneeFilter && (
             <FilterTag
               label={users.find(u => u.id === assigneeFilter)?.full_name || 'Исполнитель'}
               onRemove={() => setAssigneeFilter('')} />
           )}
-
           {showReporterFilter && reporterFilter && (
             <FilterTag
               label={users.find(u => u.id === reporterFilter)?.full_name || 'Автор'}
               onRemove={() => setReporterFilter('')} />
           )}
-
           {dateFrom && dateTo && (
             <FilterTag
               label={`${new Date(dateFrom).toLocaleDateString('ru-RU')} — ${new Date(dateTo).toLocaleDateString('ru-RU')}`}
@@ -1134,18 +1067,19 @@ export default function TicketsPage() {
             <FilterTag label={`По ${new Date(dateTo).toLocaleDateString('ru-RU')}`}
               icon={<Calendar size={12} />} onRemove={() => setDateTo('')} />
           )}
-
           <button onClick={resetFilters}
-            className="text-base text-[var(--accent)]/60 hover:text-[var(--accent)] transition-colors ml-1">
+            className="text-base text-[var(--accent)]/60 hover:text-[var(--accent)]
+                       transition-colors ml-1">
             Сбросить
           </button>
         </div>
       )}
 
-      {/* ── Loading indicator ── */}
+      {/* ── Loading ── */}
       {loading && !initialLoad && (
         <div className="flex justify-center py-2">
-          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--hover-1)] border border-[var(--border-color)]">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--hover-1)]
+                          border border-[var(--border-color)]">
             <Loader2 size={18} className="text-[var(--accent)] animate-spin" />
             <span className="text-base text-[var(--text-muted)]">Загрузка...</span>
           </div>
@@ -1178,22 +1112,25 @@ export default function TicketsPage() {
             {tickets.map(ticket => {
               const closed = ticket.status === 'closed' || ticket.status === 'resolved';
               const typeInfo = TICKET_TYPES.find(t => t.value === ticket.type);
-              const statusLabel = STATUS_MAP[ticket.status]?.label || ticket.status;
-              const priLabel = PRIORITY_MAP[ticket.priority]?.label || ticket.priority;
+              const sLabel = STATUS_MAP[ticket.status]?.label || ticket.status;
+              const pLabel = PRIORITY_MAP[ticket.priority]?.label || ticket.priority;
 
               return (
                 <Link key={ticket.id} to={`/tickets/${ticket.number}`}
                   className="glass-card rounded-xl border border-[var(--border-color)] p-4 block
-                             hover:bg-[var(--hover-1)] hover:border-[var(--border-hover)] transition-all group">
+                             hover:bg-[var(--hover-1)] hover:border-[var(--border-hover)]
+                             transition-all group">
                   <div className="flex items-center justify-between gap-3 mb-2.5">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="text-base font-mono text-[var(--accent-light)] bg-[var(--accent-soft)]/50
-                                       px-1.5 py-0.5 rounded-md border border-[var(--accent)]/10 whitespace-nowrap">
+                      <span className="text-base font-mono text-[var(--accent-light)]
+                                       bg-[var(--accent-soft)]/50 px-1.5 py-0.5 rounded-md
+                                       border border-[var(--accent)]/10 whitespace-nowrap">
                         {ticket.number}
                       </span>
                       {!closed ? (
                         <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Активна
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                          Активна
                         </span>
                       ) : (
                         <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
@@ -1206,25 +1143,30 @@ export default function TicketsPage() {
                                  group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>
 
-                  <h3 className="text-[18px] font-semibold text-[var(--text-primary)] mb-3 leading-snug
-                                 group-hover:text-[var(--accent-light)] transition-colors line-clamp-2">
+                  <h3 className="text-[18px] font-semibold text-[var(--text-primary)] mb-3
+                                 leading-snug group-hover:text-[var(--accent-light)]
+                                 transition-colors line-clamp-2">
                     {ticket.title}
                   </h3>
 
                   <div className="flex flex-wrap items-center gap-1.5 mb-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[15px] font-medium border ${getTypeColor(ticket.type)}`}>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg
+                                     text-[15px] font-medium border ${getTypeColor(ticket.type)}`}>
                       {typeInfo?.icon} {ticket.type}
                     </span>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[15px] font-medium border ${getStatusColor(ticket.status)}`}>
-                      {statusLabel}
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg
+                                     text-[15px] font-medium border ${getStatusColor(ticket.status)}`}>
+                      {sLabel}
                     </span>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[15px] font-medium border ${PRIORITY_MAP[ticket.priority]?.color || 'priority-medium'}`}>
-                      {ticket.priority === 'critical' && <Flame size={18} />} {priLabel}
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg
+                                     text-[15px] font-medium border
+                                     ${PRIORITY_MAP[ticket.priority]?.color || 'priority-medium'}`}>
+                      {ticket.priority === 'critical' && <Flame size={18} />} {pLabel}
                     </span>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-base text-[var(--text-muted)]
-                                  border-t border-[var(--border-color)] pt-2.5">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-base
+                                  text-[var(--text-muted)] border-t border-[var(--border-color)] pt-2.5">
                     <span className="flex items-center gap-1">
                       <Calendar size={18} />{formatDate(ticket.created_at)}
                     </span>
@@ -1256,12 +1198,14 @@ export default function TicketsPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 pt-4 border-t border-[var(--border-color)]">
+            <div className="flex items-center justify-center gap-2 pt-4
+                            border-t border-[var(--border-color)]">
               <button
                 onClick={() => handlePageChange(Math.max(1, page - 1))}
                 disabled={page === 1}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card border border-[var(--border-color)]
-                           hover:bg-[var(--hover-2)] disabled:opacity-40 disabled:cursor-not-allowed
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card
+                           border border-[var(--border-color)] hover:bg-[var(--hover-2)]
+                           disabled:opacity-40 disabled:cursor-not-allowed
                            text-[var(--text-primary)] text-base transition-colors">
                 <ChevronLeft className="w-4 h-4" /> Назад
               </button>
@@ -1284,8 +1228,9 @@ export default function TicketsPage() {
               <button
                 onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
                 disabled={page === totalPages}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card border border-[var(--border-color)]
-                           hover:bg-[var(--hover-2)] disabled:opacity-40 disabled:cursor-not-allowed
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card
+                           border border-[var(--border-color)] hover:bg-[var(--hover-2)]
+                           disabled:opacity-40 disabled:cursor-not-allowed
                            text-[var(--text-primary)] text-base transition-colors">
                 Вперёд <ChevronRight className="w-4 h-4" />
               </button>
