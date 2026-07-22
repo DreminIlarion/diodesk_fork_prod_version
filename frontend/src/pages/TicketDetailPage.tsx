@@ -1017,10 +1017,10 @@ export default function TicketDetailPage() {
                     <Star className="w-4.5 h-4.5 text-emerald-500" />
                   </div>
                   <div>
-                    <p className="text-base font-semibold text-[var(--text-primary)]">
+                    <p className="text-l font-semibold text-[var(--text-primary)]">
                       Оцените работу по заявке
                     </p>
-                    <p className="text-xs text-[var(--text-primary)]/35 mt-0.5">
+                    <p className="text-sm text-[var(--text-primary)]/35 mt-0.5">
                       Ваш отзыв поможет нам стать лучше
                     </p>
                   </div>
