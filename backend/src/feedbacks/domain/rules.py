@@ -87,7 +87,7 @@ class IsFeedbackAuthorRule:
         self.feedback = feedback
 
     def check(self) -> PermissionResult:
-        if self.subject.id == self.feedback.author_id:
+        if str(self.subject.id) == str(self.feedback.author_id):  # ← str()
             return PermissionResult(True)
         
         return PermissionResult(False, "Only feedback author can manage feedback")

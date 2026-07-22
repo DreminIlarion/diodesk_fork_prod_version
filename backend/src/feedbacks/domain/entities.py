@@ -21,12 +21,8 @@ class Feedback(AggregateRoot):
     comment: str | None = None
 
     def __post_init__(self) -> None:
-        """
-        Проверяет, что комментарий отзыва не пустой, если он указан.
-        """
-
         if self.comment is not None and not self.comment.strip():
-            raise ValueError("Feedback comment cannot be empty")
+            self.comment = None  # ← исправлено
 
     @classmethod
     def create(
@@ -37,11 +33,7 @@ class Feedback(AggregateRoot):
         rating: int, 
         comment: str | None = None
     ) -> Self:
-        """
-        Создаёт новый отзыв клиента.
-        """
-
-        comment = None if comment is None else comment.strip()
+        comment = None if (comment is None or not comment.strip()) else comment.strip()  # ← исправлено
 
         feedback = cls(
             ticket_id=ticket_id,
@@ -68,26 +60,16 @@ class Feedback(AggregateRoot):
         rating: int | None = None,
         comment: str | None = None,
     ) -> None:
-        """
-        Редактирует оценку и комментарий отзыва.
-        Если данные изменились, то обновляет updated_at.
-        """
-
         is_edited = False
 
         if rating is not None:
             new_rating = FeedbackRating(rating)
-
             if new_rating != self.rating:
                 self.rating = new_rating
                 is_edited = True
 
         if comment is not None:
-            new_comment = comment.strip()
-
-            if not new_comment:
-                raise ValueError("Feedback comment cannot be empty")
-
+            new_comment = comment.strip() if comment.strip() else None  # ← исправлено
             if new_comment != self.comment:
                 self.comment = new_comment
                 is_edited = True
@@ -96,12 +78,7 @@ class Feedback(AggregateRoot):
             self.updated_at = current_datetime()
 
     def archive(self) -> None:
-        """
-        Архивирует отзыв через мягкое удаление.
-        """
-
         if self.is_deleted:
             return
-        
         self.deleted_at = current_datetime()
         self.updated_at = current_datetime()
