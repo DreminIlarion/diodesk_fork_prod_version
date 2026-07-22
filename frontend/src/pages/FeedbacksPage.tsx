@@ -1028,41 +1028,48 @@ export default function FeedbacksPage() {
 
   /* ─── Fetch feedbacks ─── */
   const fetchFeedbacks = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
+  if (!silent) setLoading(true);
+  else setRefreshing(true);
 
-    try {
-      const filters: any = {};
-      if (filterRating) filters.rating = filterRating;
-      if (filterTicketId) filters.ticketId = filterTicketId;
-      if (filterAuthorId) filters.author_id = filterAuthorId;
+  try {
+    const filters: any = {};
+    if (filterRating) filters.rating = filterRating;
+    if (filterTicketId) filters.ticketId = filterTicketId;
+    if (isStaff && filterAuthorId) filters.author_id = filterAuthorId;
 
-      const res = await feedbacksApi.getAll(page, 12, filters);
-      setFeedbacks(res.items);
-      setTotalItems(res.total_items);
-      setTotalPages(res.total_pages);
+    // Клиенты → getMy, Support → getAll
+    const res = isStaff
+      ? await feedbacksApi.getAll(page, 12, filters)
+      : await feedbacksApi.getMy(page, 12);
 
-      const statsItems = await loadAllFeedbacksForStats({
-        ...(filterTicketId ? { ticketId: filterTicketId } : {}),
-        ...(filterAuthorId ? { author_id: filterAuthorId } : {}),
-      });
+    setFeedbacks(res.items);
+    setTotalItems(res.total_items);
+    setTotalPages(res.total_pages);
 
-      const dist: [number, number, number, number, number] = [0, 0, 0, 0, 0];
-      let sum = 0;
-      statsItems.forEach(f => { dist[f.rating - 1] += 1; sum += f.rating; });
-      setStats({
-        avg: statsItems.length > 0 ? sum / statsItems.length : 0,
-        total: statsItems.length,
-        distribution: dist,
-      });
-    } catch (e: any) {
-      toast({ title: 'Ошибка загрузки', description: apiErr(e), variant: 'destructive' });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [page, filterRating, filterTicketId, filterAuthorId, toast, loadAllFeedbacksForStats]);
+    // Статистика — для клиентов только по своим, для support по фильтрам
+    const statsFilters: any = {};
+    if (filterTicketId) statsFilters.ticketId = filterTicketId;
+    if (isStaff && filterAuthorId) statsFilters.author_id = filterAuthorId;
 
+    const statsItems = isStaff
+      ? await loadAllFeedbacksForStats(statsFilters)
+      : await loadAllFeedbacksForStats({});
+
+    const dist: [number, number, number, number, number] = [0, 0, 0, 0, 0];
+    let sum = 0;
+    statsItems.forEach(f => { dist[f.rating - 1] += 1; sum += f.rating; });
+    setStats({
+      avg: statsItems.length > 0 ? sum / statsItems.length : 0,
+      total: statsItems.length,
+      distribution: dist,
+    });
+  } catch (e: any) {
+    toast({ title: 'Ошибка загрузки', description: apiErr(e), variant: 'destructive' });
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+}, [page, filterRating, filterTicketId, filterAuthorId, isStaff, toast, loadAllFeedbacksForStats]);
   useEffect(() => { fetchFeedbacks(); }, [fetchFeedbacks]);
 
   const refresh = () => fetchFeedbacks(true);
@@ -1122,14 +1129,16 @@ export default function FeedbacksPage() {
             />
           </div>
 
-          {/* Author filter */}
-          <div className="w-[220px]">
-            <AuthorSelect
-              value={filterAuthorId}
-              label={filterAuthorLabel}
-              onChange={(id, l) => { setFilterAuthorId(id); setFilterAuthorLabel(l); setPage(1); }}
-            />
-          </div>
+          {/* Author filter — только для support */}
+          {isStaff && (
+            <div className="w-[220px]">
+              <AuthorSelect
+                value={filterAuthorId}
+                label={filterAuthorLabel}
+                onChange={(id, l) => { setFilterAuthorId(id); setFilterAuthorLabel(l); setPage(1); }}
+              />
+            </div>
+          )}
 
           {/* Rating filter */}
           <div className="relative">

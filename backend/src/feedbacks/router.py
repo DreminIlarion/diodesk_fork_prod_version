@@ -92,3 +92,19 @@ async def archive_feedback(
         feedback_id=feedback_id,
         current_subject=current_subject,
     )
+
+@router.get(
+    path="/my",
+    status_code=status.HTTP_200_OK,
+    response_model=Page[FeedbackResponse],
+    summary="Получить мои отзывы (для клиентов)",
+)
+async def get_my_feedbacks(
+    pagination: PaginationDep,
+    current_subject: CurrentSubjectDep,
+    service: FeedbackServiceDep,
+) -> Page[FeedbackResponse]:
+    return await service.get_my_feedbacks(
+        pagination=pagination,
+        current_subject=current_subject,
+    )

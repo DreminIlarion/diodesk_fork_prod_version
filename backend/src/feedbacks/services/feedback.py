@@ -166,3 +166,15 @@ class FeedbackService:
         await finalize(self.uow, feedback, event_publisher=self.event_publisher)
 
         return map_feedback_to_response(feedback)
+    
+    async def get_my_feedbacks(
+        self,
+        pagination: Pagination,
+        current_subject: Subject,
+    ) -> Page[FeedbackResponse]:
+        """
+        Получить только мои отзывы.
+        """
+        filters = FeedbackFilters(author_id=current_subject.id)
+        page = await self.feedback_repo.paginate(pagination=pagination, filters=filters)
+        return page.to_response(map_feedback_to_response)

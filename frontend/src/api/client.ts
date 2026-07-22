@@ -1255,6 +1255,13 @@ export const feedbacksApi = {
     return res.data;
   },
 
+  getMy: async (page = 1, size = 12) => {
+  const response = await api.get(`/api/v1/feedbacks/my`, {
+    params: { page, size },
+  });
+  return response.data;
+},
+
   update: async (id: string, data: FeedbackUpdateInput): Promise<Feedback> => {
     const res = await api.patch(`/api/v1/feedbacks/${id}`, data);
     return res.data;
