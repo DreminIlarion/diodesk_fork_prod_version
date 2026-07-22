@@ -95,45 +95,39 @@ function StarRating({
   const [hovered, setHovered] = useState(0);
   const display = readonly ? value : (hovered || value);
 
-  const iconSizeMap = {
-    sm: 'w-4 h-4',
-    md: 'w-5 h-5',
-    lg: 'w-7 h-7',
-    xl: 'w-9 h-9',
-  };
-
-  const buttonSizeMap = {
-    sm: 'w-8 h-8',
-    md: 'w-10 h-10',
-    lg: 'w-12 h-12',
-    xl: 'w-14 h-14',
-  };
-
-  const gapMap = {
-    sm: 'gap-0.5',
-    md: 'gap-1',
-    lg: 'gap-1.5',
-    xl: 'gap-2',
-  };
+  const pxMap = { sm: 16, md: 20, lg: 28, xl: 36 };
+  const px = pxMap[size];
 
   const label = display > 0 ? RATING_LABELS[display] : '';
 
   return (
     <div className="inline-flex flex-col items-center">
-      <div className={`inline-flex items-center ${gapMap[size]}`}>
+      <div
+        className="inline-flex items-center gap-0.5"
+        onMouseLeave={() => !readonly && setHovered(0)}
+        style={{ height: px, lineHeight: 0 }}
+      >
         {[1, 2, 3, 4, 5].map(star => {
-          const filled = star <= display;
+          const isActive = star <= display;
 
           if (readonly) {
             return (
-              <Star
+              <span
                 key={star}
-                className={`${iconSizeMap[size]} flex-shrink-0 transition-colors duration-150 ${
-                  filled
-                    ? 'text-emerald-500 fill-emerald-500'
-                    : 'text-[var(--text-primary)]/15'
-                }`}
-              />
+                className="flex items-center justify-center"
+                style={{ width: px, height: px }}
+              >
+                <Star
+                  width={px}
+                  height={px}
+                  className={`transition-colors duration-150 ${
+                    isActive
+                      ? 'text-emerald-500 fill-emerald-500'
+                      : 'text-[var(--text-primary)]/10'
+                  }`}
+                  style={{ display: 'block' }}
+                />
+              </span>
             );
           }
 
@@ -142,26 +136,22 @@ function StarRating({
               key={star}
               type="button"
               aria-label={`Оценка ${star}`}
-              onMouseEnter={() => setHovered(star)}
-              onMouseLeave={() => setHovered(0)}
               onClick={() => onChange?.(star)}
-              className={`
-                ${buttonSizeMap[size]}
-                flex items-center justify-center rounded-xl
-                border border-transparent
-                transition-all duration-150
-                hover:border-emerald-500/20
-                hover:bg-emerald-500/[0.05]
-                active:scale-90
-                focus:outline-none focus:ring-2 focus:ring-emerald-500/10
-              `}
+              onMouseEnter={() => setHovered(star)}
+              className="flex items-center justify-center outline-none
+                         transition-transform duration-100
+                         hover:scale-110 active:scale-95"
+              style={{ width: px + 4, height: px + 4, lineHeight: 0 }}
             >
               <Star
-                className={`${iconSizeMap[size]} flex-shrink-0 transition-colors duration-150 ${
-                  filled
+                width={px}
+                height={px}
+                className={`transition-colors duration-150 ${
+                  isActive
                     ? 'text-emerald-500 fill-emerald-500'
                     : 'text-[var(--text-primary)]/15'
                 }`}
+                style={{ display: 'block' }}
               />
             </button>
           );
@@ -178,7 +168,7 @@ function StarRating({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.12 }}
-                className="text-sm font-medium text-emerald-500/75"
+                className="text-sm font-medium text-emerald-500/70"
               >
                 {label}
               </motion.span>

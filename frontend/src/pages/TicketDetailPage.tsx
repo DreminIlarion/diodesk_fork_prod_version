@@ -183,7 +183,7 @@ function InlineStarRating({
                 height={size}
                 className={`transition-colors duration-150 ${
                   isActive
-                    ? 'text-amber-400 fill-amber-400'
+                    ? 'text-emerald-500 fill-emerald-500'
                     : 'text-[var(--text-primary)]/10'
                 }`}
                 style={{ display: 'block' }}
@@ -205,10 +205,10 @@ function InlineStarRating({
             <Star
               width={size}
               height={size}
-              className={`transition-all duration-150 ${
+              className={`transition-colors duration-150 ${
                 isActive
-                  ? 'text-amber-400 fill-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.4)]'
-                  : 'text-[var(--text-primary)]/15 hover:text-amber-400/30'
+                  ? 'text-emerald-500 fill-emerald-500'
+                  : 'text-[var(--text-primary)]/15'
               }`}
               style={{ display: 'block' }}
             />
@@ -998,10 +998,9 @@ export default function TicketDetailPage() {
         </div>
       </div>
 
-          {/* ── Feedback Banner ── */}
+      {/* ── Feedback Banner ── */}
       {feedbackBannerState === 'show' && !existingFeedback && (
         <AnimatePresence mode="wait">
-          {/* ─── Развёрнутая форма оценки ─── */}
           {showFeedbackForm ? (
             <motion.div
               key="feedback-form"
@@ -1009,8 +1008,7 @@ export default function TicketDetailPage() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.98 }}
               transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/[0.06] to-emerald-500/[0.02]
-                         backdrop-blur-sm overflow-hidden"
+              className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] overflow-hidden"
             >
               {/* Шапка */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-emerald-500/10">
@@ -1041,10 +1039,10 @@ export default function TicketDetailPage() {
                 </button>
               </div>
 
-              {/* Тело формы */}
+              {/* Тело */}
               <div className="px-6 py-5 space-y-5">
-                {/* Звёзды + подпись */}
-                <div className="flex items-center gap-4">
+                {/* Звёзды по центру + подпись */}
+                <div className="flex flex-col items-center gap-2">
                   <InlineStarRating
                     value={feedbackRating}
                     hovered={feedbackHovered}
@@ -1053,20 +1051,22 @@ export default function TicketDetailPage() {
                     onLeave={() => setFeedbackHovered(0)}
                     size={36}
                   />
-                  <AnimatePresence mode="wait">
-                    {(feedbackHovered || feedbackRating) > 0 && (
-                      <motion.span
-                        key={feedbackHovered || feedbackRating}
-                        initial={{ opacity: 0, x: -4 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 4 }}
-                        transition={{ duration: 0.15 }}
-                        className="text-sm font-medium text-amber-400/80"
-                      >
-                        {FEEDBACK_RATING_LABELS[(feedbackHovered || feedbackRating) as keyof typeof FEEDBACK_RATING_LABELS]}
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
+                  <div className="h-5 flex items-center">
+                    <AnimatePresence mode="wait">
+                      {(feedbackHovered || feedbackRating) > 0 && (
+                        <motion.span
+                          key={feedbackHovered || feedbackRating}
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.15 }}
+                          className="text-sm font-medium text-emerald-500/70"
+                        >
+                          {FEEDBACK_RATING_LABELS[(feedbackHovered || feedbackRating) as keyof typeof FEEDBACK_RATING_LABELS]}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
 
                 {/* Комментарий */}
@@ -1098,9 +1098,8 @@ export default function TicketDetailPage() {
                     disabled={!feedbackRating || savingFeedback}
                     onClick={handleSubmitFeedback}
                     className="flex items-center gap-2 px-6 py-2.5 rounded-xl
-                               bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold
-                               disabled:opacity-35 disabled:cursor-not-allowed
-                               shadow-lg shadow-emerald-500/20 transition-all"
+                               bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold
+                               disabled:opacity-35 disabled:cursor-not-allowed transition-colors"
                   >
                     {savingFeedback
                       ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -1112,7 +1111,7 @@ export default function TicketDetailPage() {
               </div>
             </motion.div>
           ) : (
-            /* ─── Компактный баннер-приглашение ─── */
+            /* Компактный баннер */
             <motion.div
               key="feedback-prompt"
               initial={{ opacity: 0, y: -6 }}
@@ -1139,8 +1138,8 @@ export default function TicketDetailPage() {
                   <button
                     onClick={() => setShowFeedbackForm(true)}
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl
-                               bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold
-                               shadow-lg shadow-emerald-500/20 transition-all"
+                               bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold
+                               transition-colors"
                   >
                     <Star className="w-4 h-4" />
                     Оценить
