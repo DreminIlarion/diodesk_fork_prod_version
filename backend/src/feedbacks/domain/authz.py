@@ -41,7 +41,7 @@ class FeedbackAuthZService:
         """
 
         if feedback is None:
-            return IsSupportRule(subject).check()
+            return PermissionResult(True)
 
         policy = AnyOf(
             IsFeedbackAuthorRule(subject, feedback),

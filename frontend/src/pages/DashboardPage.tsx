@@ -20,7 +20,7 @@ import GridBackground from '../components/ui/GridBackground';
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   'new': { label: 'Новый', color: 'status-new' },
-  'agreement': { label: 'На согласовании', color: 'status-agreement' },
+  'pending_approval': { label: 'На согласовании', color: 'status-agreement' },
   'open': { label: 'Открыт', color: 'status-open' },
   'in_progress': { label: 'В работе', color: 'status-progress' },
   'waiting': { label: 'Ожидает ответа', color: 'status-waiting' },

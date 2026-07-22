@@ -1043,7 +1043,7 @@ const canSelectCounterparty = (!isCustomer && user?.roles?.some(r => CAN_SELECT_
                 <div className="p-6 rounded-2xl bg-[var(--hover-1)]">
                   <p className="text-[var(--text-primary)]/50 mb-3">Приоритет</p>
                   <div className={`inline-flex items-center gap-3 text-lg px-5 py-2.5 rounded-2xl ${PRIORITIES.find(p => p.value === priority)?.color || ''}`}>
-                    {PRIORITIES.find(p => p.value === priority)?.icon} {priority}
+                    {PRIORITIES.find(p => p.value === priority)?.icon} {PRIORITIES.find(p => p.value === priority)?.label || priority}
                   </div>
                 </div>
               </div>
