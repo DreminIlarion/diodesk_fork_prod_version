@@ -66,10 +66,11 @@ async def create_ticket(
 )
 async def search_tickets(
         filters: TicketFiltersBodyDep,
+        current_subject: CurrentSubjectDep, 
         pagination: PaginationDep,
         service: TicketQueryServiceDep,
 ) -> Page[TicketViewResponse]:
-    return await service.get_tickets(pagination, filters=filters)
+    return await service.get_tickets(pagination, filters=filters, current_subject=current_subject)
 
 
 @router.get(

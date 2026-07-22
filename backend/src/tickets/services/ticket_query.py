@@ -11,7 +11,7 @@ from ..domain.entities import Ticket
 from ..domain.repos import TicketFilters, TicketRepository
 from ..mappers import map_ticket_to_view_response
 from ..schemas import TicketParticipant, TicketViewResponse
-
+from src.iam.domain.authz import Subject
 
 def _collect_participants_ids(ticket: Ticket) -> set[UUID]:
     """Собирает уникальные идентификаторы участников заявки."""
@@ -59,7 +59,25 @@ class TicketQueryService:
 
     async def get_tickets(
             self, pagination: Pagination, filters: TicketFilters | None = None,
+            current_subject: Subject | None = None,
     ) -> Page[TicketViewResponse]:
+        # Принудительный фильтр для клиентов
+        if current_subject is not None and current_subject.has_any_role(['customer', 'customer_admin']):
+            client_cp_id = current_subject.counterparty_id
+            if filters is None:
+                filters = TicketFilters(counterparty_id=client_cp_id)
+            else:
+                filters = TicketFilters(
+                    search_query=filters.search_query,
+                    tags=filters.tags,
+                    counterparty_id=client_cp_id or filters.counterparty_id,
+                    project_ids=filters.project_ids,
+                    statuses=filters.statuses,
+                    priorities=filters.priorities,
+                    type=filters.type,
+                    actors=filters.actors,
+                    time_range=filters.time_range,
+                )
         page = await self.ticket_repo.paginate(pagination, filters=filters)
 
         relations = await self.reference_loader.load(

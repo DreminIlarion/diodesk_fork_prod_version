@@ -927,7 +927,7 @@ export default function TicketsPage() {
       {/* ── Filters Panel ── */}
       {showFilters && (
         <div className="rounded-xl border border-[var(--border-color)] p-3.5 space-y-3
-                        animate-in fade-in slide-in-from-top-1 duration-200">
+                        animate-in fade-in slide-in-from-top-1 duration-200 overflow-visible">
           <div className="flex items-center justify-between">
             <span className="text-base font-semibold text-[var(--text-primary)]/40 uppercase tracking-widest">
               Фильтрация
