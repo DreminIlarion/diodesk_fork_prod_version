@@ -568,6 +568,14 @@ export default function TicketDetailPage() {
 
   useEffect(() => {
     if (!ticket || !user) return;
+     console.log('=== FEEDBACK BANNER DEBUG ===');
+    console.log('ticket.status:', ticket.status);
+    console.log('user.user_id:', user.user_id);
+    console.log('ticket.created_by:', ticket.created_by);
+    console.log('ticket.reporter_id:', ticket.reporter_id);
+    console.log('userRoles:', userRoles);
+    console.log('isClient:', !hasAnyRole(userRoles, ['admin', 'support_manager', 'support_agent', 'executor']));
+    console.log('isAuthor:', user.user_id === ticket.created_by || user.user_id === ticket.reporter_id);
     if (ticket.status !== 'closed') {
       setFeedbackBannerState('hidden');
       return;
