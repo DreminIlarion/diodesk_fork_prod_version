@@ -589,11 +589,12 @@ export default function TicketDetailPage() {
 
     setFeedbackBannerState('loading');
 
-    feedbacksApi.getMy(1, 10).then(res => {
-      // Фильтруем по ticket_id на фронте
-      const ticketFeedback = (res.items || []).filter((f: any) => f.ticket_id === ticket.id);
-      if (ticketFeedback.length > 0) {
-        setExistingFeedback(ticketFeedback[0]);
+    feedbacksApi.getAll(1, 10, {
+      ticketId: ticket.id,
+      author_id: user.user_id,
+    }).then(res => {
+      if (res.items.length > 0) {
+        setExistingFeedback(res.items[0]);
       }
       setFeedbackBannerState('show');
     }).catch(() => {

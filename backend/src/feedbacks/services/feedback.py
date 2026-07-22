@@ -98,15 +98,19 @@ class FeedbackService:
         Получить список активных отзывов.
         """
 
-        permission = self.authz_service.can_view_feedback(current_subject)
-        if not permission.allowed:
-            raise PermissionDeniedError(permission.reason)
+        # Клиенты видят только свои отзывы
+        if current_subject.has_any_role(['customer', 'customer_admin']):
+            filters = FeedbackFilters(
+                rating=filters.rating if filters else None,
+                ticket_id=filters.ticket_id if filters else None,
+                author_id=current_subject.id,  # принудительно только свои
+            )
+        else:
+            permission = self.authz_service.can_view_feedback(current_subject)
+            if not permission.allowed:
+                raise PermissionDeniedError(permission.reason)
         
-        page = await self.feedback_repo.paginate(
-            pagination=pagination,
-            filters=filters,
-        )
-
+        page = await self.feedback_repo.paginate(pagination=pagination, filters=filters)
         return page.to_response(map_feedback_to_response)
     
     async def update(

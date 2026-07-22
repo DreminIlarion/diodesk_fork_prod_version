@@ -63,7 +63,7 @@ class SqlFeedbackRepository(SqlAlchemyRepository[Feedback, FeedbackOrm]):
         ).order_by(self.model.created_at.desc())
         result = await self.session.execute(stmt)
         models = result.scalars().all()
-        return [self.model_mapper.from_orm(m) for m in models]
+        return [self.model_mapper.to_entity(m) for m in models]
 
 
     
