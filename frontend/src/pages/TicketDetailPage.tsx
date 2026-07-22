@@ -568,14 +568,7 @@ export default function TicketDetailPage() {
 
   useEffect(() => {
     if (!ticket || !user) return;
-     console.log('=== FEEDBACK BANNER DEBUG ===');
-    console.log('ticket.status:', ticket.status);
-    console.log('user.user_id:', user.user_id);
-    console.log('ticket.created_by:', ticket.created_by);
-    console.log('ticket.reporter_id:', ticket.reporter_id);
-    console.log('userRoles:', userRoles);
-    console.log('isClient:', !hasAnyRole(userRoles, ['admin', 'support_manager', 'support_agent', 'executor']));
-    console.log('isAuthor:', user.user_id === ticket.created_by || user.user_id === ticket.reporter_id);
+
     if (ticket.status !== 'closed') {
       setFeedbackBannerState('hidden');
       return;
@@ -589,7 +582,7 @@ export default function TicketDetailPage() {
     }
 
     // Только автор тикета
-    const isAuthor = user.user_id === ticket.created_by || user.user_id === ticket.reporter_id;
+    const isAuthor = user.id === ticket.created_by || user.id === ticket.reporter_id;
     if (!isAuthor) {
       setFeedbackBannerState('hidden');
       return;
@@ -599,7 +592,7 @@ export default function TicketDetailPage() {
 
     feedbacksApi.getAll(1, 10, {
       ticketId: ticket.id,
-      author_id: user.user_id,
+      author_id: user.id,
     }).then(res => {
       if (res.items.length > 0) {
         setExistingFeedback(res.items[0]);
@@ -608,7 +601,7 @@ export default function TicketDetailPage() {
     }).catch(() => {
       setFeedbackBannerState('hidden');
     });
-  }, [ticket?.id, ticket?.status, user?.user_id]);
+  }, [ticket?.id, ticket?.status, user?.id]);
 
   /* ═══════════════════════════════════════════════════════════════════
      HANDLERS
