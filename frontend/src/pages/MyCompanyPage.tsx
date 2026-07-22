@@ -7,15 +7,56 @@ import {
   ExternalLink, Crown, GitBranch, Ticket,
   ChevronRight, Settings, Plus,
   Globe, X, CheckCircle2, UserPlus, Trash2,
-  ChevronLeft,
+  ChevronLeft, Package, Layers,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
-import { counterpartiesApi, usersApi, ticketsApi } from '@/api/client';
+import { counterpartiesApi, usersApi, ticketsApi, productsApi } from '@/api/client';
 import type { Counterparty, CounterpartyCustomer, TicketListItem } from '@/types';
 
-type TabType = 'info' | 'contacts' | 'branches' | 'employees' | 'tickets';
+/* ═══════════════════════════════════════════════════════════════════
+   РОЛИ
+   ═══════════════════════════════════════════════════════════════════ */
 
-// ─── Phone mask (из CounterpartyDetailPage) ───
+function useRoles() {
+  const { user } = useAuthStore();
+  const roles: string[] = user?.roles ?? [];
+  const isCustomer      = roles.includes('customer');
+  const isCustomerAdmin = roles.includes('customer_admin');
+  return { roles, isCustomer, isCustomerAdmin, isClientUser: isCustomer || isCustomerAdmin };
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   СТАТУСЫ / ПРИОРИТЕТЫ (перевод с английского)
+   ═══════════════════════════════════════════════════════════════════ */
+
+const STATUS_MAP: Record<string, { label: string; color: string }> = {
+  new:              { label: 'Новый',           color: 'status-new' },
+  pending_approval: { label: 'На согласовании', color: 'status-agreement' },
+  open:             { label: 'Открыт',          color: 'status-open' },
+  in_progress:      { label: 'В работе',        color: 'status-progress' },
+  waiting:          { label: 'Ожидает ответа',  color: 'status-waiting' },
+  resolved:         { label: 'Решён',           color: 'status-resolved' },
+  closed:           { label: 'Закрыт',          color: 'status-closed' },
+  reopened:         { label: 'Переоткрыт',      color: 'status-reopened' },
+  rejected:         { label: 'Отклонён',        color: 'status-rejected' },
+  cancelled:        { label: 'Отменён',         color: 'status-closed' },
+};
+
+const PRIORITY_MAP: Record<string, { label: string; color: string }> = {
+  low:      { label: 'Низкий',      color: 'priority-low' },
+  medium:   { label: 'Средний',     color: 'priority-medium' },
+  high:     { label: 'Высокий',     color: 'priority-high' },
+  critical: { label: 'Критический', color: 'priority-critical' },
+};
+
+const getStatusLabel  = (s: string) => STATUS_MAP[s]?.label  ?? s;
+const getStatusColor  = (s: string) => STATUS_MAP[s]?.color  ?? 'status-closed';
+const getPriorityLabel = (p: string) => PRIORITY_MAP[p]?.label ?? p;
+const getPriorityColor = (p: string) => PRIORITY_MAP[p]?.color ?? 'priority-medium';
+
+/* ═══════════════════════════════════════════════════════════════════
+   PHONE MASK
+   ═══════════════════════════════════════════════════════════════════ */
 
 function formatPhone(raw: string): string {
   const digits = raw.replace(/\D/g, '');
@@ -43,29 +84,22 @@ function PhoneInput({ value, onChange, placeholder = '+7 (999) 123-45-67', class
   value: string; onChange: (v: string) => void; placeholder?: string; className?: string;
 }) {
   return (
-    <input
-      type="tel"
-      value={value}
-      onChange={e => {
-        const digits = e.target.value.replace(/\D/g, '');
-        onChange(formatPhone(digits));
-      }}
+    <input type="tel" value={value}
+      onChange={e => { const digits = e.target.value.replace(/\D/g, ''); onChange(formatPhone(digits)); }}
       onKeyDown={e => {
         if (e.key === 'Backspace') {
           const digits = value.replace(/\D/g, '');
-          if (digits.length > 0) {
-            onChange(digits.length <= 1 ? '' : formatPhone(digits.slice(0, -1)));
-            e.preventDefault();
-          }
+          if (digits.length > 0) { onChange(digits.length <= 1 ? '' : formatPhone(digits.slice(0, -1))); e.preventDefault(); }
         }
       }}
-      placeholder={placeholder}
-      className={className}
+      placeholder={placeholder} className={className}
     />
   );
 }
 
-// ─── Helpers ──────
+/* ═══════════════════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════════════════ */
 
 function getInitials(name?: string | null): string {
   if (!name) return '?';
@@ -82,54 +116,15 @@ function Avatar({ name, size = 'md' }: { name?: string | null; size?: 'sm' | 'md
   );
 }
 
-const statusClr = (s: string) => {
-  const map: Record<string, string> = {
-    'Новый': 'status-new',
-    'На согласовании': 'status-agreement',
-    'Открыт': 'status-open',
-    'В работе': 'status-progress',
-    'Ожидает ответа': 'status-waiting',
-    'Решён': 'status-resolved',
-    'Закрыт': 'status-closed',
-    'Переоткрыт': 'status-reopened',
-  };
-  return map[s] || 'status-closed';
-};
-
-const priorityClr = (p: string) => {
-  const map: Record<string, string> = {
-    'Низкий': 'priority-low',
-    'Средний': 'priority-medium',
-    'Высокий': 'priority-high',
-    'Критический': 'priority-critical',
-  };
-  return map[p] || 'priority-medium';
-};
-
-const fmtDate = (d: string) =>
-  new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
-
-const fmtDateTime = (d: string) =>
-  new Date(d).toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const fmtDate     = (d: string) => new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+const fmtDateTime = (d: string) => new Date(d).toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 const getEmployeeRoleInfo = (role: string) => {
   const roles: Record<string, { label: string; icon: JSX.Element; color: string }> = {
-    customer_admin: {
-      label: 'Администратор',
-      icon: <Crown className="w-3.5 h-3.5" />,
-      color: 'status-reopened',
-    },
-    customer: {
-      label: 'Сотрудник',
-      icon: <User className="w-3.5 h-3.5" />,
-      color: 'status-closed',
-    },
+    customer_admin: { label: 'Администратор', icon: <Crown className="w-3.5 h-3.5" />,  color: 'status-reopened' },
+    customer:       { label: 'Сотрудник',     icon: <User className="w-3.5 h-3.5" />,   color: 'status-closed' },
   };
-  return roles[role] || {
-    label: 'Пользователь',
-    icon: <User className="w-3.5 h-3.5" />,
-    color: 'status-closed',
-  };
+  return roles[role] ?? { label: 'Пользователь', icon: <User className="w-3.5 h-3.5" />, color: 'status-closed' };
 };
 
 const inputCls = `w-full px-4 py-3 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl
@@ -140,92 +135,109 @@ const inputWithIconCls = `w-full pl-10 pr-4 py-3 bg-[var(--hover-2)] border bord
   text-[var(--text-primary)] text-base placeholder-white/25
   focus:outline-none focus:border-red-500/30 focus:ring-2 focus:ring-red-500/20 transition-all`;
 
-// ─── Основной компонент 
+/* ═══════════════════════════════════════════════════════════════════
+   ВКЛАДКИ
+   ═══════════════════════════════════════════════════════════════════ */
+
+type TabType = 'info' | 'contacts' | 'products' | 'branches' | 'employees' | 'tickets';
+
+/* ═══════════════════════════════════════════════════════════════════
+   ОСНОВНОЙ КОМПОНЕНТ
+   ═══════════════════════════════════════════════════════════════════ */
 
 export default function MyCompanyPage() {
   const { user } = useAuthStore();
+  const { isCustomer, isCustomerAdmin } = useRoles();
 
-  const [company, setCompany] = useState<Counterparty | null>(null);
-  const [branches, setBranches] = useState<Counterparty[]>([]);
-  const [employees, setEmployees] = useState<CounterpartyCustomer[]>([]);
-  const [tickets, setTickets] = useState<TicketListItem[]>([]);
-  const [ticketsPage, setTicketsPage] = useState(1);
+  /* ── Права по ролям ── */
+  // customer        → Информация, Контакты, Продукты, Подразделения, Заявки
+  // customer_admin  → + Сотрудники
+  const canViewEmployees = isCustomerAdmin;
+  const canEditContacts  = isCustomerAdmin;
+
+  /* ── State ── */
+  const [company,    setCompany]    = useState<Counterparty | null>(null);
+  const [branches,   setBranches]   = useState<Counterparty[]>([]);
+  const [employees,  setEmployees]  = useState<CounterpartyCustomer[]>([]);
+  const [products,   setProducts]   = useState<any[]>([]);
+  const [tickets,    setTickets]    = useState<TicketListItem[]>([]);
+
+  const [ticketsPage,       setTicketsPage]       = useState(1);
   const [ticketsTotalPages, setTicketsTotalPages] = useState(1);
   const [ticketsTotalItems, setTicketsTotalItems] = useState(0);
 
-  const [loading, setLoading] = useState(true);
+  const [loading,          setLoading]          = useState(true);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
-  const [loadingTickets, setLoadingTickets] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('info');
+  const [loadingTickets,   setLoadingTickets]   = useState(false);
+  const [loadingProducts,  setLoadingProducts]  = useState(false);
+  const [error,            setError]            = useState<string | null>(null);
+  const [activeTab,        setActiveTab]        = useState<TabType>('info');
 
-  // ── Состояния для формы контактного лица ──
+  /* ── Форма контактного лица ── */
   const [showContactForm, setShowContactForm] = useState(false);
   const [contactForm, setContactForm] = useState({
     last_name: '', first_name: '', middle_name: '',
-    phone: '', email: '', telegram: '', vk: ''
+    phone: '', email: '', telegram: '', vk: '',
   });
-  const [savingContact, setSavingContact] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState<any | null>(null);
-  const [deletingContact, setDeletingContact] = useState(false);
+  const [savingContact,  setSavingContact]  = useState(false);
+  const [confirmDelete,  setConfirmDelete]  = useState<any | null>(null);
+  const [deletingContact,setDeletingContact]= useState(false);
 
-  const canViewEmployees = user?.role === 'customer_admin' || user?.role === 'admin';
-  const canViewTickets = user?.role === 'customer_admin' || user?.role === 'customer' || user?.role === 'admin';
-  const canEditContacts = user?.role === 'customer_admin' || user?.role === 'admin';
-
-  // ── Загрузка компании ─────────────────────────────────────────────────────
+  /* ═══════════════════════════════════════════════════════════════════
+     ЗАГРУЗКА КОМПАНИИ
+     ═══════════════════════════════════════════════════════════════════ */
 
   const loadCompany = useCallback(async () => {
-    if (!user?.counterparty_id) {
-      setError('Вы не привязаны к компании');
-      setLoading(false);
-      return;
-    }
-
+    if (!user?.counterparty_id) { setError('Вы не привязаны к компании'); setLoading(false); return; }
     try {
       setLoading(true);
       const companyData = await counterpartiesApi.getById(user.counterparty_id);
       setCompany(companyData);
-
       try {
         const all = await counterpartiesApi.getAll(1, 100);
-        setBranches(all.items.filter(cp => cp.parent_id === companyData.id));
-      } catch {
-        setBranches([]);
-      }
-
+        setBranches(all.items.filter((cp: Counterparty) => cp.parent_id === companyData.id));
+      } catch { setBranches([]); }
       setError(null);
-    } catch {
-      setError('Не удалось загрузить данные компании');
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError('Не удалось загрузить данные компании'); }
+    finally { setLoading(false); }
   }, [user?.counterparty_id]);
 
   useEffect(() => { loadCompany(); }, [loadCompany]);
 
-  // ── Загрузка сотрудников ──────────────────────────────────────────────────
+  /* ═══════════════════════════════════════════════════════════════════
+     ЗАГРУЗКА СОТРУДНИКОВ (только customer_admin)
+     ═══════════════════════════════════════════════════════════════════ */
 
   useEffect(() => {
     if (!canViewEmployees || !company?.id) return;
-    if (activeTab !== 'employees' && employees.length > 0) return;
+    setLoadingEmployees(true);
+    usersApi.getCustomers(company.id, 1, 100)
+      .then(res => setEmployees(res.items ?? []))
+      .catch(() => setEmployees([]))
+      .finally(() => setLoadingEmployees(false));
+  }, [canViewEmployees, company?.id]);
 
-    const load = async () => {
-      setLoadingEmployees(true);
-      try {
-        const res = await usersApi.getCustomers(company.id, 1, 100);
-        setEmployees(res.items);
-      } catch {
-        setEmployees([]);
-      } finally {
-        setLoadingEmployees(false);
-      }
-    };
+  /* ═══════════════════════════════════════════════════════════════════
+     ЗАГРУЗКА ПРОДУКТОВ
+     ═══════════════════════════════════════════════════════════════════ */
 
-    load();
-  }, [canViewEmployees, company?.id, activeTab]);
+  const loadProducts = useCallback(async () => {
+    if (!company?.id) return;
+    setLoadingProducts(true);
+    try {
+      const res = await counterpartiesApi.getProducts(company.id, 1, 50);
+      setProducts(res.items ?? []);
+    } catch { setProducts([]); }
+    finally { setLoadingProducts(false); }
+  }, [company?.id]);
 
-  // ── Загрузка заявок 
+  useEffect(() => {
+    if (company?.id) loadProducts();
+  }, [company?.id, loadProducts]);
+
+  /* ═══════════════════════════════════════════════════════════════════
+     ЗАГРУЗКА ЗАЯВОК
+     ═══════════════════════════════════════════════════════════════════ */
 
   const TICKETS_PER_PAGE = 10;
 
@@ -233,29 +245,24 @@ export default function MyCompanyPage() {
     if (!company?.id) return;
     setLoadingTickets(true);
     try {
-      const res = await ticketsApi.getAllWithFilters(page, TICKETS_PER_PAGE, {
-        counterparty_id: company.id,
-      });
-      setTickets(res.items);
-      setTicketsPage(res.page);
-      setTicketsTotalPages(res.total_pages);
-      setTicketsTotalItems(res.total_items);
+      // ticketsApi.getAll с фильтром по проектам компании (бэкенд фильтрует по контрагенту)
+      const res = await ticketsApi.getAll(page, TICKETS_PER_PAGE, {});
+      setTickets(res.items ?? []);
+      setTicketsPage(res.page ?? page);
+      setTicketsTotalPages(res.total_pages ?? 1);
+      setTicketsTotalItems(res.total_items ?? 0);
     } catch {
       setTickets([]);
       setTicketsTotalItems(0);
       setTicketsTotalPages(1);
-    } finally {
-      setLoadingTickets(false);
-    }
+    } finally { setLoadingTickets(false); }
   }, [company?.id]);
 
   useEffect(() => { if (company?.id) loadTickets(1); }, [company?.id, loadTickets]);
 
-  useEffect(() => {
-    if (activeTab === 'tickets') loadTickets(ticketsPage);
-  }, [ticketsPage]);
-
-  // ── Работа с контактными лицами ─────────────────────────────────────────
+  /* ═══════════════════════════════════════════════════════════════════
+     КОНТАКТНЫЕ ЛИЦА
+     ═══════════════════════════════════════════════════════════════════ */
 
   const setContactField = (f: string) => (v: string) =>
     setContactForm(p => ({ ...p, [f]: v }));
@@ -271,88 +278,76 @@ export default function MyCompanyPage() {
     try {
       const messengers: Record<string, string> = {};
       if (contactForm.telegram.trim()) messengers.telegram = contactForm.telegram.trim().replace('@', '');
-      if (contactForm.vk.trim()) messengers.vk = contactForm.vk.trim();
-
+      if (contactForm.vk.trim())       messengers.vk       = contactForm.vk.trim();
       await counterpartiesApi.updateContactPerson(company.id, {
-        first_name: contactForm.first_name.trim(),
-        last_name: contactForm.last_name.trim(),
+        first_name:  contactForm.first_name.trim(),
+        last_name:   contactForm.last_name.trim(),
         middle_name: contactForm.middle_name.trim() || undefined,
-        phone: contactForm.phone.trim() ? phoneToApi(contactForm.phone) : undefined,
-        email: contactForm.email.trim() || undefined,
-        messengers: Object.keys(messengers).length > 0 ? messengers : undefined,
+        phone:       contactForm.phone.trim() ? phoneToApi(contactForm.phone) : undefined,
+        email:       contactForm.email.trim() || undefined,
+        messengers:  Object.keys(messengers).length > 0 ? messengers : undefined,
       });
       resetContactForm();
-      loadCompany(); // обновить данные компании
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setSavingContact(false);
-    }
+      loadCompany();
+    } catch (e) { console.error(e); }
+    finally { setSavingContact(false); }
   };
 
   const handleDeleteContact = async (person: any) => {
-    if (!person.phone && !person.email || !company?.id) return;
+    if ((!person.phone && !person.email) || !company?.id) return;
     setDeletingContact(true);
     try {
-      await counterpartiesApi.deleteContactPerson(company.id, {
-        phone: person.phone,
-        email: person.email,
-      });
+      await counterpartiesApi.deleteContactPerson(company.id, { phone: person.phone, email: person.email });
       setConfirmDelete(null);
       loadCompany();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setDeletingContact(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setDeletingContact(false); }
   };
 
-  // ── Tabs ──────
+  /* ═══════════════════════════════════════════════════════════════════
+     ВКЛАДКИ
+     customer        → info, contacts, products, branches, tickets
+     customer_admin  → + employees
+     ═══════════════════════════════════════════════════════════════════ */
 
-  const hasBranches = branches.length > 0;
-
-  const tabs: { id: TabType; label: string; icon: typeof Building2; count?: number }[] = [
-    { id: 'info', label: 'Информация', icon: Building2 },
-    { id: 'contacts', label: 'Контакты', icon: User, count: company?.contact_persons?.length || 0 },
+  const tabs: { id: TabType; label: string; icon: any; count?: number }[] = [
+    { id: 'info',      label: 'Информация',    icon: Building2 },
+    { id: 'contacts',  label: 'Контакты',      icon: User,     count: company?.contact_persons?.length ?? 0 },
+    { id: 'products',  label: 'Продукты',      icon: Package,  count: products.length },
+    ...(branches.length > 0
+      ? [{ id: 'branches' as TabType, label: 'Подразделения', icon: GitBranch, count: branches.length }]
+      : []),
+    ...(canViewEmployees
+      ? [{ id: 'employees' as TabType, label: 'Сотрудники', icon: Users, count: employees.length }]
+      : []),
+    { id: 'tickets', label: 'Заявки', icon: Ticket, count: ticketsTotalItems },
   ];
 
-  if (hasBranches) {
-    tabs.push({ id: 'branches', label: 'Подразделения', icon: GitBranch, count: branches.length });
-  }
+  /* ═══════════════════════════════════════════════════════════════════
+     LOADING / ERROR
+     ═══════════════════════════════════════════════════════════════════ */
 
-  if (canViewEmployees) {
-    tabs.push({ id: 'employees', label: 'Сотрудники', icon: Users, count: employees.length });
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <Loader2 className="w-10 h-10 text-red-500 animate-spin" />
+    </div>
+  );
 
-  if (canViewTickets) {
-    tabs.push({ id: 'tickets', label: 'Заявки', icon: Ticket, count: ticketsTotalItems });
-  }
-
-  // ── Loading / Error 
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-10 h-10 text-red-500 animate-spin" />
+  if (error || !company) return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="text-center max-w-md">
+        <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Компания не найдена</h2>
+        <p className="text-base text-[var(--text-primary)]/50">{error ?? 'Вы не привязаны ни к одной компании'}</p>
       </div>
-    );
-  }
+    </div>
+  );
 
-  if (error || !company) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center max-w-md">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Компания не найдена</h2>
-          <p className="text-base text-[var(--text-primary)]/50">{error || 'Вы не привязаны ни к одной компании'}</p>
-        </div>
-      </div>
-    );
-  }
+  const persons = company.contact_persons ?? [];
 
-  const persons = company.contact_persons || [];
-
-  // ── Render ────
+  /* ═══════════════════════════════════════════════════════════════════
+     RENDER
+     ═══════════════════════════════════════════════════════════════════ */
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -360,28 +355,20 @@ export default function MyCompanyPage() {
       {/* ── Header ── */}
       <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
         <div className="flex items-center gap-5">
-          <div className="w-16 h-16 rounded-2xl 
-                          flex items-center justify-center flex-shrink-0">
-            {company.avatar_url ? (
-              <img src={company.avatar_url} alt={company.name}
-                className="w-16 h-16 rounded-2xl object-cover " />
-            ) : (
-              <Building2 className="w-8 h-8 text-[var(--text-primary)]" />
-            )}
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0">
+            {company.avatar_url
+              ? <img src={company.avatar_url} alt={company.name} className="w-16 h-16 rounded-2xl object-cover" />
+              : <Building2 className="w-8 h-8 text-[var(--text-primary)]" />
+            }
           </div>
           <div>
             <div className="flex items-center gap-3 flex-wrap mb-2">
               <h1 className="text-3xl font-bold text-[var(--text-primary)]">{company.name}</h1>
-              <span className={`px-3 py-1 rounded-lg text-base font-medium border ${company.is_active
-                ? 'status-resolved'
-                : 'status-closed'
-                }`}>
+              <span className={`px-3 py-1 rounded-lg text-base font-medium border ${company.is_active ? 'status-resolved' : 'status-closed'}`}>
                 {company.is_active ? 'Активен' : 'Неактивен'}
               </span>
-              {hasBranches && (
-                <span className="px-3 py-1 rounded-lg text-base font-medium status-waiting">
-                  Головная компания
-                </span>
+              {branches.length > 0 && (
+                <span className="px-3 py-1 rounded-lg text-base font-medium status-waiting">Головная компания</span>
               )}
             </div>
             <p className="text-[var(--text-primary)]/50 text-base">{company.legal_name}</p>
@@ -389,42 +376,39 @@ export default function MyCompanyPage() {
         </div>
       </div>
 
-      {/* ── Tabs ──── */}
+      {/* ── Tabs ── */}
       <div className="flex gap-1.5 border-b border-[var(--border-color)] overflow-x-auto">
         {tabs.map(tab => (
-          <button key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-5 py-3 rounded-t-xl transition-all whitespace-nowrap ${activeTab === tab.id
-              ? 'bg-red-800/50 text-white border-b-2 border-red-500'
-              : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)]'
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-5 py-3 rounded-t-xl transition-all whitespace-nowrap
+              ${activeTab === tab.id
+                ? 'bg-red-800/50 text-white border-b-2 border-red-500'
+                : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)]'
               }`}>
             <tab.icon className="w-4 h-4" />
             <span className="text-base font-medium">{tab.label}</span>
             {(tab.count ?? 0) > 0 && (
-              <span className="ml-0.5 px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-sm">
-                {tab.count}
-              </span>
+              <span className="ml-0.5 px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-sm">{tab.count}</span>
             )}
           </button>
         ))}
       </div>
 
-      {/* ── Content ─ */}
+      {/* ── Content ── */}
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
 
-          {/* ═══ Info ═══ */}
+          {/* ═══ Информация ═══ */}
           {activeTab === 'info' && (
             <div className="space-y-6 animate-in fade-in duration-500">
               <div className="grid md:grid-cols-2 gap-4">
                 {[
-                  { label: 'ИНН', value: company.inn },
-                  { label: 'КПП', value: company.kpp },
-                  { label: 'ОКПО', value: company.okpo },
-                  { label: 'Тип', value: company.counterparty_type },
+                  { label: 'ИНН',   value: company.inn },
+                  { label: 'КПП',   value: company.kpp },
+                  { label: 'ОКПО',  value: company.okpo },
+                  { label: 'Тип',   value: company.counterparty_type },
                 ].map(field => (
-                  <div key={field.label}
-                    className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] p-5">
+                  <div key={field.label} className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] p-5">
                     <p className="text-xs uppercase tracking-widest text-[var(--text-primary)]/40 mb-2">{field.label}</p>
                     <p className="text-base font-semibold text-[var(--text-primary)]">{field.value || '—'}</p>
                   </div>
@@ -449,12 +433,11 @@ export default function MyCompanyPage() {
 
               <div className="grid grid-cols-3 gap-4">
                 {[
-                  { icon: GitBranch, value: branches.length, label: 'Подразделений' },
-                  { icon: Ticket, value: ticketsTotalItems, label: 'Заявок' },
-                  { icon: Users, value: employees.length, label: 'Сотрудников' },
+                  { icon: GitBranch, value: branches.length,      label: 'Подразделений' },
+                  { icon: Ticket,    value: ticketsTotalItems,     label: 'Заявок' },
+                  { icon: Package,   value: products.length,       label: 'Продуктов' },
                 ].map(s => (
-                  <div key={s.label}
-                    className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] p-5 text-center">
+                  <div key={s.label} className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] p-5 text-center">
                     <s.icon className="w-5 h-5 text-[var(--text-primary)]/40 mx-auto mb-3" />
                     <p className="text-3xl font-bold text-[var(--text-primary)] mb-1">{s.value}</p>
                     <p className="text-sm text-[var(--text-primary)]/40">{s.label}</p>
@@ -464,26 +447,21 @@ export default function MyCompanyPage() {
             </div>
           )}
 
-          {/* ═══ Contacts (НОВЫЙ ВИЗУАЛ) ═══ */}
+          {/* ═══ Контакты ═══ */}
           {activeTab === 'contacts' && (
             <div className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] overflow-hidden">
               <div className="px-6 py-5 border-b border-[var(--border-color)] bg-[var(--hover-1)] flex items-center justify-between">
                 <h2 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2.5">
                   <User className="w-5 h-5 text-[var(--text-primary)]/40" /> Контактные лица
                   {persons.length > 0 && (
-                    <span className="px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-sm text-[var(--text-primary)]/50">
-                      {persons.length}
-                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-sm text-[var(--text-primary)]/50">{persons.length}</span>
                   )}
                 </h2>
                 {canEditContacts && (
                   <button
                     onClick={() => showContactForm ? resetContactForm() : setShowContactForm(true)}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-base font-medium transition-all ${showContactForm
-                      ? 'bg-[var(--hover-2)] text-[var(--text-primary)]/70'
-                      : 'bg-red-700 text-white shadow-md'
-                      }`}
-                  >
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-base font-medium transition-all
+                      ${showContactForm ? 'bg-[var(--hover-2)] text-[var(--text-primary)]/70' : 'bg-red-700 text-white shadow-md'}`}>
                     {showContactForm ? <X size={16} /> : <Plus size={16} />}
                     {showContactForm ? 'Отмена' : 'Добавить'}
                   </button>
@@ -499,23 +477,16 @@ export default function MyCompanyPage() {
                     </h3>
                     <div className="grid md:grid-cols-3 gap-3">
                       <div>
-                        <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                          Фамилия <span className="text-red-400">*</span>
-                        </label>
-                        <input value={contactForm.last_name} onChange={e => setContactField('last_name')(e.target.value)}
-                          placeholder="Иванов" className={inputCls} />
+                        <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">Фамилия <span className="text-red-400">*</span></label>
+                        <input value={contactForm.last_name} onChange={e => setContactField('last_name')(e.target.value)} placeholder="Иванов" className={inputCls} />
                       </div>
                       <div>
-                        <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                          Имя <span className="text-red-400">*</span>
-                        </label>
-                        <input value={contactForm.first_name} onChange={e => setContactField('first_name')(e.target.value)}
-                          placeholder="Иван" className={inputCls} />
+                        <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">Имя <span className="text-red-400">*</span></label>
+                        <input value={contactForm.first_name} onChange={e => setContactField('first_name')(e.target.value)} placeholder="Иван" className={inputCls} />
                       </div>
                       <div>
                         <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">Отчество</label>
-                        <input value={contactForm.middle_name} onChange={e => setContactField('middle_name')(e.target.value)}
-                          placeholder="Иванович" className={inputCls} />
+                        <input value={contactForm.middle_name} onChange={e => setContactField('middle_name')(e.target.value)} placeholder="Иванович" className={inputCls} />
                       </div>
                     </div>
                     <div className="grid md:grid-cols-2 gap-3">
@@ -601,8 +572,7 @@ export default function MyCompanyPage() {
                     <p className="text-[var(--text-primary)]/50 text-base font-semibold mb-1">Контактные лица не указаны</p>
                     <p className="text-[var(--text-primary)]/40 text-sm mb-5">Добавьте контактное лицо для связи</p>
                     {canEditContacts && (
-                      <button onClick={() => setShowContactForm(true)}
-                        className="text-red-400 hover:text-red-300 transition-colors text-base">
+                      <button onClick={() => setShowContactForm(true)} className="text-red-400 hover:text-red-300 transition-colors text-base">
                         Добавить контактное лицо →
                       </button>
                     )}
@@ -620,11 +590,8 @@ export default function MyCompanyPage() {
                             </div>
                           </div>
                           {canEditContacts && (
-                            <button
-                              onClick={() => setConfirmDelete(confirmDelete?.full_name === person.full_name ? null : person)}
-                              className="p-2 rounded-xl hover:bg-red-500/10 text-[var(--text-primary)]/40 hover:text-red-400 transition-colors flex-shrink-0"
-                              title="Удалить"
-                            >
+                            <button onClick={() => setConfirmDelete(confirmDelete?.full_name === person.full_name ? null : person)}
+                              className="p-2 rounded-xl hover:bg-red-500/10 text-[var(--text-primary)]/40 hover:text-red-400 transition-colors flex-shrink-0" title="Удалить">
                               <Trash2 size={16} />
                             </button>
                           )}
@@ -635,10 +602,7 @@ export default function MyCompanyPage() {
                               <Phone size={15} className="text-[var(--text-primary)]/40 mt-0.5 flex-shrink-0" />
                               <div>
                                 <p className="text-xs text-[var(--text-primary)]/40 mb-0.5">Телефон</p>
-                                <a href={`tel:${person.phone}`}
-                                  className="text-sm text-[var(--text-primary)] hover:text-red-400 transition-colors">
-                                  {person.phone}
-                                </a>
+                                <a href={`tel:${person.phone}`} className="text-sm text-[var(--text-primary)] hover:text-red-400 transition-colors">{person.phone}</a>
                               </div>
                             </div>
                           )}
@@ -647,10 +611,7 @@ export default function MyCompanyPage() {
                               <Mail size={15} className="text-[var(--text-primary)]/40 mt-0.5 flex-shrink-0" />
                               <div>
                                 <p className="text-xs text-[var(--text-primary)]/40 mb-0.5">Email</p>
-                                <a href={`mailto:${person.email}`}
-                                  className="text-sm text-[var(--text-primary)] hover:text-red-400 transition-colors break-all">
-                                  {person.email}
-                                </a>
+                                <a href={`mailto:${person.email}`} className="text-sm text-[var(--text-primary)] hover:text-red-400 transition-colors break-all">{person.email}</a>
                               </div>
                             </div>
                           )}
@@ -691,19 +652,63 @@ export default function MyCompanyPage() {
             </div>
           )}
 
-          {/* ═══ Branches ═══ */}
+          {/* ═══ Продукты ═══ */}
+          {activeTab === 'products' && (
+            <div className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] overflow-hidden">
+              <div className="px-6 py-5 border-b border-[var(--border-color)] bg-[var(--hover-1)] flex items-center justify-between">
+                <h2 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2.5">
+                  <Layers className="w-5 h-5 text-[var(--text-primary)]/40" /> Продукты
+                  {products.length > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-sm text-[var(--text-primary)]/50">{products.length}</span>
+                  )}
+                </h2>
+              </div>
+              <div className="p-6">
+                {loadingProducts ? (
+                  <div className="flex justify-center py-16">
+                    <Loader2 className="w-8 h-8 animate-spin text-[var(--text-primary)]/20" />
+                  </div>
+                ) : products.length === 0 ? (
+                  <div className="text-center py-16">
+                    <Package size={36} className="text-[var(--text-primary)]/15 mx-auto mb-4" />
+                    <p className="text-[var(--text-primary)]/50 text-base font-semibold mb-1">Нет привязанных продуктов</p>
+                    <p className="text-[var(--text-primary)]/40 text-sm">Продукты появятся после привязки вашим менеджером</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-[var(--border-color)]">
+                    {products.map((product: any) => (
+                      <div key={product.id} className="flex items-center gap-4 py-4 px-2">
+                        <div className="w-10 h-10 rounded-xl bg-[var(--hover-1)] flex items-center justify-center flex-shrink-0">
+                          <Package className="w-5 h-5 text-[var(--text-primary)]/40" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-base font-semibold text-[var(--text-primary)] truncate">
+                            {product.display_name || product.name}
+                          </p>
+                          <p className="text-sm text-[var(--text-primary)]/40 truncate">{product.vendor}</p>
+                        </div>
+                        {product.environment && (
+                          <span className="px-2.5 py-1 rounded-lg text-sm font-medium bg-[var(--hover-1)] border border-[var(--border-color)] text-[var(--text-primary)]/60 flex-shrink-0">
+                            {product.environment}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ═══ Подразделения ═══ */}
           {activeTab === 'branches' && (
             <div className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] overflow-hidden">
               <div className="px-6 py-5 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--hover-1)]">
                 <h2 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2.5">
-                  <GitBranch className="w-5 h-5 text-amber-400" />
-                  Подразделения
-                  <span className="px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-sm text-[var(--text-primary)]/50">
-                    {branches.length}
-                  </span>
+                  <GitBranch className="w-5 h-5 text-amber-400" /> Подразделения
+                  <span className="px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-sm text-[var(--text-primary)]/50">{branches.length}</span>
                 </h2>
               </div>
-
               <div className="p-6">
                 {branches.length === 0 ? (
                   <div className="text-center py-16">
@@ -733,18 +738,14 @@ export default function MyCompanyPage() {
             </div>
           )}
 
-          {/* ═══ Employees (без изменений) ═══ */}
+          {/* ═══ Сотрудники (только customer_admin) ═══ */}
           {activeTab === 'employees' && canViewEmployees && (
             <div className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] overflow-hidden">
-              {/* ... содержимое без изменений ... */}
               <div className="px-6 py-5 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--hover-1)]">
                 <h2 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2.5">
-                  <Users className="w-5 h-5 text-[var(--text-primary)]/40" />
-                  Сотрудники
+                  <Users className="w-5 h-5 text-[var(--text-primary)]/40" /> Сотрудники
                   {employees.length > 0 && (
-                    <span className="px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-sm text-[var(--text-primary)]/50">
-                      {employees.length}
-                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-sm text-[var(--text-primary)]/50">{employees.length}</span>
                   )}
                 </h2>
               </div>
@@ -769,8 +770,12 @@ export default function MyCompanyPage() {
                           <Avatar name={emp.full_name || emp.username} />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-[var(--text-primary)] font-semibold text-base truncate">{emp.full_name || emp.username}</span>
-                              {isMe && <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-[var(--text-primary)]/50">Вы</span>}
+                              <span className="text-[var(--text-primary)] font-semibold text-base truncate">
+                                {emp.full_name || emp.username}
+                              </span>
+                              {isMe && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-[var(--text-primary)]/50">Вы</span>
+                              )}
                             </div>
                             <p className="text-[var(--text-primary)]/40 text-sm truncate">{emp.email}</p>
                           </div>
@@ -786,43 +791,61 @@ export default function MyCompanyPage() {
             </div>
           )}
 
-          {/* ═══ Tickets (без изменений) ═══ */}
-          {activeTab === 'tickets' && canViewTickets && (
+          {/* ═══ Заявки ═══ */}
+          {activeTab === 'tickets' && (
             <div className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] overflow-hidden">
-              {/* ... содержимое без изменений ... */}
               <div className="px-6 py-5 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--hover-1)]">
                 <h2 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2.5">
-                  <Ticket className="w-5 h-5 text-[var(--text-primary)]/40" />
-                  Заявки
-                  {tickets.length > 0 && (
-                    <span className="px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-sm text-[var(--text-primary)]/50">{tickets.length}</span>
+                  <Ticket className="w-5 h-5 text-[var(--text-primary)]/40" /> Заявки
+                  {ticketsTotalItems > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-sm text-[var(--text-primary)]/50">
+                      {ticketsTotalItems}
+                    </span>
                   )}
                 </h2>
-                <Link to="/tickets/new" className="btn-primary flex items-center gap-2 px-3.5 py-2 rounded-xl text-white text-base font-medium shadow-md shadow-[var(--accent-glow)]">
-                  <Plus className="w-4 h-4" />Создать
+                <Link to="/tickets/new"
+                  className="btn-primary flex items-center gap-2 px-3.5 py-2 rounded-xl text-white text-base font-medium shadow-md">
+                  <Plus className="w-4 h-4" /> Создать
                 </Link>
               </div>
+
               <div className="p-6">
                 {loadingTickets ? (
-                  <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-[var(--text-primary)]/20" /></div>
+                  <div className="flex justify-center py-16">
+                    <Loader2 className="w-8 h-8 animate-spin text-[var(--text-primary)]/20" />
+                  </div>
                 ) : tickets.length === 0 ? (
                   <div className="text-center py-20">
                     <Ticket className="w-16 h-16 text-[var(--text-primary)]/10 mx-auto mb-4" />
                     <p className="text-[var(--text-primary)]/50 text-base font-semibold mb-1">Нет заявок</p>
                     <p className="text-[var(--text-primary)]/40 text-sm mb-5">У вашей компании пока нет заявок</p>
-                    <Link to="/tickets/new" className="text-[var(--accent-light)] hover:text-[var(--accent)] transition-colors text-base font-medium">Создать первую заявку →</Link>
+                    <Link to="/tickets/new" className="text-[var(--accent-light)] hover:text-[var(--accent)] transition-colors text-base font-medium">
+                      Создать первую заявку →
+                    </Link>
                   </div>
                 ) : (
                   <div className="divide-y divide-[var(--border-color)]">
                     {tickets.map(ticket => (
-                      <Link key={ticket.id} to={`/tickets/${ticket.number}`} className="flex items-start justify-between gap-4 py-4 px-2 hover:bg-[var(--hover-1)] rounded-xl transition-colors group">
+                      <Link key={ticket.id} to={`/tickets/${ticket.number}`}
+                        className="flex items-start justify-between gap-4 py-4 px-2 hover:bg-[var(--hover-1)] rounded-xl transition-colors group">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            <span className="text-red-400 font-mono text-sm bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-lg">#{ticket.number}</span>
-                            <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${statusClr(ticket.status)}`}>{ticket.status}</span>
-                            <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${priorityClr(ticket.priority)}`}>{ticket.priority}</span>
+                            {/* Номер */}
+                            <span className="text-red-400 font-mono text-sm bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-lg">
+                              #{ticket.number}
+                            </span>
+                            {/* Статус — переводим с английского */}
+                            <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${getStatusColor(ticket.status)}`}>
+                              {getStatusLabel(ticket.status)}
+                            </span>
+                            {/* Приоритет — переводим с английского */}
+                            <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${getPriorityColor(ticket.priority)}`}>
+                              {getPriorityLabel(ticket.priority)}
+                            </span>
                           </div>
-                          <p className="text-[var(--text-primary)] font-medium text-base group-hover:text-red-400 transition-colors truncate">{ticket.title}</p>
+                          <p className="text-[var(--text-primary)] font-medium text-base group-hover:text-red-400 transition-colors truncate">
+                            {ticket.title}
+                          </p>
                           <p className="text-[var(--text-primary)]/40 text-sm mt-1">{fmtDate(ticket.created_at)}</p>
                         </div>
                         <ChevronRight className="w-4 h-4 text-[var(--text-primary)]/20 group-hover:text-red-400 group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-1" />
@@ -830,27 +853,42 @@ export default function MyCompanyPage() {
                     ))}
                   </div>
                 )}
+
+                {/* Пагинация */}
                 {ticketsTotalPages > 1 && (
                   <div className="flex items-center justify-center gap-2 pt-6 border-t border-[var(--border-color)]">
-                    <button onClick={() => setTicketsPage(p => Math.max(1, p - 1))} disabled={ticketsPage === 1}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] hover:bg-[var(--hover-3)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-primary)] text-base transition-colors">
-                      <ChevronRight className="w-4 h-4 rotate-180" />Назад
+                    <button
+                      onClick={() => { const p = Math.max(1, ticketsPage - 1); setTicketsPage(p); loadTickets(p); }}
+                      disabled={ticketsPage === 1}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)]
+                                 hover:bg-[var(--hover-3)] disabled:opacity-40 disabled:cursor-not-allowed
+                                 text-[var(--text-primary)] text-base transition-colors">
+                      <ChevronLeft className="w-4 h-4" /> Назад
                     </button>
                     <div className="flex items-center gap-1.5">
                       {Array.from({ length: Math.min(5, ticketsTotalPages) }, (_, i) => {
                         const pageNum = Math.max(1, Math.min(ticketsPage - 2, ticketsTotalPages - 4)) + i;
                         if (pageNum > ticketsTotalPages) return null;
                         return (
-                          <button key={pageNum} onClick={() => setTicketsPage(pageNum)}
-                            className={`w-10 h-10 rounded-xl text-base font-medium transition-colors ${pageNum === ticketsPage ? 'bg-red-700 text-white' : 'bg-[var(--hover-2)] text-[var(--text-primary)]/60 border border-[var(--border-color)] hover:bg-[var(--hover-3)]'}`}>
+                          <button key={pageNum}
+                            onClick={() => { setTicketsPage(pageNum); loadTickets(pageNum); }}
+                            className={`w-10 h-10 rounded-xl text-base font-medium transition-colors
+                              ${pageNum === ticketsPage
+                                ? 'bg-red-700 text-white'
+                                : 'bg-[var(--hover-2)] text-[var(--text-primary)]/60 border border-[var(--border-color)] hover:bg-[var(--hover-3)]'
+                              }`}>
                             {pageNum}
                           </button>
                         );
                       })}
                     </div>
-                    <button onClick={() => setTicketsPage(p => Math.min(ticketsTotalPages, p + 1))} disabled={ticketsPage === ticketsTotalPages}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] hover:bg-[var(--hover-3)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-primary)] text-base transition-colors">
-                      Вперёд<ChevronRight className="w-4 h-4" />
+                    <button
+                      onClick={() => { const p = Math.min(ticketsTotalPages, ticketsPage + 1); setTicketsPage(p); loadTickets(p); }}
+                      disabled={ticketsPage === ticketsTotalPages}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)]
+                                 hover:bg-[var(--hover-3)] disabled:opacity-40 disabled:cursor-not-allowed
+                                 text-[var(--text-primary)] text-base transition-colors">
+                      Вперёд <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 )}
@@ -859,7 +897,7 @@ export default function MyCompanyPage() {
           )}
         </div>
 
-        {/* ── Sidebar ───────────────────────────────────────────────────── */}
+        {/* ── Sidebar ── */}
         <div className="space-y-5">
           <div className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] p-5">
             <p className="text-xs uppercase tracking-widest text-[var(--text-primary)]/40 mb-5 flex items-center gap-2">
@@ -867,12 +905,31 @@ export default function MyCompanyPage() {
             </p>
             <div className="divide-y divide-white/[0.06]">
               {[
-                { label: 'Тип', value: <span className="text-[var(--text-primary)]/80">{company.counterparty_type}</span> },
-                { label: 'Статус', value: <span className={`text-sm px-2.5 py-1 rounded-lg font-medium border ${company.is_active ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40 border-[var(--border-color)]'}`}>{company.is_active ? 'Активен' : 'Неактивен'}</span> },
+                {
+                  label: 'Тип',
+                  value: <span className="text-[var(--text-primary)]/80">{company.counterparty_type}</span>,
+                },
+                {
+                  label: 'Статус',
+                  value: (
+                    <span className={`text-sm px-2.5 py-1 rounded-lg font-medium border
+                      ${company.is_active
+                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                        : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40 border-[var(--border-color)]'}`}>
+                      {company.is_active ? 'Активен' : 'Неактивен'}
+                    </span>
+                  ),
+                },
                 { label: 'Подразделений', value: <span className="text-[var(--text-primary)] font-bold">{branches.length}</span> },
-                { label: 'Заявок', value: <span className="text-[var(--text-primary)] font-bold">{ticketsTotalItems}</span> },
-                { label: 'Сотрудников', value: <span className="text-[var(--text-primary)] font-bold">{employees.length}</span> },
-                { label: 'Зарегистрирован', value: <span className="text-[var(--text-primary)]/70 text-sm">{fmtDate(company.created_at)}</span> },
+                { label: 'Продуктов',     value: <span className="text-[var(--text-primary)] font-bold">{products.length}</span> },
+                { label: 'Заявок',        value: <span className="text-[var(--text-primary)] font-bold">{ticketsTotalItems}</span> },
+                ...(canViewEmployees
+                  ? [{ label: 'Сотрудников', value: <span className="text-[var(--text-primary)] font-bold">{employees.length}</span> }]
+                  : []),
+                {
+                  label: 'Зарегистрирован',
+                  value: <span className="text-[var(--text-primary)]/70 text-sm">{fmtDate(company.created_at)}</span>,
+                },
               ].map(row => (
                 <div key={row.label} className="flex items-center justify-between py-3">
                   <span className="text-[var(--text-primary)]/40 text-base">{row.label}</span>
@@ -888,14 +945,16 @@ export default function MyCompanyPage() {
             </p>
             <div className="space-y-3">
               {company.phone ? (
-                <a href={`tel:${company.phone}`} className="flex items-center gap-2 text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70 transition-colors text-base">
+                <a href={`tel:${company.phone}`}
+                  className="flex items-center gap-2 text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70 transition-colors text-base">
                   <Phone className="w-4 h-4" /> {company.phone}
                 </a>
               ) : (
                 <p className="text-[var(--text-primary)]/20 text-base">Телефон не указан</p>
               )}
               {company.email ? (
-                <a href={`mailto:${company.email}`} className="flex items-center gap-2 text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70 transition-colors text-base break-all">
+                <a href={`mailto:${company.email}`}
+                  className="flex items-center gap-2 text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70 transition-colors text-base break-all">
                   <Mail className="w-4 h-4" /> {company.email}
                 </a>
               ) : (
@@ -908,8 +967,10 @@ export default function MyCompanyPage() {
             <div className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] p-5">
               <p className="text-xs uppercase tracking-widest text-[var(--text-primary)]/40 mb-4">Реквизиты</p>
               <div className="space-y-2 text-sm">
-                <p className="text-[var(--text-primary)]/40">ИНН <span className="text-[var(--text-primary)] font-mono">{company.inn}</span></p>
-                {company.kpp && <p className="text-[var(--text-primary)]/40">КПП <span className="text-[var(--text-primary)] font-mono">{company.kpp}</span></p>}
+                <p className="text-[var(--text-primary)]/40">
+                  ИНН <span className="text-[var(--text-primary)] font-mono">{company.inn}</span>
+                </p>
+                {company.kpp  && <p className="text-[var(--text-primary)]/40">КПП  <span className="text-[var(--text-primary)] font-mono">{company.kpp}</span></p>}
                 {company.okpo && <p className="text-[var(--text-primary)]/40">ОКПО <span className="text-[var(--text-primary)] font-mono">{company.okpo}</span></p>}
               </div>
             </div>
