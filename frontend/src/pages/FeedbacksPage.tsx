@@ -550,6 +550,7 @@ function CreateFeedbackModal({
   const [ticketLabel, setTicketLabel] = useState(presetTicketLabel ?? '');
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
+  
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { if (presetTicketId) setTicketId(presetTicketId); }, [presetTicketId]);
@@ -683,6 +684,7 @@ function EditFeedbackModal({
   const { toast } = useToast();
   const [rating, setRating] = useState(feedback.rating);
   const [comment, setComment] = useState(feedback.comment);
+
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -697,7 +699,12 @@ function EditFeedbackModal({
     try {
       const data: FeedbackUpdateInput = {};
       if (rating !== feedback.rating) data.rating = rating;
-      if (comment.trim() !== feedback.comment) data.comment = comment.trim();
+      
+      // Исправь эту строку:
+      const newComment = (comment || '').trim();
+      const oldComment = (feedback.comment || '').trim();
+      if (newComment !== oldComment) data.comment = newComment || undefined;
+      
       if (Object.keys(data).length > 0) await feedbacksApi.update(feedback.id, data);
       toast({ title: 'Отзыв обновлён' });
       onUpdated();
