@@ -20,7 +20,7 @@ import type { Counterparty, CounterpartyCustomer, TicketListItem } from '@/types
 function useRoles() {
   const { user } = useAuthStore();
   const roles: string[] = user?.roles ?? [];
-  const isCustomer      = roles.includes('customer');
+  const isCustomer = roles.includes('customer');
   const isCustomerAdmin = roles.includes('customer_admin');
   return { roles, isCustomer, isCustomerAdmin, isClientUser: isCustomer || isCustomerAdmin };
 }
@@ -30,27 +30,27 @@ function useRoles() {
    ═══════════════════════════════════════════════════════════════════ */
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  new:              { label: 'Новый',           color: 'status-new' },
+  new: { label: 'Новый', color: 'status-new' },
   pending_approval: { label: 'На согласовании', color: 'status-agreement' },
-  open:             { label: 'Открыт',          color: 'status-open' },
-  in_progress:      { label: 'В работе',        color: 'status-progress' },
-  waiting:          { label: 'Ожидает ответа',  color: 'status-waiting' },
-  resolved:         { label: 'Решён',           color: 'status-resolved' },
-  closed:           { label: 'Закрыт',          color: 'status-closed' },
-  reopened:         { label: 'Переоткрыт',      color: 'status-reopened' },
-  rejected:         { label: 'Отклонён',        color: 'status-rejected' },
-  cancelled:        { label: 'Отменён',         color: 'status-closed' },
+  open: { label: 'Открыт', color: 'status-open' },
+  in_progress: { label: 'В работе', color: 'status-progress' },
+  waiting: { label: 'Ожидает ответа', color: 'status-waiting' },
+  resolved: { label: 'Решён', color: 'status-resolved' },
+  closed: { label: 'Закрыт', color: 'status-closed' },
+  reopened: { label: 'Переоткрыт', color: 'status-reopened' },
+  rejected: { label: 'Отклонён', color: 'status-rejected' },
+  cancelled: { label: 'Отменён', color: 'status-closed' },
 };
 
 const PRIORITY_MAP: Record<string, { label: string; color: string }> = {
-  low:      { label: 'Низкий',      color: 'priority-low' },
-  medium:   { label: 'Средний',     color: 'priority-medium' },
-  high:     { label: 'Высокий',     color: 'priority-high' },
+  low: { label: 'Низкий', color: 'priority-low' },
+  medium: { label: 'Средний', color: 'priority-medium' },
+  high: { label: 'Высокий', color: 'priority-high' },
   critical: { label: 'Критический', color: 'priority-critical' },
 };
 
-const getStatusLabel  = (s: string) => STATUS_MAP[s]?.label  ?? s;
-const getStatusColor  = (s: string) => STATUS_MAP[s]?.color  ?? 'status-closed';
+const getStatusLabel = (s: string) => STATUS_MAP[s]?.label ?? s;
+const getStatusColor = (s: string) => STATUS_MAP[s]?.color ?? 'status-closed';
 const getPriorityLabel = (p: string) => PRIORITY_MAP[p]?.label ?? p;
 const getPriorityColor = (p: string) => PRIORITY_MAP[p]?.color ?? 'priority-medium';
 
@@ -116,13 +116,13 @@ function Avatar({ name, size = 'md' }: { name?: string | null; size?: 'sm' | 'md
   );
 }
 
-const fmtDate     = (d: string) => new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+const fmtDate = (d: string) => new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 const fmtDateTime = (d: string) => new Date(d).toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 const getEmployeeRoleInfo = (role: string) => {
   const roles: Record<string, { label: string; icon: JSX.Element; color: string }> = {
-    customer_admin: { label: 'Администратор', icon: <Crown className="w-3.5 h-3.5" />,  color: 'status-reopened' },
-    customer:       { label: 'Сотрудник',     icon: <User className="w-3.5 h-3.5" />,   color: 'status-closed' },
+    customer_admin: { label: 'Администратор', icon: <Crown className="w-3.5 h-3.5" />, color: 'status-reopened' },
+    customer: { label: 'Сотрудник', icon: <User className="w-3.5 h-3.5" />, color: 'status-closed' },
   };
   return roles[role] ?? { label: 'Пользователь', icon: <User className="w-3.5 h-3.5" />, color: 'status-closed' };
 };
@@ -153,25 +153,25 @@ export default function MyCompanyPage() {
   // customer        → Информация, Контакты, Продукты, Подразделения, Заявки
   // customer_admin  → + Сотрудники
   const canViewEmployees = isCustomerAdmin;
-  const canEditContacts  = isCustomerAdmin;
+  const canEditContacts = isCustomerAdmin;
 
   /* ── State ── */
-  const [company,    setCompany]    = useState<Counterparty | null>(null);
-  const [branches,   setBranches]   = useState<Counterparty[]>([]);
-  const [employees,  setEmployees]  = useState<CounterpartyCustomer[]>([]);
-  const [products,   setProducts]   = useState<any[]>([]);
-  const [tickets,    setTickets]    = useState<TicketListItem[]>([]);
+  const [company, setCompany] = useState<Counterparty | null>(null);
+  const [branches, setBranches] = useState<Counterparty[]>([]);
+  const [employees, setEmployees] = useState<CounterpartyCustomer[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [tickets, setTickets] = useState<TicketListItem[]>([]);
 
-  const [ticketsPage,       setTicketsPage]       = useState(1);
+  const [ticketsPage, setTicketsPage] = useState(1);
   const [ticketsTotalPages, setTicketsTotalPages] = useState(1);
   const [ticketsTotalItems, setTicketsTotalItems] = useState(0);
 
-  const [loading,          setLoading]          = useState(true);
+  const [loading, setLoading] = useState(true);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
-  const [loadingTickets,   setLoadingTickets]   = useState(false);
-  const [loadingProducts,  setLoadingProducts]  = useState(false);
-  const [error,            setError]            = useState<string | null>(null);
-  const [activeTab,        setActiveTab]        = useState<TabType>('info');
+  const [loadingTickets, setLoadingTickets] = useState(false);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('info');
 
   /* ── Форма контактного лица ── */
   const [showContactForm, setShowContactForm] = useState(false);
@@ -179,9 +179,9 @@ export default function MyCompanyPage() {
     last_name: '', first_name: '', middle_name: '',
     phone: '', email: '', telegram: '', vk: '',
   });
-  const [savingContact,  setSavingContact]  = useState(false);
-  const [confirmDelete,  setConfirmDelete]  = useState<any | null>(null);
-  const [deletingContact,setDeletingContact]= useState(false);
+  const [savingContact, setSavingContact] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<any | null>(null);
+  const [deletingContact, setDeletingContact] = useState(false);
 
   /* ═══════════════════════════════════════════════════════════════════
      ЗАГРУЗКА КОМПАНИИ
@@ -278,14 +278,14 @@ export default function MyCompanyPage() {
     try {
       const messengers: Record<string, string> = {};
       if (contactForm.telegram.trim()) messengers.telegram = contactForm.telegram.trim().replace('@', '');
-      if (contactForm.vk.trim())       messengers.vk       = contactForm.vk.trim();
+      if (contactForm.vk.trim()) messengers.vk = contactForm.vk.trim();
       await counterpartiesApi.updateContactPerson(company.id, {
-        first_name:  contactForm.first_name.trim(),
-        last_name:   contactForm.last_name.trim(),
+        first_name: contactForm.first_name.trim(),
+        last_name: contactForm.last_name.trim(),
         middle_name: contactForm.middle_name.trim() || undefined,
-        phone:       contactForm.phone.trim() ? phoneToApi(contactForm.phone) : undefined,
-        email:       contactForm.email.trim() || undefined,
-        messengers:  Object.keys(messengers).length > 0 ? messengers : undefined,
+        phone: contactForm.phone.trim() ? phoneToApi(contactForm.phone) : undefined,
+        email: contactForm.email.trim() || undefined,
+        messengers: Object.keys(messengers).length > 0 ? messengers : undefined,
       });
       resetContactForm();
       loadCompany();
@@ -311,9 +311,9 @@ export default function MyCompanyPage() {
      ═══════════════════════════════════════════════════════════════════ */
 
   const tabs: { id: TabType; label: string; icon: any; count?: number }[] = [
-    { id: 'info',      label: 'Информация',    icon: Building2 },
-    { id: 'contacts',  label: 'Контакты',      icon: User,     count: company?.contact_persons?.length ?? 0 },
-    { id: 'products',  label: 'Продукты',      icon: Package,  count: products.length },
+    { id: 'info', label: 'Информация', icon: Building2 },
+    { id: 'contacts', label: 'Контакты', icon: User, count: company?.contact_persons?.length ?? 0 },
+    { id: 'products', label: 'Продукты', icon: Package, count: products.length },
     ...(branches.length > 0
       ? [{ id: 'branches' as TabType, label: 'Подразделения', icon: GitBranch, count: branches.length }]
       : []),
@@ -403,10 +403,10 @@ export default function MyCompanyPage() {
             <div className="space-y-6 animate-in fade-in duration-500">
               <div className="grid md:grid-cols-2 gap-4">
                 {[
-                  { label: 'ИНН',   value: company.inn },
-                  { label: 'КПП',   value: company.kpp },
-                  { label: 'ОКПО',  value: company.okpo },
-                  { label: 'Тип',   value: company.counterparty_type },
+                  { label: 'ИНН', value: company.inn },
+                  { label: 'КПП', value: company.kpp },
+                  { label: 'ОКПО', value: company.okpo },
+                  { label: 'Тип', value: company.counterparty_type },
                 ].map(field => (
                   <div key={field.label} className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] p-5">
                     <p className="text-xs uppercase tracking-widest text-[var(--text-primary)]/40 mb-2">{field.label}</p>
@@ -433,9 +433,9 @@ export default function MyCompanyPage() {
 
               <div className="grid grid-cols-3 gap-4">
                 {[
-                  { icon: GitBranch, value: branches.length,      label: 'Подразделений' },
-                  { icon: Ticket,    value: ticketsTotalItems,     label: 'Заявок' },
-                  { icon: Package,   value: products.length,       label: 'Продуктов' },
+                  { icon: GitBranch, value: branches.length, label: 'Подразделений' },
+                  { icon: Ticket, value: ticketsTotalItems, label: 'Заявок' },
+                  { icon: Package, value: products.length, label: 'Продуктов' },
                 ].map(s => (
                   <div key={s.label} className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] p-5 text-center">
                     <s.icon className="w-5 h-5 text-[var(--text-primary)]/40 mx-auto mb-3" />
@@ -763,7 +763,7 @@ export default function MyCompanyPage() {
                 ) : (
                   <div className="divide-y divide-[var(--border-color)]">
                     {employees.map(emp => {
-                      const roleInfo = getEmployeeRoleInfo(emp.role);
+                      const roleInfo = getEmployeeRoleInfo(emp.roles?.[0] || 'customer');
                       const isMe = emp.id === user?.user_id;
                       return (
                         <div key={emp.id} className={`flex items-center gap-4 py-4 px-2 rounded-xl ${isMe ? 'bg-red-500/[0.04]' : ''}`}>
@@ -921,8 +921,8 @@ export default function MyCompanyPage() {
                   ),
                 },
                 { label: 'Подразделений', value: <span className="text-[var(--text-primary)] font-bold">{branches.length}</span> },
-                { label: 'Продуктов',     value: <span className="text-[var(--text-primary)] font-bold">{products.length}</span> },
-                { label: 'Заявок',        value: <span className="text-[var(--text-primary)] font-bold">{ticketsTotalItems}</span> },
+                { label: 'Продуктов', value: <span className="text-[var(--text-primary)] font-bold">{products.length}</span> },
+                { label: 'Заявок', value: <span className="text-[var(--text-primary)] font-bold">{ticketsTotalItems}</span> },
                 ...(canViewEmployees
                   ? [{ label: 'Сотрудников', value: <span className="text-[var(--text-primary)] font-bold">{employees.length}</span> }]
                   : []),
@@ -970,7 +970,7 @@ export default function MyCompanyPage() {
                 <p className="text-[var(--text-primary)]/40">
                   ИНН <span className="text-[var(--text-primary)] font-mono">{company.inn}</span>
                 </p>
-                {company.kpp  && <p className="text-[var(--text-primary)]/40">КПП  <span className="text-[var(--text-primary)] font-mono">{company.kpp}</span></p>}
+                {company.kpp && <p className="text-[var(--text-primary)]/40">КПП  <span className="text-[var(--text-primary)] font-mono">{company.kpp}</span></p>}
                 {company.okpo && <p className="text-[var(--text-primary)]/40">ОКПО <span className="text-[var(--text-primary)] font-mono">{company.okpo}</span></p>}
               </div>
             </div>
