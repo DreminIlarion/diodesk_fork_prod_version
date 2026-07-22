@@ -14,19 +14,6 @@ import { useAuthStore } from '../stores/authStore';
 import type { TicketListItem, Counterparty, Project, SimpleUser } from '../types';
 
 /* ═══════════════════════════════════════════════════════════════════
-   РОЛИ
-   ═══════════════════════════════════════════════════════════════════ */
-
-function useUserRole() {
-  const { user } = useAuthStore();
-  const roles = user?.roles ?? [];
-  const isCustomer = roles.includes('customer');
-  const isCustomerAdmin = roles.includes('customer_admin');
-  const isClientUser = isCustomer || isCustomerAdmin;
-  return { isCustomer, isCustomerAdmin, isClientUser };
-}
-
-/* ═══════════════════════════════════════════════════════════════════
    СТАТУСЫ
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -44,7 +31,7 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
 };
 
 const STATUS_OPTIONS = Object.entries(STATUS_MAP).map(([value, { label, color }]) => ({
-  value, label, color
+  value, label, color,
 }));
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -59,7 +46,7 @@ const PRIORITY_MAP: Record<string, { label: string; color: string }> = {
 };
 
 const PRIORITY_OPTIONS = Object.entries(PRIORITY_MAP).map(([value, { label, color }]) => ({
-  value, label, color
+  value, label, color,
 }));
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -99,13 +86,18 @@ function formatDate(d: string): string {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const compareDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const diffDays = Math.floor((today.getTime() - compareDate.getTime()) / 86400000);
-
-  if (diffDays === 0) {
+  if (diffDays === 0)
     return `Сегодня, ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
-  }
   if (diffDays === 1) return 'Вчера';
   if (diffDays < 7) return `${diffDays} дн. назад`;
   return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** Безопасно достаём items из любого ответа API */
+function toItems<T>(res: any): T[] {
+  if (Array.isArray(res)) return res as T[];
+  if (Array.isArray(res?.items)) return res.items as T[];
+  return [];
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -136,8 +128,8 @@ interface FilterDropdownProps {
    ═══════════════════════════════════════════════════════════════════ */
 
 function FilterDropdown({
-  label, icon, options, value, onChange, placeholder = 'Все',
-  searchable = false, loading = false, multiple = false,
+  label, icon, options, value, onChange,
+  placeholder = 'Все', searchable = false, loading = false, multiple = false,
 }: FilterDropdownProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -160,7 +152,7 @@ function FilterDropdown({
   }, [open, searchable]);
 
   const selectedValues = multiple
-    ? (value as string[]) || []
+    ? (Array.isArray(value) ? value : [])
     : [value as string].filter(Boolean);
 
   const selected = multiple
@@ -169,60 +161,58 @@ function FilterDropdown({
 
   const filtered = query
     ? options.filter(o =>
-        o.label.toLowerCase().includes(query.toLowerCase()) ||
-        o.sublabel?.toLowerCase().includes(query.toLowerCase()))
+      o.label.toLowerCase().includes(query.toLowerCase()) ||
+      o.sublabel?.toLowerCase().includes(query.toLowerCase()))
     : options;
+
+  const hasValue = selectedValues.length > 0;
 
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl border text-base
-          transition-all whitespace-nowrap cursor-pointer
+        className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl border
+          text-base transition-all whitespace-nowrap cursor-pointer
           ${open
             ? 'bg-[var(--hover-2)] border-[var(--accent)]/40 text-[var(--text-primary)]'
-            : selectedValues.length > 0
+            : hasValue
               ? 'bg-[var(--hover-2)] border-[var(--border-color)] text-[var(--text-primary)]/90'
               : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70'
           }`}
       >
         <span className="flex items-center gap-2 truncate min-w-0">
           {icon && (
-            <span className={`flex-shrink-0 ${selectedValues.length > 0 ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'}`}>
+            <span className={`flex-shrink-0 ${hasValue ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'}`}>
               {icon}
             </span>
           )}
-          {selected ? (
+          {hasValue ? (
             <span className="flex items-center gap-2 truncate min-w-0">
               {multiple ? (
-                (selected as DropdownOption[]).length === 0 ? (
-                  <span className="truncate">{label}</span>
-                ) : (selected as DropdownOption[]).length === 1 ? (
+                (selected as DropdownOption[]).length === 1 ? (
                   <>
                     {(selected as DropdownOption[])[0].color && (
-                      <span
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: `var(--${(selected as DropdownOption[])[0].color}-text)` }}
-                      />
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: `var(--${(selected as DropdownOption[])[0].color}-text)` }} />
                     )}
                     <span className="truncate">{(selected as DropdownOption[])[0].label}</span>
                   </>
                 ) : (
                   <>
                     <span className="truncate">{(selected as DropdownOption[])[0].label}</span>
-                    <span className="text-[var(--text-primary)]/40 flex-shrink-0">+{(selected as DropdownOption[]).length - 1}</span>
+                    <span className="text-[var(--text-primary)]/40 flex-shrink-0">
+                      +{(selected as DropdownOption[]).length - 1}
+                    </span>
                   </>
                 )
               ) : (
                 <>
-                  {(selected as DropdownOption).color && (
-                    <span
-                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: `var(--${(selected as DropdownOption).color}-text)` }}
-                    />
+                  {(selected as DropdownOption)?.color && (
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: `var(--${(selected as DropdownOption).color}-text)` }} />
                   )}
-                  <span className="truncate">{(selected as DropdownOption).label}</span>
+                  <span className="truncate">{(selected as DropdownOption)?.label}</span>
                 </>
               )}
             </span>
@@ -233,10 +223,9 @@ function FilterDropdown({
 
         {loading ? (
           <Loader2 size={18} className="text-[var(--text-primary)]/40 animate-spin flex-shrink-0" />
-        ) : selectedValues.length > 0 ? (
+        ) : hasValue ? (
           <span
-            role="button"
-            tabIndex={0}
+            role="button" tabIndex={0}
             onClick={e => { e.stopPropagation(); onChange(multiple ? [] : ''); setOpen(false); }}
             onKeyDown={e => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -249,50 +238,39 @@ function FilterDropdown({
             <X size={18} />
           </span>
         ) : (
-          <ChevronDown
-            size={18}
-            className={`text-[var(--text-primary)]/40 transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}
-          />
+          <ChevronDown size={18}
+            className={`text-[var(--text-primary)]/40 transition-transform duration-200 flex-shrink-0
+                        ${open ? 'rotate-180' : ''}`} />
         )}
       </button>
 
       {open && (
-        <div
-          className="absolute z-[100] min-w-[220px] w-max top-full mt-2 left-0
-                      bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden"
-          style={{ boxShadow: 'var(--shadow-lg)' }}
-        >
+        <div className="absolute z-[100] min-w-[220px] w-max top-full mt-2 left-0
+                        bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden"
+          style={{ boxShadow: 'var(--shadow-lg)' }}>
           {searchable && (
             <div className="p-2 border-b border-[var(--border-color)]">
               <div className="relative">
                 <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-                <input
-                  ref={inputRef}
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
+                <input ref={inputRef} value={query} onChange={e => setQuery(e.target.value)}
                   placeholder="Поиск..."
-                  className="w-full pl-7 pr-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-color)]
-                             text-base text-[var(--text-primary)] placeholder-[var(--text-muted)]
-                             focus:outline-none focus:border-[var(--border-hover)]"
-                />
+                  className="w-full pl-7 pr-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] border
+                             border-[var(--border-color)] text-base text-[var(--text-primary)]
+                             placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-hover)]" />
               </div>
             </div>
           )}
           <div className="py-1.5 max-h-[300px] overflow-y-auto">
             {!multiple && (
-              <button
-                type="button"
+              <button type="button"
                 onClick={() => { onChange(''); setOpen(false); setQuery(''); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-left text-base transition-colors
                   ${!value
                     ? 'bg-[var(--accent)]/10 text-[var(--text-primary)]'
-                    : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)]'
-                  }`}
-              >
+                    : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)]'}`}>
                 {!value
                   ? <Check size={18} className="text-[var(--accent)] flex-shrink-0" />
-                  : <span className="w-4 flex-shrink-0" />
-                }
+                  : <span className="w-4 flex-shrink-0" />}
                 <span>{placeholder}</span>
               </button>
             )}
@@ -306,16 +284,13 @@ function FilterDropdown({
             ) : filtered.map(option => {
               const isSelected = selectedValues.includes(option.value);
               return (
-                <button
-                  type="button"
-                  key={option.value}
+                <button type="button" key={option.value}
                   onClick={() => {
                     if (multiple) {
                       const current = Array.isArray(value) ? value : [];
-                      const newValue = current.includes(option.value)
+                      onChange(current.includes(option.value)
                         ? current.filter(v => v !== option.value)
-                        : [...current, option.value];
-                      onChange(newValue);
+                        : [...current, option.value]);
                     } else {
                       onChange(option.value);
                       setOpen(false);
@@ -325,13 +300,10 @@ function FilterDropdown({
                   className={`w-full flex items-center gap-3 px-4 py-3 text-left text-base transition-colors
                     ${isSelected
                       ? 'bg-[var(--accent)]/10 text-[var(--text-primary)]'
-                      : 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)]'
-                    }`}
-                >
+                      : 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)]'}`}>
                   {isSelected
                     ? <Check size={18} className="text-[var(--accent)] flex-shrink-0" />
-                    : <span className="w-4 flex-shrink-0" />
-                  }
+                    : <span className="w-4 flex-shrink-0" />}
                   {option.color ? (
                     <span className={`px-2.5 py-1 rounded-lg text-base font-medium border ${option.color}`}>
                       {option.label}
@@ -383,26 +355,24 @@ function FilterTag({ label, icon, colorClass, onRemove }: {
   label: string; icon?: ReactNode; colorClass?: string; onRemove: () => void;
 }) {
   return (
-    <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-base border transition-all hover:opacity-80
+    <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-base border
+      transition-all hover:opacity-80
       ${colorClass || 'bg-[var(--hover-2)] text-[var(--text-primary)]/80 border-[var(--border-color)]'}`}>
       {icon}
       <span className="truncate max-w-[180px]">{label}</span>
-      <X
-        size={12}
+      <X size={12}
         className="cursor-pointer opacity-50 hover:opacity-100 transition-opacity flex-shrink-0"
-        onClick={e => { e.preventDefault(); e.stopPropagation(); onRemove(); }}
-      />
+        onClick={e => { e.preventDefault(); e.stopPropagation(); onRemove(); }} />
     </span>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   TICKET ROW
+   TICKET ROW (desktop)
    ═══════════════════════════════════════════════════════════════════ */
 
-function TicketRow({ ticket, formatDate, showAssignee, showReporter }: {
+function TicketRow({ ticket, showAssignee, showReporter }: {
   ticket: TicketListItem;
-  formatDate: (d: string) => string;
   showAssignee: boolean;
   showReporter: boolean;
 }) {
@@ -450,30 +420,28 @@ function TicketRow({ ticket, formatDate, showAssignee, showReporter }: {
 
       {/* Исполнитель / Автор */}
       <div className="min-w-0 pr-2 self-center">
-        {showAssignee ? (
-          (ticket.assignee?.full_name || ticket.assignee?.username || ticket.assignee?.email) ? (
+        {showAssignee && (
+          (ticket.assignee?.full_name || ticket.assignee?.username) ? (
             <span className="flex items-center gap-1 text-[16px] text-[var(--text-primary)]/60 truncate">
               <UserCheck size={18} className="shrink-0 text-[var(--text-primary)]/40" />
               <span className="truncate">
-                {toShortName(ticket.assignee.full_name || ticket.assignee.username || 'ФИО не указано')}
+                {toShortName(ticket.assignee.full_name || ticket.assignee.username)}
               </span>
             </span>
           ) : (
             <span className="text-[16px] text-[var(--text-primary)]/20">—</span>
           )
-        ) : null}
-
-        {showReporter ? (
-          (ticket.reporter?.full_name || ticket.reporter?.username || ticket.reporter?.email) ? (
+        )}
+        {showReporter && (
+          (ticket.reporter?.full_name || ticket.reporter?.username) ? (
             <span className="flex items-center gap-1 text-[16px] text-[var(--text-primary)]/35 mt-0.5 truncate">
               <User size={18} className="shrink-0" />
               <span className="truncate">
-                {toShortName(ticket.reporter.full_name || ticket.reporter.username || 'ФИО не указано')}
+                {toShortName(ticket.reporter.full_name || ticket.reporter.username)}
               </span>
             </span>
           ) : null
-        ) : null}
-
+        )}
         {!showAssignee && !showReporter && (
           <span className="text-[16px] text-[var(--text-primary)]/20">—</span>
         )}
@@ -503,11 +471,9 @@ function TicketRow({ ticket, formatDate, showAssignee, showReporter }: {
       </div>
 
       <div className="self-center flex justify-end">
-        <ChevronRight
-          size={18}
+        <ChevronRight size={18}
           className="text-[var(--text-primary)]/20 group-hover:text-[var(--accent-light)]
-                     group-hover:translate-x-0.5 transition-all shrink-0"
-        />
+                     group-hover:translate-x-0.5 transition-all shrink-0" />
       </div>
     </Link>
   );
@@ -517,28 +483,20 @@ function TicketRow({ ticket, formatDate, showAssignee, showReporter }: {
    TABLE HEADER
    ═══════════════════════════════════════════════════════════════════ */
 
-function TableHeader({ showAssigneeReporter }: { showAssigneeReporter: boolean }) {
+function TableHeader({ showAssigneeCol }: { showAssigneeCol: boolean }) {
   const cols: { label: ReactNode; align?: string }[] = [
     { label: <><span>Тема /</span><br /><span>Номер</span></> },
     { label: <><span>Контрагент /</span><br /><span>Проект</span></> },
-    {
-      label: showAssigneeReporter
-        ? <><span>Исполнитель /</span><br /><span>Автор</span></>
-        : ''
-    },
+    { label: showAssigneeCol ? <><span>Исполнитель /</span><br /><span>Автор</span></> : '' },
     { label: 'Статус' },
     { label: 'Приоритет' },
     { label: 'Дата', align: 'text-right' },
     { label: '' },
   ];
-
   return (
-    <div
-      className="hidden lg:grid px-4 py-2 text-[13px] uppercase tracking-widest
-                 font-semibold text-[var(--text-primary)]/25
-                 border-b border-[var(--border-color)]"
-      style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) 160px 120px 110px 20px' }}
-    >
+    <div className="hidden lg:grid px-4 py-2 text-[13px] uppercase tracking-widest
+                    font-semibold text-[var(--text-primary)]/25 border-b border-[var(--border-color)]"
+      style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) 160px 120px 110px 20px' }}>
       {cols.map((c, i) => (
         <div key={i} className={c.align || ''}>{c.label}</div>
       ))}
@@ -583,8 +541,21 @@ export default function TicketsPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [searchParams] = useSearchParams();
-  const { isCustomer, isCustomerAdmin, isClientUser } = useUserRole();
 
+  /* ── Роли ── */
+  const roles = user?.roles ?? [];
+  const isCustomer = roles.includes('customer');
+  const isCustomerAdmin = roles.includes('customer_admin');
+  const isClientUser = isCustomer || isCustomerAdmin;
+
+  /* Что показываем клиентам */
+  const showCounterpartyFilter = !isClientUser;               // скрыть для customer + customer_admin
+  const showAssigneeFilter = !isClientUser;               // скрыть для customer + customer_admin
+  const showReporterFilter = !isCustomer;                 // только customer_admin + остальные
+  const showAssigneeCol = !isClientUser;               // колонка исполнитель
+  const showReporterCol = !isCustomer;                 // колонка автор
+
+  /* ── State ── */
   const initialSearch = searchParams.get('search') || '';
 
   const [tickets, setTickets] = useState<TicketListItem[]>([]);
@@ -616,15 +587,8 @@ export default function TicketsPage() {
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
-  /* ── Видимость колонок и фильтров по ролям ── */
-  // customer — только проекты, без контрагентов/исполнителей/авторов
-  // customer_admin — только проекты, без контрагентов/исполнителей, автор виден
-  // остальные — всё
-  const showCounterpartyFilter = !isClientUser;
-  const showAssigneeFilter = !isClientUser;
-  const showReporterFilter = !isCustomer; // customer_admin видит, customer — нет
-  const showAssigneeColumn = !isClientUser;
-  const showReporterColumn = !isCustomer;
+  /* Флаг: клиентские проекты уже загружены и можно делать запрос тикетов */
+  const [clientProjectsReady, setClientProjectsReady] = useState(!isClientUser);
 
   /* ── Debounce поиска ── */
   useEffect(() => {
@@ -632,40 +596,100 @@ export default function TicketsPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  /* ── Загрузка справочников при открытии фильтров ── */
+  /* ── Для клиентов грузим getMyProjects() СРАЗУ, до открытия фильтров ── */
+  useEffect(() => {
+    if (!isClientUser) {
+      setClientProjectsReady(true);
+      return;
+    }
+    setLoadingProjects(true);
+    setClientProjectsReady(false);
+
+    projectsApi.getMyProjects()
+      .then((res: any) => {
+        setProjects(toItems<Project>(res));
+      })
+      .catch((err: any) => {
+        console.error('getMyProjects error:', err);
+        setProjects([]);
+      })
+      .finally(() => {
+        setLoadingProjects(false);
+        setClientProjectsReady(true);
+      });
+  }, [isClientUser]);
+
+  /* ── При открытии фильтров грузим справочники для не-клиентов ── */
   useEffect(() => {
     if (!showFilters) return;
 
-    // Проекты: для клиентов используем getMyProjects
-    if (projects.length === 0) {
-      setLoadingProjects(true);
-      const loadProjects = isClientUser
-        ? projectsApi.getMyProjects()   // ← ручка для клиентов
-        : projectsApi.getAll(1, 100).then(res => res.items);
-      loadProjects
-        .then(items => setProjects(items))
-        .finally(() => setLoadingProjects(false));
-    }
-
-    // Контрагенты: только для не-клиентов
-    if (!isClientUser && counterparties.length === 0) {
+    // Контрагенты — только для не-клиентов
+    if (showCounterpartyFilter && counterparties.length === 0) {
       setLoadingCounterparties(true);
       counterpartiesApi.getAll(1, 100)
-        .then(res => setCounterparties(res.items))
+        .then(res => setCounterparties(toItems<Counterparty>(res)))
         .finally(() => setLoadingCounterparties(false));
     }
 
-    // Пользователи: только для не-клиентов и customer_admin (для фильтра по автору)
-    if (!isCustomer && users.length === 0) {
+    // Проекты — для не-клиентов (клиенты уже загрузили выше)
+    if (!isClientUser && projects.length === 0) {
+      setLoadingProjects(true);
+      projectsApi.getAll(1, 100)
+        .then(res => setProjects(toItems<Project>(res)))
+        .finally(() => setLoadingProjects(false));
+    }
+
+    // Пользователи — для не-клиентов и customer_admin (видят фильтр "Автор")
+    if ((showAssigneeFilter || showReporterFilter) && users.length === 0) {
       setLoadingUsers(true);
       usersApi.getAllUsers(1, 100)
-        .then(res => setUsers(res.items))
+        .then(res => setUsers(toItems<SimpleUser>(res)))
         .finally(() => setLoadingUsers(false));
     }
-  }, [showFilters, isClientUser, isCustomer]);
+  }, [
+    showFilters,
+    isClientUser,
+    showCounterpartyFilter,
+    showAssigneeFilter,
+    showReporterFilter,
+    counterparties.length,
+    projects.length,
+    users.length,
+  ]);
+
+  /* ── Вычисляем effective project_ids с учётом ролей ── */
+  const getEffectiveProjectIds = useCallback((): string[] | undefined => {
+    if (!isClientUser) {
+      return projectFilter.length > 0 ? projectFilter : undefined;
+    }
+    // Для клиентов — только их проекты
+    const allowed = projects.map(p => p.id);
+    if (allowed.length === 0) return [];           // нет доступных проектов
+    if (projectFilter.length > 0) {
+      const intersect = projectFilter.filter(id => allowed.includes(id));
+      return intersect.length > 0 ? intersect : allowed;
+    }
+    return allowed;
+  }, [isClientUser, projects, projectFilter]);
 
   /* ── Загрузка тикетов ── */
   const loadTickets = useCallback(async () => {
+    // Ждём готовности проектов для клиентов
+    if (isClientUser && !clientProjectsReady) return;
+
+    const effectiveProjectIds = getEffectiveProjectIds();
+
+    // Если у клиента нет проектов — показываем пусто
+    if (isClientUser && Array.isArray(effectiveProjectIds) && effectiveProjectIds.length === 0) {
+      setTickets([]);
+      setTotalPages(1);
+      setTotalItems(0);
+      setLoading(false);
+      setInitialLoad(false);
+      setPage(1);
+      return;
+    }
+
     setLoading(true);
     setPage(1);
     try {
@@ -674,13 +698,10 @@ export default function TicketsPage() {
         status: statusFilter.length > 0 ? statusFilter : undefined,
         priority: priorityFilter || undefined,
         ticket_type: typeFilter || undefined,
-        // Контрагент — только для не-клиентов
-        counterparty_id: !isClientUser && counterpartyFilter ? counterpartyFilter : undefined,
-        project_ids: projectFilter.length > 0 ? projectFilter : undefined,
-        // Исполнитель — только для не-клиентов
-        assignee_id: !isClientUser && assigneeFilter ? assigneeFilter : undefined,
-        // Автор — для не-клиентов и customer_admin
-        reporter_id: !isCustomer && reporterFilter ? reporterFilter : undefined,
+        counterparty_id: showCounterpartyFilter ? (counterpartyFilter || undefined) : undefined,
+        project_ids: effectiveProjectIds,
+        assignee_id: showAssigneeFilter ? (assigneeFilter || undefined) : undefined,
+        reporter_id: showReporterFilter ? (reporterFilter || undefined) : undefined,
         created_after: dateFrom || undefined,
         created_before: dateTo || undefined,
       });
@@ -688,16 +709,27 @@ export default function TicketsPage() {
       setTotalPages(response.total_pages);
       setTotalItems(response.total_items);
     } catch (e) {
-      console.error('Search error:', e);
+      console.error('loadTickets error:', e);
     } finally {
       setLoading(false);
       setInitialLoad(false);
     }
   }, [
-    statusFilter, priorityFilter, typeFilter, counterpartyFilter,
-    projectFilter, assigneeFilter, reporterFilter,
-    debouncedSearch, dateFrom, dateTo,
-    isClientUser, isCustomer,
+    isClientUser,
+    clientProjectsReady,
+    getEffectiveProjectIds,
+    debouncedSearch,
+    statusFilter,
+    priorityFilter,
+    typeFilter,
+    counterpartyFilter,
+    assigneeFilter,
+    reporterFilter,
+    dateFrom,
+    dateTo,
+    showCounterpartyFilter,
+    showAssigneeFilter,
+    showReporterFilter,
   ]);
 
   useEffect(() => {
@@ -706,6 +738,14 @@ export default function TicketsPage() {
 
   /* ── Пагинация ── */
   const handlePageChange = async (pageNum: number) => {
+    if (isClientUser && !clientProjectsReady) return;
+
+    const effectiveProjectIds = getEffectiveProjectIds();
+    if (isClientUser && Array.isArray(effectiveProjectIds) && effectiveProjectIds.length === 0) {
+      setTickets([]); setTotalPages(1); setTotalItems(0); setPage(1);
+      return;
+    }
+
     setPage(pageNum);
     setLoading(true);
     try {
@@ -714,10 +754,10 @@ export default function TicketsPage() {
         status: statusFilter.length > 0 ? statusFilter : undefined,
         priority: priorityFilter || undefined,
         ticket_type: typeFilter || undefined,
-        counterparty_id: !isClientUser && counterpartyFilter ? counterpartyFilter : undefined,
-        project_ids: projectFilter.length > 0 ? projectFilter : undefined,
-        assignee_id: !isClientUser && assigneeFilter ? assigneeFilter : undefined,
-        reporter_id: !isCustomer && reporterFilter ? reporterFilter : undefined,
+        counterparty_id: showCounterpartyFilter ? (counterpartyFilter || undefined) : undefined,
+        project_ids: effectiveProjectIds,
+        assignee_id: showAssigneeFilter ? (assigneeFilter || undefined) : undefined,
+        reporter_id: showReporterFilter ? (reporterFilter || undefined) : undefined,
         created_after: dateFrom || undefined,
         created_before: dateTo || undefined,
       });
@@ -725,7 +765,7 @@ export default function TicketsPage() {
       setTotalPages(response.total_pages);
       setTotalItems(response.total_items);
     } catch (e) {
-      console.error('Pagination error:', e);
+      console.error('handlePageChange error:', e);
     } finally {
       setLoading(false);
     }
@@ -742,37 +782,47 @@ export default function TicketsPage() {
     setReporterFilter('');
     setSearch('');
     setDebouncedSearch('');
-    setPage(1);
     setDateFrom('');
     setDateTo('');
+    setPage(1);
   };
 
+  /* ── Активные фильтры ── */
   const hasFilters = !!(
     statusFilter.length || priorityFilter || typeFilter ||
-    counterpartyFilter || projectFilter.length ||
-    assigneeFilter || reporterFilter ||
+    (showCounterpartyFilter && counterpartyFilter) ||
+    projectFilter.length ||
+    (showAssigneeFilter && assigneeFilter) ||
+    (showReporterFilter && reporterFilter) ||
     dateFrom || dateTo
   );
-
-  const activeFiltersCount = [
-    statusFilter.length,
-    priorityFilter,
-    typeFilter,
-    showCounterpartyFilter ? counterpartyFilter : '',
-    projectFilter.length,
-    showAssigneeFilter ? assigneeFilter : '',
-    showReporterFilter ? reporterFilter : '',
-    dateFrom,
-    dateTo,
-  ].filter(Boolean).length;
-
   const hasActiveFilters = !!(hasFilters || debouncedSearch);
 
+  const activeFiltersCount = [
+    statusFilter.length > 0,
+    !!priorityFilter,
+    !!typeFilter,
+    showCounterpartyFilter && !!counterpartyFilter,
+    projectFilter.length > 0,
+    showAssigneeFilter && !!assigneeFilter,
+    showReporterFilter && !!reporterFilter,
+    !!dateFrom,
+    !!dateTo,
+  ].filter(Boolean).length;
+
+  /* ── Helpers ── */
   const getStatusColor = (s: string) => STATUS_MAP[s]?.color || 'status-closed';
   const getPriorityColor = (p: string) => PRIORITY_MAP[p]?.color || 'priority-medium';
   const getTypeColor = (t: string) => TICKET_TYPES.find(x => x.value === t)?.color || 'type-other';
   const getStatusLabel = (s: string) => STATUS_MAP[s]?.label || s;
   const getPriorityLabel = (p: string) => PRIORITY_MAP[p]?.label || p;
+
+  /* ── Options ── */
+  const counterpartyOptions: DropdownOption[] = counterparties.map(c => ({
+    value: c.id,
+    label: c.name || c.legal_name || c.inn || 'Без названия',
+    sublabel: c.inn ? `ИНН: ${c.inn}` : undefined,
+  }));
 
   const projectOptions: DropdownOption[] = projects.map(p => ({
     value: p.id,
@@ -780,17 +830,15 @@ export default function TicketsPage() {
     sublabel: p.key,
   }));
 
-  const counterpartyOptions: DropdownOption[] = counterparties.map(c => ({
-    value: c.id,
-    label: c.name || c.legal_name || c.inn || 'Без названия',
-    sublabel: c.inn ? `ИНН: ${c.inn}` : undefined,
-  }));
-
   const userOptions: DropdownOption[] = users.map(u => ({
     value: u.id,
     label: u.full_name || u.username || u.email || 'Без имени',
     sublabel: u.email,
   }));
+
+  /* ══════════════════════════════════════════════════════════════════
+     RENDER
+     ══════════════════════════════════════════════════════════════════ */
 
   if (initialLoad) {
     return (
@@ -802,7 +850,8 @@ export default function TicketsPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Header */}
+
+      {/* ── Header ── */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold text-[var(--text-primary)] mb-1.5">
@@ -822,7 +871,7 @@ export default function TicketsPage() {
         </button>
       </div>
 
-      {/* Stats */}
+      {/* ── Stats ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label="Всего" value={totalItems} icon={Ticket} color="text-[var(--text-secondary)]" bg="bg-[var(--hover-1)]" />
         <StatCard label="Новых" value={tickets.filter(t => t.status === 'new').length} icon={Clock} color="text-[var(--status-new-text)]" bg="bg-[var(--status-new-bg)]" />
@@ -830,7 +879,7 @@ export default function TicketsPage() {
         <StatCard label="Критических" value={tickets.filter(t => t.priority === 'critical').length} icon={AlertTriangle} color="text-[var(--priority-critical-text)]" bg="bg-[var(--priority-critical-bg)]" />
       </div>
 
-      {/* Search + Filters toggle */}
+      {/* ── Search + Filters toggle ── */}
       <div className="flex flex-wrap items-center gap-2.5">
         <div className="relative flex-1 min-w-[220px]">
           <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/40 pointer-events-none" />
@@ -845,13 +894,11 @@ export default function TicketsPage() {
                        focus:ring-[var(--accent)]/10 transition-all"
           />
           {search && !loading && (
-            <button
-              type="button"
+            <button type="button"
               onClick={() => { setSearch(''); setDebouncedSearch(''); }}
               className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 rounded-md
                          text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60
-                         hover:bg-[var(--hover-2)] transition-colors"
-            >
+                         hover:bg-[var(--hover-2)] transition-colors">
               <X size={18} />
             </button>
           )}
@@ -864,22 +911,20 @@ export default function TicketsPage() {
             ${showFilters || activeFiltersCount > 0
               ? 'bg-[var(--accent)]/10 border-[var(--accent)]/40 text-[var(--text-primary)]'
               : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70'
-            }`}
-        >
-          <SlidersHorizontal
-            size={18}
-            className={showFilters || activeFiltersCount > 0 ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'}
-          />
+            }`}>
+          <SlidersHorizontal size={18}
+            className={showFilters || activeFiltersCount > 0 ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'} />
           <span>Фильтры</span>
           {activeFiltersCount > 0 && (
-            <span className="w-5 h-5 rounded-full bg-[var(--accent)] text-white text-[15px] font-bold flex items-center justify-center">
+            <span className="w-5 h-5 rounded-full bg-[var(--accent)] text-white text-[15px] font-bold
+                             flex items-center justify-center">
               {activeFiltersCount}
             </span>
           )}
         </button>
       </div>
 
-      {/* Filters Panel */}
+      {/* ── Filters Panel ── */}
       {showFilters && (
         <div className="rounded-xl border border-[var(--border-color)] p-3.5 space-y-3
                         animate-in fade-in slide-in-from-top-1 duration-200">
@@ -888,20 +933,20 @@ export default function TicketsPage() {
               Фильтрация
             </span>
             {hasActiveFilters && (
-              <button
-                onClick={resetFilters}
-                className="text-base text-[var(--accent)] hover:text-[var(--accent-light)] flex items-center gap-1 transition-colors"
-              >
+              <button onClick={resetFilters}
+                className="text-base text-[var(--accent)] hover:text-[var(--accent-light)]
+                           flex items-center gap-1 transition-colors">
                 <X size={18} /> Сбросить
               </button>
             )}
           </div>
 
           {/*
-            Используем flex-wrap вместо grid, чтобы «Дата создания» не вылезало за границы.
-            Каждый фильтр имеет min-w + flex-1, «Дата» растянута на всю строку при необходимости.
+            flex-wrap: каждый фильтр тянется на свою ширину.
+            Блок "Дата" — w-full, поэтому всегда на отдельной строке и не вылезает за границы.
           */}
           <div className="flex flex-wrap gap-2.5">
+
             {/* Статус */}
             <div className="flex-1 min-w-[180px]">
               <FilterDropdown
@@ -980,7 +1025,7 @@ export default function TicketsPage() {
               </div>
             )}
 
-            {/* Автор — для не-клиентов и customer_admin */}
+            {/* Автор — customer_admin + не-клиенты */}
             {showReporterFilter && (
               <div className="flex-1 min-w-[180px]">
                 <FilterDropdown
@@ -995,7 +1040,7 @@ export default function TicketsPage() {
               </div>
             )}
 
-            {/* Дата создания — всегда на всю доступную ширину строки */}
+            {/* Дата создания — всегда на отдельной строке (w-full) */}
             <div className="w-full">
               <label className="text-sm text-[var(--text-primary)]/50 mb-1.5 block font-medium">
                 Дата создания
@@ -1005,16 +1050,16 @@ export default function TicketsPage() {
                   type="date"
                   value={dateFrom}
                   onChange={e => setDateFrom(e.target.value)}
-                  className="flex-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)]
+                  className="flex-1 min-w-0 px-3 py-2.5 rounded-xl border border-[var(--border-color)]
                              bg-[var(--hover-1)] text-[var(--text-primary)] text-sm
                              focus:outline-none focus:border-[var(--accent)]/40"
                 />
-                <span className="text-[var(--text-muted)] text-sm flex-shrink-0">—</span>
+                <span className="text-[var(--text-muted)] text-sm shrink-0">—</span>
                 <input
                   type="date"
                   value={dateTo}
                   onChange={e => setDateTo(e.target.value)}
-                  className="flex-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)]
+                  className="flex-1 min-w-0 px-3 py-2.5 rounded-xl border border-[var(--border-color)]
                              bg-[var(--hover-1)] text-[var(--text-primary)] text-sm
                              focus:outline-none focus:border-[var(--accent)]/40"
                 />
@@ -1024,97 +1069,80 @@ export default function TicketsPage() {
         </div>
       )}
 
-      {/* Active Filter Tags */}
+      {/* ── Active Filter Tags ── */}
       {hasActiveFilters && (
         <div className="flex items-center gap-2.5 flex-wrap">
           <span className="text-base text-[var(--text-primary)]/40 flex items-center gap-1.5">
             <SlidersHorizontal size={18} /> Фильтры:
           </span>
+
           {debouncedSearch && (
-            <FilterTag
-              label={`«${debouncedSearch}»`}
-              icon={<Search size={12} />}
-              onRemove={() => { setSearch(''); setDebouncedSearch(''); }}
-            />
+            <FilterTag label={`«${debouncedSearch}»`} icon={<Search size={12} />}
+              onRemove={() => { setSearch(''); setDebouncedSearch(''); }} />
           )}
+
           {statusFilter.map(s => (
-            <FilterTag
-              key={s}
-              label={getStatusLabel(s)}
-              colorClass={`${getStatusColor(s)} border`}
-              onRemove={() => setStatusFilter(statusFilter.filter(f => f !== s))}
-            />
+            <FilterTag key={s} label={getStatusLabel(s)} colorClass={`${getStatusColor(s)} border`}
+              onRemove={() => setStatusFilter(statusFilter.filter(f => f !== s))} />
           ))}
+
           {priorityFilter && (
-            <FilterTag
-              label={getPriorityLabel(priorityFilter)}
-              colorClass={`${getPriorityColor(priorityFilter)} border`}
-              onRemove={() => setPriorityFilter('')}
-            />
+            <FilterTag label={getPriorityLabel(priorityFilter)} colorClass={`${getPriorityColor(priorityFilter)} border`}
+              onRemove={() => setPriorityFilter('')} />
           )}
+
           {typeFilter && (
-            <FilterTag
-              label={typeFilter}
-              colorClass={`${getTypeColor(typeFilter)} border`}
-              onRemove={() => setTypeFilter('')}
-            />
+            <FilterTag label={typeFilter} colorClass={`${getTypeColor(typeFilter)} border`}
+              onRemove={() => setTypeFilter('')} />
           )}
+
           {showCounterpartyFilter && counterpartyFilter && (
             <FilterTag
               label={counterparties.find(c => c.id === counterpartyFilter)?.name || 'Контрагент'}
-              onRemove={() => setCounterpartyFilter('')}
-            />
+              onRemove={() => setCounterpartyFilter('')} />
           )}
+
           {projectFilter.map(p => (
-            <FilterTag
-              key={p}
+            <FilterTag key={p}
               label={projects.find(proj => proj.id === p)?.name || 'Проект'}
-              onRemove={() => setProjectFilter(projectFilter.filter(f => f !== p))}
-            />
+              onRemove={() => setProjectFilter(projectFilter.filter(f => f !== p))} />
           ))}
+
           {showAssigneeFilter && assigneeFilter && (
             <FilterTag
               label={users.find(u => u.id === assigneeFilter)?.full_name || 'Исполнитель'}
-              onRemove={() => setAssigneeFilter('')}
-            />
+              onRemove={() => setAssigneeFilter('')} />
           )}
+
           {showReporterFilter && reporterFilter && (
             <FilterTag
               label={users.find(u => u.id === reporterFilter)?.full_name || 'Автор'}
-              onRemove={() => setReporterFilter('')}
-            />
+              onRemove={() => setReporterFilter('')} />
           )}
+
           {dateFrom && dateTo && (
             <FilterTag
               label={`${new Date(dateFrom).toLocaleDateString('ru-RU')} — ${new Date(dateTo).toLocaleDateString('ru-RU')}`}
               icon={<Calendar size={12} />}
-              onRemove={() => { setDateFrom(''); setDateTo(''); }}
-            />
+              onRemove={() => { setDateFrom(''); setDateTo(''); }} />
           )}
           {dateFrom && !dateTo && (
-            <FilterTag
-              label={`С ${new Date(dateFrom).toLocaleDateString('ru-RU')}`}
-              icon={<Calendar size={12} />}
-              onRemove={() => setDateFrom('')}
-            />
+            <FilterTag label={`С ${new Date(dateFrom).toLocaleDateString('ru-RU')}`}
+              icon={<Calendar size={12} />} onRemove={() => setDateFrom('')} />
           )}
           {!dateFrom && dateTo && (
-            <FilterTag
-              label={`По ${new Date(dateTo).toLocaleDateString('ru-RU')}`}
-              icon={<Calendar size={12} />}
-              onRemove={() => setDateTo('')}
-            />
+            <FilterTag label={`По ${new Date(dateTo).toLocaleDateString('ru-RU')}`}
+              icon={<Calendar size={12} />} onRemove={() => setDateTo('')} />
           )}
-          <button
-            onClick={resetFilters}
-            className="text-base text-[var(--accent)]/60 hover:text-[var(--accent)] transition-colors ml-1"
-          >
+
+          <button onClick={resetFilters}
+            className="text-base text-[var(--accent)]/60 hover:text-[var(--accent)] transition-colors ml-1">
             Сбросить
           </button>
         </div>
       )}
 
-      {/* Loading indicator */}
+      {/* ── Loading indicator ── */}
       {loading && !initialLoad && (
         <div className="flex justify-center py-2">
           <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--hover-1)] border border-[var(--border-color)]">
@@ -1124,46 +1152,39 @@ export default function TicketsPage() {
         </div>
       )}
 
-      {/* Content */}
+      {/* ── Content ── */}
       {tickets.length === 0 && !loading ? (
-        <EmptyState
-          hasFilters={hasFilters}
-          hasSearch={!!debouncedSearch}
-          onCreateClick={() => navigate('/tickets/new')}
-        />
+        <EmptyState hasFilters={hasFilters} hasSearch={!!debouncedSearch}
+          onCreateClick={() => navigate('/tickets/new')} />
       ) : tickets.length > 0 ? (
         <>
-          {/* Desktop Table */}
+          {/* Desktop */}
           <div className="hidden lg:block rounded-xl border border-[var(--border-color)] overflow-hidden">
-            <TableHeader showAssigneeReporter={showAssigneeColumn || showReporterColumn} />
+            <TableHeader showAssigneeCol={showAssigneeCol || showReporterCol} />
             <div className="divide-y divide-[var(--border-color)]/40 px-1 py-1">
               {tickets.map(ticket => (
                 <TicketRow
                   key={ticket.id}
                   ticket={ticket}
-                  formatDate={formatDate}
-                  showAssignee={showAssigneeColumn}
-                  showReporter={showReporterColumn}
+                  showAssignee={showAssigneeCol}
+                  showReporter={showReporterCol}
                 />
               ))}
             </div>
           </div>
 
-          {/* Mobile Cards */}
+          {/* Mobile */}
           <div className="lg:hidden space-y-2">
             {tickets.map(ticket => {
               const closed = ticket.status === 'closed' || ticket.status === 'resolved';
               const typeInfo = TICKET_TYPES.find(t => t.value === ticket.type);
               const statusLabel = STATUS_MAP[ticket.status]?.label || ticket.status;
-              const priorityLabel = PRIORITY_MAP[ticket.priority]?.label || ticket.priority;
+              const priLabel = PRIORITY_MAP[ticket.priority]?.label || ticket.priority;
 
               return (
-                <Link
-                  key={ticket.id}
-                  to={`/tickets/${ticket.number}`}
+                <Link key={ticket.id} to={`/tickets/${ticket.number}`}
                   className="glass-card rounded-xl border border-[var(--border-color)] p-4 block
-                             hover:bg-[var(--hover-1)] hover:border-[var(--border-hover)] transition-all group"
-                >
+                             hover:bg-[var(--hover-1)] hover:border-[var(--border-hover)] transition-all group">
                   <div className="flex items-center justify-between gap-3 mb-2.5">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span className="text-base font-mono text-[var(--accent-light)] bg-[var(--accent-soft)]/50
@@ -1180,11 +1201,9 @@ export default function TicketsPage() {
                         </span>
                       )}
                     </div>
-                    <ChevronRight
-                      size={18}
+                    <ChevronRight size={18}
                       className="text-[var(--text-muted)] group-hover:text-[var(--accent-light)]
-                                 group-hover:translate-x-0.5 transition-all shrink-0"
-                    />
+                                 group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>
 
                   <h3 className="text-[18px] font-semibold text-[var(--text-primary)] mb-3 leading-snug
@@ -1200,7 +1219,7 @@ export default function TicketsPage() {
                       {statusLabel}
                     </span>
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[15px] font-medium border ${PRIORITY_MAP[ticket.priority]?.color || 'priority-medium'}`}>
-                      {ticket.priority === 'critical' && <Flame size={18} />} {priorityLabel}
+                      {ticket.priority === 'critical' && <Flame size={18} />} {priLabel}
                     </span>
                   </div>
 
@@ -1209,7 +1228,6 @@ export default function TicketsPage() {
                     <span className="flex items-center gap-1">
                       <Calendar size={18} />{formatDate(ticket.created_at)}
                     </span>
-                    {/* Контрагент — всем видим в карточке (он просто отображает данные) */}
                     {ticket.counterparty?.name && (
                       <span className="flex items-center gap-1 truncate max-w-[150px]">
                         <Building2 size={18} />{ticket.counterparty.name}
@@ -1220,14 +1238,12 @@ export default function TicketsPage() {
                         <FolderOpen size={18} />{ticket.project.key}
                       </span>
                     )}
-                    {/* Исполнитель в карточке */}
-                    {showAssigneeColumn && ticket.assignee?.full_name && (
+                    {showAssigneeCol && ticket.assignee?.full_name && (
                       <span className="flex items-center gap-1 truncate max-w-[130px]">
                         <UserCheck size={18} />{toShortName(ticket.assignee.full_name)}
                       </span>
                     )}
-                    {/* Автор в карточке */}
-                    {showReporterColumn && ticket.reporter?.full_name && (
+                    {showReporterCol && ticket.reporter?.full_name && (
                       <span className="flex items-center gap-1 truncate max-w-[130px]">
                         <User size={18} />{toShortName(ticket.reporter.full_name)}
                       </span>
@@ -1246,8 +1262,7 @@ export default function TicketsPage() {
                 disabled={page === 1}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card border border-[var(--border-color)]
                            hover:bg-[var(--hover-2)] disabled:opacity-40 disabled:cursor-not-allowed
-                           text-[var(--text-primary)] text-base transition-colors"
-              >
+                           text-[var(--text-primary)] text-base transition-colors">
                 <ChevronLeft className="w-4 h-4" /> Назад
               </button>
               <div className="flex items-center gap-1.5">
@@ -1255,15 +1270,12 @@ export default function TicketsPage() {
                   const pageNum = Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
                   if (pageNum > totalPages) return null;
                   return (
-                    <button
-                      key={pageNum}
-                      onClick={() => handlePageChange(pageNum)}
+                    <button key={pageNum} onClick={() => handlePageChange(pageNum)}
                       className={`w-10 h-10 rounded-xl text-base font-medium transition-colors
                         ${pageNum === page
                           ? 'bg-[var(--accent)] text-white'
                           : 'glass-card text-[var(--text-primary)]/60 border border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                        }`}
-                    >
+                        }`}>
                       {pageNum}
                     </button>
                   );
@@ -1274,8 +1286,7 @@ export default function TicketsPage() {
                 disabled={page === totalPages}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card border border-[var(--border-color)]
                            hover:bg-[var(--hover-2)] disabled:opacity-40 disabled:cursor-not-allowed
-                           text-[var(--text-primary)] text-base transition-colors"
-              >
+                           text-[var(--text-primary)] text-base transition-colors">
                 Вперёд <ChevronRight className="w-4 h-4" />
               </button>
             </div>
