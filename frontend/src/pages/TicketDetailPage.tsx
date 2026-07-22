@@ -1126,10 +1126,10 @@ export default function TicketDetailPage() {
                     <Star className="w-5 h-5 text-emerald-500" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    <p className="text-l font-semibold text-[var(--text-primary)]">
                       Как вам обслуживание?
                     </p>
-                    <p className="text-xs text-[var(--text-primary)]/35 mt-0.5">
+                    <p className="text-sm text-[var(--text-primary)]/35 mt-0.5">
                       Заявка закрыта — оцените качество работы
                     </p>
                   </div>
