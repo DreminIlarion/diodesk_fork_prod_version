@@ -11,13 +11,13 @@
   color-scheme: dark;
 
   /* Фоны */
-  --bg-primary:    #272727;
+  --bg-primary:    #232323;
   --bg-secondary:  #232323;
   --bg-tertiary:   #252525;
   --bg-card:       rgba(48, 48, 48, 0.95);
   --bg-card-hover: rgba(42, 42, 42, 0.98);
-  --bg-sidebar:    #272727;
-  --bg-sidebar-inner: #272727;
+  --bg-sidebar:    #232323;
+  --bg-sidebar-inner: #232323;
 
   --bg-all: #ffffff;
 
