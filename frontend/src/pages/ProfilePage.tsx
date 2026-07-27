@@ -1,60 +1,84 @@
-import { useState, useRef } from 'react';
+// pages/ProfilePage.tsx
+import { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  User,
-  Shield,
-  Bell,
-  Camera,
-  Loader2,
-  Building2,
-  Check
+  User, Camera, Loader2, Building2, ArrowRight,
+  Mail, Phone, MapPin, Hash, Briefcase, CreditCard,
+  Calendar, Users, Ticket, Package, GitBranch, ExternalLink,
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
-import { authApi, counterpartiesApi } from '../api/client';
+import { authApi, counterpartiesApi, ticketsApi } from '../api/client';
 import { useToast } from '../components/ui/use-toast';
 import type { Counterparty } from '../types';
-import { useEffect } from 'react';
 
 export default function ProfilePage() {
   const { user, setUser } = useAuthStore();
   const { toast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'company' | 'security' | 'notifications'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'company'>('profile');
   const [uploading, setUploading] = useState(false);
   const [myCompany, setMyCompany] = useState<Counterparty | null>(null);
+  const [branches, setBranches] = useState<Counterparty[]>([]);
+  const [productsCount, setProductsCount] = useState(0);
+  const [ticketsCount, setTicketsCount] = useState(0);
+  const [employeesCount, setEmployeesCount] = useState(0);
+  const [loadingCompany, setLoadingCompany] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const isCustomer = user?.role === 'customer' || user?.role === 'customer_admin';
+  const roles: string[] = user?.roles ?? [];
+  const isCustomer = roles.includes('customer') || roles.includes('customer_admin');
 
   useEffect(() => {
     if (isCustomer && user?.counterparty_id) {
-      loadMyCompany();
+      loadCompanyData();
     }
   }, [user]);
 
-  const loadMyCompany = async () => {
+  const loadCompanyData = async () => {
     if (!user?.counterparty_id) return;
+    setLoadingCompany(true);
     try {
       const company = await counterpartiesApi.getById(user.counterparty_id);
       setMyCompany(company);
+
+      // Загружаем сопутствующие данные
+      const [branchesRes, ticketsRes] = await Promise.all([
+        counterpartiesApi.getAll(1, 100).catch(() => ({ items: [] })),
+        ticketsApi.getAll(1, 100, { counterparty_id: user.counterparty_id }).catch(() => ({ items: [], total_items: 0 })),
+      ]);
+
+      setBranches(branchesRes.items.filter((b: Counterparty) => b.parent_id === company.id));
+      setTicketsCount(ticketsRes.total_items ?? ticketsRes.items?.length ?? 0);
+
+      // Продукты и сотрудники
+      try {
+        const products = await counterpartiesApi.getProducts(user.counterparty_id, 1, 1);
+        setProductsCount(products?.total_items ?? products?.items?.length ?? 0);
+      } catch { }
+
+      try {
+        const customers = await counterpartiesApi.getCustomers(user.counterparty_id);
+        setEmployeesCount(Array.isArray(customers?.items) ? customers.items.length : Array.isArray(customers) ? customers.length : 0);
+      } catch { }
+
     } catch (error) {
       console.error('Failed to load company:', error);
+    } finally {
+      setLoadingCompany(false);
     }
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!file.type.startsWith('image/')) {
       toast({ title: 'Ошибка', description: 'Выберите изображение', variant: 'destructive' });
       return;
     }
-
     if (file.size > 5 * 1024 * 1024) {
       toast({ title: 'Ошибка', description: 'Максимальный размер 5MB', variant: 'destructive' });
       return;
     }
-
     setUploading(true);
     try {
       const updatedProfile = await authApi.uploadAvatar(file);
@@ -66,7 +90,7 @@ export default function ProfilePage() {
         });
       }
       toast({ title: 'Успешно', description: 'Аватар обновлён' });
-    } catch (error) {
+    } catch {
       toast({ title: 'Ошибка', description: 'Не удалось загрузить аватар', variant: 'destructive' });
     } finally {
       setUploading(false);
@@ -88,60 +112,52 @@ export default function ProfilePage() {
   const tabs = [
     { id: 'profile' as const, label: 'Профиль', icon: User },
     ...(isCustomer ? [{ id: 'company' as const, label: 'Моя компания', icon: Building2 }] : []),
-    { id: 'security' as const, label: 'Безопасность', icon: Shield },
-    { id: 'notifications' as const, label: 'Уведомления', icon: Bell },
   ];
 
   return (
-    <div className=" space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-500">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Профиль</h1>
+      <div>
+        <h1 className="text-3xl font-bold text-[var(--text-primary)]">Профиль</h1>
         <p className="text-[var(--text-primary)]/50 mt-1">Управление аккаунтом и настройками</p>
       </div>
 
       <div className="grid lg:grid-cols-4 gap-6">
         {/* Sidebar */}
         <div className="lg:col-span-1">
-          <div className="glass-card-static p-6">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6">
             {/* Avatar */}
             <div className="text-center mb-6">
               <div className="relative inline-block">
-                <div className="w-24 h-24 rounded-2xl overflow-hidden bg-gradient-to-br from-red-800 to-red-900 mx-auto">
+                <div className="w-24 h-24 rounded-2xl overflow-hidden bg-gradient-to-br from-red-800 to-red-700 mx-auto ring-4 ring-[var(--bg-primary)]">
                   {user?.avatar_url ? (
                     <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <User className="w-10 h-10 text-[var(--text-primary)]" />
+                      <User className="w-10 h-10 text-white/60" />
                     </div>
                   )}
                 </div>
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  className="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent)] flex items-center justify-center transition-colors"
+                  className="absolute -bottom-2 -right-2 w-9 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] flex items-center justify-center transition-colors shadow-lg"
                 >
-                  {uploading ? (
-                    <Loader2 className="w-5 h-5 text-white animate-spin" />
-                  ) : (
-                    <Camera className="w-5 h-5 text-white" />
-                  )}
+                  {uploading ? <Loader2 className="w-4 h-4 text-white animate-spin" /> : <Camera className="w-4 h-4 text-white" />}
                 </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarUpload}
-                  className="hidden"
-                />
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
               </div>
-              <h2 className="font-semibold text-[var(--text-primary)] mt-4">
+              <h2 className="font-semibold text-[var(--text-primary)] mt-4 text-lg">
                 {user?.full_name || user?.username || 'Пользователь'}
               </h2>
-              <p className="text-sm text-[var(--text-primary)]/50">{user?.email}</p>
-              <span className="inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium bg-[var(--accent)]/20 text-[var(--accent)] border border-red-800/30">
-                {getRoleLabel(user?.role || '')}
-              </span>
+              <p className="text-sm text-[var(--text-primary)]/40">{user?.email}</p>
+              <div className="flex flex-wrap justify-center gap-1.5 mt-2">
+                {roles.map(role => (
+                  <span key={role} className="inline-block px-2.5 py-1 rounded-lg text-xs font-medium bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/10">
+                    {getRoleLabel(role)}
+                  </span>
+                ))}
+              </div>
             </div>
 
             {/* Navigation */}
@@ -150,9 +166,10 @@ export default function ProfilePage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeTab === tab.id
-                      ? 'bg-[var(--accent)]/20 text-[var(--accent)]'
-                      : 'text-[var(--text-primary)]/60 hover:text-[var(--text-primary)] hover:bg-[var(--hover-1)]'
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-all
+                    ${activeTab === tab.id
+                      ? 'bg-[var(--accent)]/10 text-[var(--accent)]'
+                      : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)] hover:bg-[var(--hover-1)]'
                     }`}
                 >
                   <tab.icon className="w-5 h-5" />
@@ -160,6 +177,11 @@ export default function ProfilePage() {
                 </button>
               ))}
             </nav>
+
+            {/* Version */}
+            <div className="mt-6 pt-4 border-t border-[var(--border-color)] text-center">
+              <p className="text-xs text-[var(--text-primary)]/20">ДИО Деск v2.0.0</p>
+            </div>
           </div>
         </div>
 
@@ -167,174 +189,118 @@ export default function ProfilePage() {
         <div className="lg:col-span-3">
           {/* Profile Tab */}
           {activeTab === 'profile' && (
-            <div className="glass-card-static p-6">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-6">Личная информация</h3>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="label">Имя пользователя</label>
-                  <input
-                    type="text"
-                    value={user?.username || ''}
-                    disabled
-                    className="input-field opacity-60"
-                  />
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
+                  <User className="w-5 h-5 text-[var(--accent)]" />
                 </div>
-                <div>
-                  <label className="label">Полное имя</label>
-                  <input
-                    type="text"
-                    value={user?.full_name || ''}
-                    disabled
-                    className="input-field opacity-60"
-                  />
-                </div>
-                <div>
-                  <label className="label">Email</label>
-                  <input
-                    type="email"
-                    value={user?.email || ''}
-                    disabled
-                    className="input-field opacity-60"
-                  />
-                </div>
-                <div>
-                  <label className="label">Роль</label>
-                  <input
-                    type="text"
-                    value={getRoleLabel(user?.role || '')}
-                    disabled
-                    className="input-field opacity-60"
-                  />
-                </div>
+                <h3 className="text-lg font-bold text-[var(--text-primary)]">Личная информация</h3>
               </div>
 
-              <p className="text-[var(--text-primary)]/40 text-sm mt-6">
+              <div className="grid md:grid-cols-2 gap-5">
+                {[
+                  { label: 'Имя пользователя', value: user?.username },
+                  { label: 'Полное имя', value: user?.full_name },
+                  { label: 'Email', value: user?.email },
+                  { label: 'Роль', value: roles.map(r => getRoleLabel(r)).join(', ') },
+                ].map(field => (
+                  <div key={field.label}>
+                    <label className="block text-sm font-medium text-[var(--text-primary)]/50 mb-1.5">{field.label}</label>
+                    <div className="px-4 py-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)] text-[var(--text-primary)] text-base">
+                      {field.value || '—'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-[var(--text-primary)]/30 text-sm mt-6">
                 Для изменения данных профиля обратитесь к администратору системы.
               </p>
             </div>
           )}
 
           {/* Company Tab */}
-          {activeTab === 'company' && myCompany && (
-            <div className="glass-card-static p-6">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-6">Информация о компании</h3>
+          {activeTab === 'company' && (
+            <div className="space-y-6">
+              {loadingCompany ? (
+                <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-12 flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" />
+                </div>
+              ) : myCompany ? (
+                <>
+                  {/* Stats */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    {[
+                      { icon: Users, value: employeesCount, label: 'Сотрудников' },
+                      { icon: Ticket, value: ticketsCount, label: 'Заявок' },
+                      { icon: Package, value: productsCount, label: 'Продуктов' },
+                      { icon: GitBranch, value: branches.length, label: 'Подразделений' },
+                    ].map(stat => (
+                      <div key={stat.label} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-4 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center flex-shrink-0">
+                          <stat.icon className="w-5 h-5 text-[var(--accent)]" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-[var(--text-primary)] leading-none">{stat.value}</p>
+                          <p className="text-sm text-[var(--text-primary)]/40">{stat.label}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="label">Название</label>
-                  <input type="text" value={myCompany.name} disabled className="input-field opacity-60" />
-                </div>
-                <div>
-                  <label className="label">Юридическое название</label>
-                  <input type="text" value={myCompany.legal_name} disabled className="input-field opacity-60" />
-                </div>
-                <div>
-                  <label className="label">Тип</label>
-                  <input type="text" value={myCompany.counterparty_type} disabled className="input-field opacity-60" />
-                </div>
-                <div>
-                  <label className="label">ИНН</label>
-                  <input type="text" value={myCompany.inn} disabled className="input-field opacity-60" />
-                </div>
-                {myCompany.kpp && (
-                  <div>
-                    <label className="label">КПП</label>
-                    <input type="text" value={myCompany.kpp} disabled className="input-field opacity-60" />
+                  {/* Company Info */}
+                  <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
+                    <div className="px-6 py-5 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
+                          <Building2 className="w-5 h-5 text-[var(--accent)]" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-[var(--text-primary)]">{myCompany.name}</h3>
+                          <p className="text-sm text-[var(--text-primary)]/40">{myCompany.legal_name}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-6">
+                      <div className="grid md:grid-cols-2 gap-5">
+                        {[
+                          { icon: Hash, label: 'ИНН', value: myCompany.inn },
+                          { icon: CreditCard, label: 'КПП', value: myCompany.kpp },
+                          { icon: Briefcase, label: 'ОКПО', value: myCompany.okpo },
+                          { icon: Building2, label: 'Тип', value: myCompany.counterparty_type },
+                          { icon: Phone, label: 'Телефон', value: myCompany.phone },
+                          { icon: Mail, label: 'Email', value: myCompany.email },
+                          { icon: MapPin, label: 'Адрес', value: myCompany.address },
+                          { icon: Calendar, label: 'Зарегистрирована', value: myCompany.created_at ? new Date(myCompany.created_at).toLocaleDateString('ru-RU') : null },
+                        ].filter(f => f.value).map(field => (
+                          <div key={field.label}>
+                            <label className="flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]/40 mb-1.5">
+                              <field.icon className="w-3.5 h-3.5" />{field.label}
+                            </label>
+                            <div className="px-4 py-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)] text-[var(--text-primary)] text-base">
+                              {field.value}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                )}
-                {myCompany.okpo && (
-                  <div>
-                    <label className="label">ОКПО</label>
-                    <input type="text" value={myCompany.okpo} disabled className="input-field opacity-60" />
-                  </div>
-                )}
-                {myCompany.phone && (
-                  <div>
-                    <label className="label">Телефон</label>
-                    <input type="text" value={myCompany.phone} disabled className="input-field opacity-60" />
-                  </div>
-                )}
-                {myCompany.email && (
-                  <div>
-                    <label className="label">Email</label>
-                    <input type="text" value={myCompany.email} disabled className="input-field opacity-60" />
-                  </div>
-                )}
-              </div>
 
-              {myCompany.address && (
-                <div className="mt-6">
-                  <label className="label">Адрес</label>
-                  <input type="text" value={myCompany.address} disabled className="input-field opacity-60" />
+                  {/* Link to full company page */}
+                  <Link
+                    to="/my-company"
+                    className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/20 text-[var(--accent)] text-base font-medium transition-all"
+                  >
+                    Подробнее о компании <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </>
+              ) : (
+                <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-12 text-center">
+                  <Building2 className="w-12 h-12 text-[var(--text-primary)]/15 mx-auto mb-4" />
+                  <p className="text-[var(--text-primary)]/50 text-base">Компания не найдена</p>
+                  <p className="text-[var(--text-primary)]/30 text-sm mt-1">Вы не привязаны ни к одной компании</p>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Security Tab */}
-          {activeTab === 'security' && (
-            <div className="glass-card-static p-6">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-6">Безопасность</h3>
-
-              <div className="space-y-6 animate-in fade-in duration-500">
-                <div className="p-4 rounded-xl bg-[var(--hover-1)] border border-white/5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[var(--success)]/8 flex items-center justify-center">
-                        <Check className="w-5 h-5 text-[var(--success)]" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-[var(--text-primary)]">Пароль</p>
-                        <p className="text-sm text-[var(--text-primary)]/50">Установлен</p>
-                      </div>
-                    </div>
-                    <button className="btn-secondary text-sm">Изменить</button>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-[var(--hover-1)] border border-white/5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[var(--warning)]/8 flex items-center justify-center">
-                        <Shield className="w-5 h-5 text-[var(--warning)]" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-[var(--text-primary)]">Двухфакторная аутентификация</p>
-                        <p className="text-sm text-[var(--text-primary)]/50">Не настроена</p>
-                      </div>
-                    </div>
-                    <button className="btn-secondary text-sm">Настроить</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Notifications Tab */}
-          {activeTab === 'notifications' && (
-            <div className="glass-card-static p-6">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-6">Настройки уведомлений</h3>
-
-              <div className="space-y-4">
-                {[
-                  { label: 'Новая заявка', desc: 'Уведомления о новых заявках' },
-                  { label: 'Назначение заявки', desc: 'Когда вам назначают заявку' },
-                  { label: 'Новый комментарий', desc: 'Комментарии в ваших заявках' },
-                  { label: 'Решение заявки', desc: 'Когда заявка решена' },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-[var(--hover-1)] border border-white/5">
-                    <div>
-                      <p className="font-medium text-[var(--text-primary)]">{item.label}</p>
-                      <p className="text-sm text-[var(--text-primary)]/50">{item.desc}</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" defaultChecked className="sr-only peer" />
-                      <div className="w-11 h-6 bg-[var(--hover-1)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]"></div>
-                    </label>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
         </div>
