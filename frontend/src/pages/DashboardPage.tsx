@@ -1,1097 +1,679 @@
 // pages/DashboardPage.tsx
-
-import { useEffect, useMemo, useState, type PropsWithChildren } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowRight,
-  BarChart3,
-  Building2,
-  CheckCircle2,
-  ChevronRight,
-  CloudSun,
-  FileText,
-  Flame,
-  FolderOpen,
-  Loader2,
-  Moon,
-  Package,
-  Plus,
-  Search,
-  Sparkles,
-  Sun,
-  Ticket,
-  Timer,
-  UserCheck,
+  ArrowRight, Building2, CheckCircle2, ChevronRight, CloudSun, FileText,
+  Flame, FolderOpen, Moon, Package, Plus, Search, Sun,
+  Ticket as TicketIcon, Timer, TrendingDown, TrendingUp, UserCheck,
 } from 'lucide-react';
-
 import { useAuthStore } from '../stores/authStore';
-import {
-  ticketsApi,
-  counterpartiesApi,
-  projectsApi,
-  productsApi,
-} from '../api/client';
+import { ticketsApi, counterpartiesApi, projectsApi, productsApi } from '../api/client';
+import type { TicketListItem, Counterparty, Project } from '../types';
+import GridBackground from '../components/ui/GridBackground';
 
-import type {
-  TicketListItem,
-  Counterparty,
-  Project,
-} from '../types';
+/* ═══════════════════════════════════════════════════════════════════
+   ДИЗАЙН-ТОКЕНЫ — единственный источник правды.
+   Не пиши стили «на глаз», бери отсюда.
 
-/* -------------------------------------------------------------------------- */
-/* Русификация                                                                */
-/* -------------------------------------------------------------------------- */
+   Отступы:  4 · 8 · 16 · 24 · 32 · 48 · 64      (шкала 8pt)
+   Радиусы:  карточка 16px (2xl) · элемент 12px (xl) · мелочь 8px (lg) · пилюля full
+   Текст:    12 (meta) · 14 (secondary) · 16 (body) · 18 (title) · 30/36 (hero)
+   Цвет:     ровно 3 уровня — 100% / 60% / 40%. Больше НЕЛЬЗЯ.
+   Иконки:   16px в тексте · 20px в кнопках. Больше нигде.
+   ═══════════════════════════════════════════════════════════════════ */
+
+const T_MAIN = 'text-[var(--text-primary)]';
+const T_SOFT = 'text-[var(--text-primary)]/60';
+const T_MUTE = 'text-[var(--text-primary)]/40';
+
+const CARD = 'rounded-2xl border border-[var(--border-color)]';
+const CARD_HEAD =
+  'flex h-16 shrink-0 items-center justify-between gap-4 border-b border-[var(--border-color)] px-6';
+const ROW =
+  'group flex items-center gap-4 px-6 py-4 transition-colors duration-150 hover:bg-[var(--hover-1)]';
+const PILL = 'inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium';
+
+/* ═══════════════════════════════════════════════════════════════════
+   СЛОВАРИ
+   ═══════════════════════════════════════════════════════════════════ */
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  new: {
-    label: 'Новый',
-    color: 'status-new',
-  },
-  pending_approval: {
-    label: 'На согласовании',
-    color: 'status-agreement',
-  },
-  open: {
-    label: 'Открыт',
-    color: 'status-open',
-  },
-  in_progress: {
-    label: 'В работе',
-    color: 'status-progress',
-  },
-  waiting: {
-    label: 'Ожидает ответа',
-    color: 'status-waiting',
-  },
-  resolved: {
-    label: 'Решён',
-    color: 'status-resolved',
-  },
-  closed: {
-    label: 'Закрыт',
-    color: 'status-closed',
-  },
-  reopened: {
-    label: 'Переоткрыт',
-    color: 'status-reopened',
-  },
-  rejected: {
-    label: 'Отклонён',
-    color: 'status-rejected',
-  },
+  new: { label: 'Новый', color: 'status-new' },
+  pending_approval: { label: 'На согласовании', color: 'status-agreement' },
+  open: { label: 'Открыт', color: 'status-open' },
+  in_progress: { label: 'В работе', color: 'status-progress' },
+  waiting: { label: 'Ожидает ответа', color: 'status-waiting' },
+  resolved: { label: 'Решён', color: 'status-resolved' },
+  closed: { label: 'Закрыт', color: 'status-closed' },
+  reopened: { label: 'Переоткрыт', color: 'status-reopened' },
+  rejected: { label: 'Отклонён', color: 'status-rejected' },
 };
 
-const PRIORITY_MAP: Record<
-  string,
-  {
-    label: string;
-    color: string;
-    bar: string;
-  }
-> = {
-  low: {
-    label: 'Низкий',
-    color: 'priority-low',
-    bar: 'status-bar-resolved',
-  },
-  medium: {
-    label: 'Средний',
-    color: 'priority-medium',
-    bar: 'status-bar-progress',
-  },
-  high: {
-    label: 'Высокий',
-    color: 'priority-high',
-    bar: 'status-bar-waiting',
-  },
-  critical: {
-    label: 'Критический',
-    color: 'priority-critical',
-    bar: 'status-bar-reopened',
-  },
+const PRIORITY_MAP: Record<string, { label: string; bar: string }> = {
+  low: { label: 'Низкий', bar: 'status-bar-resolved' },
+  medium: { label: 'Средний', bar: 'status-bar-progress' },
+  high: { label: 'Высокий', bar: 'status-bar-waiting' },
+  critical: { label: 'Критический', bar: 'status-bar-reopened' },
 };
 
-const getStatusLabel = (status: string) =>
-  STATUS_MAP[status]?.label || status;
+const statusLabel = (s: string) => STATUS_MAP[s]?.label ?? s;
+const statusColor = (s: string) => STATUS_MAP[s]?.color ?? 'status-closed';
+const priorityLabel = (p: string) => PRIORITY_MAP[p]?.label ?? p;
+const priorityBar = (p: string) => PRIORITY_MAP[p]?.bar ?? 'status-bar-progress';
 
-const getStatusColor = (status: string) =>
-  STATUS_MAP[status]?.color || 'status-closed';
+/* ═══════════════════════════════════════════════════════════════════
+   УТИЛИТЫ
+   ═══════════════════════════════════════════════════════════════════ */
 
-const getPriorityLabel = (priority: string) =>
-  PRIORITY_MAP[priority]?.label || priority;
-
-const getPriorityColor = (priority: string) =>
-  PRIORITY_MAP[priority]?.color || 'priority-medium';
-
-const getPriorityBar = (priority: string) =>
-  PRIORITY_MAP[priority]?.bar || '';
-
-function toShortName(fullName: string | null | undefined): string {
+function toShortName(fullName?: string | null): string {
   if (!fullName) return '—';
-
-  const parts = fullName.trim().split(/\s+/);
-
-  if (parts.length === 1) {
-    return parts[0];
-  }
-
-  const [lastName, firstName, middleName] = parts;
-
-  const initials = [firstName, middleName]
-    .filter(Boolean)
-    .map((part) => `${part[0].toUpperCase()}.`)
-    .join('');
-
-  return initials ? `${lastName} ${initials}` : lastName;
+  const [last, first, middle] = fullName.trim().split(/\s+/);
+  const initials = [first, middle].filter(Boolean).map((p) => `${p[0].toUpperCase()}.`).join('');
+  return initials ? `${last} ${initials}` : last;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Вспомогательные компоненты                                                 */
-/* -------------------------------------------------------------------------- */
+/** Русское склонение: plural(3, 'заявка', 'заявки', 'заявок') */
+function plural(n: number, one: string, few: string, many: string) {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
+  return many;
+}
 
-const Panel = ({
-  children,
-  className = '',
-}: PropsWithChildren<{ className?: string }>) => {
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 6) return { text: 'Доброй ночи', Icon: Moon };
+  if (h < 12) return { text: 'Доброе утро', Icon: Sun };
+  if (h < 18) return { text: 'Добрый день', Icon: CloudSun };
+  return { text: 'Добрый вечер', Icon: Moon };
+}
+
+const fmtDate = (d: string) =>
+  new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+const fmtTime = (d: string) =>
+  new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+/* ═══════════════════════════════════════════════════════════════════
+   ПРИМИТИВЫ UI
+   ═══════════════════════════════════════════════════════════════════ */
+
+function Section({
+  title, count, to, linkLabel = 'Все', children, className = '',
+}: {
+  title: string; count?: number; to?: string; linkLabel?: string;
+  children: ReactNode; className?: string;
+}) {
   return (
-    <section
-      className={[
-        'glass-card overflow-hidden rounded-2xl border border-[var(--border-color)] shadow-sm',
-        className,
-      ].join(' ')}
-    >
+    <section className={`${CARD} flex flex-col overflow-hidden ${className}`}>
+      <header className={CARD_HEAD}>
+        <div className="flex items-center gap-2.5">
+          <h2 className={`text-base font-semibold ${T_MAIN}`}>{title}</h2>
+          {count !== undefined && count > 0 && (
+            <span
+              className={`rounded-full bg-[var(--hover-1)] px-2 py-0.5 text-xs font-medium tabular-nums ${T_MUTE}`}
+            >
+              {count}
+            </span>
+          )}
+        </div>
+        {to && (
+          <Link
+            to={to}
+            className={`group inline-flex items-center gap-1.5 text-sm font-medium ${T_SOFT} transition-colors hover:text-[var(--accent)]`}
+          >
+            {linkLabel}
+            <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+          </Link>
+        )}
+      </header>
       {children}
     </section>
   );
-};
+}
 
-const getGreeting = () => {
-  const hour = new Date().getHours();
-
-  if (hour < 6) {
-    return {
-      text: 'Доброй ночи',
-      icon: Moon,
-    };
-  }
-
-  if (hour < 12) {
-    return {
-      text: 'Доброе утро',
-      icon: Sun,
-    };
-  }
-
-  if (hour < 18) {
-    return {
-      text: 'Добрый день',
-      icon: CloudSun,
-    };
-  }
-
-  return {
-    text: 'Добрый вечер',
-    icon: Moon,
-  };
-};
-
-/* -------------------------------------------------------------------------- */
-/* График активности                                                           */
-/* -------------------------------------------------------------------------- */
-
-type ChartPoint = {
-  label: string;
-  value: number;
-  isToday?: boolean;
-};
-
-const BarChart = ({ data }: { data: ChartPoint[] }) => {
-  const maxValue = Math.max(...data.map((item) => item.value), 1);
-  const total = data.reduce((sum, item) => sum + item.value, 0);
-
+function EmptyState({
+  icon: Icon, title, description, action,
+}: {
+  icon: typeof FileText; title: string; description?: string; action?: ReactNode;
+}) {
   return (
-    <div>
-      <div className="flex h-48 items-end gap-2 border-b border-[var(--border-color)]">
-        {data.map((item, index) => {
-          const hasValue = item.value > 0;
-          const height = hasValue
-            ? Math.max((item.value / maxValue) * 100, 10)
-            : 3;
-
-          return (
-            <div
-              key={`${item.label}-${index}`}
-              className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2"
-            >
-              <span
-                className={[
-                  'h-5 text-xs font-semibold tabular-nums',
-                  item.isToday
-                    ? 'text-[var(--accent)]'
-                    : 'text-[var(--text-primary)]/45',
-                ].join(' ')}
-              >
-                {hasValue ? item.value : ''}
-              </span>
-
-              <div className="flex w-full flex-1 items-end justify-center">
-                <div
-                  className={[
-                    'w-full max-w-10 rounded-t-md transition-all duration-500',
-                    item.isToday
-                      ? 'bg-[var(--accent)]'
-                      : hasValue
-                        ? 'bg-[var(--hover-2)]'
-                        : 'bg-[var(--hover-1)]',
-                  ].join(' ')}
-                  style={{ height: `${height}%` }}
-                />
-              </div>
-
-              <span
-                className={[
-                  'text-xs font-medium',
-                  item.isToday
-                    ? 'text-[var(--accent)]'
-                    : 'text-[var(--text-primary)]/40',
-                ].join(' ')}
-              >
-                {item.label}
-              </span>
-            </div>
-          );
-        })}
+    <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--hover-1)]">
+        <Icon className={`h-5 w-5 ${T_MUTE}`} />
       </div>
-
-      <p className="mt-4 text-sm text-[var(--text-primary)]/40">
-        {total > 0
-          ? `${total} заявок за последние 7 дней`
-          : 'Нет активности за последние 7 дней'}
-      </p>
+      <p className={`text-base font-medium ${T_MAIN}`}>{title}</p>
+      {description && (
+        <p className={`mt-2 max-w-[280px] text-sm leading-relaxed ${T_MUTE}`}>{description}</p>
+      )}
+      {action && <div className="mt-6">{action}</div>}
     </div>
   );
-};
+}
 
-/* -------------------------------------------------------------------------- */
-/* Основной компонент                                                          */
-/* -------------------------------------------------------------------------- */
+function StatCard({
+  label, value, hint, icon: Icon, trend, highlight = false,
+}: {
+  label: string; value: number; hint: string; icon: typeof TicketIcon;
+  trend?: { value: number; up: boolean; suffix?: string } | null;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className={`${CARD} p-6 transition-colors duration-200 hover:border-[var(--border-hover,var(--accent))]`}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <span className={`text-sm font-medium ${T_SOFT}`}>{label}</span>
+        <Icon className={`h-4 w-4 shrink-0 ${highlight ? 'text-[var(--accent)]' : T_MUTE}`} />
+      </div>
 
-export default function DashboardPage() {
-  const navigate = useNavigate();
-  const { user } = useAuthStore();
+      <div className="mt-6 flex items-baseline gap-3">
+        <span className={`text-4xl font-semibold leading-none tracking-tight tabular-nums ${T_MAIN}`}>
+          {value}
+        </span>
+        {trend && (
+          <span
+            className={`inline-flex items-center gap-1 text-sm font-medium tabular-nums ${
+              trend.up ? 'text-[var(--success)]' : 'text-[var(--accent)]'
+            }`}
+          >
+            {trend.up ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+            {trend.value}
+            {trend.suffix}
+          </span>
+        )}
+      </div>
 
-  const [tickets, setTickets] = useState<TicketListItem[]>([]);
-  const [counterparty, setCounterparty] =
-    useState<Counterparty | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
-  const [productsCount, setProductsCount] = useState(0);
+      <p className={`mt-2 text-sm ${T_MUTE}`}>{hint}</p>
+    </div>
+  );
+}
 
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+function WeekChart({ data }: { data: { label: string; value: number; isToday: boolean }[] }) {
+  const max = Math.max(...data.map((d) => d.value), 1);
+  const total = data.reduce((s, d) => s + d.value, 0);
 
-  const userRoles = user?.roles ?? [];
-
-  const isCustomer =
-    userRoles.includes('customer') ||
-    userRoles.includes('customer_admin');
-
-  const isSupport =
-    userRoles.includes('admin') ||
-    userRoles.includes('support_manager') ||
-    userRoles.includes('support_agent');
-
-  const greeting = useMemo(() => getGreeting(), []);
-  const GreetingIcon = greeting.icon;
-
-  const displayName =
-    user?.full_name ||
-    user?.username ||
-    'коллега';
-
-  /* ------------------------------------------------------------------------ */
-  /* Загрузка данных                                                          */
-  /* ------------------------------------------------------------------------ */
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadData = async () => {
-      try {
-        const ticketsPromise: Promise<TicketListItem[]> =
-          ticketsApi
-            .getAll(1, 100)
-            .then((response) => response.items ?? [])
-            .catch(() => []);
-
-        const projectsPromise: Promise<Project[]> = (
-          isCustomer
-            ? projectsApi.getMyProjects('all', 1, 5)
-            : projectsApi.getAll(1, 5)
-        )
-          .then((response) => response.items ?? [])
-          .catch(() => []);
-
-        const counterpartyPromise: Promise<Counterparty | null> =
-          isCustomer && user?.counterparty_id
-            ? counterpartiesApi
-                .getById(user.counterparty_id)
-                .catch(() => null)
-            : Promise.resolve(null);
-
-        const counterpartiesPromise: Promise<Counterparty[]> = isSupport
-          ? counterpartiesApi
-              .getAll(1, 5)
-              .then((response) => response.items ?? [])
-              .catch(() => [])
-          : Promise.resolve([]);
-
-        const productsPromise: Promise<number> = productsApi
-          .getProducts({
-            page: 1,
-            size: 1,
-          })
-          .then((response) => response.total_items ?? 0)
-          .catch(() => 0);
-
-        const [
-          ticketsData,
-          projectsData,
-          counterpartyData,
-          counterpartiesData,
-          productsTotal,
-        ] = await Promise.all([
-          ticketsPromise,
-          projectsPromise,
-          counterpartyPromise,
-          counterpartiesPromise,
-          productsPromise,
-        ]);
-
-        if (cancelled) return;
-
-        setTickets(ticketsData);
-        setProjects(projectsData);
-        setCounterparty(counterpartyData);
-        setCounterparties(counterpartiesData);
-        setProductsCount(productsTotal);
-      } catch (error) {
-        console.error('Dashboard load error:', error);
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void loadData();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    isCustomer,
-    isSupport,
-    user?.counterparty_id,
-  ]);
-
-  /* ------------------------------------------------------------------------ */
-  /* Статистика                                                                */
-  /* ------------------------------------------------------------------------ */
-
-  const stats = {
-    total: tickets.length,
-
-    new: tickets.filter(
-      (ticket) => ticket.status === 'new',
-    ).length,
-
-    inProgress: tickets.filter((ticket) =>
-      [
-        'pending_approval',
-        'open',
-        'in_progress',
-        'waiting',
-      ].includes(ticket.status),
-    ).length,
-
-    critical: tickets.filter(
-      (ticket) =>
-        ticket.priority === 'critical' &&
-        !['resolved', 'closed'].includes(ticket.status),
-    ).length,
-
-    resolved: tickets.filter((ticket) =>
-      ['resolved', 'closed'].includes(ticket.status),
-    ).length,
-
-    waiting: tickets.filter(
-      (ticket) => ticket.status === 'waiting',
-    ).length,
-  };
-
-  const resolvePercent =
-    stats.total > 0
-      ? Math.round((stats.resolved / stats.total) * 100)
-      : 0;
-
-  /* ------------------------------------------------------------------------ */
-  /* Активность за последние 7 дней                                           */
-  /* ------------------------------------------------------------------------ */
-
-  const ticketsLast7Days = useMemo<ChartPoint[]>(() => {
-    const today = new Date();
-
-    today.setHours(0, 0, 0, 0);
-
-    const firstDay = new Date(today);
-    firstDay.setDate(firstDay.getDate() - 6);
-
-    return Array.from({ length: 7 }, (_, index) => {
-      const dayStart = new Date(firstDay);
-      dayStart.setDate(firstDay.getDate() + index);
-
-      const dayEnd = new Date(dayStart);
-      dayEnd.setDate(dayStart.getDate() + 1);
-
-      const value = tickets.filter((ticket) => {
-        const createdAt = new Date(ticket.created_at).getTime();
-
-        return (
-          createdAt >= dayStart.getTime() &&
-          createdAt < dayEnd.getTime()
-        );
-      }).length;
-
-      const shortWeekday = dayStart
-        .toLocaleDateString('ru-RU', {
-          weekday: 'short',
-        })
-        .replace('.', '');
-
-      const label =
-        shortWeekday.charAt(0).toUpperCase() +
-        shortWeekday.slice(1);
-
-      return {
-        label,
-        value,
-        isToday: index === 6,
-      };
-    });
-  }, [tickets]);
-
-  const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString('ru-RU', {
-      day: 'numeric',
-      month: 'short',
-    });
-
-  const formatTime = (date: string) =>
-    new Date(date).toLocaleTimeString('ru-RU', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-
-  const handleSearch = () => {
-    const query = searchQuery.trim();
-
-    if (!query) return;
-
-    navigate(`/tickets?search=${encodeURIComponent(query)}`);
-  };
-
-  const displayedTickets = tickets.slice(0, 7);
-
-  const statCards = [
-    {
-      label: 'Всего заявок',
-      value: stats.total,
-      description:
-        stats.new > 0
-          ? `${stats.new} новых`
-          : 'Новых заявок нет',
-      icon: Ticket,
-      iconColor: 'text-[var(--info)]',
-      iconBackground: 'bg-[var(--info)]/10',
-    },
-    {
-      label: 'Активные заявки',
-      value: stats.inProgress,
-      description: 'Требуют внимания',
-      icon: Timer,
-      iconColor: 'text-[var(--status-open-text)]',
-      iconBackground: 'bg-[var(--status-open-bg)]',
-    },
-    {
-      label: 'Критические',
-      value: stats.critical,
-      description:
-        stats.critical > 0
-          ? 'Нужно проверить в первую очередь'
-          : 'Критичных заявок нет',
-      icon: Flame,
-      iconColor: 'text-[var(--accent)]',
-      iconBackground: 'bg-[var(--accent-soft)]',
-    },
-    {
-      label: 'Решено',
-      value: stats.resolved,
-      description: `${resolvePercent}% от загруженных заявок`,
-      icon: CheckCircle2,
-      iconColor: 'text-[var(--success)]',
-      iconBackground: 'bg-[var(--success)]/10',
-    },
-  ];
-
-  if (loading) {
+  if (total === 0) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
-        <Loader2 className="h-9 w-9 animate-spin text-[var(--accent)]" />
-
-        <p className="text-base text-[var(--text-primary)]/45">
-          Загружаем данные…
-        </p>
+      <div className={`flex h-[132px] items-center justify-center text-sm ${T_MUTE}`}>
+        Нет активности за неделю
       </div>
     );
   }
 
   return (
-    <main className="mx-auto max-w-[1600px] space-y-8 pb-8 animate-in fade-in duration-500">
-      {/* ------------------------------------------------------------------ */}
-      {/* Верхний блок                                                        */}
-      {/* ------------------------------------------------------------------ */}
+    <div className="flex h-[132px] items-end gap-2">
+      {data.map((d) => (
+        <div
+          key={d.label}
+          className="flex flex-1 flex-col items-center gap-2"
+          title={`${d.label}: ${d.value}`}
+        >
+          <span
+            className={`text-xs font-medium tabular-nums ${
+              d.value > 0 ? (d.isToday ? 'text-[var(--accent)]' : T_MUTE) : 'text-transparent'
+            }`}
+          >
+            {d.value || 0}
+          </span>
+          <div className="flex w-full flex-1 items-end">
+            <div
+              className={`w-full rounded-md transition-[height] duration-500 ease-out ${
+                d.isToday ? 'bg-[var(--accent)]' : 'bg-[var(--hover-2)]'
+              }`}
+              style={{ height: `${Math.max((d.value / max) * 100, 3)}%` }}
+            />
+          </div>
+          <span
+            className={`text-xs ${d.isToday ? 'font-semibold text-[var(--accent)]' : T_MUTE}`}
+          >
+            {d.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-      <header className="glass-card rounded-2xl border border-[var(--border-color)] p-6 shadow-sm lg:p-8">
-        <div className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
+const Skeleton = ({ className = '' }: { className?: string }) => (
+  <div className={`animate-pulse rounded-xl bg-[var(--hover-1)] ${className}`} />
+);
+
+/* ═══════════════════════════════════════════════════════════════════
+   СТРАНИЦА
+   ═══════════════════════════════════════════════════════════════════ */
+
+export default function DashboardPage() {
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  const [tickets, setTickets] = useState<TicketListItem[]>([]);
+  const [counterparty, setCounterparty] = useState<Counterparty | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
+  const [productsCount, setProductsCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+
+  const roles = user?.roles ?? [];
+  const isCustomer = roles.includes('customer') || roles.includes('customer_admin');
+  const isSupport =
+    roles.includes('admin') || roles.includes('support_manager') || roles.includes('support_agent');
+
+  const greeting = useMemo(getGreeting, []);
+
+  /* ── загрузка ─────────────────────────────────────── */
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        const ticketsRes = await ticketsApi.getAll(1, 100);
+        if (alive) setTickets(ticketsRes.items);
+
+        if (isCustomer && user?.counterparty_id) {
+          counterpartiesApi
+            .getById(user.counterparty_id)
+            .then((cp) => alive && setCounterparty(cp))
+            .catch(() => {});
+        }
+
+        const projectsRes = isCustomer
+          ? await projectsApi.getMyProjects('all', 1, 5).catch(() => ({ items: [] }))
+          : await projectsApi.getAll(1, 5).catch(() => ({ items: [] }));
+        if (alive) setProjects(projectsRes.items ?? []);
+
+        if (isSupport) {
+          counterpartiesApi
+            .getAll(1, 5)
+            .then((res) => alive && setCounterparties(res.items ?? []))
+            .catch(() => {});
+        }
+
+        productsApi
+          .getProducts({ page: 1, size: 1 })
+          .then((res) => alive && setProductsCount(res.total_items ?? 0))
+          .catch(() => {});
+      } catch (err) {
+        console.error('Dashboard load error:', err);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ── хоткей "/" на поиск ──────────────────────────── */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (document.activeElement?.tagName ?? '').toLowerCase();
+      if (e.key === '/' && tag !== 'input' && tag !== 'textarea') {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  /* ── производные данные ───────────────────────────── */
+  const stats = useMemo(
+    () => ({
+      total: tickets.length,
+      new: tickets.filter((t) => t.status === 'new').length,
+      inProgress: tickets.filter((t) => t.status === 'in_progress' || t.status === 'open').length,
+      critical: tickets.filter((t) => t.priority === 'critical').length,
+      resolved: tickets.filter((t) => t.status === 'resolved' || t.status === 'closed').length,
+      waiting: tickets.filter((t) => t.status === 'waiting').length,
+    }),
+    [tickets],
+  );
+
+  const resolvePct = stats.total ? Math.round((stats.resolved / stats.total) * 100) : 0;
+
+  const weekData = useMemo(() => {
+    const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    const today = new Date();
+    const todayDow = (today.getDay() + 6) % 7;
+    const counts = Array<number>(7).fill(0);
+
+    tickets.forEach((t) => {
+      const d = new Date(t.created_at);
+      const diff = Math.floor((today.getTime() - d.getTime()) / 86_400_000);
+      if (diff >= 0 && diff < 7) counts[(d.getDay() + 6) % 7]++;
+    });
+
+    return days.map((label, i) => ({ label, value: counts[i], isToday: i === todayDow }));
+  }, [tickets]);
+
+  /* Контекстная строка вместо бессмысленной даты */
+  const summaryLine = useMemo(() => {
+    const parts: string[] = [];
+    if (stats.new)
+      parts.push(`${stats.new} ${plural(stats.new, 'новая заявка', 'новые заявки', 'новых заявок')}`);
+    if (stats.inProgress) parts.push(`${stats.inProgress} в работе`);
+    if (stats.critical)
+      parts.push(
+        `${stats.critical} ${plural(stats.critical, 'критическая', 'критические', 'критических')}`,
+      );
+    return parts.length ? parts.join(' · ') : 'Всё под контролем — открытых задач нет';
+  }, [stats]);
+
+  const todayLabel = useMemo(
+    () =>
+      new Date().toLocaleDateString('ru-RU', {
+        weekday: 'long', day: 'numeric', month: 'long',
+      }),
+    [],
+  );
+
+  const submitSearch = () => {
+    if (query.trim()) navigate(`/tickets?search=${encodeURIComponent(query.trim())}`);
+  };
+
+  /* ── скелетон вместо спиннера ─────────────────────── */
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-[168px] rounded-2xl" />
+        <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-[164px] rounded-2xl" />
+          ))}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Skeleton className="h-[520px] rounded-2xl lg:col-span-2" />
+          <Skeleton className="h-[520px] rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
+
+  /* ═════════════════════════════════════════════════ */
+
+  return (
+    <div className="space-y-6">
+      {/* ── HERO: единственное место с декором ───────── */}
+      <header className="relative overflow-hidden rounded-2xl border border-[var(--border-color)] px-6 py-8 md:px-10 md:py-10">
+        <GridBackground variant="dots" />
+
+        <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-lg bg-[var(--hover-1)] px-3 py-2 text-sm font-medium text-[var(--text-primary)]/55">
-              <GreetingIcon className="h-4 w-4" />
-              {greeting.text}
+            <div className={`flex items-center gap-2 text-sm font-medium ${T_MUTE}`}>
+              <greeting.Icon className="h-4 w-4" />
+              <span>{greeting.text}</span>
+              <span aria-hidden className="opacity-40">·</span>
+              <span className="first-letter:uppercase">{todayLabel}</span>
             </div>
 
-            <h1 className="mt-5 text-3xl font-bold tracking-tight text-[var(--text-primary)] sm:text-4xl lg:text-[44px] lg:leading-[1.1]">
-              Привет, {displayName}
+            <h1 className={`mt-3 truncate text-3xl font-semibold tracking-tight md:text-4xl ${T_MAIN}`}>
+              {user?.full_name || user?.username || 'Главная'}
             </h1>
 
-            <p className="mt-4 text-base text-[var(--text-primary)]/50 lg:text-lg">
-              {new Date().toLocaleDateString('ru-RU', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })}
-            </p>
+            <p className={`mt-3 text-base ${T_SOFT}`}>{summaryLine}</p>
           </div>
 
-          <div className="flex w-full flex-col gap-3 sm:flex-row xl:w-auto">
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                handleSearch();
-              }}
-              className="relative w-full sm:w-72 xl:w-80"
-            >
-              <button
-                type="submit"
-                aria-label="Найти заявку"
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/40 transition-colors hover:text-[var(--accent)]"
-              >
-                <Search className="h-5 w-5" />
-              </button>
-
+          <div className="flex shrink-0 items-center gap-3">
+            <div className="relative flex-1 sm:w-72 sm:flex-none">
               <input
-                value={searchQuery}
-                onChange={(event) =>
-                  setSearchQuery(event.target.value)
-                }
+                ref={searchRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && submitSearch()}
                 placeholder="Поиск заявок"
-                className="h-12 w-full rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] pl-12 pr-4 text-base text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-primary)]/35 focus:border-[var(--accent)]"
+                className={`peer h-12 w-full rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)]
+                            pl-11 pr-12 text-base ${T_MAIN} placeholder:text-[var(--text-primary)]/40
+                            transition-colors duration-200
+                            focus:border-[var(--accent)] focus:outline-none`}
               />
-            </form>
+              <Search
+                className={`pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2
+                            ${T_MUTE} transition-colors peer-focus:text-[var(--accent)]`}
+              />
+              <kbd
+                className={`pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md
+                            border border-[var(--border-color)] px-2 py-0.5 font-mono text-xs ${T_MUTE}
+                            peer-focus:opacity-0 sm:block`}
+              >
+                /
+              </kbd>
+            </div>
 
             <button
-              type="button"
               onClick={() => navigate('/tickets/new')}
-              className="btn-primary inline-flex h-12 items-center justify-center gap-2 rounded-xl px-5 text-base font-semibold transition-transform hover:-translate-y-0.5"
+              className="btn-primary group inline-flex h-12 items-center gap-2 rounded-xl px-5 text-base font-medium"
             >
-              <Plus className="h-5 w-5" />
-              <span>Создать заявку</span>
+              <Plus className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" />
+              <span className="hidden sm:inline">Создать заявку</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Карточки статистики                                                 */}
-      {/* ------------------------------------------------------------------ */}
+      {/* ── МЕТРИКИ ──────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
+        <StatCard
+          label="Всего заявок"
+          value={stats.total}
+          hint={stats.new ? `${stats.new} новых за период` : 'новых нет'}
+          icon={TicketIcon}
+          trend={stats.new ? { value: stats.new, up: true } : null}
+        />
+        <StatCard
+          label="В работе"
+          value={stats.inProgress}
+          hint={stats.waiting ? `${stats.waiting} ждут ответа` : 'все в процессе'}
+          icon={Timer}
+        />
+        <StatCard
+          label="Критических"
+          value={stats.critical}
+          hint={stats.critical ? 'требуют внимания' : 'критичных нет'}
+          icon={Flame}
+          highlight={stats.critical > 0}
+          trend={stats.critical ? { value: stats.critical, up: false } : null}
+        />
+        <StatCard
+          label="Решено"
+          value={stats.resolved}
+          hint={`${resolvePct}% от общего числа`}
+          icon={CheckCircle2}
+          trend={resolvePct > 0 ? { value: resolvePct, up: true, suffix: '%' } : null}
+        />
+      </div>
 
-      <section
-        aria-label="Статистика"
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
-      >
-        {statCards.map((card) => {
-          const Icon = card.icon;
-
-          return (
-            <div
-              key={card.label}
-              className="glass-card rounded-2xl border border-[var(--border-color)] p-5 shadow-sm transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-[var(--border-hover)] lg:p-6"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-primary)]/50 lg:text-base">
-                    {card.label}
-                  </p>
-
-                  <p className="mt-3 text-4xl font-bold leading-none tracking-tight text-[var(--text-primary)] tabular-nums">
-                    {card.value}
-                  </p>
-                </div>
-
-                <div
-                  className={[
-                    'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl',
-                    card.iconBackground,
-                  ].join(' ')}
+      {/* ── КОНТЕНТ ──────────────────────────────────── */}
+      <div className="grid items-start gap-6 lg:grid-cols-3">
+        {/* ЛЕВО — заявки */}
+        <Section title="Последние заявки" count={tickets.length} to="/tickets" className="lg:col-span-2">
+          {tickets.length === 0 ? (
+            <EmptyState
+              icon={FileText}
+              title="Заявок пока нет"
+              description="Создайте первую заявку — она появится здесь вместе со статусом и исполнителем."
+              action={
+                <button
+                  onClick={() => navigate('/tickets/new')}
+                  className="btn-primary inline-flex h-11 items-center gap-2 rounded-xl px-5 text-base font-medium"
                 >
-                  <Icon className={`h-5 w-5 ${card.iconColor}`} />
-                </div>
-              </div>
-
-              <p className="mt-5 min-h-5 text-sm leading-5 text-[var(--text-primary)]/40">
-                {card.description}
-              </p>
-            </div>
-          );
-        })}
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Основной контент                                                    */}
-      {/* ------------------------------------------------------------------ */}
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Последние заявки */}
-        <Panel className="lg:col-span-2">
-          <div className="flex items-center justify-between gap-4 border-b border-[var(--border-color)] px-6 py-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft)]">
-                <Ticket className="h-5 w-5 text-[var(--accent)]" />
-              </div>
-
-              <div>
-                <h2 className="text-lg font-bold text-[var(--text-primary)]">
-                  Последние заявки
-                </h2>
-
-                <p className="mt-0.5 text-sm text-[var(--text-primary)]/40">
-                  {tickets.length > 0
-                    ? 'Недавняя активность по обращениям'
-                    : 'Здесь появятся ваши обращения'}
-                </p>
-              </div>
-            </div>
-
-            <Link
-              to="/tickets"
-              className="group inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-[var(--accent)] transition-colors hover:text-[var(--accent-hover)] lg:text-base"
-            >
-              Все заявки
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-          </div>
-
-          {displayedTickets.length === 0 ? (
-            <div className="px-6 py-16 text-center lg:py-20">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--hover-1)]">
-                <FileText className="h-8 w-8 text-[var(--text-primary)]/20" />
-              </div>
-
-              <h3 className="mt-5 text-lg font-semibold text-[var(--text-primary)]">
-                Заявок пока нет
-              </h3>
-
-              <p className="mx-auto mt-2 max-w-sm text-base leading-6 text-[var(--text-primary)]/45">
-                Создайте первую заявку, чтобы начать работу с поддержкой.
-              </p>
-
-              <button
-                type="button"
-                onClick={() => navigate('/tickets/new')}
-                className="btn-primary mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-base font-semibold"
-              >
-                <Sparkles className="h-4 w-4" />
-                Создать заявку
-              </button>
-            </div>
+                  <Plus className="h-5 w-5" />
+                  Создать заявку
+                </button>
+              }
+            />
           ) : (
             <div className="divide-y divide-[var(--border-color)]">
-              {displayedTickets.map((ticket) => (
-                <Link
-                  key={ticket.id}
-                  to={`/tickets/${ticket.number}`}
-                  className="group relative flex gap-4 px-5 py-5 transition-colors hover:bg-[var(--hover-1)] lg:px-6"
-                >
-                  <div
-                    className={[
-                      'absolute inset-y-5 left-0 w-1 rounded-r-full opacity-70 transition-opacity group-hover:opacity-100',
-                      getPriorityBar(ticket.priority),
-                    ].join(' ')}
+              {tickets.slice(0, 8).map((ticket) => (
+                <Link key={ticket.id} to={`/tickets/${ticket.number}`} className={ROW}>
+                  {/* приоритет — только цветной штрих, без второй пилюли */}
+                  <span
+                    title={`Приоритет: ${priorityLabel(ticket.priority)}`}
+                    className={`h-10 w-1 shrink-0 rounded-full ${priorityBar(ticket.priority)}`}
                   />
 
-                  <div className="min-w-0 flex-1 pl-2">
-                    <div className="flex items-start justify-between gap-4">
-                      <p className="min-w-0 flex-1 truncate text-base font-semibold text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent)]">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2.5">
+                      <span className={`shrink-0 font-mono text-xs ${T_MUTE}`}>#{ticket.number}</span>
+                      <span
+                        className={`truncate text-base font-medium ${T_MAIN} transition-colors group-hover:text-[var(--accent)]`}
+                      >
                         {ticket.title}
-                      </p>
-
-                      <div className="hidden shrink-0 text-right sm:block">
-                        <p className="text-sm text-[var(--text-primary)]/50">
-                          {formatDate(ticket.created_at)}
-                        </p>
-
-                        <p className="mt-0.5 text-xs text-[var(--text-primary)]/30">
-                          {formatTime(ticket.created_at)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-sm text-[var(--text-primary)]/45">
-                        #{ticket.number}
-                      </span>
-
-                      <span
-                        className={[
-                          'rounded-md border px-2 py-1 text-xs font-medium',
-                          getStatusColor(ticket.status),
-                        ].join(' ')}
-                      >
-                        {getStatusLabel(ticket.status)}
-                      </span>
-
-                      <span
-                        className={[
-                          'rounded-md border px-2 py-1 text-xs font-medium',
-                          getPriorityColor(ticket.priority),
-                        ].join(' ')}
-                      >
-                        {getPriorityLabel(ticket.priority)}
                       </span>
                     </div>
 
-                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--text-primary)]/40">
+                    <div className={`mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs ${T_MUTE}`}>
+                      <span className={`${PILL} ${statusColor(ticket.status)}`}>
+                        {statusLabel(ticket.status)}
+                      </span>
                       {ticket.counterparty?.name && (
-                        <span className="flex min-w-0 max-w-[180px] items-center gap-1.5">
+                        <span className="hidden max-w-[160px] items-center gap-1.5 sm:flex">
                           <Building2 className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">
-                            {ticket.counterparty.name}
-                          </span>
+                          <span className="truncate">{ticket.counterparty.name}</span>
                         </span>
                       )}
-
                       {ticket.project?.key && (
-                        <span className="flex items-center gap-1.5 font-mono">
+                        <span className="hidden items-center gap-1.5 font-mono md:flex">
                           <FolderOpen className="h-3.5 w-3.5 shrink-0" />
                           {ticket.project.key}
                         </span>
                       )}
-
                       {ticket.assignee?.full_name && (
-                        <span className="flex min-w-0 max-w-[160px] items-center gap-1.5">
+                        <span className="hidden items-center gap-1.5 md:flex">
                           <UserCheck className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">
-                            {toShortName(ticket.assignee.full_name)}
-                          </span>
+                          {toShortName(ticket.assignee.full_name)}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-[var(--text-primary)]/20 transition-all group-hover:translate-x-0.5 group-hover:text-[var(--accent)]" />
+                  <div className="hidden shrink-0 text-right sm:block">
+                    <p className={`text-sm ${T_SOFT}`}>{fmtDate(ticket.created_at)}</p>
+                    <p className={`mt-0.5 text-xs ${T_MUTE}`}>{fmtTime(ticket.created_at)}</p>
+                  </div>
+
+                  <ChevronRight
+                    className={`h-4 w-4 shrink-0 ${T_MUTE} transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-[var(--accent)]`}
+                  />
                 </Link>
               ))}
             </div>
           )}
-        </Panel>
+        </Section>
 
-        {/* Правая колонка */}
+        {/* ПРАВО — сайдбар */}
         <div className="space-y-6">
           {/* Активность */}
-          <Panel className="p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-bold text-[var(--text-primary)]">
-                  Активность
-                </h2>
-
-                <p className="mt-1 text-sm text-[var(--text-primary)]/40">
-                  Заявки за последние 7 дней
-                </p>
-              </div>
-
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--hover-1)]">
-                <BarChart3 className="h-5 w-5 text-[var(--text-primary)]/50" />
-              </div>
+          <Section title="Активность за неделю">
+            <div className="p-6">
+              <WeekChart data={weekData} />
             </div>
-
-            <div className="mt-6">
-              <BarChart data={ticketsLast7Days} />
-            </div>
-          </Panel>
+          </Section>
 
           {/* Проекты */}
-          <Panel>
-            <div className="flex items-center justify-between gap-4 border-b border-[var(--border-color)] px-6 py-5">
-              <div>
-                <h2 className="text-lg font-bold text-[var(--text-primary)]">
-                  Проекты
-                </h2>
-
-                <p className="mt-1 text-sm text-[var(--text-primary)]/40">
-                  Недавние проекты
-                </p>
-              </div>
-
-              <Link
-                to="/projects"
-                className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent)]"
-              >
-                Все
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-
+          <Section title="Проекты" count={projects.length} to="/projects">
             {projects.length === 0 ? (
-              <div className="px-6 py-10 text-center">
-                <FolderOpen className="mx-auto h-10 w-10 text-[var(--text-primary)]/15" />
-
-                <p className="mt-3 text-base text-[var(--text-primary)]/45">
-                  Проектов пока нет
-                </p>
-              </div>
+              <EmptyState icon={FolderOpen} title="Нет проектов" />
             ) : (
               <div className="divide-y divide-[var(--border-color)]">
-                {projects.slice(0, 4).map((project) => (
-                  <Link
-                    key={project.id}
-                    to={`/projects/${project.id}`}
-                    className="group flex items-center gap-3 px-6 py-4 transition-colors hover:bg-[var(--hover-1)]"
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--status-open-bg)]">
-                      <FolderOpen className="h-5 w-5 text-[var(--status-open-text)]" />
-                    </div>
-
+                {projects.slice(0, 4).map((proj) => (
+                  <Link key={proj.id} to={`/projects/${proj.id}`} className={ROW}>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-base font-medium text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent)]">
-                        {project.name}
+                      <p
+                        className={`truncate text-base font-medium ${T_MAIN} transition-colors group-hover:text-[var(--accent)]`}
+                      >
+                        {proj.name}
                       </p>
-
-                      <div className="mt-1 flex items-center gap-2">
-                        <span className="font-mono text-sm text-[var(--text-primary)]/40">
-                          {project.key}
-                        </span>
-
+                      <div className="mt-1.5 flex items-center gap-3">
+                        <span className={`font-mono text-xs ${T_MUTE}`}>{proj.key}</span>
                         <span
-                          className={[
-                            'rounded border px-1.5 py-0.5 text-xs font-medium',
-                            project.status === 'active'
-                              ? 'status-resolved'
-                              : 'status-closed',
-                          ].join(' ')}
+                          className={`${PILL} ${proj.status === 'active' ? 'status-resolved' : 'status-closed'}`}
                         >
-                          {project.status === 'active'
-                            ? 'Активен'
-                            : 'Архив'}
+                          {proj.status === 'active' ? 'Активен' : 'Архив'}
                         </span>
                       </div>
                     </div>
-
-                    <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-primary)]/20 transition-colors group-hover:text-[var(--accent)]" />
+                    <ChevronRight
+                      className={`h-4 w-4 shrink-0 ${T_MUTE} transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-[var(--accent)]`}
+                    />
                   </Link>
                 ))}
               </div>
             )}
-          </Panel>
+          </Section>
 
-          {/* Контрагенты для поддержки */}
+          {/* Контрагенты — только для саппорта */}
           {isSupport && counterparties.length > 0 && (
-            <Panel>
-              <div className="flex items-center justify-between gap-4 border-b border-[var(--border-color)] px-6 py-5">
-                <div>
-                  <h2 className="text-lg font-bold text-[var(--text-primary)]">
-                    Контрагенты
-                  </h2>
-
-                  <p className="mt-1 text-sm text-[var(--text-primary)]/40">
-                    Последние организации
-                  </p>
-                </div>
-
-                <Link
-                  to="/counterparties"
-                  className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent)]"
-                >
-                  Все
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-
+            <Section title="Контрагенты" count={counterparties.length} to="/counterparties">
               <div className="divide-y divide-[var(--border-color)]">
-                {counterparties.slice(0, 3).map((item) => (
-                  <Link
-                    key={item.id}
-                    to={`/counterparties/${item.id}`}
-                    className="group flex items-center gap-3 px-6 py-4 transition-colors hover:bg-[var(--hover-1)]"
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--status-waiting-bg)]">
-                      <Building2 className="h-5 w-5 text-[var(--status-waiting-text)]" />
-                    </div>
-
+                {counterparties.slice(0, 3).map((cp) => (
+                  <Link key={cp.id} to={`/counterparties/${cp.id}`} className={ROW}>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-base font-medium text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent)]">
-                        {item.name}
+                      <p
+                        className={`truncate text-base font-medium ${T_MAIN} transition-colors group-hover:text-[var(--accent)]`}
+                      >
+                        {cp.name}
                       </p>
-
-                      {item.inn && (
-                        <p className="mt-1 font-mono text-sm text-[var(--text-primary)]/40">
-                          ИНН {item.inn}
-                        </p>
-                      )}
+                      {cp.inn && <p className={`mt-1 font-mono text-xs ${T_MUTE}`}>ИНН {cp.inn}</p>}
                     </div>
-
-                    <span
-                      className={[
-                        'shrink-0 rounded-md border px-2 py-1 text-xs font-medium',
-                        item.is_active
-                          ? 'status-resolved'
-                          : 'status-closed',
-                      ].join(' ')}
-                    >
-                      {item.is_active ? 'Активен' : 'Неактивен'}
+                    <span className={`${PILL} shrink-0 ${cp.is_active ? 'status-resolved' : 'status-closed'}`}>
+                      {cp.is_active ? 'Активен' : 'Неактивен'}
                     </span>
                   </Link>
                 ))}
               </div>
-            </Panel>
+            </Section>
           )}
 
-          {/* Компания клиента */}
+          {/* Моя компания — для клиента */}
           {isCustomer && counterparty && (
-            <Panel className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--accent)]">
-                  <Building2 className="h-6 w-6 text-white" />
+            <Section title="Моя компания" to="/my-company" linkLabel="Подробнее">
+              <div className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)]">
+                    <Building2 className="h-5 w-5 text-[var(--accent)]" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`truncate text-base font-medium ${T_MAIN}`}>{counterparty.name}</p>
+                    <p className={`mt-1 text-sm ${T_MUTE}`}>{counterparty.counterparty_type}</p>
+                  </div>
                 </div>
 
-                <div className="min-w-0">
-                  <p className="text-sm text-[var(--text-primary)]/40">
-                    Ваша компания
-                  </p>
-
-                  <h2 className="mt-1 truncate text-lg font-bold text-[var(--text-primary)]">
-                    {counterparty.name}
-                  </h2>
-                </div>
+                <dl className="mt-6 border-t border-[var(--border-color)] pt-6">
+                  <div className="flex items-center justify-between text-sm">
+                    <dt className={T_MUTE}>ИНН</dt>
+                    <dd className={`font-mono ${T_SOFT}`}>{counterparty.inn}</dd>
+                  </div>
+                </dl>
               </div>
-
-              <div className="mt-6 space-y-3 border-t border-[var(--border-color)] pt-5">
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-[var(--text-primary)]/45">
-                    Тип
-                  </span>
-
-                  <span className="text-right text-sm font-medium text-[var(--text-primary)]/75">
-                    {counterparty.counterparty_type || 'Организация'}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-[var(--text-primary)]/45">
-                    ИНН
-                  </span>
-
-                  <span className="rounded-md bg-[var(--hover-1)] px-2 py-1 font-mono text-sm text-[var(--text-primary)]/75">
-                    {counterparty.inn || '—'}
-                  </span>
-                </div>
-              </div>
-
-              <Link
-                to="/my-company"
-                className="mt-6 flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--hover-1)] px-4 text-base font-medium text-[var(--text-primary)]/70 transition-colors hover:text-[var(--text-primary)]"
-              >
-                Подробнее
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </Panel>
+            </Section>
           )}
 
-          {/* Сводка для поддержки */}
+          {/* Сводка — для саппорта */}
           {isSupport && (
-            <Panel className="p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-bold text-[var(--text-primary)]">
-                    Справочники
-                  </h2>
-
-                  <p className="mt-1 text-sm text-[var(--text-primary)]/40">
-                    Загруженные данные
-                  </p>
-                </div>
-
-                <Package className="h-5 w-5 text-[var(--text-primary)]/40" />
+            <Section title="Сводка">
+              <div className="divide-y divide-[var(--border-color)]">
+                {[
+                  { label: 'Контрагентов', value: counterparties.length, icon: Building2 },
+                  { label: 'Проектов', value: projects.length, icon: FolderOpen },
+                  { label: 'Продуктов', value: productsCount, icon: Package },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center justify-between px-6 py-4">
+                    <span className={`flex items-center gap-3 text-sm ${T_SOFT}`}>
+                      <row.icon className={`h-4 w-4 ${T_MUTE}`} />
+                      {row.label}
+                    </span>
+                    <span className={`text-base font-semibold tabular-nums ${T_MAIN}`}>{row.value}</span>
+                  </div>
+                ))}
               </div>
-
-              <div className="mt-5 space-y-2">
-                <div className="flex items-center justify-between rounded-xl px-3 py-3 transition-colors hover:bg-[var(--hover-1)]">
-                  <div className="flex items-center gap-3">
-                    <Building2 className="h-4 w-4 text-[var(--text-primary)]/45" />
-
-                    <span className="text-sm text-[var(--text-primary)]/60">
-                      Контрагенты в списке
-                    </span>
-                  </div>
-
-                  <span className="text-base font-bold text-[var(--text-primary)] tabular-nums">
-                    {counterparties.length}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between rounded-xl px-3 py-3 transition-colors hover:bg-[var(--hover-1)]">
-                  <div className="flex items-center gap-3">
-                    <FolderOpen className="h-4 w-4 text-[var(--text-primary)]/45" />
-
-                    <span className="text-sm text-[var(--text-primary)]/60">
-                      Проекты в списке
-                    </span>
-                  </div>
-
-                  <span className="text-base font-bold text-[var(--text-primary)] tabular-nums">
-                    {projects.length}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between rounded-xl px-3 py-3 transition-colors hover:bg-[var(--hover-1)]">
-                  <div className="flex items-center gap-3">
-                    <Package className="h-4 w-4 text-[var(--text-primary)]/45" />
-
-                    <span className="text-sm text-[var(--text-primary)]/60">
-                      Продуктов в каталоге
-                    </span>
-                  </div>
-
-                  <span className="text-base font-bold text-[var(--text-primary)] tabular-nums">
-                    {productsCount}
-                  </span>
-                </div>
-              </div>
-            </Panel>
+            </Section>
           )}
         </div>
       </div>
-    </main>
+    </div>
   );
 }
