@@ -125,6 +125,8 @@ services:
         condition: service_healthy
       languagetool:
         condition: service_healthy
+      rabbitmq:                          
+        condition: service_healthy       
 
   frontend:
     build:
