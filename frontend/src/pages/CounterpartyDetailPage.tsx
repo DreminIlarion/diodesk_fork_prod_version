@@ -143,6 +143,26 @@ const formatAttrValue = (v: any): string => {
   return String(v);
 };
 
+const TICKET_STATUS_LABELS: Record<string, string> = {
+  'new': 'Новый',
+  'pending_approval': 'На согласовании',
+  'open': 'Открыт',
+  'in_progress': 'В работе',
+  'waiting': 'Ожидает ответа',
+  'resolved': 'Решён',
+  'closed': 'Закрыт',
+  'reopened': 'Переоткрыт',
+  'rejected': 'Отклонён',
+  'cancelled': 'Отменён',
+};
+
+const TICKET_PRIORITY_LABELS: Record<string, string> = {
+  'low': 'Низкий',
+  'medium': 'Средний',
+  'high': 'Высокий',
+  'critical': 'Критический',
+};
+
 // ─── Модалка удаления ──
 
 function DeleteModal({ title, name, loading, onConfirm, onClose }: {
@@ -1021,22 +1041,25 @@ export default function CounterpartyDetailPage() {
 
   const canAddBranch = counterparty?.counterparty_type === 'Юридическое лицо';
 
-  const statusClr = (s: string) => ({
-    'Новый': 'bg-blue-500/15 text-[var(--info)] border-[var(--info)]/15',
-    'Открыт': 'bg-cyan-500/15 text-[var(--info)] border-cyan-500/30',
-    'В работе': 'bg-yellow-500/15 text-[var(--warning)] border-[var(--warning)]/15',
-    'Ожидает ответа': 'bg-purple-500/15 text-[var(--info)] border-[var(--info)]/15',
-    'Решён': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-    'Закрыт': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
-    'Переоткрыт': 'bg-orange-500/15 text-[var(--warning)] border-[var(--warning)]/15',
-  }[s] ?? 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15');
+const statusClr = (s: string) => ({
+  'new': 'bg-blue-500/15 text-[var(--info)] border-blue-500/30',
+  'pending_approval': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
+  'open': 'bg-cyan-500/15 text-[var(--info)] border-cyan-500/30',
+  'in_progress': 'bg-yellow-500/15 text-[var(--warning)] border-yellow-500/30',
+  'waiting': 'bg-purple-500/15 text-[var(--info)] border-purple-500/30',
+  'resolved': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+  'closed': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
+  'reopened': 'bg-orange-500/15 text-[var(--warning)] border-orange-500/30',
+  'rejected': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
+  'cancelled': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
+}[s] ?? 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15');
 
-  const priorityClr = (p: string) => ({
-    'Низкий': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-    'Средний': 'bg-yellow-500/15 text-[var(--warning)] border-[var(--warning)]/15',
-    'Высокий': 'bg-orange-500/15 text-[var(--warning)] border-[var(--warning)]/15',
-    'Критический': 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/15',
-  }[p] ?? 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15');
+const priorityClr = (p: string) => ({
+  'low': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+  'medium': 'bg-yellow-500/15 text-[var(--warning)] border-yellow-500/30',
+  'high': 'bg-orange-500/15 text-[var(--warning)] border-orange-500/30',
+  'critical': 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/15',
+}[p] ?? 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15');
 
   const fmtDate = (d: string) => new Date(d).toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const fmtDateShort = (d: string) => new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -1263,8 +1286,12 @@ export default function CounterpartyDetailPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-2 flex-wrap">
                             <span className="text-[var(--accent)] font-mono text-sm bg-[var(--accent-soft)] border border-[var(--accent)]/15 px-2 py-0.5 rounded-lg">#{ticket.number}</span>
-                            <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${statusClr(ticket.status)}`}>{ticket.status}</span>
-                            <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${priorityClr(ticket.priority)}`}>{ticket.priority}</span>
+                            <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${statusClr(ticket.status)}`}>
+                            {TICKET_STATUS_LABELS[ticket.status] || ticket.status}
+                          </span>
+                          <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${priorityClr(ticket.priority)}`}>
+                            {TICKET_PRIORITY_LABELS[ticket.priority] || ticket.priority}
+                          </span>
                           </div>
                           <p className="text-base font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)] transition-colors">{ticket.title}</p>
                           <p className="text-sm text-[var(--text-primary)]/40 mt-1">{fmtDateShort(ticket.created_at)}</p>
