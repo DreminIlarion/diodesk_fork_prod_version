@@ -263,6 +263,12 @@ export const authApi = {
     const response = await api.post<User>(`/api/v1/auth/register/${token}`, data);
     return response.data;
   },
+
+  getMyProfile: async (): Promise<User> => {
+  const response = await api.get<User>('/api/v1/users/me');
+  return response.data;
+},
+
 };
 
 // ==== Counterparties API ====
