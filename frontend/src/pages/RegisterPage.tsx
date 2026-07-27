@@ -9,8 +9,8 @@ const calculatePasswordStrength = (password: string) => {
   let strength = 0;
   const checks = {
     length: password.length >= 8,
-    hasLower: /[a-z]/.test(password),
-    hasUpper: /[A-Z]/.test(password),
+    hasLower: /[a-zа-яё]/.test(password),
+    hasUpper: /[A-ZА-ЯЁ]/.test(password),
     hasNumber: /\d/.test(password),
     hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(password),
   };
@@ -230,7 +230,7 @@ export default function RegisterPage() {
               {/* Full Name */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
-                  Полное имя
+                  Ваше ФИО
                 </label>
                 <input
                   type="text"

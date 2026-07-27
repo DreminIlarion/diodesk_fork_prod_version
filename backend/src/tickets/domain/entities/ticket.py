@@ -127,6 +127,9 @@ class Ticket(AggregateRoot):
 
         tags: list[Tag] | None = None,
     ) -> Self:
+        # Определяем статус в зависимости от роли создателя
+        status = TicketStatus.PENDING_APPROVAL if created_by_role in (UserRole.CUSTOMER, UserRole.CUSTOMER_ADMIN) else TicketStatus.NEW
+
         ticket = cls(
             created_by=created_by,
             reporter_id=reporter_id,
@@ -135,7 +138,7 @@ class Ticket(AggregateRoot):
             description=description,
             type=ticket_type,
             priority=priority,
-            status=TicketStatus.NEW,
+            status=status,
             created_by_role=created_by_role,
             project_id=project_id,
             counterparty_id=counterparty_id,

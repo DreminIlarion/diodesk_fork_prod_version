@@ -97,14 +97,14 @@ export default function ProfilePage() {
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-[var(--text-primary)]">Профиль</h1>
+        <h1 className="text-4xl font-bold text-[var(--text-primary)]">Профиль</h1>
         <p className="text-[var(--text-primary)]/50 mt-1">Управление аккаунтом и настройками</p>
       </div>
 
       <div className="grid lg:grid-cols-4 gap-6">
         {/* Sidebar */}
         <div className="lg:col-span-1">
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6">
+          <div className="bg-[var(--hover-1)] border border-[var(--border-color)] rounded-2xl p-6">
             {/* Avatar */}
             <div className="text-center mb-6">
               <div className="relative inline-block">
@@ -141,7 +141,7 @@ export default function ProfilePage() {
 
             {/* Version */}
             <div className="mt-6 pt-4 border-t border-[var(--border-color)] text-center">
-              <p className="text-xs text-[var(--text-primary)]/20">ДИО Деск v2.0.0</p>
+              <p className="text-xs text-[var(--text-primary)]/50">ДИО Деск v2.0.0</p>
             </div>
           </div>
         </div>
@@ -149,7 +149,7 @@ export default function ProfilePage() {
         {/* Content */}
         <div className="lg:col-span-3">
           {/* Profile Info */}
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
+          <div className="bg-[var(--hover-1)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
             <div className="px-6 py-5 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
@@ -173,7 +173,7 @@ export default function ProfilePage() {
                     value: roles.length > 0 ? (
                       <div className="flex flex-wrap gap-1.5">
                         {roles.map(role => (
-                          <span key={role} className="inline-block px-2.5 py-1 rounded-lg text-xs font-medium bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/10">
+                          <span key={role} className="inline-block px-2.5 py-1  text-xs font-medium  text-[var(--text-primary)] ">
                             {getRoleLabel(role)}
                           </span>
                         ))}
@@ -181,7 +181,6 @@ export default function ProfilePage() {
                     ) : '—',
                     icon: Shield,
                   },
-                  { label: 'ID', value: profile?.id, icon: Hash },
                   { label: 'Зарегистрирован', value: profile?.created_at ? new Date(profile.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) : '—', icon: Calendar },
                 ].map(field => (
                   <div key={field.label}>

@@ -168,6 +168,26 @@ const STAGE_STATUS_OPTIONS: { value: StageStatus; label: string }[] = [
   { value: 'completed', label: 'Завершён' },
 ];
 
+const TICKET_STATUS_LABELS: Record<string, string> = {
+  'new': 'Новый',
+  'pending_approval': 'На согласовании',
+  'open': 'Открыт',
+  'in_progress': 'В работе',
+  'waiting': 'Ожидает ответа',
+  'resolved': 'Решён',
+  'closed': 'Закрыт',
+  'reopened': 'Переоткрыт',
+  'rejected': 'Отклонён',
+  'cancelled': 'Отменён',
+};
+
+const TICKET_PRIORITY_LABELS: Record<string, string> = {
+  'low': 'Низкий',
+  'medium': 'Средний',
+  'high': 'Высокий',
+  'critical': 'Критический',
+};
+
 // ═══════════════════════════════════════════════════════════════════
 // УТИЛИТЫ
 // ═══════════════════════════════════════════════════════════════════
@@ -848,24 +868,25 @@ const loadMembers = useCallback(async () => {
     return name.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
   });
 
-  const statusClr = (s: string) => ({
-    'Новый': 'bg-blue-500/15 text-[var(--info)] border-blue-500/30',
-    'На согласовании': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
-    'Открыт': 'bg-[var(--info)]/15 text-[var(--info)] border-[var(--info)]/30',
-    'В работе': 'bg-yellow-500/15 text-[var(--warning)] border-yellow-500/30',
-    'Ожидает ответа': 'bg-orange-500/15 text-[var(--warning)] border-orange-500/30',
-    'Решён': 'bg-[var(--success)]/8 text-[var(--success)] border-emerald-500/30',
-    'Закрыт': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
-    'Переоткрыт': 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/15',
-  }[s] ?? 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-white/10');
+const statusClr = (s: string) => ({
+  'new': 'bg-blue-500/15 text-[var(--info)] border-blue-500/30',
+  'pending_approval': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
+  'open': 'bg-cyan-500/15 text-[var(--info)] border-cyan-500/30',
+  'in_progress': 'bg-yellow-500/15 text-[var(--warning)] border-yellow-500/30',
+  'waiting': 'bg-purple-500/15 text-[var(--info)] border-purple-500/30',
+  'resolved': 'bg-emerald-500/15 text-[var(--success)] border-emerald-500/30',
+  'closed': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
+  'reopened': 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/15',
+  'rejected': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
+  'cancelled': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
+}[s] ?? 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-white/10');
 
-  const priorityClr = (p: string) => ({
-    'Низкий': 'bg-[var(--success)]/8 text-[var(--success)] border-emerald-500/30',
-    'Средний': 'bg-yellow-500/15 text-[var(--warning)] border-yellow-500/30',
-    'Высокий': 'bg-orange-500/15 text-[var(--warning)] border-orange-500/30',
-    'Критический': 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/15',
-  }[p] ?? 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-white/10');
-
+const priorityClr = (p: string) => ({
+  'low': 'bg-[var(--success)]/8 text-[var(--success)] border-emerald-500/30',
+  'medium': 'bg-yellow-500/15 text-[var(--warning)] border-yellow-500/30',
+  'high': 'bg-orange-500/15 text-[var(--warning)] border-orange-500/30',
+  'critical': 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/15',
+}[p] ?? 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-white/10');
   // ── Render ────────────────────────────────────────────────────────
 
   if (loading) return (
@@ -1125,8 +1146,12 @@ const loadMembers = useCallback(async () => {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-2 flex-wrap">
                               <span className="text-[var(--accent)] font-mono text-sm bg-[var(--accent-soft)] border border-[var(--accent)]/15 px-2 py-0.5 rounded-lg">#{ticket.number}</span>
-                              <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${statusClr(ticket.status)}`}>{ticket.status}</span>
-                              <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${priorityClr(ticket.priority)}`}>{ticket.priority}</span>
+                              <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${statusClr(ticket.status)}`}>
+  {TICKET_STATUS_LABELS[ticket.status] || ticket.status}
+</span>
+                              <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${priorityClr(ticket.priority)}`}>
+  {TICKET_PRIORITY_LABELS[ticket.priority] || ticket.priority}
+</span>
                             </div>
                             <p className="text-[var(--text-primary)] font-medium text-base group-hover:text-[var(--accent)] truncate">{ticket.title}</p>
                             <p className="text-[var(--text-primary)]/40 text-sm mt-1">{fmtDate(ticket.created_at)}</p>
