@@ -11,13 +11,13 @@
   color-scheme: dark;
 
   /* Фоны */
-  --bg-primary:    #1c1c1c;
-  --bg-secondary:  #111111;
-  --bg-tertiary:   #161618;
-  --bg-card:       rgba(22, 22, 22, 0.95);
-  --bg-card-hover: rgba(26, 26, 26, 0.98);
-  --bg-sidebar:    #1c1c1c;
-  --bg-sidebar-inner: #1c1c1c;
+  --bg-primary:    #272727;
+  --bg-secondary:  #232323;
+  --bg-tertiary:   #252525;
+  --bg-card:       rgba(48, 48, 48, 0.95);
+  --bg-card-hover: rgba(42, 42, 42, 0.98);
+  --bg-sidebar:    #272727;
+  --bg-sidebar-inner: #272727;
 
   --bg-all: #ffffff;
 
@@ -936,10 +936,10 @@ a {
 @media (max-width: 1024px) {
   .page-container { padding: var(--space-4); }
   .page-title { font-size: var(--text-2xl); }
-  
+
   /* Таблицы */
   .table-row { grid-template-columns: 1fr !important; gap: var(--space-2); }
-  
+
   /* Карточки в сетках */
   .grid-cols-3 { grid-template-columns: repeat(2, 1fr) !important; }
   .grid-cols-4 { grid-template-columns: repeat(2, 1fr) !important; }
@@ -948,70 +948,70 @@ a {
 /* Мобильные */
 @media (max-width: 768px) {
   html { font-size: 15px; }
-  
+
   .page-container { padding: var(--space-3); }
   .page-title { font-size: var(--text-xl); }
   .page-subtitle { font-size: var(--text-xs); }
-  
+
   /* Карточки */
   .glass-card { border-radius: var(--radius-md); padding: var(--space-4) !important; }
   .stat-card { padding: var(--space-4) !important; }
-  
+
   /* Сетки */
   .grid-cols-2 { grid-template-columns: 1fr !important; }
   .grid-cols-3 { grid-template-columns: 1fr !important; }
   .grid-cols-4 { grid-template-columns: 1fr !important; }
   .lg\\:grid-cols-2 { grid-template-columns: 1fr !important; }
   .lg\\:grid-cols-3 { grid-template-columns: 1fr !important; }
-  
+
   /* Отступы */
   .space-y-8 > * + * { margin-top: var(--space-4) !important; }
   .space-y-10 > * + * { margin-top: var(--space-4) !important; }
   .space-y-12 > * + * { margin-top: var(--space-5) !important; }
-  
+
   /* Кнопки */
   .btn-primary { padding: 0.625rem 1.25rem; font-size: var(--text-sm); }
-  
+
   /* Формы */
   .input-field { padding: 0.75rem 0.875rem; font-size: 16px; }
-  
+
   /* Заголовки */
   h1 { font-size: var(--text-2xl); }
   h2 { font-size: var(--text-xl); }
   h3 { font-size: var(--text-lg); }
-  
+
   /* Flex */
   /* .flex-wrap removed */
   /* .items-center removed */
   .lg\\:items-center { align-items: flex-start !important; }
-  
+
   /* Пагинация, табы */
   .overflow-x-auto { -webkit-overflow-scrolling: touch; }
-  
+
   /* Модалки */
   .fixed\\:inset-0 { padding: var(--space-2) !important; }
-  
+
   /* Чат */
   .max-h-\\[500px\\] { max-height: 300px !important; }
-  
+
   /* Изображения */
   img { max-width: 100%; height: auto; }
-  
+
   /* Text */
   .text-3xl { font-size: var(--text-2xl) !important; }
   .text-4xl { font-size: var(--text-3xl) !important; }
-  
+
   /* Padding */
   .p-8 { padding: var(--space-4) !important; }
   .p-12 { padding: var(--space-4) !important; }
   .px-6 { padding-left: var(--space-4) !important; padding-right: var(--space-4) !important; }
   .py-5 { padding-top: var(--space-4) !important; padding-bottom: var(--space-4) !important; }
-  
+
   /* Gap */
   .gap-6 { gap: var(--space-3) !important; }
   .gap-8 { gap: var(--space-4) !important; }
   .gap-10 { gap: var(--space-4) !important; }
-  
+
   /* Навигация — компактные отступы у иконок */
   .nav-item {
     gap: 0.5rem !important;
@@ -1020,10 +1020,10 @@ a {
 
   /* Hidden на мобильных */
   /* .hidden removed */
-  
+
   /* Mobile full width */
   .w-full { width: 100% !important; }
-  
+
   /* Sticky header */
   .sticky { position: sticky !important; }
 }
@@ -1031,27 +1031,27 @@ a {
 /* Очень маленькие экраны */
 @media (max-width: 480px) {
   html { font-size: 14px; }
-  
+
   .page-container { padding: var(--space-2); }
-  
+
   .glass-card { padding: var(--space-3) !important; }
-  
+
   .btn-primary { padding: 0.5rem 1rem; font-size: var(--text-sm); }
   .input-field { padding: 0.625rem 0.75rem; }
-  
+
   h1 { font-size: var(--text-xl); }
   h2 { font-size: var(--text-lg); }
-  
+
   .p-4 { padding: var(--space-3) !important; }
   .px-4 { padding-left: var(--space-3) !important; padding-right: var(--space-3) !important; }
   .py-3 { padding-top: var(--space-3) !important; padding-bottom: var(--space-3) !important; }
-  
+
   .gap-4 { gap: var(--space-2) !important; }
   .gap-5 { gap: var(--space-2) !important; }
-  
+
   .text-lg { font-size: var(--text-base) !important; }
   .text-xl { font-size: var(--text-lg) !important; }
-  
+
   /* Уменьшенные иконки */
   .w-12\\.h-12, .w-12.h-12 { width: 40px !important; height: 40px !important; }
   .w-10\\.h-10, .w-10.h-10 { width: 32px !important; height: 32px !important; }
@@ -1070,52 +1070,52 @@ a {
 /* Мобильные */
 @media (max-width: 768px) {
   html { font-size: 15px; }
-  
+
   .page-container { padding: var(--space-3); }
   .page-title { font-size: var(--text-xl); }
   .page-subtitle { font-size: var(--text-xs); }
-  
+
   /* Карточки */
   .glass-card { border-radius: var(--radius-md); }
   .stat-card { padding: var(--space-4) !important; }
-  
+
   /* Сетки - только конкретные классы Tailwind */
   .grid > .grid-cols-3, .grid > .grid-cols-4 { grid-template-columns: 1fr !important; }
   .lg\\:grid-cols-2 > * { grid-template-columns: 1fr !important; }
-  
+
   /* Отступы */
   .space-y-8 > * + * { margin-top: var(--space-4) !important; }
   .space-y-10 > * + * { margin-top: var(--space-4) !important; }
   .space-y-12 > * + * { margin-top: var(--space-5) !important; }
-  
+
   /* Кнопки */
   .btn-primary { padding: 0.625rem 1.25rem; font-size: var(--text-sm); }
-  
+
   /* Формы */
   .input-field { padding: 0.75rem 0.875rem; font-size: 16px; }
-  
+
   /* Заголовки */
   h1 { font-size: var(--text-2xl); }
   h2 { font-size: var(--text-xl); }
   h3 { font-size: var(--text-lg); }
-  
+
   /* Пагинация, табы */
   .overflow-x-auto { -webkit-overflow-scrolling: touch; }
-  
+
   /* Чат */
   .max-h-\\[500px\\] { max-height: 300px !important; }
-  
+
   /* Изображения */
   img { max-width: 100%; height: auto; }
-  
+
   /* Text */
   .text-3xl { font-size: var(--text-2xl); }
   .text-4xl { font-size: var(--text-3xl); }
-  
+
   /* Padding - только крупные */
   .p-12 { padding: var(--space-4) !important; }
   .py-5 { padding-top: var(--space-4) !important; padding-bottom: var(--space-4) !important; }
-  
+
   /* Gap */
   .gap-8 { gap: var(--space-4); }
   .gap-10 { gap: var(--space-4); }
@@ -1124,24 +1124,24 @@ a {
 /* Очень маленькие экраны */
 @media (max-width: 480px) {
   html { font-size: 14px; }
-  
+
   .page-container { padding: var(--space-2); }
-  
+
   .glass-card { border-radius: var(--radius-sm); }
-  
+
   .btn-primary { padding: 0.5rem 1rem; font-size: var(--text-sm); }
   .input-field { padding: 0.625rem 0.75rem; }
-  
+
   h1 { font-size: var(--text-xl); }
   h2 { font-size: var(--text-lg); }
-  
+
   .p-8 { padding: var(--space-3) !important; }
   .px-4 { padding-left: var(--space-3); padding-right: var(--space-3); }
   .py-3 { padding-top: var(--space-3); padding-bottom: var(--space-3); }
-  
+
   .gap-4 { gap: var(--space-2); }
   .gap-5 { gap: var(--space-2); }
-  
+
   .text-lg { font-size: var(--text-base); }
   .text-xl { font-size: var(--text-lg); }
 }
@@ -1154,27 +1154,27 @@ a {
 @media (max-width: 768px) {
   /* Header страницы */
   .max-w-7xl\\.mx-auto { max-width: 100% !important; }
-  
+
   /* Progress indicator */
   .mx-6 { margin-left: var(--space-2) !important; margin-right: var(--space-2) !important; }
   .w-24 { width: 40px !important; }
-  
+
   /* Кнопки выбора */
   .min-w-\\[200px\\] { min-width: auto !important; }
   .px-8 { padding-left: var(--space-3) !important; padding-right: var(--space-3) !important; }
   .py-5 { padding-top: var(--space-3) !important; padding-bottom: var(--space-3) !important; }
-  
+
   /* Табы */
   .px-6 { padding-left: var(--space-3) !important; padding-right: var(--space-3) !important; }
   .py-3 { padding-top: var(--space-2) !important; padding-bottom: var(--space-2) !important; }
-  
+
   /* Правая колонка */
   .lg\\:col-span-2 { grid-column: 1 / -1 !important; }
-  
+
   /* Иконки в flex */
   .flex.items-center.gap-3 > svg { flex-shrink: 0; }
   .flex.items-center.gap-4 > svg { flex-shrink: 0; }
-  
+
   /* Grid для вложений */
   .grid-cols-1.sm\\:grid-cols-2.lg\\:grid-cols-3 { grid-template-columns: 1fr !important; }
 }
@@ -1185,25 +1185,23 @@ a {
   .text-4xl { font-size: var(--text-2xl) !important; }
   .text-3xl { font-size: var(--text-xl) !important; }
   .text-2xl { font-size: var(--text-lg) !important; }
-  
+
   /* Кнопки */
   .px-10 { padding-left: var(--space-3) !important; padding-right: var(--space-3) !important; }
   .px-12 { padding-left: var(--space-3) !important; padding-right: var(--space-3) !important; }
-  
+
   /* Gap */
   .gap-5 { gap: var(--space-2) !important; }
   .gap-6 { gap: var(--space-2) !important; }
-  
+
   /* Иконки */
   .w-16.h-16, .w-16.h-16 { width: 40px !important; height: 40px !important; }
   .w-20.h-20, .w-20.h-20 { width: 48px !important; height: 48px !important; }
   .w-12.h-12, .w-12.h-12 { width: 36px !important; height: 36px !important; }
   .w-10.h-10, .w-10.h-10 { width: 32px !important; height: 32px !important; }
-  
+
   /* Модалки */
   .max-w-3xl { max-width: 100% !important; }
   .max-w-5xl { max-width: 100% !important; }
   .p-6 { padding: var(--space-3) !important; }
 }
-
-
