@@ -68,13 +68,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         <div className="hidden lg:block" />
 
         <div className="flex items-center gap-2 md:gap-4">
-          <Link 
-            to="/notifications"
-            className="relative p-2 rounded-xl hover:bg-[var(--hover-1)] transition-colors"
-          >
-            <Bell className="w-6 h-6 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors" />
-            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-[var(--accent)] rounded-full" />
-          </Link>
+          
 
           <button
             onClick={toggleTheme}
