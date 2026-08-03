@@ -91,8 +91,8 @@ interface ToastData {
    CONSTANTS
    ═══════════════════════════════════════════════════════════════════ */
 
-const NODE_W = 220;
-const NODE_H = 88;
+const NODE_W = 240;
+const NODE_H = 96;
 const CANVAS_SIZE = 6000;
 // Минимальное расстояние перетаскивания (px) чтобы считать действие "drag", а не "click"
 const DRAG_THRESHOLD = 5;
@@ -400,40 +400,39 @@ function WfNodeCard({
             ].join(' ')}
             style={{ left: node.x, top: node.y, width: NODE_W, height: NODE_H, zIndex: isSelected ? 20 : hoverTarget ? 15 : 10 }}
         >
-            {/* Tooltip ABOVE the node */}
             {hoverTarget && (
-                <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-30 pointer-events-none whitespace-nowrap">
-                    <span className="text-[11px] font-semibold text-emerald-400 bg-[var(--bg-card)] border border-emerald-500/30 px-2.5 py-1 rounded-lg shadow-lg">
+                <div className="absolute -top-9 left-1/2 -translate-x-1/2 z-30 pointer-events-none whitespace-nowrap">
+                    <span className="text-[12px] font-semibold text-emerald-400 bg-[var(--bg-card)] border border-emerald-500/30 px-3 py-1 rounded-lg shadow-lg">
                         Отпустите для связи
                     </span>
                 </div>
             )}
 
             <div className="h-1 w-full rounded-t-2xl" style={{ backgroundColor: node.color }} />
-            <div className="px-3.5 py-2.5 flex items-center gap-3 h-[calc(100%-4px)]">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${cat.bg}`}>
-                    <Icon className={`w-[18px] h-[18px] ${cat.text}`} />
+            <div className="px-4 py-3 flex items-center gap-3 h-[calc(100%-4px)]">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${cat.bg}`}>
+                    <Icon className={`w-5 h-5 ${cat.text}`} />
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                        {node.isInitial && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />}
-                        <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate leading-tight">{node.label}</span>
-                        {node.isTerminal && <Lock className="w-3 h-3 text-[var(--text-primary)]/25 shrink-0" />}
+                        {node.isInitial && <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />}
+                        <span className="text-[14px] font-semibold text-[var(--text-primary)] truncate leading-5">{node.label}</span>
+                        {node.isTerminal && <Lock className="w-3.5 h-3.5 text-[var(--text-primary)]/25 shrink-0" />}
                     </div>
-                    <span className={`text-[11px] ${cat.text}`}>{CATEGORY_LABELS[node.category]}</span>
+                    <span className={`text-[12px] leading-4 ${cat.text}`}>{CATEGORY_LABELS[node.category]}</span>
                 </div>
 
                 <div
                     onMouseDown={onConnectHandleDown}
                     className={[
-                        'w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all cursor-crosshair',
+                        'w-7 h-7 rounded-full border-2 flex items-center justify-center shrink-0 transition-all cursor-crosshair',
                         isConnecting
                             ? 'border-[var(--accent)] bg-[var(--accent)]/20 scale-110'
                             : 'border-[var(--border-color)] hover:border-[var(--accent)] hover:bg-[var(--accent)]/10',
                     ].join(' ')}
                     title="Зажмите и перетащите на другой статус"
                 >
-                    <Plus className="w-3 h-3 text-[var(--text-primary)]/40" />
+                    <Plus className="w-3.5 h-3.5 text-[var(--text-primary)]/40" />
                 </div>
             </div>
         </motion.div>
@@ -466,22 +465,22 @@ function WfEdgePath({ transition, fromNode, toNode, isSelected, onClick }: {
             {transition.label && (
                 <g className="cursor-pointer" style={{ pointerEvents: 'bounding-box' }}
                     onClick={(e) => { e.stopPropagation(); onClick(); }}>
-                    <rect x={midX - 50} y={midY - 12} width={100} height={24} rx={8}
+                    <rect x={midX - 54} y={midY - 13} width={108} height={26} rx={8}
                         fill={isSelected ? 'var(--accent)' : 'var(--bg-card)'}
                         stroke={isSelected ? 'var(--accent)' : 'var(--border-color)'} strokeWidth={1} />
-                    <text x={midX} y={midY + 4} textAnchor="middle" className="text-[11px] font-medium select-none"
-                        fill={isSelected ? 'white' : 'var(--text-primary)'} opacity={isSelected ? 1 : 0.55}>
+                    <text x={midX} y={midY + 4.5} textAnchor="middle" className="text-[12px] font-medium select-none"
+                        fill={isSelected ? 'white' : 'var(--text-primary)'} opacity={isSelected ? 1 : 0.6}>
                         {transition.label}
                     </text>
                 </g>
             )}
             {transition.actions.length > 0 && (
                 <g>
-                    <circle cx={midX + 55} cy={midY} r={8}
+                    <circle cx={midX + 60} cy={midY} r={9}
                         fill={isSelected ? 'var(--accent)' : 'var(--hover-3)'}
                         stroke={isSelected ? 'var(--accent)' : 'var(--border-color)'} strokeWidth={1} />
-                    <text x={midX + 55} y={midY + 3.5} textAnchor="middle"
-                        className="text-[9px] font-bold select-none" fill="white">{transition.actions.length}</text>
+                    <text x={midX + 60} y={midY + 4} textAnchor="middle"
+                        className="text-[10px] font-bold select-none" fill="white">{transition.actions.length}</text>
                 </g>
             )}
         </g>
@@ -501,25 +500,25 @@ function ActionItem({ action, onToggle, onRemove, onEdit }: {
     return (
         <motion.div layout initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6, scale: 0.96 }}
-            className={['group flex items-start gap-3 p-3 rounded-xl border transition-all',
+            className={['group flex items-start gap-3 p-3.5 rounded-xl border transition-all',
                 action.enabled ? 'bg-[var(--hover-1)] border-[var(--border-color)]' : 'bg-[var(--hover-2)]/50 border-[var(--border-color)]/50 opacity-50',
             ].join(' ')}>
             <button onClick={onToggle}
-                className={`mt-0.5 w-8 h-5 rounded-full shrink-0 relative transition-colors ${action.enabled ? 'bg-[var(--accent)]' : 'bg-[var(--hover-3)]'}`}>
-                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${action.enabled ? 'left-3.5' : 'left-0.5'}`} />
+                className={`mt-0.5 w-9 h-5 rounded-full shrink-0 relative transition-colors ${action.enabled ? 'bg-[var(--accent)]' : 'bg-[var(--hover-3)]'}`}>
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${action.enabled ? 'left-4' : 'left-0.5'}`} />
             </button>
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${action.enabled ? 'bg-[var(--accent)]/10' : 'bg-[var(--hover-2)]'}`}>
-                <Ic className={`w-4 h-4 ${action.enabled ? m.color : 'text-[var(--text-primary)]/30'}`} />
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${action.enabled ? 'bg-[var(--accent)]/10' : 'bg-[var(--hover-2)]'}`}>
+                <Ic className={`w-4.5 h-4.5 ${action.enabled ? m.color : 'text-[var(--text-primary)]/30'}`} />
             </div>
             <div className="flex-1 min-w-0">
-                <p className={`text-[13px] font-medium ${action.enabled ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/40'}`}>{m.label}</p>
+                <p className={`text-[14px] leading-5 font-medium ${action.enabled ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/40'}`}>{m.label}</p>
                 {Object.entries(action.params).slice(0, 2).map(([k, v]) => (
-                    <p key={k} className="text-[11px] text-[var(--text-primary)]/30 truncate">{k}: <span className="text-[var(--text-primary)]/50">{v}</span></p>
+                    <p key={k} className="text-[12px] leading-4 text-[var(--text-primary)]/30 truncate">{k}: <span className="text-[var(--text-primary)]/50">{v}</span></p>
                 ))}
             </div>
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-[var(--hover-3)] text-[var(--text-primary)]/30 hover:text-[var(--text-primary)]/60"><Edit3 className="w-3.5 h-3.5" /></button>
-                <button onClick={onRemove} className="p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--text-primary)]/30 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
+                <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-[var(--hover-3)] text-[var(--text-primary)]/30 hover:text-[var(--text-primary)]/60"><Edit3 className="w-4 h-4" /></button>
+                <button onClick={onRemove} className="p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--text-primary)]/30 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
             </div>
         </motion.div>
     );
@@ -531,10 +530,10 @@ function ConditionItem({ condition, onRemove }: { condition: WfCondition; onRemo
     const Ic = m.icon;
     return (
         <motion.div layout initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
-            className="group flex items-center gap-3 p-2.5 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-[var(--hover-2)]"><Ic className={`w-3.5 h-3.5 ${m.color}`} /></div>
-            <span className="flex-1 text-[13px] text-[var(--text-primary)]/70 truncate">{m.label}</span>
-            <button onClick={onRemove} className="p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-[var(--text-primary)]/30 hover:text-red-400 transition-all"><X className="w-3.5 h-3.5" /></button>
+            className="group flex items-center gap-3 p-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-[var(--hover-2)]"><Ic className={`w-4 h-4 ${m.color}`} /></div>
+            <span className="flex-1 text-[14px] leading-5 text-[var(--text-primary)]/70 truncate">{m.label}</span>
+            <button onClick={onRemove} className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-[var(--text-primary)]/30 hover:text-red-400 transition-all"><X className="w-4 h-4" /></button>
         </motion.div>
     );
 }
@@ -556,12 +555,12 @@ function AddMenu({ items, onSelect, onClose }: { items: AddMenuItem[]; onSelect:
         <motion.div ref={ref} initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.97 }}
             className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-[var(--shadow-lg)] overflow-hidden">
-            <div className="p-1.5 max-h-[260px] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--hover-3)]">
+            <div className="p-1.5 max-h-[280px] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--hover-3)]">
                 {items.map((item) => {
                     const Ic = item.icon; return (
                         <button key={item.type} onClick={() => { onSelect(item.type); onClose(); }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] transition-colors text-left">
-                            <Ic className={`w-4 h-4 ${item.color} shrink-0`} /><span>{item.label}</span>
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-[14px] leading-5 text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] transition-colors text-left">
+                            <Ic className={`w-4.5 h-4.5 ${item.color} shrink-0`} /><span>{item.label}</span>
                         </button>
                     );
                 })}
@@ -578,12 +577,12 @@ function DeleteConfirm({ label, description, onCancel, onConfirm }: {
     label: string; description: string; onCancel: () => void; onConfirm: () => void;
 }) {
     return (
-        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 space-y-2">
-            <div className="flex items-center gap-2 text-red-400"><AlertTriangle className="w-4 h-4" /><p className="text-[13px] font-medium">{label}</p></div>
-            <p className="text-[11px] text-[var(--text-primary)]/40">{description}</p>
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 space-y-2.5">
+            <div className="flex items-center gap-2 text-red-400"><AlertTriangle className="w-4.5 h-4.5" /><p className="text-[14px] leading-5 font-medium">{label}</p></div>
+            <p className="text-[12px] leading-4 text-[var(--text-primary)]/40">{description}</p>
             <div className="flex gap-2">
-                <button onClick={onCancel} className="flex-1 px-3 py-1.5 rounded-lg bg-[var(--hover-2)] text-[var(--text-primary)]/60 text-[13px]">Отмена</button>
-                <button onClick={onConfirm} className="flex-1 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-[13px] font-medium hover:bg-red-500/30">Удалить</button>
+                <button onClick={onCancel} className="flex-1 px-3.5 py-2 rounded-lg bg-[var(--hover-2)] text-[var(--text-primary)]/60 text-[14px]">Отмена</button>
+                <button onClick={onConfirm} className="flex-1 px-3.5 py-2 rounded-lg bg-red-500/20 text-red-400 text-[14px] font-medium hover:bg-red-500/30">Удалить</button>
             </div>
         </div>
     );
@@ -610,45 +609,45 @@ function NodeDetailPanel({ node, onClose, onUpdate, onDelete }: {
     return (
         <motion.div initial={{ x: '100%', opacity: 0 }} animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0 }} transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="w-[360px] shrink-0 h-full bg-[var(--bg-card)] border-l border-[var(--border-color)] flex flex-col"
+            className="w-[380px] shrink-0 h-full bg-[var(--bg-card)] border-l border-[var(--border-color)] flex flex-col"
             onClick={(e) => e.stopPropagation()}>
 
             <div className="px-5 py-4 border-b border-[var(--border-color)] shrink-0">
                 <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${cat.bg}`}>
-                            <NodeIcon iconKey={node.iconKey} className={`w-4 h-4 ${cat.text}`} />
+                    <div className="flex items-center gap-2.5">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${cat.bg}`}>
+                            <NodeIcon iconKey={node.iconKey} className={`w-4.5 h-4.5 ${cat.text}`} />
                         </div>
                         <div>
-                            <h3 className="text-[15px] font-bold text-[var(--text-primary)]">Настройка статуса</h3>
-                            <p className="text-[11px] text-[var(--text-primary)]/35">ID: {node.id}</p>
+                            <h3 className="text-[16px] font-bold text-[var(--text-primary)] leading-5">Настройка статуса</h3>
+                            <p className="text-[12px] leading-4 text-[var(--text-primary)]/35 mt-0.5">ID: {node.id}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"><X className="w-4 h-4" /></button>
+                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"><X className="w-5 h-5" /></button>
                 </div>
                 <div className="h-1.5 rounded-full w-full" style={{ backgroundColor: node.color }} />
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 scrollbar-thin scrollbar-thumb-[var(--hover-3)]">
                 <div>
-                    <label className="block text-[13px] font-medium text-[var(--text-primary)]/55 mb-1.5">Название</label>
+                    <label className="block text-[14px] font-medium text-[var(--text-primary)]/55 mb-1.5">Название</label>
                     <input value={label} onChange={(e) => setLabel(e.target.value)}
-                        className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[13px] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all" />
+                        className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[14px] leading-5 placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all" />
                 </div>
                 <div>
-                    <label className="block text-[13px] font-medium text-[var(--text-primary)]/55 mb-1.5">Описание</label>
+                    <label className="block text-[14px] font-medium text-[var(--text-primary)]/55 mb-1.5">Описание</label>
                     <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} placeholder="Описание..."
-                        className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[13px] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all resize-none" />
+                        className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[14px] leading-5 placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all resize-none" />
                 </div>
 
                 <div>
-                    <label className="block text-[13px] font-medium text-[var(--text-primary)]/55 mb-1.5">Категория</label>
+                    <label className="block text-[14px] font-medium text-[var(--text-primary)]/55 mb-1.5">Категория</label>
                     <div className="relative">
                         <button onClick={() => setShowCatMenu((v) => !v)}
-                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[13px] text-left hover:bg-[var(--hover-3)] transition-colors">
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[14px] text-left hover:bg-[var(--hover-3)] transition-colors">
                             <span className={`w-2.5 h-2.5 rounded-full ${cat.dot}`} />
                             <span className="flex-1 text-[var(--text-primary)]">{CATEGORY_LABELS[category]}</span>
-                            <ChevronDown className="w-4 h-4 text-[var(--text-primary)]/30" />
+                            <ChevronDown className="w-4.5 h-4.5 text-[var(--text-primary)]/30" />
                         </button>
                         {showCatMenu && (<>
                             <div className="fixed inset-0 z-10" onClick={() => setShowCatMenu(false)} />
@@ -658,11 +657,11 @@ function NodeDetailPanel({ node, onClose, onUpdate, onDelete }: {
                                         const cm = CATEGORY_META[key];
                                         return (
                                             <button key={key} onClick={() => { setCategory(key); setShowCatMenu(false); }}
-                                                className={['w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-colors',
+                                                className={['w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-[14px] transition-colors',
                                                     category === key ? 'bg-[var(--accent)]/10 text-[var(--text-primary)]' : 'text-[var(--text-primary)]/55 hover:bg-[var(--hover-2)]',
                                                 ].join(' ')}>
                                                 <span className={`w-2.5 h-2.5 rounded-full ${cm.dot}`} />{lbl}
-                                                {category === key && <Check className="w-3.5 h-3.5 text-[var(--accent)] ml-auto" />}
+                                                {category === key && <Check className="w-4 h-4 text-[var(--accent)] ml-auto" />}
                                             </button>
                                         );
                                     })}
@@ -672,18 +671,18 @@ function NodeDetailPanel({ node, onClose, onUpdate, onDelete }: {
                     </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                     {([
                         { key: 'isInitial' as const, label: 'Начальный статус', hint: 'Задачи создаются в этом статусе' },
                         { key: 'isTerminal' as const, label: 'Конечный статус', hint: 'Из него нет переходов' },
                     ]).map(({ key, label: fl, hint }) => (
-                        <label key={key} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)] cursor-pointer hover:bg-[var(--hover-2)] transition-colors">
+                        <label key={key} className="flex items-center gap-3 p-3.5 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)] cursor-pointer hover:bg-[var(--hover-2)] transition-colors">
                             <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${node[key] ? 'bg-emerald-500 border-emerald-600' : 'border-[var(--border-color)]'}`}>
                                 {node[key] && <Check className="w-3.5 h-3.5 text-white" />}
                             </div>
                             <div>
-                                <p className="text-[13px] font-medium text-[var(--text-primary)]">{fl}</p>
-                                <p className="text-[11px] text-[var(--text-primary)]/35">{hint}</p>
+                                <p className="text-[14px] leading-5 font-medium text-[var(--text-primary)]">{fl}</p>
+                                <p className="text-[12px] leading-4 text-[var(--text-primary)]/35">{hint}</p>
                             </div>
                             <input type="checkbox" checked={node[key] ?? false} onChange={(e) => onUpdate({ ...node, [key]: e.target.checked })} className="sr-only" />
                         </label>
@@ -692,7 +691,7 @@ function NodeDetailPanel({ node, onClose, onUpdate, onDelete }: {
 
                 <div className="pt-3 border-t border-[var(--border-color)]">
                     {!showDel ? (
-                        <button onClick={() => setShowDel(true)} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/20 text-red-400 text-[13px] font-medium hover:bg-red-500/10 transition-colors">
+                        <button onClick={() => setShowDel(true)} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/20 text-red-400 text-[14px] font-medium hover:bg-red-500/10 transition-colors">
                             <Trash2 className="w-4 h-4" /> Удалить статус
                         </button>
                     ) : (
@@ -701,9 +700,9 @@ function NodeDetailPanel({ node, onClose, onUpdate, onDelete }: {
                 </div>
             </div>
 
-            <div className="px-5 py-3.5 border-t border-[var(--border-color)] shrink-0">
-                <button onClick={handleSave} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-[13px] font-medium transition-colors shadow-[var(--shadow-md)]">
-                    <Save className="w-4 h-4" /> Сохранить
+            <div className="px-5 py-4 border-t border-[var(--border-color)] shrink-0">
+                <button onClick={handleSave} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-[14px] font-medium transition-colors shadow-[var(--shadow-md)]">
+                    <Save className="w-4.5 h-4.5" /> Сохранить
                 </button>
             </div>
         </motion.div>
@@ -759,76 +758,76 @@ function TransitionDetailPanel({ transition, fromNode, toNode, onClose, onUpdate
     return (
         <motion.div initial={{ x: '100%', opacity: 0 }} animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0 }} transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="w-[400px] shrink-0 h-full bg-[var(--bg-card)] border-l border-[var(--border-color)] flex flex-col"
+            className="w-[420px] shrink-0 h-full bg-[var(--bg-card)] border-l border-[var(--border-color)] flex flex-col"
             onClick={(e) => e.stopPropagation()}>
 
             <div className="px-5 py-4 border-b border-[var(--border-color)] shrink-0">
                 <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-xl bg-[var(--accent)]/15 flex items-center justify-center"><ArrowRight className="w-4 h-4 text-[var(--accent)]" /></div>
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-[var(--accent)]/15 flex items-center justify-center"><ArrowRight className="w-4.5 h-4.5 text-[var(--accent)]" /></div>
                         <div>
-                            <h3 className="text-[15px] font-bold text-[var(--text-primary)]">Настройка перехода</h3>
-                            <p className="text-[11px] text-[var(--text-primary)]/35">ID: {transition.id}</p>
+                            <h3 className="text-[16px] font-bold text-[var(--text-primary)] leading-5">Настройка перехода</h3>
+                            <p className="text-[12px] leading-4 text-[var(--text-primary)]/35 mt-0.5">ID: {transition.id}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"><X className="w-4 h-4" /></button>
+                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"><X className="w-5 h-5" /></button>
                 </div>
                 <div className="flex items-center gap-2">
                     <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${fromCat.chip}`}>
-                        <span className={`w-2 h-2 rounded-full ${fromCat.dot}`} /><span className="text-[11px] font-medium">{fromNode.label}</span>
+                        <span className={`w-2 h-2 rounded-full ${fromCat.dot}`} /><span className="text-[12px] font-medium">{fromNode.label}</span>
                     </div>
                     <ArrowRight className="w-4 h-4 text-[var(--text-primary)]/20 shrink-0" />
                     <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${toCat.chip}`}>
-                        <span className={`w-2 h-2 rounded-full ${toCat.dot}`} /><span className="text-[11px] font-medium">{toNode.label}</span>
+                        <span className={`w-2 h-2 rounded-full ${toCat.dot}`} /><span className="text-[12px] font-medium">{toNode.label}</span>
                     </div>
                 </div>
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 scrollbar-thin scrollbar-thumb-[var(--hover-3)]">
                 <div>
-                    <label className="block text-[13px] font-medium text-[var(--text-primary)]/55 mb-1.5">Название</label>
+                    <label className="block text-[14px] font-medium text-[var(--text-primary)]/55 mb-1.5">Название</label>
                     <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Например: «Взять в работу»"
-                        className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[13px] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all" />
+                        className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[14px] leading-5 placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all" />
                 </div>
 
                 <section>
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-2.5">
                         <div className="flex items-center gap-2">
-                            <Shield className="w-4 h-4 text-[var(--text-primary)]/35" />
-                            <h4 className="text-[13px] font-semibold text-[var(--text-primary)]">Условия</h4>
-                            {transition.conditions.length > 0 && <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-[var(--hover-2)] text-[var(--text-primary)]/45">{transition.conditions.length}</span>}
+                            <Shield className="w-4.5 h-4.5 text-[var(--text-primary)]/35" />
+                            <h4 className="text-[14px] font-semibold text-[var(--text-primary)]">Условия</h4>
+                            {transition.conditions.length > 0 && <span className="px-1.5 py-0.5 rounded-md text-[11px] font-semibold bg-[var(--hover-2)] text-[var(--text-primary)]/45">{transition.conditions.length}</span>}
                         </div>
                         <div className="relative">
-                            <button onClick={() => setShowAddCond((v) => !v)} className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors"><Plus className="w-3 h-3" /> Добавить</button>
-                            <AnimatePresence>{showAddCond && <div className="absolute right-0 top-full mt-1 z-30 w-56"><AddMenu items={condItems} onSelect={addCondition} onClose={() => setShowAddCond(false)} /></div>}</AnimatePresence>
+                            <button onClick={() => setShowAddCond((v) => !v)} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors"><Plus className="w-3.5 h-3.5" /> Добавить</button>
+                            <AnimatePresence>{showAddCond && <div className="absolute right-0 top-full mt-1 z-30 w-60"><AddMenu items={condItems} onSelect={addCondition} onClose={() => setShowAddCond(false)} /></div>}</AnimatePresence>
                         </div>
                     </div>
                     <div className="space-y-1.5">
                         <AnimatePresence mode="popLayout">
                             {transition.conditions.length === 0 ? (
-                                <div className="py-4 text-center border-2 border-dashed border-[var(--border-color)] rounded-xl"><p className="text-[11px] text-[var(--text-primary)]/25">Без ограничений</p></div>
+                                <div className="py-5 text-center border-2 border-dashed border-[var(--border-color)] rounded-xl"><p className="text-[12px] text-[var(--text-primary)]/25">Без ограничений</p></div>
                             ) : transition.conditions.map((c) => <ConditionItem key={c.id} condition={c} onRemove={() => removeCondition(c.id)} />)}
                         </AnimatePresence>
                     </div>
                 </section>
 
                 <section>
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-2.5">
                         <div className="flex items-center gap-2">
-                            <Zap className="w-4 h-4 text-[var(--text-primary)]/35" />
-                            <h4 className="text-[13px] font-semibold text-[var(--text-primary)]">Действия</h4>
-                            {transition.actions.length > 0 && <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-[var(--hover-2)] text-[var(--text-primary)]/45">{transition.actions.length}</span>}
+                            <Zap className="w-4.5 h-4.5 text-[var(--text-primary)]/35" />
+                            <h4 className="text-[14px] font-semibold text-[var(--text-primary)]">Действия</h4>
+                            {transition.actions.length > 0 && <span className="px-1.5 py-0.5 rounded-md text-[11px] font-semibold bg-[var(--hover-2)] text-[var(--text-primary)]/45">{transition.actions.length}</span>}
                         </div>
                         <div className="relative">
-                            <button onClick={() => setShowAddAction((v) => !v)} className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors"><Plus className="w-3 h-3" /> Добавить</button>
-                            <AnimatePresence>{showAddAction && <div className="absolute right-0 top-full mt-1 z-30 w-64"><AddMenu items={actionItems} onSelect={addAction} onClose={() => setShowAddAction(false)} /></div>}</AnimatePresence>
+                            <button onClick={() => setShowAddAction((v) => !v)} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors"><Plus className="w-3.5 h-3.5" /> Добавить</button>
+                            <AnimatePresence>{showAddAction && <div className="absolute right-0 top-full mt-1 z-30 w-68"><AddMenu items={actionItems} onSelect={addAction} onClose={() => setShowAddAction(false)} /></div>}</AnimatePresence>
                         </div>
                     </div>
                     <div className="space-y-2">
                         <AnimatePresence mode="popLayout">
                             {transition.actions.length === 0 ? (
-                                <div className="py-5 text-center border-2 border-dashed border-[var(--border-color)] rounded-xl">
-                                    <Zap className="w-5 h-5 text-[var(--text-primary)]/10 mx-auto mb-1" /><p className="text-[11px] text-[var(--text-primary)]/25">Нет действий</p>
+                                <div className="py-6 text-center border-2 border-dashed border-[var(--border-color)] rounded-xl">
+                                    <Zap className="w-5 h-5 text-[var(--text-primary)]/10 mx-auto mb-1.5" /><p className="text-[12px] text-[var(--text-primary)]/25">Нет действий</p>
                                 </div>
                             ) : transition.actions.map((a) => <ActionItem key={a.id} action={a} onToggle={() => toggleAction(a.id)} onRemove={() => removeAction(a.id)} onEdit={() => { }} />)}
                         </AnimatePresence>
@@ -837,7 +836,7 @@ function TransitionDetailPanel({ transition, fromNode, toNode, onClose, onUpdate
 
                 <div className="pt-3 border-t border-[var(--border-color)]">
                     {!showDel ? (
-                        <button onClick={() => setShowDel(true)} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/20 text-red-400 text-[13px] font-medium hover:bg-red-500/10 transition-colors">
+                        <button onClick={() => setShowDel(true)} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/20 text-red-400 text-[14px] font-medium hover:bg-red-500/10 transition-colors">
                             <Unlink className="w-4 h-4" /> Удалить переход
                         </button>
                     ) : (
@@ -846,9 +845,9 @@ function TransitionDetailPanel({ transition, fromNode, toNode, onClose, onUpdate
                 </div>
             </div>
 
-            <div className="px-5 py-3.5 border-t border-[var(--border-color)] shrink-0">
-                <button onClick={handleSave} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-[13px] font-medium transition-colors shadow-[var(--shadow-md)]">
-                    <Save className="w-4 h-4" /> Сохранить
+            <div className="px-5 py-4 border-t border-[var(--border-color)] shrink-0">
+                <button onClick={handleSave} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-[14px] font-medium transition-colors shadow-[var(--shadow-md)]">
+                    <Save className="w-4.5 h-4.5" /> Сохранить
                 </button>
             </div>
         </motion.div>
@@ -883,8 +882,8 @@ function CreateWorkflowModal({ onClose, onCreate }: { onClose: () => void; onCre
     };
 
     const opts: { value: WfEntityKind; label: string; icon: React.ComponentType<{ className?: string }>; desc: string }[] = [
-        { value: 'task', label: 'Задачи', icon: Layers, desc: 'Для задач' },
-        { value: 'ticket', label: 'Заявки', icon: Ticket, desc: 'Для обращений' },
+        { value: 'task', label: 'Задачи', icon: Layers, desc: 'Для задач сотрудников' },
+        { value: 'ticket', label: 'Заявки', icon: Ticket, desc: 'Для обращений клиентов' },
     ];
 
     return (
@@ -893,12 +892,12 @@ function CreateWorkflowModal({ onClose, onCreate }: { onClose: () => void; onCre
             <div className="relative w-full max-w-lg bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden mx-4"
                 style={{ boxShadow: 'var(--shadow-lg)' }} onClick={(e) => e.stopPropagation()}>
 
-                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
+                <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/15 flex items-center justify-center"><Workflow className="w-5 h-5 text-[var(--accent)]" /></div>
+                        <div className="w-11 h-11 rounded-xl bg-[var(--accent)]/15 flex items-center justify-center"><Workflow className="w-5.5 h-5.5 text-[var(--accent)]" /></div>
                         <div>
-                            <h2 className="text-[17px] font-bold text-[var(--text-primary)]">Новый процесс</h2>
-                            <p className="text-[13px] text-[var(--text-primary)]/40">Создайте workflow</p>
+                            <h2 className="text-[18px] font-bold text-[var(--text-primary)] leading-6">Новый процесс</h2>
+                            <p className="text-[14px] text-[var(--text-primary)]/40 mt-0.5">Создайте workflow с нуля</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"><X className="w-5 h-5" /></button>
@@ -906,26 +905,26 @@ function CreateWorkflowModal({ onClose, onCreate }: { onClose: () => void; onCre
 
                 <div className="p-6 space-y-5">
                     <div>
-                        <label className="block text-[13px] font-medium text-[var(--text-primary)]/65 mb-1.5">Название <span className="text-[var(--accent)]">*</span></label>
+                        <label className="block text-[14px] font-medium text-[var(--text-primary)]/65 mb-2">Название <span className="text-[var(--accent)]">*</span></label>
                         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Жизненный цикл задачи" autoFocus
-                            className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[15px] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all" />
+                            className="w-full px-4 py-3 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[15px] leading-5 placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all" />
                     </div>
                     <div>
-                        <label className="block text-[13px] font-medium text-[var(--text-primary)]/65 mb-1.5">Описание</label>
-                        <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Описание..." rows={3}
-                            className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[15px] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all resize-none" />
+                        <label className="block text-[14px] font-medium text-[var(--text-primary)]/65 mb-2">Описание</label>
+                        <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Описание рабочего процесса..." rows={3}
+                            className="w-full px-4 py-3 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[15px] leading-5 placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all resize-none" />
                     </div>
                     <div>
-                        <label className="block text-[13px] font-medium text-[var(--text-primary)]/65 mb-2">Тип сущности</label>
-                        <div className="grid grid-cols-2 gap-2">
+                        <label className="block text-[14px] font-medium text-[var(--text-primary)]/65 mb-2">Тип сущности</label>
+                        <div className="grid grid-cols-2 gap-3">
                             {opts.map((o) => {
                                 const Ic = o.icon; return (
                                     <button key={o.value} onClick={() => setKind(o.value)}
-                                        className={['flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all border',
+                                        className={['flex items-center gap-3 px-4 py-3.5 rounded-xl text-left transition-all border',
                                             kind === o.value ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--text-primary)]' : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/55 hover:bg-[var(--hover-2)]',
                                         ].join(' ')}>
                                         <Ic className={`w-5 h-5 shrink-0 ${kind === o.value ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/30'}`} />
-                                        <div><p className="text-[13px] font-medium">{o.label}</p><p className="text-[11px] text-[var(--text-primary)]/35">{o.desc}</p></div>
+                                        <div><p className="text-[14px] font-medium">{o.label}</p><p className="text-[12px] text-[var(--text-primary)]/35">{o.desc}</p></div>
                                     </button>
                                 );
                             })}
@@ -936,7 +935,7 @@ function CreateWorkflowModal({ onClose, onCreate }: { onClose: () => void; onCre
                 <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--hover-1)]">
                     <button onClick={onClose} className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/65 text-[14px]">Отмена</button>
                     <button onClick={handleSubmit} disabled={!name.trim()} className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-[14px] font-medium disabled:opacity-40 shadow-[var(--shadow-md)]">
-                        <Plus className="w-4 h-4" /> Создать
+                        <Plus className="w-4.5 h-4.5" /> Создать
                     </button>
                 </div>
             </div>
@@ -1138,13 +1137,15 @@ function WorkflowCanvas({
                 </AnimatePresence>
             </div>
 
-            <div className="absolute bottom-3 right-3 flex items-center gap-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-1 shadow-[var(--shadow-md)]">
-                <button onClick={() => setZoom((z) => clamp(z * 0.85, 0.2, 3))} className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/45 hover:text-[var(--text-primary)]"><ZoomOut className="w-4 h-4" /></button>
-                <span className="px-1.5 text-[11px] font-medium text-[var(--text-primary)]/45 tabular-nums min-w-[36px] text-center select-none">{Math.round(zoom * 100)}%</span>
-                <button onClick={() => setZoom((z) => clamp(z * 1.15, 0.2, 3))} className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/45 hover:text-[var(--text-primary)]"><ZoomIn className="w-4 h-4" /></button>
-                <div className="w-px h-4 bg-[var(--border-color)]" />
-                <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/45 hover:text-[var(--text-primary)]" title="Сбросить"><Maximize2 className="w-4 h-4" /></button>
+            <div className="absolute bottom-3 right-3 flex items-center gap-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-1.5 shadow-[var(--shadow-md)]">
+                <button onClick={() => setZoom((z) => clamp(z * 0.85, 0.2, 3))} className="p-2 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/45 hover:text-[var(--text-primary)]"><ZoomOut className="w-4.5 h-4.5" /></button>
+                <span className="px-2 text-[12px] font-medium text-[var(--text-primary)]/45 tabular-nums min-w-[40px] text-center select-none">{Math.round(zoom * 100)}%</span>
+                <button onClick={() => setZoom((z) => clamp(z * 1.15, 0.2, 3))} className="p-2 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/45 hover:text-[var(--text-primary)]"><ZoomIn className="w-4.5 h-4.5" /></button>
+                <div className="w-px h-5 bg-[var(--border-color)]" />
+                <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} className="p-2 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/45 hover:text-[var(--text-primary)]" title="Сбросить"><Maximize2 className="w-4.5 h-4.5" /></button>
             </div>
+
+
         </div>
     );
 }
@@ -1156,16 +1157,16 @@ function WorkflowCanvas({
 function WorkflowListItem({ wf, isActive, onClick }: { wf: WorkflowData; isActive: boolean; onClick: () => void }) {
     const Ic = wf.entityKind === 'task' ? Layers : Ticket;
     return (
-        <button onClick={onClick} className={['w-full text-left px-3 py-2.5 rounded-xl transition-all border',
+        <button onClick={onClick} className={['w-full text-left px-3 py-3 rounded-xl transition-all border',
             isActive ? 'bg-[var(--accent)]/10 border-[var(--accent)]/20' : 'hover:bg-[var(--hover-2)] border-transparent',
         ].join(' ')}>
             <div className="flex items-center gap-2.5">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActive ? 'bg-[var(--accent)]/15' : 'bg-[var(--hover-2)]'}`}>
-                    <Ic className={`w-4 h-4 ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/30'}`} />
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${isActive ? 'bg-[var(--accent)]/15' : 'bg-[var(--hover-2)]'}`}>
+                    <Ic className={`w-4.5 h-4.5 ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/30'}`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <p className={`text-[13px] font-medium truncate ${isActive ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/65'}`}>{wf.name}</p>
-                    <p className="text-[11px] text-[var(--text-primary)]/30 mt-0.5">{wf.nodes.length} статусов</p>
+                    <p className={`text-[14px] leading-5 font-medium truncate ${isActive ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/65'}`}>{wf.name}</p>
+                    <p className="text-[12px] leading-4 text-[var(--text-primary)]/30 mt-0.5">{wf.nodes.length} статусов</p>
                 </div>
             </div>
         </button>
@@ -1181,22 +1182,22 @@ function WfSidebar({ workflows, activeId, onSelect, onCreate }: {
         <div>
             <div className="flex items-center gap-2 px-1 mb-2">
                 {icon}
-                <span className="text-[10px] uppercase tracking-widest text-[var(--text-primary)]/25 font-semibold">{label}</span>
+                <span className="text-[11px] uppercase tracking-widest text-[var(--text-primary)]/25 font-semibold">{label}</span>
             </div>
             <div className="space-y-0.5">{items.map((wf) => <WorkflowListItem key={wf.id} wf={wf} isActive={activeId === wf.id} onClick={() => onSelect(wf.id)} />)}</div>
         </div>
     );
     return (
-        <div className="w-[240px] shrink-0 h-full bg-[var(--bg-card)] border-r border-[var(--border-color)] flex flex-col">
-            <div className="px-4 py-3 border-b border-[var(--border-color)] shrink-0">
+        <div className="w-[260px] shrink-0 h-full bg-[var(--bg-card)] border-r border-[var(--border-color)] flex flex-col">
+            <div className="px-4 py-3.5 border-b border-[var(--border-color)] shrink-0">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-[15px] font-bold text-[var(--text-primary)]">Процессы</h2>
-                    <button onClick={onCreate} className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--accent)]"><Plus className="w-4 h-4" /></button>
+                    <h2 className="text-[16px] font-bold text-[var(--text-primary)]">Процессы</h2>
+                    <button onClick={onCreate} className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--accent)]"><Plus className="w-4.5 h-4.5" /></button>
                 </div>
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-4 scrollbar-thin scrollbar-thumb-[var(--hover-3)]">
-                {group('Задачи', <Layers className="w-3.5 h-3.5 text-[var(--text-primary)]/25" />, tasks)}
-                {group('Заявки', <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/25" />, tickets)}
+            <div className="flex-1 min-h-0 overflow-y-auto p-2.5 space-y-4 scrollbar-thin scrollbar-thumb-[var(--hover-3)]">
+                {group('Задачи', <Layers className="w-4 h-4 text-[var(--text-primary)]/25" />, tasks)}
+                {group('Заявки', <Ticket className="w-4 h-4 text-[var(--text-primary)]/25" />, tickets)}
             </div>
         </div>
     );
@@ -1212,26 +1213,26 @@ function WfToolbar({ workflow, saving, isFullscreen, onAddNode, onSave, onToggle
 }) {
     const Ic = workflow.entityKind === 'task' ? Layers : Ticket;
     return (
-        <div className="h-[48px] shrink-0 bg-[var(--bg-card)] border-b border-[var(--border-color)] flex items-center justify-between px-4">
+        <div className="h-[52px] shrink-0 bg-[var(--bg-card)] border-b border-[var(--border-color)] flex items-center justify-between px-5">
             <div className="flex items-center gap-2.5">
-                <Ic className="w-4 h-4 text-[var(--text-primary)]/25" />
-                <h2 className="text-[15px] font-bold text-[var(--text-primary)]">{workflow.name}</h2>
-                {workflow.description && <span className="text-[13px] text-[var(--text-primary)]/25 hidden xl:block ml-1">— {workflow.description}</span>}
+                <Ic className="w-4.5 h-4.5 text-[var(--text-primary)]/25" />
+                <h2 className="text-[16px] font-bold text-[var(--text-primary)]">{workflow.name}</h2>
+                {workflow.description && <span className="text-[14px] text-[var(--text-primary)]/25 hidden xl:block ml-1">— {workflow.description}</span>}
             </div>
             <div className="flex items-center gap-2">
                 <button onClick={onToggleFullscreen}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/55 text-[13px] font-medium hover:bg-[var(--hover-3)] hover:text-[var(--text-primary)] transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/55 text-[14px] font-medium hover:bg-[var(--hover-3)] hover:text-[var(--text-primary)] transition-colors"
                     title={isFullscreen ? 'Свернуть' : 'Во весь экран'}>
-                    {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                     {isFullscreen ? 'Свернуть' : 'Весь экран'}
                 </button>
                 <button onClick={onAddNode}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/55 text-[13px] font-medium hover:bg-[var(--hover-3)] hover:text-[var(--text-primary)] transition-colors">
-                    <Plus className="w-3.5 h-3.5" /> Статус
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/55 text-[14px] font-medium hover:bg-[var(--hover-3)] hover:text-[var(--text-primary)] transition-colors">
+                    <Plus className="w-4 h-4" /> Статус
                 </button>
                 <button onClick={onSave} disabled={saving}
-                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-[13px] font-medium disabled:opacity-40 transition-colors shadow-[var(--shadow-md)]">
-                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-[14px] font-medium disabled:opacity-40 transition-colors shadow-[var(--shadow-md)]">
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Сохранить
                 </button>
             </div>
@@ -1246,11 +1247,11 @@ function WfToolbar({ workflow, saving, isFullscreen, onAddNode, onSave, onToggle
 function ToastNotification({ data }: { data: ToastData }) {
     return (
         <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
-            className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[200] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-[var(--shadow-lg)] px-4 py-2.5 flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0"><Check className="w-3.5 h-3.5 text-emerald-400" /></div>
+            className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[200] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-[var(--shadow-lg)] px-5 py-3 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0"><Check className="w-4 h-4 text-emerald-400" /></div>
             <div>
-                <p className="text-[13px] font-semibold text-[var(--text-primary)]">{data.title}</p>
-                {data.description && <p className="text-[11px] text-[var(--text-primary)]/35">{data.description}</p>}
+                <p className="text-[14px] leading-5 font-semibold text-[var(--text-primary)]">{data.title}</p>
+                {data.description && <p className="text-[12px] leading-4 text-[var(--text-primary)]/35">{data.description}</p>}
             </div>
         </motion.div>
     );
@@ -1417,12 +1418,12 @@ export default function WorkflowPage() {
     useEffect(() => {
         if (isFullscreen) {
             document.body.style.overflow = 'hidden';
-            
+
             const header = document.querySelector('header');
             const sidebar = document.querySelector('aside');
             if (header) header.style.display = 'none';
             if (sidebar) sidebar.style.display = 'none';
-            
+
             return () => {
                 document.body.style.overflow = '';
                 const header = document.querySelector('header');
@@ -1434,9 +1435,9 @@ export default function WorkflowPage() {
     }, [isFullscreen]);
 
     const content = (
-        <WorkflowInner 
-            isFullscreen={isFullscreen} 
-            onToggleFullscreen={() => setIsFullscreen(!isFullscreen)} 
+        <WorkflowInner
+            isFullscreen={isFullscreen}
+            onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
         />
     );
 
