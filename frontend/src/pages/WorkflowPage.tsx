@@ -15,7 +15,7 @@ import {
   Database, Globe, Code, Search, Filter,
   MoreHorizontal, Edit3, Move, Link2, Unlink,
   AlertTriangle, ThumbsUp, ThumbsDown, RefreshCw,
-  Package, Radio, Hash, Tag, Calendar,
+  Package, Radio, Hash, Tag, Calendar, ZoomOut
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════════
