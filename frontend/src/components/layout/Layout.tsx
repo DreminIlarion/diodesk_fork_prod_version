@@ -20,7 +20,7 @@ export default function Layout() {
         <div className="flex-1 flex flex-col min-h-screen min-w-0">
           <Header onMenuClick={() => setSidebarOpen(true)} />
           
-          <main className="flex-1 p-3 md:p-6 lg:p-8 bg-[var(--bg-primary)] min-w-0">
+          <main id="main-content" className="flex-1 p-3 md:p-6 lg:p-8 bg-[var(--bg-primary)] min-w-0">
             <Outlet />
           </main>
         </div>

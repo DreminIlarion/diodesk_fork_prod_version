@@ -386,7 +386,7 @@ function WfNodeCard({
       onClick={onClick}
       className={[
         'absolute select-none cursor-grab active:cursor-grabbing',
-        'bg-[var(--bg-card)] border-2 rounded-2xl overflow-hidden',
+        'bg-[var(--bg-card)] border-2 rounded-2xl overflow-visible',
         'transition-all duration-150',
         isSelected
           ? 'border-[var(--accent)] shadow-[0_0_0_3px_var(--accent-ring)]'
@@ -399,7 +399,16 @@ function WfNodeCard({
       ].join(' ')}
       style={{ left: node.x, top: node.y, width: NODE_W, height: NODE_H, zIndex: isSelected ? 20 : hoverTarget ? 15 : 10 }}
     >
-      <div className="h-1 w-full" style={{ backgroundColor: node.color }} />
+      {/* Tooltip ABOVE the node */}
+      {hoverTarget && (
+        <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-30 pointer-events-none whitespace-nowrap">
+          <span className="text-[11px] font-semibold text-emerald-400 bg-[var(--bg-card)] border border-emerald-500/30 px-2.5 py-1 rounded-lg shadow-lg">
+            Отпустите для связи
+          </span>
+        </div>
+      )}
+
+      <div className="h-1 w-full rounded-t-2xl" style={{ backgroundColor: node.color }} />
       <div className="px-3.5 py-2.5 flex items-center gap-3 h-[calc(100%-4px)]">
         <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${cat.bg}`}>
           <Icon className={`w-[18px] h-[18px] ${cat.text}`} />
@@ -413,7 +422,6 @@ function WfNodeCard({
           <span className={`text-[11px] ${cat.text}`}>{CATEGORY_LABELS[node.category]}</span>
         </div>
 
-        {/* Connect handle */}
         <div
           onMouseDown={onConnectHandleDown}
           className={[
@@ -427,15 +435,6 @@ function WfNodeCard({
           <Plus className="w-3 h-3 text-[var(--text-primary)]/40" />
         </div>
       </div>
-
-      {/* Drop zone indicator when connecting */}
-      {hoverTarget && (
-        <div className="absolute inset-0 rounded-2xl bg-emerald-400/5 pointer-events-none flex items-center justify-center">
-          <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full">
-            Отпустите для связи
-          </span>
-        </div>
-      )}
     </motion.div>
   );
 }
@@ -469,7 +468,7 @@ function WfEdgePath({ transition, fromNode, toNode, isSelected, onClick }: {
           <rect x={midX - 50} y={midY - 12} width={100} height={24} rx={8}
             fill={isSelected ? 'var(--accent)' : 'var(--bg-card)'}
             stroke={isSelected ? 'var(--accent)' : 'var(--border-color)'} strokeWidth={1} />
-          <text x={midX} y={midY + 4} textAnchor="middle" className="text-[10px] font-medium select-none"
+          <text x={midX} y={midY + 4} textAnchor="middle" className="text-[11px] font-medium select-none"
             fill={isSelected ? 'white' : 'var(--text-primary)'} opacity={isSelected ? 1 : 0.55}>
             {transition.label}
           </text>
@@ -1408,6 +1407,31 @@ function WorkflowInner({ isFullscreen, onToggleFullscreen }: {
 export default function WorkflowPage() {
   const [isFullscreen, setIsFullscreen] = useState(true);
 
+  // Убираем padding у main когда страница смонтирована (даже в свёрнутом режиме)
+  useEffect(() => {
+    const main = document.getElementById('main-content');
+    if (!main) return;
+
+    // Сохраняем оригинальные классы
+    const original = main.className;
+
+    // Убираем все padding-классы
+    main.className = main.className
+      .replace(/\bp-\d+\b/g, '')
+      .replace(/\bmd:p-\d+\b/g, '')
+      .replace(/\blg:p-\d+\b/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Добавляем p-0
+    main.classList.add('p-0');
+
+    return () => {
+      // Восстанавливаем при уходе со страницы
+      main.className = original;
+    };
+  }, []);
+
   useEffect(() => {
     if (isFullscreen) {
       document.body.style.overflow = 'hidden';
@@ -1417,12 +1441,16 @@ export default function WorkflowPage() {
 
   if (isFullscreen) {
     return (
-      <div className="fixed inset-0 z-[50] bg-[var(--bg-main)] flex flex-col">
+      <div
+        className="fixed inset-0 flex flex-col"
+        style={{ zIndex: 9999, backgroundColor: 'var(--bg-main)', isolation: 'isolate' }}
+      >
         <WorkflowInner isFullscreen={true} onToggleFullscreen={() => setIsFullscreen(false)} />
       </div>
     );
   }
 
+  // Свёрнутый режим — без padding, занимает всё пространство main
   return (
     <div className="h-full flex flex-col bg-[var(--bg-main)]">
       <WorkflowInner isFullscreen={false} onToggleFullscreen={() => setIsFullscreen(true)} />
