@@ -17,10 +17,8 @@ import {
     Calendar, ZoomOut, ZoomIn, Maximize2,
     Loader2,
     Play, Pause, StopCircle,
-    Flag,
-    Tag,
-    Code,
-    Star,
+    Flag, Tag, Code, Star,
+    Minimize2,
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -28,12 +26,13 @@ import {
    ═══════════════════════════════════════════════════════════════════ */
 
 type WfEntityKind = 'task' | 'ticket';
+type NodeCategory = 'open' | 'progress' | 'review' | 'done' | 'cancelled' | 'custom';
 
 interface WfStatusNode {
     id: string;
     label: string;
     description?: string;
-    category: 'open' | 'progress' | 'review' | 'done' | 'cancelled' | 'custom';
+    category: NodeCategory;
     color: string;
     iconKey: string;
     x: number;
@@ -57,18 +56,21 @@ interface WfCondition {
     params: Record<string, string>;
 }
 
+type ActionType =
+    | 'notify_email' | 'notify_telegram' | 'notify_push' | 'change_assignee'
+    | 'create_subtask' | 'set_priority' | 'run_webhook' | 'send_template'
+    | 'log_event' | 'auto_assign' | 'set_deadline';
+
 interface WfAction {
     id: string;
-    type: 'notify_email' | 'notify_telegram' | 'notify_push' | 'change_assignee' |
-    'create_subtask' | 'set_priority' | 'run_webhook' | 'send_template' |
-    'log_event' | 'auto_assign' | 'set_deadline';
+    type: ActionType;
     label: string;
     enabled: boolean;
     params: Record<string, string>;
     order: number;
 }
 
-interface Workflow {
+interface WorkflowData {
     id: string;
     name: string;
     entityKind: WfEntityKind;
@@ -79,25 +81,31 @@ interface Workflow {
     updatedAt: string;
 }
 
+interface ToastData {
+    title: string;
+    description?: string;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
-   CONSTANTS & MAPS
+   CONSTANTS
    ═══════════════════════════════════════════════════════════════════ */
 
 const NODE_W = 220;
 const NODE_H = 88;
+const CANVAS_SIZE = 6000;
 
-const CATEGORY_META: Record<string, {
+const CATEGORY_META: Record<NodeCategory, {
     bg: string; border: string; text: string; dot: string; chip: string;
 }> = {
     open: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-400', dot: 'bg-blue-400', chip: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
     progress: { bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', text: 'text-yellow-400', dot: 'bg-yellow-400', chip: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' },
     review: { bg: 'bg-violet-500/10', border: 'border-violet-500/30', text: 'text-violet-400', dot: 'bg-violet-400', chip: 'bg-violet-500/15 text-violet-400 border-violet-500/30' },
     done: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-400', dot: 'bg-emerald-400', chip: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
-    cancelled: { bg: 'bg-[var(--hover-2)]', border: 'border-[var(--border-color)]', text: 'text-[var(--text-primary)]/40', dot: 'bg-[var(--text-muted)]', chip: 'bg-[var(--hover-2)] text-[var(--text-primary)]/40 border-[var(--border-color)]' },
+    cancelled: { bg: 'bg-neutral-500/10', border: 'border-neutral-500/30', text: 'text-neutral-400', dot: 'bg-neutral-400', chip: 'bg-neutral-500/15 text-neutral-400 border-neutral-500/30' },
     custom: { bg: 'bg-orange-500/10', border: 'border-orange-500/30', text: 'text-orange-400', dot: 'bg-orange-400', chip: 'bg-orange-500/15 text-orange-400 border-orange-500/30' },
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
+const CATEGORY_LABELS: Record<NodeCategory, string> = {
     open: 'Начальный', progress: 'В работе', review: 'Проверка',
     done: 'Завершён', cancelled: 'Отменён', custom: 'Другой',
 };
@@ -109,7 +117,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
     flag: Flag, star: Star, shield: Shield,
 };
 
-const ACTION_META: Record<string, {
+const ACTION_META: Record<ActionType, {
     icon: React.ComponentType<{ className?: string }>;
     label: string;
     color: string;
@@ -171,7 +179,7 @@ const ACTION_META: Record<string, {
         ],
     },
     log_event: {
-        icon: Database, label: 'Логировать событие', color: 'text-[var(--text-primary)]/50',
+        icon: Database, label: 'Логировать событие', color: 'text-neutral-400',
         fields: [
             { key: 'level', label: 'Уровень', type: 'select', options: ['info', 'warning', 'error'] },
             { key: 'message', label: 'Сообщение', type: 'text' },
@@ -192,7 +200,7 @@ const ACTION_META: Record<string, {
     },
 };
 
-const CONDITION_META: Record<string, {
+const CONDITION_META: Record<WfCondition['type'], {
     icon: React.ComponentType<{ className?: string }>;
     label: string;
     color: string;
@@ -207,7 +215,7 @@ const CONDITION_META: Record<string, {
    MOCK DATA
    ═══════════════════════════════════════════════════════════════════ */
 
-const MOCK_WORKFLOWS: Workflow[] = [
+const MOCK_WORKFLOWS: WorkflowData[] = [
     {
         id: 'wf-task-default',
         name: 'Жизненный цикл задачи',
@@ -216,110 +224,68 @@ const MOCK_WORKFLOWS: Workflow[] = [
         isDefault: true,
         updatedAt: '2026-07-28T14:30:00Z',
         nodes: [
-            { id: 'n1', label: 'Резерв', category: 'open', color: '#3b82f6', iconKey: 'circle', x: 60, y: 60, isInitial: true, description: 'Задача создана, но не готова к выполнению' },
-            { id: 'n2', label: 'Готово к выполнению', category: 'open', color: '#3b82f6', iconKey: 'alert', x: 360, y: 60, description: 'Задача оценена и готова к взятию в работу' },
-            { id: 'n3', label: 'В работе', category: 'progress', color: '#eab308', iconKey: 'timer', x: 660, y: 60, description: 'Исполнитель работает над задачей' },
-            { id: 'n4', label: 'На проверке', category: 'review', color: '#8b5cf6', iconKey: 'eye', x: 960, y: 60, description: 'Задача отправлена на ревью' },
-            { id: 'n5', label: 'На доработку', category: 'custom', color: '#f97316', iconKey: 'alert', x: 960, y: 240, description: 'Ревьюер вернул задачу на доработку' },
-            { id: 'n6', label: 'На тестировании', category: 'review', color: '#06b6d4', iconKey: 'check', x: 660, y: 240, description: 'Задача проходит QA' },
-            { id: 'n7', label: 'Выполнено', category: 'done', color: '#10b981', iconKey: 'check', x: 360, y: 240, isTerminal: true, description: 'Задача успешно завершена' },
-            { id: 'n8', label: 'Отменено', category: 'cancelled', color: '#6b7280', iconKey: 'ban', x: 60, y: 240, isTerminal: true, description: 'Задача отменена' },
+            { id: 'n1', label: 'Резерв', category: 'open', color: '#3b82f6', iconKey: 'circle', x: 80, y: 80, isInitial: true, description: 'Задача создана' },
+            { id: 'n2', label: 'Готово к выполнению', category: 'open', color: '#3b82f6', iconKey: 'alert', x: 380, y: 80, description: 'Оценена' },
+            { id: 'n3', label: 'В работе', category: 'progress', color: '#eab308', iconKey: 'timer', x: 680, y: 80, description: 'Работа' },
+            { id: 'n4', label: 'На проверке', category: 'review', color: '#8b5cf6', iconKey: 'eye', x: 980, y: 80, description: 'Ревью' },
+            { id: 'n5', label: 'На доработку', category: 'custom', color: '#f97316', iconKey: 'alert', x: 980, y: 260, description: 'Возврат' },
+            { id: 'n6', label: 'На тестировании', category: 'review', color: '#06b6d4', iconKey: 'check', x: 680, y: 260, description: 'QA' },
+            { id: 'n7', label: 'Выполнено', category: 'done', color: '#10b981', iconKey: 'check', x: 380, y: 260, isTerminal: true },
+            { id: 'n8', label: 'Отменено', category: 'cancelled', color: '#6b7280', iconKey: 'ban', x: 80, y: 260, isTerminal: true },
         ],
         transitions: [
-            {
-                id: 't1', fromId: 'n1', toId: 'n2', label: 'Подготовить',
-                conditions: [{ id: 'c1', type: 'field_required', params: { fields: 'priority,story_points' } }],
-                actions: [{ id: 'a1', type: 'notify_push', label: 'Уведомить о готовности', enabled: true, params: { to: 'Все участники', title: 'Задача готова к выполнению' }, order: 0 }],
-            },
-            {
-                id: 't2', fromId: 'n2', toId: 'n3', label: 'Взять в работу',
-                conditions: [{ id: 'c2', type: 'assignee_set', params: {} }],
-                actions: [
-                    { id: 'a2', type: 'notify_telegram', label: 'TG: задача взята', enabled: true, params: { to: 'Автор', message: '{{assignee}} взял задачу {{task_number}}' }, order: 0 },
-                    { id: 'a3', type: 'set_deadline', label: 'Установить дедлайн', enabled: true, params: { offset: '7', notify: '2 дня' }, order: 1 },
-                ],
-            },
-            {
-                id: 't3', fromId: 'n3', toId: 'n4', label: 'Отправить на ревью',
-                conditions: [{ id: 'c3', type: 'field_required', params: { fields: 'description' } }],
-                actions: [{ id: 'a4', type: 'notify_email', label: 'Email ревьюеру', enabled: true, params: { to: 'Ревьюер', subject: 'Задача {{task_number}} на ревью', body: 'Проверьте задачу: {{task_url}}' }, order: 0 }],
-            },
-            {
-                id: 't4', fromId: 'n4', toId: 'n6', label: 'Принято → Тесты',
-                conditions: [],
-                actions: [{ id: 'a5', type: 'auto_assign', label: 'Назначить QA', enabled: true, params: { strategy: 'По нагрузке' }, order: 0 }],
-            },
-            {
-                id: 't5', fromId: 'n4', toId: 'n5', label: 'Вернуть на доработку',
-                conditions: [],
-                actions: [{ id: 'a6', type: 'notify_push', label: 'Уведомить исполнителя', enabled: true, params: { to: 'Исполнитель', title: 'Задача возвращена на доработку' }, order: 0 }],
-            },
+            { id: 't1', fromId: 'n1', toId: 'n2', label: 'Подготовить', conditions: [{ id: 'c1', type: 'field_required', params: { fields: 'priority' } }], actions: [{ id: 'a1', type: 'notify_push', label: 'Уведомить', enabled: true, params: { to: 'Все участники', title: 'Готова' }, order: 0 }] },
+            { id: 't2', fromId: 'n2', toId: 'n3', label: 'Взять в работу', conditions: [{ id: 'c2', type: 'assignee_set', params: {} }], actions: [{ id: 'a2', type: 'notify_telegram', label: 'TG', enabled: true, params: { to: 'Автор', message: 'Взята' }, order: 0 }] },
+            { id: 't3', fromId: 'n3', toId: 'n4', label: 'На ревью', conditions: [], actions: [] },
+            { id: 't4', fromId: 'n4', toId: 'n6', label: 'Принято → Тесты', conditions: [], actions: [] },
+            { id: 't5', fromId: 'n4', toId: 'n5', label: 'На доработку', conditions: [], actions: [] },
             { id: 't6', fromId: 'n5', toId: 'n3', label: 'Доработать', conditions: [], actions: [] },
-            {
-                id: 't7', fromId: 'n6', toId: 'n7', label: 'Тесты пройдены',
-                conditions: [],
-                actions: [
-                    { id: 'a7', type: 'notify_email', label: 'Email автору', enabled: true, params: { to: 'Автор', subject: 'Задача {{task_number}} выполнена', body: 'Задача успешно завершена' }, order: 0 },
-                    { id: 'a8', type: 'run_webhook', label: 'Webhook в аналитику', enabled: false, params: { url: 'https://analytics.example.com/hook', method: 'POST', payload: '{"event":"task_done","id":"{{task_id}}"}' }, order: 1 },
-                ],
-            },
-            {
-                id: 't8', fromId: 'n6', toId: 'n5', label: 'Баг → Доработка',
-                conditions: [],
-                actions: [{ id: 'a9', type: 'set_priority', label: 'Повысить приоритет', enabled: false, params: { priority: 'Высокий' }, order: 0 }],
-            },
-            {
-                id: 't9', fromId: 'n1', toId: 'n8', label: 'Отменить',
-                conditions: [{ id: 'c4', type: 'role', params: { role: 'admin,manager' } }],
-                actions: [{ id: 'a10', type: 'log_event', label: 'Лог отмены', enabled: true, params: { level: 'info', message: 'Задача {{task_number}} отменена' }, order: 0 }],
-            },
+            { id: 't7', fromId: 'n6', toId: 'n7', label: 'Тесты пройдены', conditions: [], actions: [] },
+            { id: 't8', fromId: 'n6', toId: 'n5', label: 'Баг', conditions: [], actions: [] },
+            { id: 't9', fromId: 'n1', toId: 'n8', label: 'Отменить', conditions: [{ id: 'c4', type: 'role', params: { role: 'admin' } }], actions: [] },
             { id: 't10', fromId: 'n2', toId: 'n8', label: 'Отменить', conditions: [], actions: [] },
-            {
-                id: 't11', fromId: 'n3', toId: 'n7', label: 'Завершить (без ревью)',
-                conditions: [{ id: 'c5', type: 'role', params: { role: 'admin' } }],
-                actions: [{ id: 'a11', type: 'send_template', label: 'Шаблон завершения', enabled: true, params: { template: 'Задача принята' }, order: 0 }],
-            },
+            { id: 't11', fromId: 'n3', toId: 'n7', label: 'Быстро', conditions: [{ id: 'c5', type: 'role', params: { role: 'admin' } }], actions: [] },
         ],
     },
     {
         id: 'wf-ticket-default',
         name: 'Жизненный цикл заявки',
         entityKind: 'ticket',
-        description: 'Workflow для обращений клиентов',
+        description: 'Workflow для обращений',
         isDefault: true,
         updatedAt: '2026-07-25T09:15:00Z',
         nodes: [
-            { id: 'tn1', label: 'Новая', category: 'open', color: '#3b82f6', iconKey: 'circle', x: 60, y: 60, isInitial: true },
-            { id: 'tn2', label: 'В работе', category: 'progress', color: '#eab308', iconKey: 'timer', x: 360, y: 60 },
-            { id: 'tn3', label: 'Ожидание клиента', category: 'custom', color: '#f97316', iconKey: 'clock', x: 660, y: 60 },
-            { id: 'tn4', label: 'Решена', category: 'done', color: '#10b981', iconKey: 'check', x: 360, y: 240, isTerminal: true },
-            { id: 'tn5', label: 'Закрыта', category: 'done', color: '#10b981', iconKey: 'shield', x: 660, y: 240, isTerminal: true },
-            { id: 'tn6', label: 'Отклонена', category: 'cancelled', color: '#6b7280', iconKey: 'ban', x: 60, y: 240, isTerminal: true },
+            { id: 'tn1', label: 'Новая', category: 'open', color: '#3b82f6', iconKey: 'circle', x: 80, y: 80, isInitial: true },
+            { id: 'tn2', label: 'В работе', category: 'progress', color: '#eab308', iconKey: 'timer', x: 380, y: 80 },
+            { id: 'tn3', label: 'Ожидание клиента', category: 'custom', color: '#f97316', iconKey: 'clock', x: 680, y: 80 },
+            { id: 'tn4', label: 'Решена', category: 'done', color: '#10b981', iconKey: 'check', x: 380, y: 260, isTerminal: true },
+            { id: 'tn5', label: 'Закрыта', category: 'done', color: '#10b981', iconKey: 'shield', x: 680, y: 260, isTerminal: true },
+            { id: 'tn6', label: 'Отклонена', category: 'cancelled', color: '#6b7280', iconKey: 'ban', x: 80, y: 260, isTerminal: true },
         ],
         transitions: [
-            { id: 'tt1', fromId: 'tn1', toId: 'tn2', label: 'Взять', conditions: [{ id: 'tc1', type: 'assignee_set', params: {} }], actions: [{ id: 'ta1', type: 'notify_email', label: 'Email клиенту', enabled: true, params: { to: 'Автор', subject: 'Заявка принята', body: 'Ваша заявка взята в работу' }, order: 0 }] },
-            { id: 'tt2', fromId: 'tn2', toId: 'tn3', label: 'Ожидание', conditions: [], actions: [{ id: 'ta2', type: 'notify_email', label: 'Запрос информации', enabled: true, params: { to: 'Автор', subject: 'Нужна дополнительная информация', body: 'Уточните, пожалуйста...' }, order: 0 }] },
+            { id: 'tt1', fromId: 'tn1', toId: 'tn2', label: 'Взять', conditions: [], actions: [] },
+            { id: 'tt2', fromId: 'tn2', toId: 'tn3', label: 'Ожидание', conditions: [], actions: [] },
             { id: 'tt3', fromId: 'tn3', toId: 'tn2', label: 'Продолжить', conditions: [], actions: [] },
-            { id: 'tt4', fromId: 'tn2', toId: 'tn4', label: 'Решить', conditions: [], actions: [{ id: 'ta3', type: 'notify_email', label: 'Email клиенту', enabled: true, params: { to: 'Автор', subject: 'Заявка решена', body: 'Ваша заявка решена' }, order: 0 }] },
-            { id: 'tt5', fromId: 'tn4', toId: 'tn5', label: 'Закрыть', conditions: [], actions: [{ id: 'ta4', type: 'log_event', label: 'Лог закрытия', enabled: true, params: { level: 'info', message: 'Заявка закрыта' }, order: 0 }] },
-            { id: 'tt6', fromId: 'tn1', toId: 'tn6', label: 'Отклонить', conditions: [{ id: 'tc2', type: 'role', params: { role: 'admin,support_manager' } }], actions: [] },
+            { id: 'tt4', fromId: 'tn2', toId: 'tn4', label: 'Решить', conditions: [], actions: [] },
+            { id: 'tt5', fromId: 'tn4', toId: 'tn5', label: 'Закрыть', conditions: [], actions: [] },
+            { id: 'tt6', fromId: 'tn1', toId: 'tn6', label: 'Отклонить', conditions: [], actions: [] },
         ],
     },
     {
         id: 'wf-task-bugfix',
         name: 'Быстрый баг-фикс',
         entityKind: 'task',
-        description: 'Упрощённый workflow для срочных багов',
+        description: 'Упрощённый workflow',
         isDefault: false,
         updatedAt: '2026-07-20T16:45:00Z',
         nodes: [
-            { id: 'bn1', label: 'Буг-репорт', category: 'open', color: '#ef4444', iconKey: 'alert', x: 60, y: 60, isInitial: true },
-            { id: 'bn2', label: 'Фикс в процессе', category: 'progress', color: '#eab308', iconKey: 'timer', x: 360, y: 60 },
-            { id: 'bn3', label: 'Задеплоено', category: 'done', color: '#10b981', iconKey: 'check', x: 660, y: 60, isTerminal: true },
+            { id: 'bn1', label: 'Буг-репорт', category: 'open', color: '#ef4444', iconKey: 'alert', x: 80, y: 80, isInitial: true },
+            { id: 'bn2', label: 'Фикс в процессе', category: 'progress', color: '#eab308', iconKey: 'timer', x: 380, y: 80 },
+            { id: 'bn3', label: 'Задеплоено', category: 'done', color: '#10b981', iconKey: 'check', x: 680, y: 80, isTerminal: true },
         ],
         transitions: [
-            { id: 'bt1', fromId: 'bn1', toId: 'bn2', label: 'Взять', conditions: [], actions: [{ id: 'ba1', type: 'notify_telegram', label: 'Алерт в чат', enabled: true, params: { to: 'Канал', message: '🔥 Баг {{task_number}} взят в работу' }, order: 0 }] },
-            { id: 'bt2', fromId: 'bn2', toId: 'bn3', label: 'Задеплоено', conditions: [], actions: [{ id: 'ba2', type: 'notify_telegram', label: 'Алерт о деплое', enabled: true, params: { to: 'Канал', message: '✅ Баг {{task_number}} исправлен и задеплоен' }, order: 0 }] },
+            { id: 'bt1', fromId: 'bn1', toId: 'bn2', label: 'Взять', conditions: [], actions: [] },
+            { id: 'bt2', fromId: 'bn2', toId: 'bn3', label: 'Задеплоено', conditions: [], actions: [] },
         ],
     },
 ];
@@ -329,21 +295,19 @@ const MOCK_WORKFLOWS: Workflow[] = [
    ═══════════════════════════════════════════════════════════════════ */
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-
-const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 function getNodeCenter(n: WfStatusNode) {
     return { cx: n.x + NODE_W / 2, cy: n.y + NODE_H / 2 };
 }
 
-function getEdgePath(from: WfStatusNode, to: WfStatusNode): { path: string; midX: number; midY: number } {
+function getEdgePath(from: WfStatusNode, to: WfStatusNode) {
     const fc = getNodeCenter(from);
     const tc = getNodeCenter(to);
     const dx = tc.cx - fc.cx;
     const dy = tc.cy - fc.cy;
 
     let sx: number, sy: number, ex: number, ey: number;
-
     if (Math.abs(dx) >= Math.abs(dy)) {
         if (dx > 0) { sx = from.x + NODE_W; sy = fc.cy; ex = to.x; ey = tc.cy; }
         else { sx = from.x; sy = fc.cy; ex = to.x + NODE_W; ey = tc.cy; }
@@ -364,11 +328,21 @@ function getEdgePath(from: WfStatusNode, to: WfStatusNode): { path: string; midX
         c2x = ex; c2y = sy + (ey - sy) * 0.6;
     }
 
-    return {
-        path: `M ${sx} ${sy} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${ex} ${ey}`,
-        midX,
-        midY,
-    };
+    return { path: `M ${sx} ${sy} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${ex} ${ey}`, midX, midY };
+}
+
+function makeBezier(from: { x: number; y: number }, to: { x: number; y: number }) {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    let c1x: number, c1y: number, c2x: number, c2y: number;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+        c1x = from.x + dx * 0.4; c1y = from.y;
+        c2x = from.x + dx * 0.6; c2y = to.y;
+    } else {
+        c1x = from.x; c1y = from.y + dy * 0.4;
+        c2x = to.x; c2y = from.y + dy * 0.6;
+    }
+    return `M ${from.x} ${from.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${to.x} ${to.y}`;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -381,10 +355,13 @@ function NodeIcon({ iconKey, className }: { iconKey: string; className?: string 
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   WORKFLOW NODE CARD (on canvas)
+   NODE CARD
    ═══════════════════════════════════════════════════════════════════ */
 
-interface WfNodeCardProps {
+function WfNodeCard({
+    node, isSelected, isConnectSource, isConnectTarget,
+    transitionCount, onMouseDown, onClick, onConnectStart, onConnectEnd,
+}: {
     node: WfStatusNode;
     isSelected: boolean;
     isConnectSource: boolean;
@@ -394,75 +371,56 @@ interface WfNodeCardProps {
     onClick: () => void;
     onConnectStart: () => void;
     onConnectEnd: () => void;
-}
-
-function WfNodeCard({
-    node, isSelected, isConnectSource, isConnectTarget,
-    transitionCount, onMouseDown, onClick, onConnectStart, onConnectEnd,
-}: WfNodeCardProps) {
+}) {
     const cat = CATEGORY_META[node.category];
     const Icon = ICON_MAP[node.iconKey] ?? Circle;
 
     return (
         <motion.div
-            layout
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            exit={{ opacity: 0, scale: 0.92 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 320 }}
             onMouseDown={onMouseDown}
             onClick={(e) => { e.stopPropagation(); onClick(); }}
             className={[
                 'absolute select-none cursor-grab active:cursor-grabbing',
                 'bg-[var(--bg-card)] border-2 rounded-2xl overflow-hidden',
-                'transition-shadow duration-200',
+                'transition-shadow duration-150',
                 isSelected
                     ? 'border-[var(--accent)] shadow-[0_0_0_3px_var(--accent-ring)]'
                     : isConnectTarget
-                        ? 'border-emerald-500/50 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]'
+                        ? 'border-emerald-500/50 shadow-[0_0_0_3px_rgba(16,185,129,.15)]'
                         : `${cat.border} hover:shadow-lg`,
                 isConnectSource ? 'ring-2 ring-[var(--accent)]/30' : '',
             ].join(' ')}
             style={{ left: node.x, top: node.y, width: NODE_W, height: NODE_H, zIndex: isSelected ? 20 : 10 }}
         >
             <div className="h-1 w-full" style={{ backgroundColor: node.color }} />
-
             <div className="px-3.5 py-2.5 flex items-center gap-3 h-[calc(100%-4px)]">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${cat.bg}`}>
-                    <Icon className={`w-4.5 h-4.5 ${cat.text}`} />
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${cat.bg}`}>
+                    <Icon className={`w-[18px] h-[18px] ${cat.text}`} />
                 </div>
-
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                        {node.isInitial && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" title="Начальный статус" />
-                        )}
-                        <h4 className="text-sm font-semibold text-[var(--text-primary)] truncate leading-tight">
-                            {node.label}
-                        </h4>
-                        {node.isTerminal && (
-                            <Lock className="w-3 h-3 text-[var(--text-primary)]/25 flex-shrink-0" />
-                        )}
+                        {node.isInitial && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />}
+                        <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate leading-tight">{node.label}</span>
+                        {node.isTerminal && <Lock className="w-3 h-3 text-[var(--text-primary)]/25 shrink-0" />}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                         <span className={`text-[11px] ${cat.text}`}>{CATEGORY_LABELS[node.category]}</span>
-                        <span className="text-[11px] text-[var(--text-primary)]/25">
-                            {transitionCount.outgoing}→ {transitionCount.incoming}←
-                        </span>
+                        <span className="text-[11px] text-[var(--text-primary)]/25">{transitionCount.outgoing}→ {transitionCount.incoming}←</span>
                     </div>
                 </div>
-
                 <div
                     onMouseDown={(e) => { e.stopPropagation(); onConnectStart(); }}
                     onMouseUp={(e) => { e.stopPropagation(); onConnectEnd(); }}
                     className={[
-                        'w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0',
-                        'transition-all cursor-crosshair',
+                        'w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all cursor-crosshair',
                         isConnectSource
                             ? 'border-[var(--accent)] bg-[var(--accent)]/20 scale-110'
                             : 'border-[var(--border-color)] hover:border-[var(--accent)] hover:bg-[var(--accent)]/10',
                     ].join(' ')}
-                    title="Перетащите для создания перехода"
                 >
                     <Plus className="w-3 h-3 text-[var(--text-primary)]/40" />
                 </div>
@@ -472,69 +430,47 @@ function WfNodeCard({
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   EDGE PATH
+   EDGE
    ═══════════════════════════════════════════════════════════════════ */
 
-interface WfEdgePathProps {
-    transition: WfTransition;
-    fromNode: WfStatusNode;
-    toNode: WfStatusNode;
-    isSelected: boolean;
-    onClick: () => void;
-}
-
-function WfEdgePath({ transition, fromNode, toNode, isSelected, onClick }: WfEdgePathProps) {
+function WfEdgePath({ transition, fromNode, toNode, isSelected, onClick }: {
+    transition: WfTransition; fromNode: WfStatusNode; toNode: WfStatusNode;
+    isSelected: boolean; onClick: () => void;
+}) {
     const { path, midX, midY } = getEdgePath(fromNode, toNode);
-
     return (
         <g>
-            {/* Wide invisible hit area */}
             <path d={path} fill="none" stroke="transparent" strokeWidth={20}
-                className="cursor-pointer" onClick={(e) => { e.stopPropagation(); onClick(); }} />
-
-            {/* Visible path */}
-            <path
-                d={path} fill="none"
+                className="cursor-pointer" style={{ pointerEvents: 'stroke' }}
+                onClick={(e) => { e.stopPropagation(); onClick(); }} />
+            <path d={path} fill="none"
                 stroke={isSelected ? 'var(--accent)' : 'var(--border-color)'}
                 strokeWidth={isSelected ? 2.5 : 1.5}
-                className="transition-all duration-200"
-                markerEnd={isSelected ? 'url(#arrowSelected)' : 'url(#arrow)'}
-            />
-
-            {/* Animated dash when selected */}
+                className="transition-colors duration-150"
+                markerEnd={isSelected ? 'url(#arrowSel)' : 'url(#arrow)'} />
             {isSelected && (
                 <path d={path} fill="none" stroke="var(--accent)"
-                    strokeWidth={2} strokeDasharray="6 4" opacity={0.5}
-                    className="animate-flow" />
+                    strokeWidth={2} strokeDasharray="6 4" opacity={0.4} className="animate-flow" />
             )}
-
-            {/* Label */}
             {transition.label && (
-                <g className="cursor-pointer" onClick={(e) => { e.stopPropagation(); onClick(); }}>
+                <g className="cursor-pointer" style={{ pointerEvents: 'bounding-box' }}
+                    onClick={(e) => { e.stopPropagation(); onClick(); }}>
                     <rect x={midX - 50} y={midY - 12} width={100} height={24} rx={8}
                         fill={isSelected ? 'var(--accent)' : 'var(--bg-card)'}
-                        stroke={isSelected ? 'var(--accent)' : 'var(--border-color)'}
-                        strokeWidth={1} />
-                    <text x={midX} y={midY + 4} textAnchor="middle"
-                        className="text-[10px] font-medium"
-                        fill={isSelected ? 'white' : 'var(--text-primary)'}
-                        opacity={isSelected ? 1 : 0.6}>
+                        stroke={isSelected ? 'var(--accent)' : 'var(--border-color)'} strokeWidth={1} />
+                    <text x={midX} y={midY + 4} textAnchor="middle" className="text-[10px] font-medium select-none"
+                        fill={isSelected ? 'white' : 'var(--text-primary)'} opacity={isSelected ? 1 : 0.55}>
                         {transition.label}
                     </text>
                 </g>
             )}
-
-            {/* Action count badge */}
             {transition.actions.length > 0 && (
                 <g>
                     <circle cx={midX + 55} cy={midY} r={8}
                         fill={isSelected ? 'var(--accent)' : 'var(--hover-3)'}
-                        stroke={isSelected ? 'var(--accent)' : 'var(--border-color)'}
-                        strokeWidth={1} />
+                        stroke={isSelected ? 'var(--accent)' : 'var(--border-color)'} strokeWidth={1} />
                     <text x={midX + 55} y={midY + 3.5} textAnchor="middle"
-                        className="text-[9px] font-bold" fill="white">
-                        {transition.actions.length}
-                    </text>
+                        className="text-[9px] font-bold select-none" fill="white">{transition.actions.length}</text>
                 </g>
             )}
         </g>
@@ -542,170 +478,79 @@ function WfEdgePath({ transition, fromNode, toNode, isSelected, onClick }: WfEdg
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   TEMP CONNECTION LINE
+   ACTION & CONDITION ITEMS
    ═══════════════════════════════════════════════════════════════════ */
 
-function TempConnectionLine({ from, to }: { from: { x: number; y: number }; to: { x: number; y: number } }) {
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-
-    let c1x: number, c1y: number, c2x: number, c2y: number;
-    if (Math.abs(dx) >= Math.abs(dy)) {
-        c1x = from.x + dx * 0.4; c1y = from.y;
-        c2x = from.x + dx * 0.6; c2y = to.y;
-    } else {
-        c1x = from.x; c1y = from.y + dy * 0.4;
-        c2x = to.x; c2y = from.y + dy * 0.6;
-    }
-
-    return (
-        <path
-            d={`M ${from.x} ${from.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${to.x} ${to.y}`}
-            fill="none" stroke="var(--accent)" strokeWidth={2}
-            strokeDasharray="6 4" opacity={0.6}
-        />
-    );
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   ACTION ITEM
-   ═══════════════════════════════════════════════════════════════════ */
-
-interface ActionItemProps {
-    action: WfAction;
-    onToggle: () => void;
-    onRemove: () => void;
-    onEdit: () => void;
-}
-
-function ActionItem({ action, onToggle, onRemove, onEdit }: ActionItemProps) {
+function ActionItem({ action, onToggle, onRemove, onEdit }: {
+    action: WfAction; onToggle: () => void; onRemove: () => void; onEdit: () => void;
+}) {
     const m = ACTION_META[action.type];
     if (!m) return null;
     const Ic = m.icon;
-
     return (
-        <motion.div
-            layout
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8, scale: 0.95 }}
-            className={[
-                'group flex items-start gap-3 p-3 rounded-xl border transition-all',
-                action.enabled
-                    ? 'bg-[var(--hover-1)] border-[var(--border-color)]'
-                    : 'bg-[var(--hover-2)]/50 border-[var(--border-color)]/50 opacity-60',
-            ].join(' ')}
-        >
-            {/* Toggle */}
+        <motion.div layout initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6, scale: 0.96 }}
+            className={['group flex items-start gap-3 p-3 rounded-xl border transition-all',
+                action.enabled ? 'bg-[var(--hover-1)] border-[var(--border-color)]' : 'bg-[var(--hover-2)]/50 border-[var(--border-color)]/50 opacity-50',
+            ].join(' ')}>
             <button onClick={onToggle}
-                className={`mt-0.5 w-8 h-5 rounded-full flex-shrink-0 relative transition-colors ${action.enabled ? 'bg-[var(--accent)]' : 'bg-[var(--hover-3)]'}`}>
+                className={`mt-0.5 w-8 h-5 rounded-full shrink-0 relative transition-colors ${action.enabled ? 'bg-[var(--accent)]' : 'bg-[var(--hover-3)]'}`}>
                 <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${action.enabled ? 'left-3.5' : 'left-0.5'}`} />
             </button>
-
-            {/* Icon */}
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${action.enabled ? 'bg-[var(--accent)]/10' : 'bg-[var(--hover-2)]'}`}>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${action.enabled ? 'bg-[var(--accent)]/10' : 'bg-[var(--hover-2)]'}`}>
                 <Ic className={`w-4 h-4 ${action.enabled ? m.color : 'text-[var(--text-primary)]/30'}`} />
             </div>
-
-            {/* Content */}
             <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium ${action.enabled ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/40'}`}>
-                    {m.label}
-                </p>
+                <p className={`text-[13px] font-medium ${action.enabled ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/40'}`}>{m.label}</p>
                 {Object.entries(action.params).slice(0, 2).map(([k, v]) => (
-                    <p key={k} className="text-[11px] text-[var(--text-primary)]/30 truncate">
-                        {k}: <span className="text-[var(--text-primary)]/50">{v}</span>
-                    </p>
+                    <p key={k} className="text-[11px] text-[var(--text-primary)]/30 truncate">{k}: <span className="text-[var(--text-primary)]/50">{v}</span></p>
                 ))}
             </div>
-
-            {/* Controls */}
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                <button onClick={onEdit}
-                    className="p-1.5 rounded-lg hover:bg-[var(--hover-3)] text-[var(--text-primary)]/30 hover:text-[var(--text-primary)]/60">
-                    <Edit3 className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={onRemove}
-                    className="p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--text-primary)]/30 hover:text-red-400">
-                    <Trash2 className="w-3.5 h-3.5" />
-                </button>
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-[var(--hover-3)] text-[var(--text-primary)]/30 hover:text-[var(--text-primary)]/60"><Edit3 className="w-3.5 h-3.5" /></button>
+                <button onClick={onRemove} className="p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--text-primary)]/30 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
             </div>
         </motion.div>
     );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   CONDITION ITEM
-   ═══════════════════════════════════════════════════════════════════ */
-
-interface ConditionItemProps {
-    condition: WfCondition;
-    onRemove: () => void;
-}
-
-function ConditionItem({ condition, onRemove }: ConditionItemProps) {
+function ConditionItem({ condition, onRemove }: { condition: WfCondition; onRemove: () => void }) {
     const m = CONDITION_META[condition.type];
     if (!m) return null;
     const Ic = m.icon;
-
     return (
-        <motion.div
-            layout
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="group flex items-center gap-3 p-2.5 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]"
-        >
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-[var(--hover-2)]">
-                <Ic className={`w-3.5 h-3.5 ${m.color}`} />
-            </div>
-            <span className="flex-1 text-sm text-[var(--text-primary)]/70 truncate">{m.label}</span>
-            <button onClick={onRemove}
-                className="p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-[var(--text-primary)]/30 hover:text-red-400 transition-all">
-                <X className="w-3.5 h-3.5" />
-            </button>
+        <motion.div layout initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+            className="group flex items-center gap-3 p-2.5 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-[var(--hover-2)]"><Ic className={`w-3.5 h-3.5 ${m.color}`} /></div>
+            <span className="flex-1 text-[13px] text-[var(--text-primary)]/70 truncate">{m.label}</span>
+            <button onClick={onRemove} className="p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-[var(--text-primary)]/30 hover:text-red-400 transition-all"><X className="w-3.5 h-3.5" /></button>
         </motion.div>
     );
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   ADD MENU (dropdown for actions/conditions)
+   ADD MENU
    ═══════════════════════════════════════════════════════════════════ */
 
-interface AddMenuProps {
-    items: { type: string; label: string; icon: React.ComponentType<{ className?: string }>; color: string }[];
-    onSelect: (type: string) => void;
-    onClose: () => void;
-}
+interface AddMenuItem { type: string; label: string; icon: React.ComponentType<{ className?: string }>; color: string }
 
-function AddMenu({ items, onSelect, onClose }: AddMenuProps) {
+function AddMenu({ items, onSelect, onClose }: { items: AddMenuItem[]; onSelect: (t: string) => void; onClose: () => void }) {
     const ref = useRef<HTMLDivElement>(null);
-
     useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+        document.addEventListener('mousedown', h);
+        return () => document.removeEventListener('mousedown', h);
     }, [onClose]);
-
     return (
-        <motion.div
-            ref={ref}
-            initial={{ opacity: 0, y: -4, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+        <motion.div ref={ref} initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.97 }}
-            className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-[var(--shadow-lg)] overflow-hidden"
-        >
+            className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-[var(--shadow-lg)] overflow-hidden">
             <div className="p-1.5 max-h-[260px] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--hover-3)]">
                 {items.map((item) => {
-                    const Ic = item.icon;
-                    return (
-                        <button key={item.type}
-                            onClick={() => { onSelect(item.type); onClose(); }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] transition-colors text-left">
-                            <Ic className={`w-4 h-4 ${item.color} flex-shrink-0`} />
-                            <span>{item.label}</span>
+                    const Ic = item.icon; return (
+                        <button key={item.type} onClick={() => { onSelect(item.type); onClose(); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] transition-colors text-left">
+                            <Ic className={`w-4 h-4 ${item.color} shrink-0`} /><span>{item.label}</span>
                         </button>
                     );
                 })}
@@ -715,172 +560,139 @@ function AddMenu({ items, onSelect, onClose }: AddMenuProps) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   DELETE CONFIRM
+   ═══════════════════════════════════════════════════════════════════ */
+
+function DeleteConfirm({ label, description, onCancel, onConfirm }: {
+    label: string; description: string; onCancel: () => void; onConfirm: () => void;
+}) {
+    return (
+        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 space-y-2">
+            <div className="flex items-center gap-2 text-red-400"><AlertTriangle className="w-4 h-4" /><p className="text-[13px] font-medium">{label}</p></div>
+            <p className="text-[11px] text-[var(--text-primary)]/40">{description}</p>
+            <div className="flex gap-2">
+                <button onClick={onCancel} className="flex-1 px-3 py-1.5 rounded-lg bg-[var(--hover-2)] text-[var(--text-primary)]/60 text-[13px]">Отмена</button>
+                <button onClick={onConfirm} className="flex-1 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-[13px] font-medium hover:bg-red-500/30">Удалить</button>
+            </div>
+        </div>
+    );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    NODE DETAIL PANEL
    ═══════════════════════════════════════════════════════════════════ */
 
-interface NodeDetailPanelProps {
-    node: WfStatusNode;
-    onClose: () => void;
-    onUpdate: (n: WfStatusNode) => void;
-    onDelete: () => void;
-}
-
-function NodeDetailPanel({ node, onClose, onUpdate, onDelete }: NodeDetailPanelProps) {
+function NodeDetailPanel({ node, onClose, onUpdate, onDelete }: {
+    node: WfStatusNode; onClose: () => void; onUpdate: (n: WfStatusNode) => void; onDelete: () => void;
+}) {
     const [label, setLabel] = useState(node.label);
     const [desc, setDesc] = useState(node.description ?? '');
     const [category, setCategory] = useState(node.category);
     const [showCatMenu, setShowCatMenu] = useState(false);
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showDel, setShowDel] = useState(false);
+
+    useEffect(() => { setLabel(node.label); setDesc(node.description ?? ''); setCategory(node.category); setShowDel(false); }, [node.id]);
 
     const cat = CATEGORY_META[category];
-
-    const handleSave = () => {
-        onUpdate({ ...node, label: label.trim() || node.label, description: desc.trim(), category });
-    };
+    const handleSave = () => onUpdate({ ...node, label: label.trim() || node.label, description: desc.trim(), category });
 
     return (
-        <motion.div
-            initial={{ x: '100%', opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: '100%', opacity: 0 }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="w-[380px] flex-shrink-0 h-full bg-[var(--bg-card)] border-l border-[var(--border-color)] flex flex-col"
-        >
-            {/* Header */}
-            <div className="px-5 py-4 border-b border-[var(--border-color)] flex-shrink-0">
+        <motion.div initial={{ x: '100%', opacity: 0 }} animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0 }} transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+            className="w-[360px] shrink-0 h-full bg-[var(--bg-card)] border-l border-[var(--border-color)] flex flex-col"
+            onClick={(e) => e.stopPropagation()}>
+
+            <div className="px-5 py-4 border-b border-[var(--border-color)] shrink-0">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${cat.bg}`}>
                             <NodeIcon iconKey={node.iconKey} className={`w-4 h-4 ${cat.text}`} />
                         </div>
                         <div>
-                            <h3 className="text-base font-bold text-[var(--text-primary)]">Настройка статуса</h3>
-                            <p className="text-[11px] text-[var(--text-primary)]/40">ID: {node.id}</p>
+                            <h3 className="text-[15px] font-bold text-[var(--text-primary)]">Настройка статуса</h3>
+                            <p className="text-[11px] text-[var(--text-primary)]/35">ID: {node.id}</p>
                         </div>
                     </div>
-                    <button onClick={onClose}
-                        className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]">
-                        <X className="w-4 h-4" />
-                    </button>
+                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"><X className="w-4 h-4" /></button>
                 </div>
                 <div className="h-1.5 rounded-full w-full" style={{ backgroundColor: node.color }} />
             </div>
 
-            {/* Body */}
             <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 scrollbar-thin scrollbar-thumb-[var(--hover-3)]">
-                {/* Name */}
                 <div>
-                    <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">Название</label>
+                    <label className="block text-[13px] font-medium text-[var(--text-primary)]/55 mb-1.5">Название</label>
                     <input value={label} onChange={(e) => setLabel(e.target.value)}
-                        className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-sm placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all" />
+                        className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[13px] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all" />
+                </div>
+                <div>
+                    <label className="block text-[13px] font-medium text-[var(--text-primary)]/55 mb-1.5">Описание</label>
+                    <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} placeholder="Описание..."
+                        className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[13px] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all resize-none" />
                 </div>
 
-                {/* Description */}
                 <div>
-                    <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">Описание</label>
-                    <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3}
-                        placeholder="Описание статуса..."
-                        className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-sm placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all resize-none" />
-                </div>
-
-                {/* Category */}
-                <div>
-                    <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">Категория</label>
+                    <label className="block text-[13px] font-medium text-[var(--text-primary)]/55 mb-1.5">Категория</label>
                     <div className="relative">
                         <button onClick={() => setShowCatMenu((v) => !v)}
-                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-sm text-left hover:bg-[var(--hover-3)] transition-colors">
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[13px] text-left hover:bg-[var(--hover-3)] transition-colors">
                             <span className={`w-2.5 h-2.5 rounded-full ${cat.dot}`} />
                             <span className="flex-1 text-[var(--text-primary)]">{CATEGORY_LABELS[category]}</span>
                             <ChevronDown className="w-4 h-4 text-[var(--text-primary)]/30" />
                         </button>
-
-                        {showCatMenu && (
-                            <>
-                                <div className="fixed inset-0 z-10" onClick={() => setShowCatMenu(false)} />
-                                <div className="absolute left-0 right-0 top-full mt-1.5 z-20 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-[var(--shadow-lg)] overflow-hidden">
-                                    <div className="p-1">
-                                        {Object.entries(CATEGORY_LABELS).map(([key, lbl]) => {
-                                            const cm = CATEGORY_META[key];
-                                            return (
-                                                <button key={key}
-                                                    onClick={() => { setCategory(key as WfStatusNode['category']); setShowCatMenu(false); }}
-                                                    className={[
-                                                        'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
-                                                        category === key
-                                                            ? 'bg-[var(--accent)]/10 text-[var(--text-primary)]'
-                                                            : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]',
-                                                    ].join(' ')}>
-                                                    <span className={`w-2.5 h-2.5 rounded-full ${cm.dot}`} />
-                                                    {lbl}
-                                                    {category === key && <Check className="w-3.5 h-3.5 text-[var(--accent)] ml-auto" />}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                        {showCatMenu && (<>
+                            <div className="fixed inset-0 z-10" onClick={() => setShowCatMenu(false)} />
+                            <div className="absolute left-0 right-0 top-full mt-1.5 z-20 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-[var(--shadow-lg)] overflow-hidden">
+                                <div className="p-1">
+                                    {(Object.entries(CATEGORY_LABELS) as [NodeCategory, string][]).map(([key, lbl]) => {
+                                        const cm = CATEGORY_META[key];
+                                        return (
+                                            <button key={key} onClick={() => { setCategory(key); setShowCatMenu(false); }}
+                                                className={['w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-colors',
+                                                    category === key ? 'bg-[var(--accent)]/10 text-[var(--text-primary)]' : 'text-[var(--text-primary)]/55 hover:bg-[var(--hover-2)]',
+                                                ].join(' ')}>
+                                                <span className={`w-2.5 h-2.5 rounded-full ${cm.dot}`} />{lbl}
+                                                {category === key && <Check className="w-3.5 h-3.5 text-[var(--accent)] ml-auto" />}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
-                            </>
-                        )}
+                            </div>
+                        </>)}
                     </div>
                 </div>
 
-                {/* Flags */}
                 <div className="space-y-2">
-                    {(
-                        [
-                            { key: 'isInitial', label: 'Начальный статус', hint: 'Задачи создаются сразу в этом статусе', color: 'bg-emerald-500 border-emerald-600' },
-                            { key: 'isTerminal', label: 'Конечный статус', hint: 'Из этого статуса нет переходов', color: 'bg-emerald-500 border-emerald-600' },
-                        ] as const
-                    ).map(({ key, label, hint, color }) => (
-                        <label key={key}
-                            className="flex items-center gap-3 p-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)] cursor-pointer hover:bg-[var(--hover-2)] transition-colors">
-                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 transition-colors ${node[key] ? color : 'border-[var(--border-color)]'}`}>
+                    {([
+                        { key: 'isInitial' as const, label: 'Начальный статус', hint: 'Задачи создаются в этом статусе' },
+                        { key: 'isTerminal' as const, label: 'Конечный статус', hint: 'Из него нет переходов' },
+                    ]).map(({ key, label: fl, hint }) => (
+                        <label key={key} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)] cursor-pointer hover:bg-[var(--hover-2)] transition-colors">
+                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${node[key] ? 'bg-emerald-500 border-emerald-600' : 'border-[var(--border-color)]'}`}>
                                 {node[key] && <Check className="w-3.5 h-3.5 text-white" />}
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-[var(--text-primary)]">{label}</p>
-                                <p className="text-[11px] text-[var(--text-primary)]/40">{hint}</p>
+                                <p className="text-[13px] font-medium text-[var(--text-primary)]">{fl}</p>
+                                <p className="text-[11px] text-[var(--text-primary)]/35">{hint}</p>
                             </div>
-                            <input type="checkbox" checked={node[key] ?? false}
-                                onChange={(e) => onUpdate({ ...node, [key]: e.target.checked })}
-                                className="sr-only" />
+                            <input type="checkbox" checked={node[key] ?? false} onChange={(e) => onUpdate({ ...node, [key]: e.target.checked })} className="sr-only" />
                         </label>
                     ))}
                 </div>
 
-                {/* Delete */}
                 <div className="pt-3 border-t border-[var(--border-color)]">
-                    {!showDeleteConfirm ? (
-                        <button onClick={() => setShowDeleteConfirm(true)}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/10 transition-colors">
+                    {!showDel ? (
+                        <button onClick={() => setShowDel(true)} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/20 text-red-400 text-[13px] font-medium hover:bg-red-500/10 transition-colors">
                             <Trash2 className="w-4 h-4" /> Удалить статус
                         </button>
                     ) : (
-                        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 space-y-2">
-                            <div className="flex items-center gap-2 text-red-400">
-                                <AlertTriangle className="w-4 h-4" />
-                                <p className="text-sm font-medium">Удалить «{node.label}»?</p>
-                            </div>
-                            <p className="text-[11px] text-[var(--text-primary)]/40">Все переходы к этому статусу будут удалены.</p>
-                            <div className="flex gap-2">
-                                <button onClick={() => setShowDeleteConfirm(false)}
-                                    className="flex-1 px-3 py-1.5 rounded-lg bg-[var(--hover-2)] text-[var(--text-primary)]/60 text-sm">
-                                    Отмена
-                                </button>
-                                <button onClick={onDelete}
-                                    className="flex-1 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/30">
-                                    Удалить
-                                </button>
-                            </div>
-                        </div>
+                        <DeleteConfirm label={`Удалить «${node.label}»?`} description="Все связанные переходы удалятся." onCancel={() => setShowDel(false)} onConfirm={onDelete} />
                     )}
                 </div>
             </div>
 
-            {/* Footer */}
-            <div className="px-5 py-3.5 border-t border-[var(--border-color)] flex-shrink-0">
-                <button onClick={handleSave}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-sm font-medium transition-colors shadow-[var(--shadow-md)]">
-                    <Save className="w-4 h-4" /> Сохранить изменения
+            <div className="px-5 py-3.5 border-t border-[var(--border-color)] shrink-0">
+                <button onClick={handleSave} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-[13px] font-medium transition-colors shadow-[var(--shadow-md)]">
+                    <Save className="w-4 h-4" /> Сохранить
                 </button>
             </div>
         </motion.div>
@@ -891,46 +703,33 @@ function NodeDetailPanel({ node, onClose, onUpdate, onDelete }: NodeDetailPanelP
    TRANSITION DETAIL PANEL
    ═══════════════════════════════════════════════════════════════════ */
 
-interface TransitionDetailPanelProps {
-    transition: WfTransition;
-    fromNode: WfStatusNode;
-    toNode: WfStatusNode;
-    onClose: () => void;
-    onUpdate: (t: WfTransition) => void;
-    onDelete: () => void;
-}
-
-function TransitionDetailPanel({
-    transition, fromNode, toNode, onClose, onUpdate, onDelete,
-}: TransitionDetailPanelProps) {
+function TransitionDetailPanel({ transition, fromNode, toNode, onClose, onUpdate, onDelete }: {
+    transition: WfTransition; fromNode: WfStatusNode; toNode: WfStatusNode;
+    onClose: () => void; onUpdate: (t: WfTransition) => void; onDelete: () => void;
+}) {
     const [label, setLabel] = useState(transition.label ?? '');
     const [showAddAction, setShowAddAction] = useState(false);
     const [showAddCond, setShowAddCond] = useState(false);
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showDel, setShowDel] = useState(false);
+
+    useEffect(() => { setLabel(transition.label ?? ''); setShowDel(false); }, [transition.id]);
 
     const fromCat = CATEGORY_META[fromNode.category];
     const toCat = CATEGORY_META[toNode.category];
 
     const addAction = useCallback((type: string) => {
-        const m = ACTION_META[type];
-        const newAction: WfAction = {
-            id: uid(), type: type as WfAction['type'],
-            label: m?.label ?? type, enabled: true,
-            params: {}, order: transition.actions.length,
-        };
-        onUpdate({ ...transition, actions: [...transition.actions, newAction] });
+        const m = ACTION_META[type as ActionType];
+        const a: WfAction = { id: uid(), type: type as ActionType, label: m?.label ?? type, enabled: true, params: {}, order: transition.actions.length };
+        onUpdate({ ...transition, actions: [...transition.actions, a] });
     }, [transition, onUpdate]);
 
     const addCondition = useCallback((type: string) => {
-        const newCond: WfCondition = { id: uid(), type: type as WfCondition['type'], params: {} };
-        onUpdate({ ...transition, conditions: [...transition.conditions, newCond] });
+        const c: WfCondition = { id: uid(), type: type as WfCondition['type'], params: {} };
+        onUpdate({ ...transition, conditions: [...transition.conditions, c] });
     }, [transition, onUpdate]);
 
     const toggleAction = useCallback((id: string) => {
-        onUpdate({
-            ...transition,
-            actions: transition.actions.map((a) => a.id === id ? { ...a, enabled: !a.enabled } : a),
-        });
+        onUpdate({ ...transition, actions: transition.actions.map((a) => a.id === id ? { ...a, enabled: !a.enabled } : a) });
     }, [transition, onUpdate]);
 
     const removeAction = useCallback((id: string) => {
@@ -943,104 +742,62 @@ function TransitionDetailPanel({
 
     const handleSave = () => onUpdate({ ...transition, label: label.trim() });
 
-    const actionItems = useMemo(() =>
-        Object.entries(ACTION_META).map(([type, m]) => ({ type, label: m.label, icon: m.icon, color: m.color })),
-        []);
-
-    const condItems = useMemo(() =>
-        Object.entries(CONDITION_META).map(([type, m]) => ({ type, label: m.label, icon: m.icon, color: m.color })),
-        []);
+    const actionItems = useMemo<AddMenuItem[]>(() => Object.entries(ACTION_META).map(([t, m]) => ({ type: t, label: m.label, icon: m.icon, color: m.color })), []);
+    const condItems = useMemo<AddMenuItem[]>(() => Object.entries(CONDITION_META).map(([t, m]) => ({ type: t, label: m.label, icon: m.icon, color: m.color })), []);
 
     return (
-        <motion.div
-            initial={{ x: '100%', opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: '100%', opacity: 0 }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="w-[420px] flex-shrink-0 h-full bg-[var(--bg-card)] border-l border-[var(--border-color)] flex flex-col"
-        >
-            {/* Header */}
-            <div className="px-5 py-4 border-b border-[var(--border-color)] flex-shrink-0">
+        <motion.div initial={{ x: '100%', opacity: 0 }} animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0 }} transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+            className="w-[400px] shrink-0 h-full bg-[var(--bg-card)] border-l border-[var(--border-color)] flex flex-col"
+            onClick={(e) => e.stopPropagation()}>
+
+            <div className="px-5 py-4 border-b border-[var(--border-color)] shrink-0">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-xl bg-[var(--accent)]/15 flex items-center justify-center">
-                            <ArrowRight className="w-4 h-4 text-[var(--accent)]" />
-                        </div>
+                        <div className="w-8 h-8 rounded-xl bg-[var(--accent)]/15 flex items-center justify-center"><ArrowRight className="w-4 h-4 text-[var(--accent)]" /></div>
                         <div>
-                            <h3 className="text-base font-bold text-[var(--text-primary)]">Настройка перехода</h3>
-                            <p className="text-[11px] text-[var(--text-primary)]/40">ID: {transition.id}</p>
+                            <h3 className="text-[15px] font-bold text-[var(--text-primary)]">Настройка перехода</h3>
+                            <p className="text-[11px] text-[var(--text-primary)]/35">ID: {transition.id}</p>
                         </div>
                     </div>
-                    <button onClick={onClose}
-                        className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]">
-                        <X className="w-4 h-4" />
-                    </button>
+                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"><X className="w-4 h-4" /></button>
                 </div>
-
-                {/* From → To chips */}
                 <div className="flex items-center gap-2">
-                    {[fromNode, toNode].map((n, i) => {
-                        const c = i === 0 ? fromCat : toCat;
-                        return (
-                            <div key={n.id}>
-                                <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${c.chip}`}>
-                                    <span className={`w-2 h-2 rounded-full ${c.dot}`} />
-                                    <span className="text-xs font-medium">{n.label}</span>
-                                </div>
-                                {i === 0 && <ArrowRight className="w-4 h-4 text-[var(--text-primary)]/20 flex-shrink-0 inline mx-2" />}
-                            </div>
-                        );
-                    })}
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${fromCat.chip}`}>
+                        <span className={`w-2 h-2 rounded-full ${fromCat.dot}`} /><span className="text-[11px] font-medium">{fromNode.label}</span>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-[var(--text-primary)]/20 shrink-0" />
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${toCat.chip}`}>
+                        <span className={`w-2 h-2 rounded-full ${toCat.dot}`} /><span className="text-[11px] font-medium">{toNode.label}</span>
+                    </div>
                 </div>
             </div>
 
-            {/* Body */}
             <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 scrollbar-thin scrollbar-thumb-[var(--hover-3)]">
-                {/* Label */}
                 <div>
-                    <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">Название перехода</label>
-                    <input value={label} onChange={(e) => setLabel(e.target.value)}
-                        placeholder="Например: «Взять в работу»"
-                        className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-sm placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all" />
+                    <label className="block text-[13px] font-medium text-[var(--text-primary)]/55 mb-1.5">Название</label>
+                    <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Например: «Взять в работу»"
+                        className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[13px] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all" />
                 </div>
 
                 {/* Conditions */}
                 <section>
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                            <Shield className="w-4 h-4 text-[var(--text-primary)]/40" />
-                            <h4 className="text-sm font-semibold text-[var(--text-primary)]">Условия</h4>
-                            {transition.conditions.length > 0 && (
-                                <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-[var(--hover-2)] text-[var(--text-primary)]/50">
-                                    {transition.conditions.length}
-                                </span>
-                            )}
+                            <Shield className="w-4 h-4 text-[var(--text-primary)]/35" />
+                            <h4 className="text-[13px] font-semibold text-[var(--text-primary)]">Условия</h4>
+                            {transition.conditions.length > 0 && <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-[var(--hover-2)] text-[var(--text-primary)]/45">{transition.conditions.length}</span>}
                         </div>
                         <div className="relative">
-                            <button onClick={() => setShowAddCond((v) => !v)}
-                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors">
-                                <Plus className="w-3 h-3" /> Добавить
-                            </button>
-                            <AnimatePresence>
-                                {showAddCond && (
-                                    <div className="absolute right-0 top-full mt-1 z-30 w-56">
-                                        <AddMenu items={condItems} onSelect={addCondition} onClose={() => setShowAddCond(false)} />
-                                    </div>
-                                )}
-                            </AnimatePresence>
+                            <button onClick={() => setShowAddCond((v) => !v)} className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors"><Plus className="w-3 h-3" /> Добавить</button>
+                            <AnimatePresence>{showAddCond && <div className="absolute right-0 top-full mt-1 z-30 w-56"><AddMenu items={condItems} onSelect={addCondition} onClose={() => setShowAddCond(false)} /></div>}</AnimatePresence>
                         </div>
                     </div>
                     <div className="space-y-1.5">
                         <AnimatePresence mode="popLayout">
                             {transition.conditions.length === 0 ? (
-                                <div className="py-4 text-center border-2 border-dashed border-[var(--border-color)] rounded-xl">
-                                    <p className="text-[11px] text-[var(--text-primary)]/30">Без ограничений — любой пользователь</p>
-                                </div>
-                            ) : (
-                                transition.conditions.map((c) => (
-                                    <ConditionItem key={c.id} condition={c} onRemove={() => removeCondition(c.id)} />
-                                ))
-                            )}
+                                <div className="py-4 text-center border-2 border-dashed border-[var(--border-color)] rounded-xl"><p className="text-[11px] text-[var(--text-primary)]/25">Без ограничений</p></div>
+                            ) : transition.conditions.map((c) => <ConditionItem key={c.id} condition={c} onRemove={() => removeCondition(c.id)} />)}
                         </AnimatePresence>
                     </div>
                 </section>
@@ -1049,83 +806,40 @@ function TransitionDetailPanel({
                 <section>
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                            <Zap className="w-4 h-4 text-[var(--text-primary)]/40" />
-                            <h4 className="text-sm font-semibold text-[var(--text-primary)]">Действия</h4>
-                            {transition.actions.length > 0 && (
-                                <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-[var(--hover-2)] text-[var(--text-primary)]/50">
-                                    {transition.actions.length}
-                                </span>
-                            )}
+                            <Zap className="w-4 h-4 text-[var(--text-primary)]/35" />
+                            <h4 className="text-[13px] font-semibold text-[var(--text-primary)]">Действия</h4>
+                            {transition.actions.length > 0 && <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-[var(--hover-2)] text-[var(--text-primary)]/45">{transition.actions.length}</span>}
                         </div>
                         <div className="relative">
-                            <button onClick={() => setShowAddAction((v) => !v)}
-                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors">
-                                <Plus className="w-3 h-3" /> Добавить
-                            </button>
-                            <AnimatePresence>
-                                {showAddAction && (
-                                    <div className="absolute right-0 top-full mt-1 z-30 w-64">
-                                        <AddMenu items={actionItems} onSelect={addAction} onClose={() => setShowAddAction(false)} />
-                                    </div>
-                                )}
-                            </AnimatePresence>
+                            <button onClick={() => setShowAddAction((v) => !v)} className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors"><Plus className="w-3 h-3" /> Добавить</button>
+                            <AnimatePresence>{showAddAction && <div className="absolute right-0 top-full mt-1 z-30 w-64"><AddMenu items={actionItems} onSelect={addAction} onClose={() => setShowAddAction(false)} /></div>}</AnimatePresence>
                         </div>
                     </div>
                     <div className="space-y-2">
                         <AnimatePresence mode="popLayout">
                             {transition.actions.length === 0 ? (
-                                <div className="py-6 text-center border-2 border-dashed border-[var(--border-color)] rounded-xl">
-                                    <Zap className="w-5 h-5 text-[var(--text-primary)]/10 mx-auto mb-1.5" />
-                                    <p className="text-[11px] text-[var(--text-primary)]/30">Нет действий после перехода</p>
+                                <div className="py-5 text-center border-2 border-dashed border-[var(--border-color)] rounded-xl">
+                                    <Zap className="w-5 h-5 text-[var(--text-primary)]/10 mx-auto mb-1" /><p className="text-[11px] text-[var(--text-primary)]/25">Нет действий</p>
                                 </div>
-                            ) : (
-                                transition.actions.map((a) => (
-                                    <ActionItem key={a.id} action={a}
-                                        onToggle={() => toggleAction(a.id)}
-                                        onRemove={() => removeAction(a.id)}
-                                        onEdit={() => {/* TODO */ }} />
-                                ))
-                            )}
+                            ) : transition.actions.map((a) => <ActionItem key={a.id} action={a} onToggle={() => toggleAction(a.id)} onRemove={() => removeAction(a.id)} onEdit={() => { }} />)}
                         </AnimatePresence>
                     </div>
                 </section>
 
-                {/* Delete */}
                 <div className="pt-3 border-t border-[var(--border-color)]">
-                    {!showDeleteConfirm ? (
-                        <button onClick={() => setShowDeleteConfirm(true)}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/10 transition-colors">
+                    {!showDel ? (
+                        <button onClick={() => setShowDel(true)} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/20 text-red-400 text-[13px] font-medium hover:bg-red-500/10 transition-colors">
                             <Unlink className="w-4 h-4" /> Удалить переход
                         </button>
                     ) : (
-                        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 space-y-2">
-                            <div className="flex items-center gap-2 text-red-400">
-                                <AlertTriangle className="w-4 h-4" />
-                                <p className="text-sm font-medium">Удалить этот переход?</p>
-                            </div>
-                            <p className="text-[11px] text-[var(--text-primary)]/40">
-                                Переход «{fromNode.label}» → «{toNode.label}» будет удалён.
-                            </p>
-                            <div className="flex gap-2">
-                                <button onClick={() => setShowDeleteConfirm(false)}
-                                    className="flex-1 px-3 py-1.5 rounded-lg bg-[var(--hover-2)] text-[var(--text-primary)]/60 text-sm">
-                                    Отмена
-                                </button>
-                                <button onClick={onDelete}
-                                    className="flex-1 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/30">
-                                    Удалить
-                                </button>
-                            </div>
-                        </div>
+                        <DeleteConfirm label="Удалить переход?" description={`«${fromNode.label}» → «${toNode.label}»`} onCancel={() => setShowDel(false)} onConfirm={onDelete} />
                     )}
                 </div>
             </div>
 
-            {/* Footer */}
-            <div className="px-5 py-3.5 border-t border-[var(--border-color)] flex-shrink-0">
-                <button onClick={handleSave}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-sm font-medium transition-colors shadow-[var(--shadow-md)]">
-                    <Save className="w-4 h-4" /> Сохранить переход
+            <div className="px-5 py-3.5 border-t border-[var(--border-color)] shrink-0">
+                <button onClick={handleSave} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-[13px] font-medium transition-colors shadow-[var(--shadow-md)]">
+                    <Save className="w-4 h-4" /> Сохранить
                 </button>
             </div>
         </motion.div>
@@ -1133,109 +847,76 @@ function TransitionDetailPanel({
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   CREATE WORKFLOW MODAL
+   CREATE MODAL
    ═══════════════════════════════════════════════════════════════════ */
 
-interface CreateWorkflowModalProps {
-    onClose: () => void;
-    onCreate: (wf: Partial<Workflow>) => void;
-}
-
-function CreateWorkflowModal({ onClose, onCreate }: CreateWorkflowModalProps) {
+function CreateWorkflowModal({ onClose, onCreate }: { onClose: () => void; onCreate: (wf: Partial<WorkflowData>) => void }) {
     const [name, setName] = useState('');
     const [kind, setKind] = useState<WfEntityKind>('task');
     const [desc, setDesc] = useState('');
 
     useEffect(() => {
-        const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-        document.addEventListener('keydown', handleKey);
-        document.body.style.overflow = 'hidden';
-        return () => {
-            document.removeEventListener('keydown', handleKey);
-            document.body.style.overflow = '';
-        };
+        const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', h);
+        return () => document.removeEventListener('keydown', h);
     }, [onClose]);
 
     const handleSubmit = () => {
         if (!name.trim()) return;
         onCreate({
-            name: name.trim(),
-            entityKind: kind,
-            description: desc.trim() || undefined,
+            name: name.trim(), entityKind: kind, description: desc.trim() || undefined,
             nodes: [
-                { id: uid(), label: 'Новый', category: 'open', color: '#3b82f6', iconKey: 'circle', x: 60, y: 60, isInitial: true },
-                { id: uid(), label: 'Выполнено', category: 'done', color: '#10b981', iconKey: 'check', x: 360, y: 60, isTerminal: true },
+                { id: uid(), label: 'Новый', category: 'open', color: '#3b82f6', iconKey: 'circle', x: 80, y: 80, isInitial: true },
+                { id: uid(), label: 'Выполнено', category: 'done', color: '#10b981', iconKey: 'check', x: 380, y: 80, isTerminal: true },
             ],
             transitions: [],
         });
     };
 
-    const entityOptions: { value: WfEntityKind; label: string; icon: React.ComponentType<{ className?: string }>; desc: string }[] = [
-        { value: 'task', label: 'Задачи', icon: Layers, desc: 'Для задач сотрудников' },
-        { value: 'ticket', label: 'Заявки', icon: Ticket, desc: 'Для обращений клиентов' },
+    const opts: { value: WfEntityKind; label: string; icon: React.ComponentType<{ className?: string }>; desc: string }[] = [
+        { value: 'task', label: 'Задачи', icon: Layers, desc: 'Для задач' },
+        { value: 'ticket', label: 'Заявки', icon: Ticket, desc: 'Для обращений' },
     ];
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <div
-                className="relative w-full max-w-lg bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden"
-                style={{ boxShadow: 'var(--shadow-lg)' }}
-                onClick={(e) => e.stopPropagation()}
-            >
-                {/* Header */}
+            <div className="relative w-full max-w-lg bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden mx-4"
+                style={{ boxShadow: 'var(--shadow-lg)' }} onClick={(e) => e.stopPropagation()}>
+
                 <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/15 flex items-center justify-center">
-                            <Workflow className="w-5 h-5 text-[var(--accent)]" />
-                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/15 flex items-center justify-center"><Workflow className="w-5 h-5 text-[var(--accent)]" /></div>
                         <div>
-                            <h2 className="text-lg font-bold text-[var(--text-primary)]">Новый рабочий процесс</h2>
-                            <p className="text-sm text-[var(--text-primary)]/40">Создайте workflow с нуля</p>
+                            <h2 className="text-[17px] font-bold text-[var(--text-primary)]">Новый процесс</h2>
+                            <p className="text-[13px] text-[var(--text-primary)]/40">Создайте workflow</p>
                         </div>
                     </div>
-                    <button onClick={onClose}
-                        className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]">
-                        <X className="w-5 h-5" />
-                    </button>
+                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"><X className="w-5 h-5" /></button>
                 </div>
 
-                {/* Body */}
                 <div className="p-6 space-y-5">
                     <div>
-                        <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
-                            Название <span className="text-[var(--accent)]">*</span>
-                        </label>
-                        <input value={name} onChange={(e) => setName(e.target.value)}
-                            placeholder="Например: Жизненный цикл задачи" autoFocus
-                            className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-base placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all" />
+                        <label className="block text-[13px] font-medium text-[var(--text-primary)]/65 mb-1.5">Название <span className="text-[var(--accent)]">*</span></label>
+                        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Жизненный цикл задачи" autoFocus
+                            className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[15px] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all" />
                     </div>
-
                     <div>
-                        <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Описание</label>
-                        <textarea value={desc} onChange={(e) => setDesc(e.target.value)}
-                            placeholder="Описание рабочего процесса..." rows={3}
-                            className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-base placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all resize-none" />
+                        <label className="block text-[13px] font-medium text-[var(--text-primary)]/65 mb-1.5">Описание</label>
+                        <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Описание..." rows={3}
+                            className="w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[15px] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all resize-none" />
                     </div>
-
                     <div>
-                        <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-2">Тип сущности</label>
+                        <label className="block text-[13px] font-medium text-[var(--text-primary)]/65 mb-2">Тип сущности</label>
                         <div className="grid grid-cols-2 gap-2">
-                            {entityOptions.map((opt) => {
-                                const Ic = opt.icon;
-                                return (
-                                    <button key={opt.value} onClick={() => setKind(opt.value)}
-                                        className={[
-                                            'flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all border',
-                                            kind === opt.value
-                                                ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--text-primary)]'
-                                                : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]',
+                            {opts.map((o) => {
+                                const Ic = o.icon; return (
+                                    <button key={o.value} onClick={() => setKind(o.value)}
+                                        className={['flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all border',
+                                            kind === o.value ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--text-primary)]' : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/55 hover:bg-[var(--hover-2)]',
                                         ].join(' ')}>
-                                        <Ic className={`w-5 h-5 flex-shrink-0 ${kind === opt.value ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/30'}`} />
-                                        <div>
-                                            <p className="text-sm font-medium">{opt.label}</p>
-                                            <p className="text-[11px] text-[var(--text-primary)]/40">{opt.desc}</p>
-                                        </div>
+                                        <Ic className={`w-5 h-5 shrink-0 ${kind === o.value ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/30'}`} />
+                                        <div><p className="text-[13px] font-medium">{o.label}</p><p className="text-[11px] text-[var(--text-primary)]/35">{o.desc}</p></div>
                                     </button>
                                 );
                             })}
@@ -1243,14 +924,9 @@ function CreateWorkflowModal({ onClose, onCreate }: CreateWorkflowModalProps) {
                     </div>
                 </div>
 
-                {/* Footer */}
                 <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--hover-1)]">
-                    <button onClick={onClose}
-                        className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-base">
-                        Отмена
-                    </button>
-                    <button onClick={handleSubmit} disabled={!name.trim()}
-                        className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-base font-medium disabled:opacity-40 shadow-[var(--shadow-md)]">
+                    <button onClick={onClose} className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/65 text-[14px]">Отмена</button>
+                    <button onClick={handleSubmit} disabled={!name.trim()} className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-[14px] font-medium disabled:opacity-40 shadow-[var(--shadow-md)]">
                         <Plus className="w-4 h-4" /> Создать
                     </button>
                 </div>
@@ -1260,220 +936,132 @@ function CreateWorkflowModal({ onClose, onCreate }: CreateWorkflowModalProps) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   WORKFLOW CANVAS
+   CANVAS
    ═══════════════════════════════════════════════════════════════════ */
 
-interface WorkflowCanvasProps {
-    workflow: Workflow;
-    selectedNodeId: string | null;
-    selectedTransitionId: string | null;
-    connectingFrom: string | null;
-    tempConnectPos: { x: number; y: number } | null;
-    onSelectNode: (id: string | null) => void;
-    onSelectTransition: (id: string | null) => void;
-    onNodeMove: (id: string, x: number, y: number) => void;
-    onConnectStart: (nodeId: string) => void;
-    onConnectEnd: () => void;
-    onConnectComplete: (fromId: string, toId: string) => void;
-}
-
 function WorkflowCanvas({
-    workflow, selectedNodeId, selectedTransitionId,
-    connectingFrom, tempConnectPos,
-    onSelectNode, onSelectTransition,
-    onNodeMove, onConnectStart, onConnectEnd, onConnectComplete,
-}: WorkflowCanvasProps) {
-    const canvasRef = useRef<HTMLDivElement>(null);
-
-    // Drag state
-    const draggingRef = useRef<{ id: string; startX: number; startY: number; offsetX: number; offsetY: number } | null>(null);
-    const [isDragging, setIsDragging] = useState(false);
-
-    // Pan state
+    workflow, selectedNodeId, selectedTransitionId, connectingFrom, tempConnectPos,
+    onSelectNode, onSelectTransition, onNodeMove, onConnectStart, onConnectEnd, onConnectComplete, onDeselectAll,
+}: {
+    workflow: WorkflowData;
+    selectedNodeId: string | null; selectedTransitionId: string | null;
+    connectingFrom: string | null; tempConnectPos: { x: number; y: number } | null;
+    onSelectNode: (id: string | null) => void; onSelectTransition: (id: string | null) => void;
+    onNodeMove: (id: string, x: number, y: number) => void;
+    onConnectStart: (id: string) => void; onConnectEnd: () => void;
+    onConnectComplete: (from: string, to: string) => void;
+    onDeselectAll: () => void;
+}) {
+    const containerRef = useRef<HTMLDivElement>(null);
     const [pan, setPan] = useState({ x: 0, y: 0 });
-    const [isPanning, setIsPanning] = useState(false);
-    const panStartRef = useRef({ x: 0, y: 0 });
-
     const [zoom, setZoom] = useState(1);
 
-    const nodeMap = useMemo(() => {
-        const m = new Map<string, WfStatusNode>();
-        workflow.nodes.forEach((n) => m.set(n.id, n));
-        return m;
-    }, [workflow.nodes]);
+    const panRef = useRef(pan); panRef.current = pan;
+    const zoomRef = useRef(zoom); zoomRef.current = zoom;
 
-    const transitionCounts = useMemo(() => {
-        const counts = new Map<string, { incoming: number; outgoing: number }>();
-        workflow.nodes.forEach((n) => counts.set(n.id, { incoming: 0, outgoing: 0 }));
-        workflow.transitions.forEach((t) => {
-            const from = counts.get(t.fromId);
-            const to = counts.get(t.toId);
-            if (from) from.outgoing++;
-            if (to) to.incoming++;
-        });
-        return counts;
+    const modeRef = useRef<null | { type: 'pan'; sx: number; sy: number; px: number; py: number } | { type: 'drag'; id: string; sx: number; sy: number; ox: number; oy: number }>(null);
+
+    const nodeMap = useMemo(() => { const m = new Map<string, WfStatusNode>(); workflow.nodes.forEach((n) => m.set(n.id, n)); return m; }, [workflow.nodes]);
+    const transCounts = useMemo(() => {
+        const c = new Map<string, { incoming: number; outgoing: number }>();
+        workflow.nodes.forEach((n) => c.set(n.id, { incoming: 0, outgoing: 0 }));
+        workflow.transitions.forEach((t) => { const f = c.get(t.fromId); const to = c.get(t.toId); if (f) f.outgoing++; if (to) to.incoming++; });
+        return c;
     }, [workflow.nodes, workflow.transitions]);
 
-    // Node drag
     const handleNodeMouseDown = useCallback((e: React.MouseEvent, node: WfStatusNode) => {
-        if (e.button !== 0) return;
-        e.stopPropagation();
-        draggingRef.current = { id: node.id, startX: e.clientX, startY: e.clientY, offsetX: node.x, offsetY: node.y };
-        setIsDragging(true);
+        if (e.button !== 0) return; e.stopPropagation(); e.preventDefault();
+        modeRef.current = { type: 'drag', id: node.id, sx: e.clientX, sy: e.clientY, ox: node.x, oy: node.y };
     }, []);
 
-    // Canvas pan start
     const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
         if (e.button !== 0) return;
-        const target = e.target as HTMLElement;
-        if (target !== e.currentTarget && !target.dataset.canvasBg) return;
-        panStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
-        setIsPanning(true);
-        onSelectNode(null);
-        onSelectTransition(null);
-    }, [pan, onSelectNode, onSelectTransition]);
+        modeRef.current = { type: 'pan', sx: e.clientX, sy: e.clientY, px: panRef.current.x, py: panRef.current.y };
+        onDeselectAll();
+    }, [onDeselectAll]);
 
-    // Global mouse move / up
     useEffect(() => {
-        const handleMove = (e: MouseEvent) => {
-            if (draggingRef.current) {
-                const { id, startX, startY, offsetX, offsetY } = draggingRef.current;
-                const dx = (e.clientX - startX) / zoom;
-                const dy = (e.clientY - startY) / zoom;
-                onNodeMove(id, Math.max(0, offsetX + dx), Math.max(0, offsetY + dy));
-            }
-            if (isPanning) {
-                setPan({ x: e.clientX - panStartRef.current.x, y: e.clientY - panStartRef.current.y });
+        const move = (e: MouseEvent) => {
+            const m = modeRef.current; if (!m) return;
+            if (m.type === 'pan') setPan({ x: m.px + e.clientX - m.sx, y: m.py + e.clientY - m.sy });
+            if (m.type === 'drag') {
+                const z = zoomRef.current;
+                onNodeMove(m.id, Math.max(0, m.ox + (e.clientX - m.sx) / z), Math.max(0, m.oy + (e.clientY - m.sy) / z));
             }
         };
-        const handleUp = () => {
-            draggingRef.current = null;
-            setIsDragging(false);
-            setIsPanning(false);
-        };
-        document.addEventListener('mousemove', handleMove);
-        document.addEventListener('mouseup', handleUp);
-        return () => {
-            document.removeEventListener('mousemove', handleMove);
-            document.removeEventListener('mouseup', handleUp);
-        };
-    }, [isPanning, zoom, onNodeMove]);
+        const up = () => { modeRef.current = null; };
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', up);
+        return () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+    }, [onNodeMove]);
 
     const handleWheel = useCallback((e: React.WheelEvent) => {
         e.preventDefault();
-        setZoom((z) => clamp(z + (e.deltaY > 0 ? -0.08 : 0.08), 0.3, 2));
+        const c = containerRef.current; if (!c) return;
+        const rect = c.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        const old = zoomRef.current;
+        const factor = e.deltaY > 0 ? 0.96 : 1.04;
+        const nz = clamp(old * factor, 0.2, 3);
+        const r = nz / old;
+        setPan({ x: mx - (mx - panRef.current.x) * r, y: my - (my - panRef.current.y) * r });
+        setZoom(nz);
     }, []);
 
     const connectFromNode = connectingFrom ? nodeMap.get(connectingFrom) : null;
-    const connectFromCenter = connectFromNode
-        ? { x: connectFromNode.x + NODE_W, y: connectFromNode.y + NODE_H / 2 }
-        : null;
+    const connectFromPt = connectFromNode ? { x: connectFromNode.x + NODE_W, y: connectFromNode.y + NODE_H / 2 } : null;
+    const tempCanvas = useMemo(() => {
+        if (!tempConnectPos || !containerRef.current) return null;
+        const r = containerRef.current.getBoundingClientRect();
+        return { x: (tempConnectPos.x - r.left - pan.x) / zoom, y: (tempConnectPos.y - r.top - pan.y) / zoom };
+    }, [tempConnectPos, pan, zoom]);
 
     return (
-        <div
-            ref={canvasRef}
-            className="flex-1 relative overflow-hidden bg-[var(--bg-main)]"
-            onMouseDown={handleCanvasMouseDown}
-            onWheel={handleWheel}
-            style={{ cursor: isPanning || isDragging ? 'grabbing' : 'default' }}
-        >
-            {/* Dot grid */}
-            <div
-                data-canvas-bg="true"
-                className="absolute inset-0"
-                style={{
-                    backgroundImage: 'radial-gradient(circle, var(--border-color) 1px, transparent 1px)',
-                    backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
-                    backgroundPosition: `${pan.x}px ${pan.y}px`,
-                }}
-            />
+        <div ref={containerRef} className="flex-1 relative overflow-hidden bg-[var(--bg-main)]"
+            onMouseDown={handleCanvasMouseDown} onWheel={handleWheel}
+            style={{ cursor: modeRef.current ? 'grabbing' : 'default' }}>
 
-            {/* Transformed container */}
-            <div
-                className="absolute inset-0 origin-top-left"
-                style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
-            >
-                {/* SVG edges */}
+            <div className="absolute inset-0 pointer-events-none" style={{
+                backgroundImage: 'radial-gradient(circle, var(--border-color) 1px, transparent 1px)',
+                backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
+                backgroundPosition: `${pan.x}px ${pan.y}px`,
+            }} />
+
+            <div className="absolute origin-top-left" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, width: CANVAS_SIZE, height: CANVAS_SIZE }}>
                 <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ overflow: 'visible' }}>
                     <defs>
-                        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--border-color)" />
-                        </marker>
-                        <marker id="arrowSelected" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)" />
-                        </marker>
+                        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--border-color)" /></marker>
+                        <marker id="arrowSel" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)" /></marker>
                     </defs>
-
                     {workflow.transitions.map((t) => {
-                        const from = nodeMap.get(t.fromId);
-                        const to = nodeMap.get(t.toId);
-                        if (!from || !to) return null;
-                        return (
-                            <WfEdgePath
-                                key={t.id} transition={t} fromNode={from} toNode={to}
-                                isSelected={selectedTransitionId === t.id}
-                                onClick={() => { onSelectTransition(t.id); onSelectNode(null); }}
-                            />
+                        const f = nodeMap.get(t.fromId), to = nodeMap.get(t.toId); if (!f || !to) return null; return (
+                            <WfEdgePath key={t.id} transition={t} fromNode={f} toNode={to} isSelected={selectedTransitionId === t.id}
+                                onClick={() => { onSelectTransition(t.id); onSelectNode(null); }} />
                         );
                     })}
-
-                    {connectFromCenter && tempConnectPos && (
-                        <TempConnectionLine from={connectFromCenter} to={tempConnectPos} />
-                    )}
+                    {connectFromPt && tempCanvas && <path d={makeBezier(connectFromPt, tempCanvas)} fill="none" stroke="var(--accent)" strokeWidth={2} strokeDasharray="6 4" opacity={0.6} />}
                 </svg>
 
-                {/* Nodes */}
                 <AnimatePresence>
-                    {workflow.nodes.map((node) => (
-                        <WfNodeCard
-                            key={node.id}
-                            node={node}
-                            isSelected={selectedNodeId === node.id}
-                            isConnectSource={connectingFrom === node.id}
-                            isConnectTarget={connectingFrom !== null && connectingFrom !== node.id}
-                            transitionCount={transitionCounts.get(node.id) ?? { incoming: 0, outgoing: 0 }}
-                            onMouseDown={(e) => handleNodeMouseDown(e, node)}
-                            onClick={() => { onSelectNode(node.id); onSelectTransition(null); }}
-                            onConnectStart={() => onConnectStart(node.id)}
-                            onConnectEnd={() => {
-                                if (connectingFrom && connectingFrom !== node.id) {
-                                    onConnectComplete(connectingFrom, node.id);
-                                }
-                                onConnectEnd();
-                            }}
-                        />
+                    {workflow.nodes.map((n) => (
+                        <WfNodeCard key={n.id} node={n} isSelected={selectedNodeId === n.id}
+                            isConnectSource={connectingFrom === n.id}
+                            isConnectTarget={connectingFrom !== null && connectingFrom !== n.id}
+                            transitionCount={transCounts.get(n.id) ?? { incoming: 0, outgoing: 0 }}
+                            onMouseDown={(e) => handleNodeMouseDown(e, n)}
+                            onClick={() => { onSelectNode(n.id); onSelectTransition(null); }}
+                            onConnectStart={() => onConnectStart(n.id)}
+                            onConnectEnd={() => { if (connectingFrom && connectingFrom !== n.id) onConnectComplete(connectingFrom, n.id); onConnectEnd(); }} />
                     ))}
                 </AnimatePresence>
             </div>
 
-            {/* Zoom controls */}
-            <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-1 shadow-[var(--shadow-md)]">
-                <button onClick={() => setZoom((z) => clamp(z - 0.15, 0.3, 2))}
-                    className="p-2 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/50 hover:text-[var(--text-primary)] transition-colors">
-                    <ZoomOut className="w-4 h-4" />
-                </button>
-                <span className="px-2 text-xs font-medium text-[var(--text-primary)]/50 tabular-nums min-w-[40px] text-center">
-                    {Math.round(zoom * 100)}%
-                </span>
-                <button onClick={() => setZoom((z) => clamp(z + 0.15, 0.3, 2))}
-                    className="p-2 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/50 hover:text-[var(--text-primary)] transition-colors">
-                    <ZoomIn className="w-4 h-4" />
-                </button>
-                <div className="w-px h-5 bg-[var(--border-color)]" />
-                <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
-                    className="p-2 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/50 hover:text-[var(--text-primary)] transition-colors"
-                    title="Сбросить вид">
-                    <Maximize2 className="w-4 h-4" />
-                </button>
-            </div>
-
-            {/* Hints */}
-            <div className="absolute bottom-4 left-4 flex items-center gap-3 text-[11px] text-[var(--text-primary)]/25 pointer-events-none">
-                <span>Перетаскивайте ноды</span>
-                <span>•</span>
-                <span>Зажмите фон для панорамы</span>
-                <span>•</span>
-                <span>Колёсико — зум</span>
+            <div className="absolute bottom-3 right-3 flex items-center gap-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-1 shadow-[var(--shadow-md)]">
+                <button onClick={() => setZoom((z) => clamp(z * 0.85, 0.2, 3))} className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/45 hover:text-[var(--text-primary)]"><ZoomOut className="w-4 h-4" /></button>
+                <span className="px-1.5 text-[11px] font-medium text-[var(--text-primary)]/45 tabular-nums min-w-[36px] text-center select-none">{Math.round(zoom * 100)}%</span>
+                <button onClick={() => setZoom((z) => clamp(z * 1.15, 0.2, 3))} className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/45 hover:text-[var(--text-primary)]"><ZoomIn className="w-4 h-4" /></button>
+                <div className="w-px h-4 bg-[var(--border-color)]" />
+                <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/45 hover:text-[var(--text-primary)]" title="Сбросить"><Maximize2 className="w-4 h-4" /></button>
             </div>
         </div>
     );
@@ -1483,42 +1071,22 @@ function WorkflowCanvas({
    WORKFLOW LIST ITEM
    ═══════════════════════════════════════════════════════════════════ */
 
-interface WorkflowListItemProps {
-    wf: Workflow;
-    isActive: boolean;
-    onClick: () => void;
-    onToggleDefault: () => void;
-}
-
-function WorkflowListItem({ wf, isActive, onClick }: WorkflowListItemProps) {
-    const EntityIcon = wf.entityKind === 'task' ? Layers : Ticket;
-
+function WorkflowListItem({ wf, isActive, onClick }: { wf: WorkflowData; isActive: boolean; onClick: () => void }) {
+    const Ic = wf.entityKind === 'task' ? Layers : Ticket;
     return (
-        <button onClick={onClick}
-            className={[
-                'w-full text-left px-3 py-2.5 rounded-xl transition-all group border',
-                isActive
-                    ? 'bg-[var(--accent)]/10 border-[var(--accent)]/20'
-                    : 'hover:bg-[var(--hover-2)] border-transparent',
-            ].join(' ')}>
+        <button onClick={onClick} className={['w-full text-left px-3 py-2.5 rounded-xl transition-all border',
+            isActive ? 'bg-[var(--accent)]/10 border-[var(--accent)]/20' : 'hover:bg-[var(--hover-2)] border-transparent',
+        ].join(' ')}>
             <div className="flex items-center gap-2.5">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isActive ? 'bg-[var(--accent)]/15' : 'bg-[var(--hover-2)]'}`}>
-                    <EntityIcon className={`w-4 h-4 ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/30'}`} />
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActive ? 'bg-[var(--accent)]/15' : 'bg-[var(--hover-2)]'}`}>
+                    <Ic className={`w-4 h-4 ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/30'}`} />
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                        <p className={`text-sm font-medium truncate ${isActive ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/70'}`}>
-                            {wf.name}
-                        </p>
-                        {wf.isDefault && (
-                            <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex-shrink-0">
-                                DEF
-                            </span>
-                        )}
+                        <p className={`text-[13px] font-medium truncate ${isActive ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/65'}`}>{wf.name}</p>
+                        {wf.isDefault && <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 shrink-0">DEF</span>}
                     </div>
-                    <p className="text-[11px] text-[var(--text-primary)]/30 mt-0.5">
-                        {wf.nodes.length} статусов · {wf.transitions.length} переходов
-                    </p>
+                    <p className="text-[11px] text-[var(--text-primary)]/30 mt-0.5">{wf.nodes.length} · {wf.transitions.length}</p>
                 </div>
             </div>
         </button>
@@ -1526,58 +1094,35 @@ function WorkflowListItem({ wf, isActive, onClick }: WorkflowListItemProps) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   WORKFLOW SIDEBAR
+   SIDEBAR
    ═══════════════════════════════════════════════════════════════════ */
 
-interface WorkflowSidebarProps {
-    workflows: Workflow[];
-    activeId: string;
-    onSelect: (id: string) => void;
-    onCreate: () => void;
-    onToggleDefault: (id: string) => void;
-}
-
-function WorkflowSidebar({ workflows, activeId, onSelect, onCreate, onToggleDefault }: WorkflowSidebarProps) {
-    const taskWfs = workflows.filter((w) => w.entityKind === 'task');
-    const ticketWfs = workflows.filter((w) => w.entityKind === 'ticket');
-
-    const renderGroup = (
-        label: string,
-        icon: React.ReactNode,
-        items: Workflow[],
-    ) => (
+function WfSidebar({ workflows, activeId, onSelect, onCreate }: {
+    workflows: WorkflowData[]; activeId: string; onSelect: (id: string) => void; onCreate: () => void;
+}) {
+    const tasks = workflows.filter((w) => w.entityKind === 'task');
+    const tickets = workflows.filter((w) => w.entityKind === 'ticket');
+    const group = (label: string, icon: React.ReactNode, items: WorkflowData[]) => (
         <div>
             <div className="flex items-center gap-2 px-1 mb-2">
                 {icon}
-                <span className="text-[11px] uppercase tracking-widest text-[var(--text-primary)]/30 font-semibold">{label}</span>
+                <span className="text-[10px] uppercase tracking-widest text-[var(--text-primary)]/25 font-semibold">{label}</span>
                 <span className="text-[10px] text-[var(--text-primary)]/20 ml-auto">{items.length}</span>
             </div>
-            <div className="space-y-1">
-                {items.map((wf) => (
-                    <WorkflowListItem key={wf.id} wf={wf} isActive={activeId === wf.id}
-                        onClick={() => onSelect(wf.id)}
-                        onToggleDefault={() => onToggleDefault(wf.id)} />
-                ))}
-            </div>
+            <div className="space-y-0.5">{items.map((wf) => <WorkflowListItem key={wf.id} wf={wf} isActive={activeId === wf.id} onClick={() => onSelect(wf.id)} />)}</div>
         </div>
     );
-
     return (
-        <div className="w-[280px] flex-shrink-0 h-full bg-[var(--bg-card)] border-r border-[var(--border-color)] flex flex-col">
-            <div className="px-4 py-4 border-b border-[var(--border-color)] flex-shrink-0">
-                <div className="flex items-center justify-between mb-1">
-                    <h2 className="text-base font-bold text-[var(--text-primary)]">Рабочие процессы</h2>
-                    <button onClick={onCreate}
-                        className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--accent)] transition-colors">
-                        <Plus className="w-4 h-4" />
-                    </button>
+        <div className="w-[240px] shrink-0 h-full bg-[var(--bg-card)] border-r border-[var(--border-color)] flex flex-col">
+            <div className="px-4 py-3 border-b border-[var(--border-color)] shrink-0">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-[15px] font-bold text-[var(--text-primary)]">Процессы</h2>
+                    <button onClick={onCreate} className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--accent)]"><Plus className="w-4 h-4" /></button>
                 </div>
-                <p className="text-[11px] text-[var(--text-primary)]/40">{workflows.length} процессов</p>
             </div>
-
-            <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-4 scrollbar-thin scrollbar-thumb-[var(--hover-3)]">
-                {renderGroup('Задачи', <Layers className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />, taskWfs)}
-                {renderGroup('Заявки', <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />, ticketWfs)}
+            <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-4 scrollbar-thin scrollbar-thumb-[var(--hover-3)]">
+                {group('Задачи', <Layers className="w-3.5 h-3.5 text-[var(--text-primary)]/25" />, tasks)}
+                {group('Заявки', <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/25" />, tickets)}
             </div>
         </div>
     );
@@ -1587,42 +1132,32 @@ function WorkflowSidebar({ workflows, activeId, onSelect, onCreate, onToggleDefa
    TOOLBAR
    ═══════════════════════════════════════════════════════════════════ */
 
-interface WorkflowToolbarProps {
-    workflow: Workflow;
-    saving: boolean;
-    onAddNode: () => void;
-    onSave: () => void;
-}
-
-function WorkflowToolbar({ workflow, saving, onAddNode, onSave }: WorkflowToolbarProps) {
-    const EntityIcon = workflow.entityKind === 'task' ? Layers : Ticket;
-
+function WfToolbar({ workflow, saving, isFullscreen, onAddNode, onSave, onToggleFullscreen }: {
+    workflow: WorkflowData; saving: boolean; isFullscreen: boolean;
+    onAddNode: () => void; onSave: () => void; onToggleFullscreen: () => void;
+}) {
+    const Ic = workflow.entityKind === 'task' ? Layers : Ticket;
     return (
-        <div className="h-14 flex-shrink-0 bg-[var(--bg-card)] border-b border-[var(--border-color)] flex items-center justify-between px-5">
-            <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                    <EntityIcon className="w-4 h-4 text-[var(--text-primary)]/30" />
-                    <h2 className="text-base font-bold text-[var(--text-primary)]">{workflow.name}</h2>
-                    {workflow.isDefault && (
-                        <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
-                            По умолчанию
-                        </span>
-                    )}
-                </div>
-                {workflow.description && (
-                    <span className="text-sm text-[var(--text-primary)]/30 hidden lg:block">
-                        — {workflow.description}
-                    </span>
-                )}
+        <div className="h-[48px] shrink-0 bg-[var(--bg-card)] border-b border-[var(--border-color)] flex items-center justify-between px-4">
+            <div className="flex items-center gap-2.5">
+                <Ic className="w-4 h-4 text-[var(--text-primary)]/25" />
+                <h2 className="text-[15px] font-bold text-[var(--text-primary)]">{workflow.name}</h2>
+                {workflow.isDefault && <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">DEF</span>}
+                {workflow.description && <span className="text-[13px] text-[var(--text-primary)]/25 hidden xl:block ml-1">— {workflow.description}</span>}
             </div>
-
             <div className="flex items-center gap-2">
+                <button onClick={onToggleFullscreen}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/55 text-[13px] font-medium hover:bg-[var(--hover-3)] hover:text-[var(--text-primary)] transition-colors"
+                    title={isFullscreen ? 'Свернуть' : 'Во весь экран'}>
+                    {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                    {isFullscreen ? 'Свернуть' : 'На весь экран'}
+                </button>
                 <button onClick={onAddNode}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/60 text-sm font-medium hover:bg-[var(--hover-3)] hover:text-[var(--text-primary)] transition-colors">
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/55 text-[13px] font-medium hover:bg-[var(--hover-3)] hover:text-[var(--text-primary)] transition-colors">
                     <Plus className="w-3.5 h-3.5" /> Статус
                 </button>
                 <button onClick={onSave} disabled={saving}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-sm font-medium disabled:opacity-40 transition-colors shadow-[var(--shadow-md)]">
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-[13px] font-medium disabled:opacity-40 transition-colors shadow-[var(--shadow-md)]">
                     {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                     Сохранить
                 </button>
@@ -1635,35 +1170,27 @@ function WorkflowToolbar({ workflow, saving, onAddNode, onSave }: WorkflowToolba
    TOAST
    ═══════════════════════════════════════════════════════════════════ */
 
-interface ToastData { title: string; description?: string }
-
-function Toast({ toast }: { toast: ToastData }) {
+function ToastNotification({ data }: { data: ToastData }) {
     return (
-        <motion.div
-            initial={{ y: 80, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 80, opacity: 0 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-[var(--shadow-lg)] px-5 py-3 flex items-center gap-3"
-        >
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
-                <Check className="w-4 h-4 text-emerald-400" />
-            </div>
+        <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
+            className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[200] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-[var(--shadow-lg)] px-4 py-2.5 flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0"><Check className="w-3.5 h-3.5 text-emerald-400" /></div>
             <div>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">{toast.title}</p>
-                {toast.description && (
-                    <p className="text-[11px] text-[var(--text-primary)]/40">{toast.description}</p>
-                )}
+                <p className="text-[13px] font-semibold text-[var(--text-primary)]">{data.title}</p>
+                {data.description && <p className="text-[11px] text-[var(--text-primary)]/35">{data.description}</p>}
             </div>
         </motion.div>
     );
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   MAIN PAGE
+   INNER CONTENT (used in both modes)
    ═══════════════════════════════════════════════════════════════════ */
 
-export default function WorkflowPage() {
-    const [workflows, setWorkflows] = useState<Workflow[]>(MOCK_WORKFLOWS);
+function WorkflowInner({ isFullscreen, onToggleFullscreen }: {
+    isFullscreen: boolean; onToggleFullscreen: () => void;
+}) {
+    const [workflows, setWorkflows] = useState<WorkflowData[]>(MOCK_WORKFLOWS);
     const [activeWfId, setActiveWfId] = useState(MOCK_WORKFLOWS[0].id);
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
     const [selectedTransId, setSelectedTransId] = useState<string | null>(null);
@@ -1672,225 +1199,169 @@ export default function WorkflowPage() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [saving, setSaving] = useState(false);
     const [toast, setToast] = useState<ToastData | null>(null);
+    const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const activeWf = useMemo(
-        () => workflows.find((w) => w.id === activeWfId) ?? workflows[0],
-        [workflows, activeWfId],
-    );
+    const activeWf = useMemo(() => workflows.find((w) => w.id === activeWfId) ?? workflows[0], [workflows, activeWfId]);
 
     const showToast = useCallback((title: string, description?: string) => {
+        if (toastTimer.current) clearTimeout(toastTimer.current);
         setToast({ title, description });
-        const id = setTimeout(() => setToast(null), 3000);
-        return () => clearTimeout(id);
+        toastTimer.current = setTimeout(() => setToast(null), 2500);
     }, []);
 
-    const updateActiveWf = useCallback((updater: (wf: Workflow) => Workflow) => {
-        setWorkflows((prev) => prev.map((w) => w.id === activeWfId ? updater(w) : w));
+    const updateActiveWf = useCallback((fn: (wf: WorkflowData) => WorkflowData) => {
+        setWorkflows((prev) => prev.map((w) => w.id === activeWfId ? fn(w) : w));
     }, [activeWfId]);
 
-    /* ── Node operations ── */
+    const handleDeselectAll = useCallback(() => { setSelectedNodeId(null); setSelectedTransId(null); }, []);
 
     const handleNodeMove = useCallback((id: string, x: number, y: number) => {
-        updateActiveWf((wf) => ({
-            ...wf,
-            nodes: wf.nodes.map((n) => n.id === id ? { ...n, x, y } : n),
-        }));
+        updateActiveWf((wf) => ({ ...wf, nodes: wf.nodes.map((n) => n.id === id ? { ...n, x, y } : n) }));
     }, [updateActiveWf]);
 
     const handleAddNode = useCallback(() => {
-        const newNode: WfStatusNode = {
-            id: uid(), label: 'Новый статус', category: 'custom',
-            color: '#f97316', iconKey: 'circle',
-            x: 200 + Math.random() * 300,
-            y: 150 + Math.random() * 200,
-        };
-        updateActiveWf((wf) => ({ ...wf, nodes: [...wf.nodes, newNode] }));
-        setSelectedNodeId(newNode.id);
-        setSelectedTransId(null);
+        const n: WfStatusNode = { id: uid(), label: 'Новый статус', category: 'custom', color: '#f97316', iconKey: 'circle', x: 200 + Math.random() * 300, y: 150 + Math.random() * 200 };
+        updateActiveWf((wf) => ({ ...wf, nodes: [...wf.nodes, n] }));
+        setSelectedNodeId(n.id); setSelectedTransId(null);
     }, [updateActiveWf]);
 
-    const handleUpdateNode = useCallback((node: WfStatusNode) => {
-        updateActiveWf((wf) => ({ ...wf, nodes: wf.nodes.map((n) => n.id === node.id ? node : n) }));
+    const handleUpdateNode = useCallback((n: WfStatusNode) => {
+        updateActiveWf((wf) => ({ ...wf, nodes: wf.nodes.map((nd) => nd.id === n.id ? n : nd) }));
         showToast('Статус обновлён');
     }, [updateActiveWf, showToast]);
 
-    const handleDeleteNode = useCallback((nodeId: string) => {
-        updateActiveWf((wf) => ({
-            ...wf,
-            nodes: wf.nodes.filter((n) => n.id !== nodeId),
-            transitions: wf.transitions.filter((t) => t.fromId !== nodeId && t.toId !== nodeId),
-        }));
-        setSelectedNodeId(null);
-        showToast('Статус удалён');
+    const handleDeleteNode = useCallback((id: string) => {
+        updateActiveWf((wf) => ({ ...wf, nodes: wf.nodes.filter((n) => n.id !== id), transitions: wf.transitions.filter((t) => t.fromId !== id && t.toId !== id) }));
+        setSelectedNodeId(null); showToast('Статус удалён');
     }, [updateActiveWf, showToast]);
 
-    /* ── Transition operations ── */
-
-    const handleUpdateTransition = useCallback((transition: WfTransition) => {
-        updateActiveWf((wf) => ({
-            ...wf,
-            transitions: wf.transitions.map((t) => t.id === transition.id ? transition : t),
-        }));
+    const handleUpdateTransition = useCallback((t: WfTransition) => {
+        updateActiveWf((wf) => ({ ...wf, transitions: wf.transitions.map((tr) => tr.id === t.id ? t : tr) }));
         showToast('Переход обновлён');
     }, [updateActiveWf, showToast]);
 
-    const handleDeleteTransition = useCallback((transitionId: string) => {
-        updateActiveWf((wf) => ({ ...wf, transitions: wf.transitions.filter((t) => t.id !== transitionId) }));
-        setSelectedTransId(null);
-        showToast('Переход удалён');
+    const handleDeleteTransition = useCallback((id: string) => {
+        updateActiveWf((wf) => ({ ...wf, transitions: wf.transitions.filter((t) => t.id !== id) }));
+        setSelectedTransId(null); showToast('Переход удалён');
     }, [updateActiveWf, showToast]);
 
-    /* ── Connection ── */
-
-    const handleConnectStart = useCallback((nodeId: string) => {
-        setConnectingFrom(nodeId);
-    }, []);
-
-    const handleConnectEnd = useCallback(() => {
-        setConnectingFrom(null);
-        setTempConnectPos(null);
-    }, []);
+    const handleConnectStart = useCallback((id: string) => setConnectingFrom(id), []);
+    const handleConnectEnd = useCallback(() => { setConnectingFrom(null); setTempConnectPos(null); }, []);
 
     const handleConnectComplete = useCallback((fromId: string, toId: string) => {
         if (fromId === toId) return;
-        const exists = activeWf.transitions.some((t) => t.fromId === fromId && t.toId === toId);
-        if (exists) { showToast('Переход уже существует'); return; }
-
-        const newTransition: WfTransition = { id: uid(), fromId, toId, label: '', conditions: [], actions: [] };
-        updateActiveWf((wf) => ({ ...wf, transitions: [...wf.transitions, newTransition] }));
-        setSelectedTransId(newTransition.id);
-        setSelectedNodeId(null);
-        showToast('Переход создан');
+        if (activeWf.transitions.some((t) => t.fromId === fromId && t.toId === toId)) { showToast('Уже существует'); return; }
+        const t: WfTransition = { id: uid(), fromId, toId, label: '', conditions: [], actions: [] };
+        updateActiveWf((wf) => ({ ...wf, transitions: [...wf.transitions, t] }));
+        setSelectedTransId(t.id); setSelectedNodeId(null); showToast('Переход создан');
     }, [activeWf.transitions, updateActiveWf, showToast]);
 
-    // Track mouse for temp connection line
     useEffect(() => {
         if (!connectingFrom) return;
-        const handleMove = (e: MouseEvent) => setTempConnectPos({ x: e.clientX, y: e.clientY });
-        document.addEventListener('mousemove', handleMove);
-        return () => document.removeEventListener('mousemove', handleMove);
+        const h = (e: MouseEvent) => setTempConnectPos({ x: e.clientX, y: e.clientY });
+        document.addEventListener('mousemove', h);
+        return () => document.removeEventListener('mousemove', h);
     }, [connectingFrom]);
-
-    /* ── Save ── */
 
     const handleSave = useCallback(() => {
         setSaving(true);
-        setTimeout(() => {
-            setSaving(false);
-            showToast('Рабочий процесс сохранён', 'Все изменения успешно применены');
-        }, 800);
+        setTimeout(() => { setSaving(false); showToast('Сохранено', 'Изменения применены'); }, 700);
     }, [showToast]);
 
-    /* ── Create ── */
-
-    const handleCreateWorkflow = useCallback((partial: Partial<Workflow>) => {
-        const newWf: Workflow = {
-            id: uid(),
-            name: partial.name ?? 'Новый процесс',
-            entityKind: partial.entityKind ?? 'task',
-            description: partial.description,
-            nodes: partial.nodes ?? [],
-            transitions: partial.transitions ?? [],
-            isDefault: false,
-            updatedAt: new Date().toISOString(),
-        };
-        setWorkflows((prev) => [...prev, newWf]);
-        setActiveWfId(newWf.id);
-        setShowCreateModal(false);
-        showToast('Рабочий процесс создан');
+    const handleCreate = useCallback((p: Partial<WorkflowData>) => {
+        const wf: WorkflowData = { id: uid(), name: p.name ?? 'Новый', entityKind: p.entityKind ?? 'task', description: p.description, nodes: p.nodes ?? [], transitions: p.transitions ?? [], isDefault: false, updatedAt: new Date().toISOString() };
+        setWorkflows((prev) => [...prev, wf]); setActiveWfId(wf.id); setShowCreateModal(false); showToast('Создано');
     }, [showToast]);
 
-    /* ── Toggle default ── */
+    const selectedNode = selectedNodeId ? activeWf.nodes.find((n) => n.id === selectedNodeId) ?? null : null;
+    const selectedTrans = selectedTransId ? activeWf.transitions.find((t) => t.id === selectedTransId) ?? null : null;
+    const transFrom = selectedTrans ? activeWf.nodes.find((n) => n.id === selectedTrans.fromId) ?? null : null;
+    const transTo = selectedTrans ? activeWf.nodes.find((n) => n.id === selectedTrans.toId) ?? null : null;
 
-    const handleToggleDefault = useCallback((id: string) => {
-        setWorkflows((prev) =>
-            prev.map((w) => w.entityKind !== activeWf.entityKind ? w : { ...w, isDefault: w.id === id }),
-        );
-        showToast('Настройки обновлены');
-    }, [activeWf.entityKind, showToast]);
-
-    /* ── Derived selections ── */
-
-    const selectedNode = selectedNodeId ? activeWf.nodes.find((n) => n.id === selectedNodeId) : null;
-    const selectedTransition = selectedTransId ? activeWf.transitions.find((t) => t.id === selectedTransId) : null;
-    const selectedTransFrom = selectedTransition ? activeWf.nodes.find((n) => n.id === selectedTransition.fromId) : null;
-    const selectedTransTo = selectedTransition ? activeWf.nodes.find((n) => n.id === selectedTransition.toId) : null;
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !showCreateModal) handleDeselectAll(); };
+        document.addEventListener('keydown', h);
+        return () => document.removeEventListener('keydown', h);
+    }, [showCreateModal, handleDeselectAll]);
 
     return (
-        <div className="h-[calc(100vh-64px)] flex flex-col bg-[var(--bg-main)] animate-in fade-in duration-500">
-            <div className="flex-1 flex min-h-0">
-                {/* Sidebar */}
-                <WorkflowSidebar
-                    workflows={workflows}
-                    activeId={activeWfId}
-                    onSelect={(id) => { setActiveWfId(id); setSelectedNodeId(null); setSelectedTransId(null); }}
-                    onCreate={() => setShowCreateModal(true)}
-                    onToggleDefault={handleToggleDefault}
-                />
+        <>
+            <div className="flex h-full w-full">
+                <WfSidebar workflows={workflows} activeId={activeWfId}
+                    onSelect={(id) => { setActiveWfId(id); handleDeselectAll(); }}
+                    onCreate={() => setShowCreateModal(true)} />
 
-                {/* Main */}
-                <div className="flex-1 flex flex-col min-w-0">
-                    <WorkflowToolbar
-                        workflow={activeWf}
-                        saving={saving}
-                        onAddNode={handleAddNode}
-                        onSave={handleSave}
-                    />
+                <div className="flex-1 flex flex-col min-w-0 min-h-0">
+                    <WfToolbar workflow={activeWf} saving={saving} isFullscreen={isFullscreen}
+                        onAddNode={handleAddNode} onSave={handleSave} onToggleFullscreen={onToggleFullscreen} />
 
                     <div className="flex-1 flex min-h-0">
                         <WorkflowCanvas
                             workflow={activeWf}
-                            selectedNodeId={selectedNodeId}
-                            selectedTransitionId={selectedTransId}
-                            connectingFrom={connectingFrom}
-                            tempConnectPos={tempConnectPos}
-                            onSelectNode={setSelectedNodeId}
-                            onSelectTransition={setSelectedTransId}
+                            selectedNodeId={selectedNodeId} selectedTransitionId={selectedTransId}
+                            connectingFrom={connectingFrom} tempConnectPos={tempConnectPos}
+                            onSelectNode={setSelectedNodeId} onSelectTransition={setSelectedTransId}
                             onNodeMove={handleNodeMove}
-                            onConnectStart={handleConnectStart}
-                            onConnectEnd={handleConnectEnd}
+                            onConnectStart={handleConnectStart} onConnectEnd={handleConnectEnd}
                             onConnectComplete={handleConnectComplete}
-                        />
+                            onDeselectAll={handleDeselectAll} />
 
-                        {/* Right panel */}
                         <AnimatePresence mode="wait">
                             {selectedNode && (
-                                <NodeDetailPanel
-                                    key={`node-${selectedNode.id}`}
-                                    node={selectedNode}
+                                <NodeDetailPanel key={`n-${selectedNode.id}`} node={selectedNode}
                                     onClose={() => setSelectedNodeId(null)}
                                     onUpdate={handleUpdateNode}
-                                    onDelete={() => handleDeleteNode(selectedNode.id)}
-                                />
+                                    onDelete={() => handleDeleteNode(selectedNode.id)} />
                             )}
-                            {selectedTransition && selectedTransFrom && selectedTransTo && (
-                                <TransitionDetailPanel
-                                    key={`trans-${selectedTransition.id}`}
-                                    transition={selectedTransition}
-                                    fromNode={selectedTransFrom}
-                                    toNode={selectedTransTo}
+                            {selectedTrans && transFrom && transTo && (
+                                <TransitionDetailPanel key={`t-${selectedTrans.id}`}
+                                    transition={selectedTrans} fromNode={transFrom} toNode={transTo}
                                     onClose={() => setSelectedTransId(null)}
                                     onUpdate={handleUpdateTransition}
-                                    onDelete={() => handleDeleteTransition(selectedTransition.id)}
-                                />
+                                    onDelete={() => handleDeleteTransition(selectedTrans.id)} />
                             )}
                         </AnimatePresence>
                     </div>
                 </div>
             </div>
 
-            {/* Create modal */}
-            {showCreateModal && (
-                <CreateWorkflowModal
-                    onClose={() => setShowCreateModal(false)}
-                    onCreate={handleCreateWorkflow}
-                />
-            )}
+            {showCreateModal && <CreateWorkflowModal onClose={() => setShowCreateModal(false)} onCreate={handleCreate} />}
 
-            {/* Toast */}
             <AnimatePresence>
-                {toast && <Toast key="toast" toast={toast} />}
+                {toast && <ToastNotification key="t" data={toast} />}
             </AnimatePresence>
+        </>
+    );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAIN PAGE — with fullscreen toggle
+   ═══════════════════════════════════════════════════════════════════ */
+
+export default function WorkflowPage() {
+    const [isFullscreen, setIsFullscreen] = useState(true);
+
+    // Lock body scroll when fullscreen
+    useEffect(() => {
+        if (isFullscreen) {
+            document.body.style.overflow = 'hidden';
+            return () => { document.body.style.overflow = ''; };
+        }
+    }, [isFullscreen]);
+
+    // Fullscreen: fixed overlay covering entire viewport
+    if (isFullscreen) {
+        return (
+            <div className="fixed inset-0 z-[50] bg-[var(--bg-main)] flex flex-col">
+                <WorkflowInner isFullscreen={true} onToggleFullscreen={() => setIsFullscreen(false)} />
+            </div>
+        );
+    }
+
+    // Normal: fits inside existing layout
+    return (
+        <div className="h-full flex flex-col bg-[var(--bg-main)]">
+            <WorkflowInner isFullscreen={false} onToggleFullscreen={() => setIsFullscreen(true)} />
         </div>
     );
 }
