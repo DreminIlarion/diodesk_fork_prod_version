@@ -219,12 +219,12 @@ const CTX_TABS: {
   icon: React.ComponentType<{ className?: string }>;
   staffOnly?: boolean;
 }[] = [
-  { id: 'my', label: 'Мои задачи', icon: User },
-  { id: 'internal', label: 'Все задачи', icon: Layers, staffOnly: true },
-  { id: 'project', label: 'Проект', icon: FolderOpen },
-  { id: 'assignee', label: 'Исполнитель', icon: UserCheck, staffOnly: true },
-  { id: 'ticket', label: 'Заявка', icon: Ticket, staffOnly: true },
-];
+    { id: 'my', label: 'Мои задачи', icon: User },
+    { id: 'internal', label: 'Все задачи', icon: Layers, staffOnly: true },
+    { id: 'project', label: 'Проект', icon: FolderOpen },
+    { id: 'assignee', label: 'Исполнитель', icon: UserCheck, staffOnly: true },
+    { id: 'ticket', label: 'Заявка', icon: Ticket, staffOnly: true },
+  ];
 
 /* ═══════════════════════════════════════════════════════════════════
    HELPERS
@@ -233,7 +233,13 @@ const CTX_TABS: {
 const initials = (n?: string | null) =>
   n ? n.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() : '?';
 
-const isOverdue = (d?: string | null) => (d ? new Date(d) < new Date() : false);
+
+const isTaskOverdue = (task: TaskKanbanItem) => {
+  if (!task.due_date) return false;
+  // Если задача в колонке "Выполнено" или "Отменено", она не считается просроченной
+  if (task.status === 'done' || task.status === 'cancelled') return false;
+  return new Date(task.due_date) < new Date();
+};
 
 const fmtDue = (d: string) => {
   const diff = Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
@@ -423,8 +429,8 @@ function CustomSelect({
 
   const filtered = search
     ? options.filter(o =>
-        o.label.toLowerCase().includes(search.toLowerCase()) ||
-        (o.sublabel || '').toLowerCase().includes(search.toLowerCase()))
+      o.label.toLowerCase().includes(search.toLowerCase()) ||
+      (o.sublabel || '').toLowerCase().includes(search.toLowerCase()))
     : options;
 
   const handleClear = (e: React.MouseEvent) => {
@@ -872,7 +878,8 @@ function TaskCard({
   onView: (t: TaskKanbanItem) => void;
   onQuickMove: (id: string, from: TaskStatus, to: TaskStatus) => void;
 }) {
-  const od = isOverdue(task.due_date);
+  const od = isTaskOverdue(task);
+  
   const a = task.assignee_id ? userMap.get(task.assignee_id) : null;
   const cm = COL[task.status];
   const cardBorder = od ? 'border-[var(--accent)]/30' : cm.border;
@@ -901,10 +908,10 @@ function TaskCard({
           <span className="px-1.5 py-0.5 rounded text-[13px] font-mono bg-[var(--hover-2)] text-[var(--text-primary)]/70 border border-[var(--border-color)] flex-shrink-0">
             #{task.number}
           </span>
-          
+
         </div>
 
-        
+
       </div>
 
       <h4 className="text-base font-semibold text-[var(--text-primary)] mb-2 leading-snug line-clamp-2">
@@ -1628,15 +1635,15 @@ function DetailModal({
               </div>
             </div>
 
-            <div className="bg-[var(--hover-2)] rounded-xl border border-[var(--border-color)] p-3">
-              <p className="text-[13px] uppercase tracking-widest text-[var(--text-primary)]/40 mb-1.5">Срок</p>
-              {task.due_date
-                ? <span className={`flex items-center gap-1 text-base font-semibold ${isOverdue(task.due_date) ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/70'}`}>
-                  <Calendar className="w-3.5 h-3.5" />
-                  {fmtDue(task.due_date)}
-                </span>
-                : <span className="text-base text-[var(--text-primary)]/25">—</span>}
-            </div>
+              <div className="bg-[var(--hover-2)] rounded-xl border border-[var(--border-color)] p-3">
+                <p className="text-[13px] uppercase tracking-widest text-[var(--text-primary)]/40 mb-1.5">Срок</p>
+                {task.due_date
+                  ? <span className={`flex items-center gap-1 text-base font-semibold ${isTaskOverdue(task) ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/70'}`}>
+                    <Calendar className="w-3.5 h-3.5" />
+                    {fmtDue(task.due_date)}
+                  </span>
+                  : <span className="text-base text-[var(--text-primary)]/25">—</span>}
+              </div>
 
             <div className="bg-[var(--hover-2)] rounded-xl border border-[var(--border-color)] p-3">
               <p className="text-[13px] uppercase tracking-widest text-[var(--text-primary)]/40 mb-1.5">Исполнитель</p>
@@ -2157,9 +2164,9 @@ export default function TasksPage() {
   /* ─── Drag info для QuickStatusPanel ─── */
   const dragTaskInfo = drag
     ? (() => {
-        const t = cols.flatMap(c => c.tasks.items).find(x => x.id === drag.id);
-        return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null;
-      })()
+      const t = cols.flatMap(c => c.tasks.items).find(x => x.id === drag.id);
+      return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null;
+    })()
     : null;
 
   return (
