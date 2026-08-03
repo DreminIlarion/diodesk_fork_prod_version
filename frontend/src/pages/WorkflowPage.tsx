@@ -3,19 +3,20 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Plus, X, Check, Save, Trash2, GripVertical,
-  ArrowRight, GitBranch, Settings, Zap, Bell,
+  Plus, X, Check, Save, Trash2,
+  ArrowRight, Zap, Bell,
   UserCheck, Mail, MessageSquare, ChevronDown,
-  ChevronRight, Circle, Timer, Eye, AlertCircle,
+  Circle, Timer, Eye, AlertCircle,
   CheckCircle2, Ban, RotateCcw, Clock, Send,
-  FileText, Layers, Ticket, FolderOpen, Play,
-  Pause, StopCircle, Copy, Lock, Unlock,
-  ArrowLeftRight, Workflow, Sparkles, Target,
-  Flag, Star, Shield, Users, Bot, Webhook,
-  Database, Globe, Code, Search, Filter,
-  MoreHorizontal, Edit3, Move, Link2, Unlink,
-  AlertTriangle, ThumbsUp, ThumbsDown, RefreshCw,
-  Package, Radio, Hash, Tag, Calendar, ZoomOut
+  FileText, Layers, Ticket,
+  Lock,
+  Workflow, Target,
+  Shield, Bot, Webhook,
+  Database,
+  Edit3, Unlink,
+  AlertTriangle,
+  Calendar, ZoomOut, ZoomIn, Maximize2,
+  Loader2 
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════════
