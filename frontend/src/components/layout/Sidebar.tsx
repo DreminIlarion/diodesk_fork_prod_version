@@ -51,7 +51,7 @@ const canInvite = user?.roles?.some(r => ['support_agent', 'support_manager', 'e
     { to: '/dashboard', icon: LayoutDashboard, label: 'Главная' },
     { to: '/tickets', icon: Ticket, label: 'Заявки' },
     { to: '/feedbacks', icon: Star, label: 'Отзывы' },
-    { to: '/workflows', icon: Workflow, label: 'Рабочие процессы' },
+    // { to: '/workflows', icon: Workflow, label: 'Рабочие процессы' },
 
     ...(isCustomer
       ? [{ to: '/my-company', icon: Building, label: 'Моя компания' }]
