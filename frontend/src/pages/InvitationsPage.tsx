@@ -3,12 +3,14 @@ import {
   Mail, Send, History, Loader2, AlertCircle, CheckCircle2, Clock,
   XCircle, Trash2, ChevronLeft, ChevronRight, HelpCircle, Building2,
   Users, Shield, UserPlus, Search, X, Check, ChevronDown, RefreshCcw,
-  User, Briefcase, HeadphonesIcon, Settings,
+  User, Briefcase, HeadphonesIcon, Settings, ExternalLink, Copy,
 } from 'lucide-react';
 import { invitationsApi, counterpartiesApi } from '../api/client';
 import type { Counterparty, Invitation, UserRole } from '../types';
 
-// ─── Роли ─────────
+/* ═══════════════════════════════════════════════════════════════════
+   ROLES CONFIG
+   ═══════════════════════════════════════════════════════════════════ */
 
 interface RoleOption {
   value: UserRole;
@@ -16,6 +18,7 @@ interface RoleOption {
   desc: string;
   icon: React.ReactNode;
   color: string;
+  bg: string;
   borderColor: string;
   group: 'client' | 'staff';
 }
@@ -26,7 +29,8 @@ const ROLES: RoleOption[] = [
     label: 'Клиент',
     desc: 'Создаёт и отслеживает заявки',
     icon: <User className="w-5 h-5" />,
-    color: 'text-[var(--info)]',
+    color: 'text-blue-400',
+    bg: 'bg-blue-500/10',
     borderColor: 'border-blue-500/40',
     group: 'client',
   },
@@ -35,7 +39,8 @@ const ROLES: RoleOption[] = [
     label: 'Админ клиента',
     desc: 'Управляет заявками и сотрудниками контрагента',
     icon: <Briefcase className="w-5 h-5" />,
-    color: 'text-[var(--info)]',
+    color: 'text-cyan-400',
+    bg: 'bg-cyan-500/10',
     borderColor: 'border-cyan-500/40',
     group: 'client',
   },
@@ -44,8 +49,9 @@ const ROLES: RoleOption[] = [
     label: 'Агент поддержки',
     desc: 'Обрабатывает входящие заявки',
     icon: <HeadphonesIcon className="w-5 h-5" />,
-    color: 'text-[var(--info)]',
-    borderColor: 'border-purple-500/40',
+    color: 'text-violet-400',
+    bg: 'bg-violet-500/10',
+    borderColor: 'border-violet-500/40',
     group: 'staff',
   },
   {
@@ -53,20 +59,21 @@ const ROLES: RoleOption[] = [
     label: 'Менеджер',
     desc: 'Управляет командой и распределяет задачи',
     icon: <Settings className="w-5 h-5" />,
-    color: 'text-[var(--warning)]',
-    borderColor: 'border-orange-500/40',
+    color: 'text-amber-400',
+    bg: 'bg-amber-500/10',
+    borderColor: 'border-amber-500/40',
     group: 'staff',
   },
 ];
 
 const getRoleMeta = (v: string) => ROLES.find(r => r.value === v);
 
-// ─── Кастомный dropdown для контрагентов ──────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════
+   COUNTERPARTY DROPDOWN
+   ═══════════════════════════════════════════════════════════════════ */
 
 function CounterpartyDropdown({
-  value,
-  onChange,
-  counterparties,
+  value, onChange, counterparties,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -74,9 +81,7 @@ function CounterpartyDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [dropDirection, setDropDirection] = useState<'down' | 'up'>('down');
   const ref = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -91,24 +96,11 @@ function CounterpartyDropdown({
   }, []);
 
   useEffect(() => {
-    if (open && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-      const dropdownHeight = 320;
-
-      if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
-        setDropDirection('up');
-      } else {
-        setDropDirection('down');
-      }
-
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
+    if (open) setTimeout(() => inputRef.current?.focus(), 50);
+    if (!open) setQuery('');
   }, [open]);
 
   const selected = counterparties.find(c => c.id === value);
-
   const filtered = query
     ? counterparties.filter(c =>
         c.name.toLowerCase().includes(query.toLowerCase()) ||
@@ -120,71 +112,56 @@ function CounterpartyDropdown({
   return (
     <div ref={ref} className="relative">
       <button
-        ref={buttonRef}
-        onClick={() => { setOpen(!open); setQuery(''); }}
-        className={`
-          w-full flex items-center gap-3 px-4 py-4 rounded-xl text-left text-base
-          transition-all duration-150 border
-          ${open
-            ? 'bg-[var(--hover-2)] border-[var(--accent)]/30 ring-2 ring-red-500/10'
+        onClick={() => setOpen(!open)}
+        className={[
+          'w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-left transition-all border',
+          open
+            ? 'bg-[var(--hover-2)] border-[var(--accent)]/30 ring-2 ring-[var(--accent-ring)]'
             : value
-              ? 'bg-[var(--hover-2)] border-[var(--border-color)] hover:border-[var(--border-color)]'
-              : 'bg-[var(--hover-1)] border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-          }
-        `}
+              ? 'bg-[var(--hover-2)] border-[var(--border-color)] hover:border-[var(--accent)]/20'
+              : 'bg-[var(--hover-2)] border-[var(--border-color)] hover:bg-[var(--hover-3)]',
+        ].join(' ')}
       >
-        <Building2 className="w-5 h-5 text-[var(--text-primary)]/40 flex-shrink-0" />
+        <Building2 className="w-5 h-5 text-[var(--text-primary)]/35 shrink-0" />
         {selected ? (
           <div className="flex-1 min-w-0">
-            <span className="text-[var(--text-primary)] truncate block">{selected.name}</span>
-            <span className="text-l text-[var(--text-primary)]/40">ИНН: {selected.inn}</span>
+            <span className="text-[14px] text-[var(--text-primary)] truncate block font-medium">{selected.name}</span>
+            <span className="text-[12px] text-[var(--text-primary)]/35">ИНН: {selected.inn}</span>
           </div>
         ) : (
-          <span className="text-[var(--text-primary)]/40 flex-1">Выберите контрагента...</span>
+          <span className="text-[14px] text-[var(--text-primary)]/35 flex-1">Выберите контрагента...</span>
         )}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           {value && (
-            <button
+            <span
+              role="button"
               onClick={(e) => { e.stopPropagation(); onChange(''); setOpen(false); }}
-              className="p-1 rounded hover:bg-[var(--hover-1)] text-[var(--text-primary)]/25 hover:text-[var(--text-primary)]/50"
+              className="p-1 rounded-lg hover:bg-[var(--hover-3)] text-[var(--text-primary)]/25 hover:text-[var(--text-primary)]/50 cursor-pointer"
             >
-              <X size={14} />
-            </button>
+              <X className="w-3.5 h-3.5" />
+            </span>
           )}
-          <ChevronDown size={16} className={`text-[var(--text-primary)]/25 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`w-4 h-4 text-[var(--text-primary)]/25 transition-transform ${open ? 'rotate-180' : ''}`} />
         </div>
       </button>
 
       {open && (
-        <div
-          className={`
-            absolute z-50 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl 
-            shadow-[var(--shadow-lg)] overflow-hidden
-            min-w-[280px] w-auto max-w-[calc(100vw-32px)]
-            ${dropDirection === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'}
-          `}
-          style={{
-            left: 0,
-            right: 0,
-            maxWidth: 'calc(100vw - 32px)',
-          }}
-        >
+        <div className="absolute z-50 left-0 right-0 top-full mt-2 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-[var(--shadow-lg)] overflow-hidden">
           <div className="p-2.5 border-b border-[var(--border-color)]">
             <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/25" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-primary)]/25" />
               <input
                 ref={inputRef}
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Поиск по названию или ИНН..."
-                className="w-full pl-9 pr-3 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-lg text-l text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-color)]"
+                className="w-full pl-9 pr-3 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-lg text-[14px] text-[var(--text-primary)] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 transition-all"
               />
             </div>
           </div>
-
-          <div className="max-h-64 overflow-y-auto py-1">
+          <div className="max-h-64 overflow-y-auto py-1 scrollbar-thin scrollbar-thumb-[var(--hover-3)]">
             {filtered.length === 0 ? (
-              <div className="px-4 py-6 text-center text-l text-[var(--text-primary)]/25">
+              <div className="px-4 py-6 text-center text-[14px] text-[var(--text-primary)]/25">
                 {query ? 'Ничего не найдено' : 'Нет контрагентов'}
               </div>
             ) : (
@@ -194,18 +171,20 @@ function CounterpartyDropdown({
                   <button
                     key={cp.id}
                     onClick={() => { onChange(cp.id); setOpen(false); setQuery(''); }}
-                    className={`
-                      w-full flex items-center gap-3 px-4 py-3 text-left text-l transition-colors
-                      ${isSelected ? 'bg-[var(--hover-2)] text-[var(--text-primary)]' : 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)]'}
-                    `}
+                    className={[
+                      'w-full flex items-center gap-3 px-4 py-3 text-left transition-colors',
+                      isSelected
+                        ? 'bg-[var(--accent)]/8 text-[var(--text-primary)]'
+                        : 'text-[var(--text-primary)]/65 hover:bg-[var(--hover-2)]',
+                    ].join(' ')}
                   >
                     {isSelected
-                      ? <Check size={14} className="text-[var(--accent)] flex-shrink-0" />
-                      : <span className="w-[14px] flex-shrink-0" />
+                      ? <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />
+                      : <span className="w-4 shrink-0" />
                     }
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{cp.name}</p>
-                      <p className="text-l text-[var(--text-primary)]/40 truncate">
+                      <p className="truncate font-medium text-[14px]">{cp.name}</p>
+                      <p className="text-[12px] text-[var(--text-primary)]/35 truncate">
                         {cp.legal_name} · ИНН: {cp.inn}
                       </p>
                     </div>
@@ -220,20 +199,58 @@ function CounterpartyDropdown({
   );
 }
 
-// ─── Статус приглашения ──────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════
+   INVITATION STATUS
+   ═══════════════════════════════════════════════════════════════════ */
 
 function getInvitationStatus(inv: Invitation) {
-  if (inv.is_used) return { label: 'Принято', cls: 'bg-green-500/15 text-[var(--success)] border border-green-500/20', Icon: CheckCircle2 };
-  if (new Date(inv.expires_at) < new Date()) return { label: 'Истекло', cls: 'bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/15', Icon: XCircle };
-  return { label: 'Ожидает', cls: 'bg-yellow-500/15 text-[var(--warning)] border border-yellow-500/20', Icon: Clock };
+  if (inv.is_used) return {
+    label: 'Принято',
+    cls: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
+    Icon: CheckCircle2,
+    dot: 'bg-emerald-400',
+  };
+  if (new Date(inv.expires_at) < new Date()) return {
+    label: 'Истекло',
+    cls: 'bg-red-500/10 text-red-400 border border-red-500/20',
+    Icon: XCircle,
+    dot: 'bg-red-400',
+  };
+  return {
+    label: 'Ожидает',
+    cls: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
+    Icon: Clock,
+    dot: 'bg-amber-400',
+  };
 }
 
-// ─── Основной компонент ──────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════════════════ */
+
+const formatDate = (d: string) =>
+  new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+
+const formatDateTime = (d: string) =>
+  new Date(d).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+const timeAgo = (d: string) => {
+  const diff = Math.floor((Date.now() - new Date(d).getTime()) / 1000);
+  if (diff < 60) return 'только что';
+  if (diff < 3600) return `${Math.floor(diff / 60)} мин. назад`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} ч. назад`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)} дн. назад`;
+  return formatDate(d);
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAIN PAGE
+   ═══════════════════════════════════════════════════════════════════ */
 
 export default function InvitationsPage() {
   const [activeTab, setActiveTab] = useState<'send' | 'history'>('send');
 
-  // Форма
+  // Form
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<UserRole | ''>('');
   const [counterpartyId, setCounterpartyId] = useState('');
@@ -242,7 +259,7 @@ export default function InvitationsPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
-  // История
+  // History
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -257,6 +274,7 @@ export default function InvitationsPage() {
   const needsCounterparty = selectedRole?.group === 'client';
   const clientRoles = ROLES.filter(r => r.group === 'client');
   const staffRoles = ROLES.filter(r => r.group === 'staff');
+  const isFormValid = email && role && (!needsCounterparty || counterpartyId);
 
   useEffect(() => { loadCounterparties(); }, []);
 
@@ -291,17 +309,16 @@ export default function InvitationsPage() {
     setSuccess(false);
 
     try {
-      // 🔥 Исправлено: отправляем массив ролей
       await invitationsApi.send({
         email,
-        granted_roles: [role as UserRole],  // 👈 Массив с одной ролью
+        granted_roles: [role as UserRole],
         counterparty_id: needsCounterparty ? counterpartyId : undefined,
       });
       setSuccess(true);
       setEmail('');
       setRole('');
       setCounterpartyId('');
-      setTimeout(() => setSuccess(false), 4000);
+      setTimeout(() => setSuccess(false), 5000);
     } catch (e: any) {
       setError(e.response?.data?.detail || 'Ошибка отправки приглашения');
     } finally {
@@ -316,14 +333,10 @@ export default function InvitationsPage() {
       await invitationsApi.delete(revokeTarget.id);
       setRevokeTarget(null);
       loadInvitations();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setRevoking(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setRevoking(false); }
   };
 
-  // Фильтрация истории на клиенте
   const filteredInvitations = invitations.filter(inv => {
     if (statusFilter === 'all') return true;
     if (statusFilter === 'used') return inv.is_used;
@@ -332,15 +345,6 @@ export default function InvitationsPage() {
     return true;
   });
 
-  const isFormValid = email && role && (!needsCounterparty || counterpartyId);
-
-  const formatDate = (d: string) =>
-    new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
-
-  const formatDateTime = (d: string) =>
-    new Date(d).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-
-  // Статистика
   const stats = {
     total: invitations.length,
     pending: invitations.filter(i => !i.is_used && new Date(i.expires_at) >= new Date()).length,
@@ -349,29 +353,35 @@ export default function InvitationsPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 max-w-[1400px] mx-auto">
 
-      {/* ── Header ─── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* ── Header ── */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl md:text-4xl font-bold text-[var(--text-primary)] mb-2">Приглашения</h1>
-          <p className="text-base text-[var(--text-primary)]/50">Пригласите новых пользователей в систему</p>
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/15 flex items-center justify-center">
+              <Mail className="w-5 h-5 text-[var(--accent)]" />
+            </div>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">Приглашения</h1>
+          </div>
+          <p className="text-[14px] text-[var(--text-primary)]/40 ml-[52px]">
+            Пригласите новых пользователей в систему по email
+          </p>
         </div>
+
         <div className="flex items-center gap-2">
           {activeTab === 'history' && (
-            <button
-              onClick={loadInvitations}
-              className="p-3 rounded-xl bg-[var(--hover-1)] hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 transition-colors"
-              title="Обновить"
-            >
-              <RefreshCcw className="w-5 h-5" />
+            <button onClick={loadInvitations}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/50 hover:text-[var(--text-primary)] hover:bg-[var(--hover-3)] text-[14px] font-medium transition-colors">
+              <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Обновить
             </button>
           )}
         </div>
       </div>
 
-      {/* ── Tabs  */}
-      <div className="flex gap-2 border-b border-white/10">
+      {/* ── Tabs ── */}
+      <div className="flex gap-1 p-1 bg-[var(--hover-2)] rounded-xl border border-[var(--border-color)] w-fit">
         {[
           { id: 'send' as const, label: 'Отправить', icon: Send },
           { id: 'history' as const, label: 'История', icon: History, count: totalItems },
@@ -379,143 +389,156 @@ export default function InvitationsPage() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-6 py-3.5 rounded-t-xl text-base font-medium transition-all ${activeTab === tab.id
-                ? 'bg-[var(--accent)]/50 text-white border-b-2 border-red-500'
-                : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)]'
-              }`}
+            className={[
+              'flex items-center gap-2 px-5 py-2.5 rounded-lg text-[14px] font-medium transition-all',
+              activeTab === tab.id
+                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]'
+                : 'text-[var(--text-primary)]/45 hover:text-[var(--text-primary)]/70',
+            ].join(' ')}
           >
-            <tab.icon className="w-5 h-5" />
+            <tab.icon className="w-4 h-4" />
             {tab.label}
             {tab.count !== undefined && tab.count > 0 && (
-              <span className="ml-1 text-l px-2 py-0.5 rounded-full bg-[var(--hover-1)]">{tab.count}</span>
+              <span className={[
+                'px-1.5 py-0.5 rounded-md text-[11px] font-semibold',
+                activeTab === tab.id
+                  ? 'bg-[var(--accent)]/15 text-[var(--accent)]'
+                  : 'bg-[var(--hover-3)] text-[var(--text-primary)]/35',
+              ].join(' ')}>
+                {tab.count}
+              </span>
             )}
           </button>
         ))}
       </div>
 
       {/* ── Content ── */}
-      <div className="grid lg:grid-cols-3 gap-8">
+      <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
 
-          {/* ═══ Вкладка «Отправить» ═══ */}
+          {/* ═══ TAB: Send ═══ */}
           {activeTab === 'send' && (
-            <div className=" bg-[var(--hover-1)] backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden">
-              <div className="p-6 border-b border-white/10 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-[var(--accent)]/25 flex items-center justify-center">
-                  <UserPlus className="w-6 h-6 text-[var(--accent)]" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-[var(--text-primary)]">Новое приглашение</h2>
-                  <p className="text-l text-[var(--text-primary)]/50">Заполните данные для отправки</p>
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] overflow-hidden">
+
+              {/* Form header */}
+              <div className="px-6 py-5 border-b border-[var(--border-color)]">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/15 flex items-center justify-center">
+                    <UserPlus className="w-5 h-5 text-[var(--accent)]" />
+                  </div>
+                  <div>
+                    <h2 className="text-[16px] font-bold text-[var(--text-primary)]">Новое приглашение</h2>
+                    <p className="text-[12px] text-[var(--text-primary)]/35 mt-0.5">Заполните данные для отправки</p>
+                  </div>
                 </div>
               </div>
 
-              <div className="p-6 space-y-7">
-                {/* Уведомления */}
+              <div className="p-6 space-y-6">
+
+                {/* Alerts */}
                 {success && (
-                  <div className="p-4 rounded-xl bg-[var(--success)]/8 border border-green-500/20 flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-[var(--success)] flex-shrink-0" />
-                    <p className="text-l text-[var(--success)]">Приглашение успешно отправлено!</p>
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/8 border border-emerald-500/20">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div>
+                      <p className="text-[14px] font-medium text-emerald-400">Приглашение отправлено!</p>
+                      <p className="text-[12px] text-emerald-400/60 mt-0.5">Пользователь получит письмо со ссылкой для регистрации</p>
+                    </div>
                   </div>
                 )}
                 {error && (
-                  <div className="p-4 rounded-xl bg-[var(--accent-soft)] border border-[var(--accent)]/15 flex items-center gap-3">
-                    <AlertCircle className="w-5 h-5 text-[var(--accent)] flex-shrink-0" />
-                    <p className="text-l text-[var(--accent)]">{error}</p>
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/8 border border-red-500/20">
+                    <div className="w-8 h-8 rounded-lg bg-red-500/15 flex items-center justify-center shrink-0">
+                      <AlertCircle className="w-4 h-4 text-red-400" />
+                    </div>
+                    <p className="text-[14px] text-red-400">{error}</p>
                   </div>
                 )}
 
                 {/* Email */}
                 <div>
-                  <label className="block text-l font-medium text-[var(--text-primary)]/70 mb-2">
+                  <label className="block text-[14px] font-medium text-[var(--text-primary)]/55 mb-2">
                     Email адрес <span className="text-[var(--accent)]">*</span>
                   </label>
                   <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-primary)]/40" />
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-[var(--text-primary)]/30" />
                     <input
                       type="email"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                       placeholder="user@company.ru"
-                      className="w-full pl-12 pr-4 py-4 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] text-base transition-all"
+                      className="w-full pl-12 pr-4 py-3.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[14px] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all"
                     />
                   </div>
                 </div>
 
-                {/* Роль — разделена на группы */}
+                {/* Role selection */}
                 <div>
-                  <label className="block text-l font-medium text-[var(--text-primary)]/70 mb-3">
+                  <label className="block text-[14px] font-medium text-[var(--text-primary)]/55 mb-3">
                     Роль пользователя <span className="text-[var(--accent)]">*</span>
                   </label>
 
-                  {/* Клиентские роли */}
-                  <div className="mb-3">
-                    <p className="text-l uppercase tracking-widest text-[var(--text-primary)]/25 mb-2 flex items-center gap-2">
+                  {/* Client roles */}
+                  <div className="mb-4">
+                    <p className="text-[11px] uppercase tracking-widest text-[var(--text-primary)]/25 mb-2.5 flex items-center gap-2">
                       <Building2 className="w-3.5 h-3.5" />
-                      Клиент (привязка к контрагенту)
+                      Клиентские роли
                     </p>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2.5">
                       {clientRoles.map(r => {
                         const isSelected = role === r.value;
                         return (
                           <button
                             key={r.value}
-                            onClick={() => {
-                              setRole(r.value);
-                              if (r.group !== 'client') setCounterpartyId('');
-                            }}
-                            className={`
-                              p-4 rounded-xl border-2 text-left transition-all
-                              ${isSelected
-                                ? `bg-[var(--hover-2)] ${r.borderColor}`
-                                : 'bg-[var(--hover-1)] border-[var(--border-color)] hover:bg-[var(--hover-2)] hover:border-[var(--border-color)]'
-                              }
-                            `}
+                            onClick={() => { setRole(r.value); if (r.group !== 'client') setCounterpartyId(''); }}
+                            className={[
+                              'p-4 rounded-xl border-2 text-left transition-all',
+                              isSelected
+                                ? `${r.bg} ${r.borderColor}`
+                                : 'bg-[var(--hover-1)] border-[var(--border-color)] hover:bg-[var(--hover-2)] hover:border-[var(--border-color)]',
+                            ].join(' ')}
                           >
                             <div className="flex items-center gap-2.5 mb-1.5">
-                              <span className={isSelected ? r.color : 'text-[var(--text-primary)]/40'}>{r.icon}</span>
-                              <span className={`text-l font-semibold ${isSelected ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/70'}`}>
+                              <span className={isSelected ? r.color : 'text-[var(--text-primary)]/30'}>{r.icon}</span>
+                              <span className={`text-[14px] font-semibold ${isSelected ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/60'}`}>
                                 {r.label}
                               </span>
                             </div>
-                            <p className="text-l text-[var(--text-primary)]/40 leading-relaxed">{r.desc}</p>
+                            <p className="text-[12px] text-[var(--text-primary)]/35 leading-relaxed">{r.desc}</p>
                           </button>
                         );
                       })}
                     </div>
                   </div>
 
-                  {/* Сотрудники */}
+                  {/* Staff roles */}
                   <div>
-                    <p className="text-l uppercase tracking-widest text-[var(--text-primary)]/25 mb-2 flex items-center gap-2">
+                    <p className="text-[11px] uppercase tracking-widest text-[var(--text-primary)]/25 mb-2.5 flex items-center gap-2">
                       <Shield className="w-3.5 h-3.5" />
-                      Сотрудник (внутренний доступ)
+                      Сотрудники
                     </p>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2.5">
                       {staffRoles.map(r => {
                         const isSelected = role === r.value;
                         return (
                           <button
                             key={r.value}
-                            onClick={() => {
-                              setRole(r.value);
-                              setCounterpartyId('');
-                            }}
-                            className={`
-                              p-4 rounded-xl border-2 text-left transition-all
-                              ${isSelected
-                                ? `bg-[var(--hover-2)] ${r.borderColor}`
-                                : 'bg-[var(--hover-1)] border-[var(--border-color)] hover:bg-[var(--hover-2)] hover:border-[var(--border-color)]'
-                              }
-                            `}
+                            onClick={() => { setRole(r.value); setCounterpartyId(''); }}
+                            className={[
+                              'p-4 rounded-xl border-2 text-left transition-all',
+                              isSelected
+                                ? `${r.bg} ${r.borderColor}`
+                                : 'bg-[var(--hover-1)] border-[var(--border-color)] hover:bg-[var(--hover-2)] hover:border-[var(--border-color)]',
+                            ].join(' ')}
                           >
                             <div className="flex items-center gap-2.5 mb-1.5">
-                              <span className={isSelected ? r.color : 'text-[var(--text-primary)]/40'}>{r.icon}</span>
-                              <span className={`text-l font-semibold ${isSelected ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/70'}`}>
+                              <span className={isSelected ? r.color : 'text-[var(--text-primary)]/30'}>{r.icon}</span>
+                              <span className={`text-[14px] font-semibold ${isSelected ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/60'}`}>
                                 {r.label}
                               </span>
                             </div>
-                            <p className="text-l text-[var(--text-primary)]/40 leading-relaxed">{r.desc}</p>
+                            <p className="text-[12px] text-[var(--text-primary)]/35 leading-relaxed">{r.desc}</p>
                           </button>
                         );
                       })}
@@ -523,10 +546,10 @@ export default function InvitationsPage() {
                   </div>
                 </div>
 
-                {/* Контрагент (если клиентская роль) */}
+                {/* Counterparty */}
                 {needsCounterparty && (
                   <div>
-                    <label className="block text-l font-medium text-[var(--text-primary)]/70 mb-2">
+                    <label className="block text-[14px] font-medium text-[var(--text-primary)]/55 mb-2">
                       Контрагент <span className="text-[var(--accent)]">*</span>
                     </label>
                     <CounterpartyDropdown
@@ -535,7 +558,7 @@ export default function InvitationsPage() {
                       counterparties={counterparties}
                     />
                     {counterparties.length === 0 && (
-                      <p className="mt-2 text-l text-[var(--warning)]/70 flex items-center gap-1.5">
+                      <p className="mt-2 text-[12px] text-amber-400/70 flex items-center gap-1.5">
                         <AlertCircle className="w-3.5 h-3.5" />
                         Нет контрагентов. Сначала создайте контрагента.
                       </p>
@@ -543,20 +566,24 @@ export default function InvitationsPage() {
                   </div>
                 )}
 
-                {/* Превью: что будет отправлено */}
+                {/* Preview */}
                 {isFormValid && (
                   <div className="p-4 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-xl">
-                    <p className="text-l text-[var(--text-primary)]/40 mb-2">Будет отправлено:</p>
-                    <div className="flex flex-wrap items-center gap-2 text-l">
-                      <span className="px-2.5 py-1 rounded-lg bg-[var(--hover-1)] text-[var(--text-primary)]/70">{email}</span>
-                      <span className="text-[var(--text-primary)]/20">→</span>
-                      <span className={`px-2.5 py-1 rounded-lg bg-[var(--hover-1)] font-medium ${selectedRole?.color || 'text-[var(--text-primary)]/70'}`}>
+                    <p className="text-[12px] text-[var(--text-primary)]/35 mb-2.5 uppercase tracking-wider font-medium">Превью приглашения</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-3 py-1.5 rounded-lg bg-[var(--hover-2)] border border-[var(--border-color)] text-[14px] text-[var(--text-primary)]/70 font-mono">
+                        {email}
+                      </span>
+                      <span className="text-[var(--text-primary)]/15">→</span>
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[14px] font-medium ${selectedRole?.bg} ${selectedRole?.color} ${selectedRole?.borderColor}`}>
+                        {selectedRole?.icon}
                         {selectedRole?.label}
                       </span>
                       {needsCounterparty && counterpartyId && (
                         <>
-                          <span className="text-[var(--text-primary)]/20">@</span>
-                          <span className="px-2.5 py-1 rounded-lg bg-[var(--hover-1)] text-[var(--text-primary)]/70">
+                          <span className="text-[var(--text-primary)]/15">@</span>
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--hover-2)] border border-[var(--border-color)] text-[14px] text-[var(--text-primary)]/60">
+                            <Building2 className="w-3.5 h-3.5" />
                             {counterparties.find(c => c.id === counterpartyId)?.name}
                           </span>
                         </>
@@ -565,17 +592,17 @@ export default function InvitationsPage() {
                   </div>
                 )}
 
-                {/* Кнопка */}
+                {/* Submit */}
                 <button
                   onClick={handleSend}
                   disabled={sending || !isFormValid}
-                  className="w-full flex items-center justify-center gap-3 py-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent)] text-white text-base font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-[14px] font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-[var(--shadow-md)]"
                 >
                   {sending ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-4.5 h-4.5 animate-spin" />
                   ) : (
                     <>
-                      <Send className="w-5 h-5" />
+                      <Send className="w-4.5 h-4.5" />
                       Отправить приглашение
                     </>
                   )}
@@ -584,15 +611,15 @@ export default function InvitationsPage() {
             </div>
           )}
 
-          {/* ═══ Вкладка «История» ═══ */}
+          {/* ═══ TAB: History ═══ */}
           {activeTab === 'history' && (
-            <div className="bg-[var(--hover-1)] backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden">
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] overflow-hidden">
 
-              {/* Шапка + фильтры */}
-              <div className="p-6 border-b border-white/10">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <h2 className="text-xl font-bold text-[var(--text-primary)]">История приглашений</h2>
-                  <div className="flex gap-1.5 bg-[var(--hover-1)] rounded-lg p-0.5">
+              {/* Header + filters */}
+              <div className="px-6 py-4 border-b border-[var(--border-color)]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <h2 className="text-[16px] font-bold text-[var(--text-primary)]">История приглашений</h2>
+                  <div className="flex gap-1 p-1 bg-[var(--hover-2)] rounded-lg">
                     {[
                       { id: 'all' as const, label: 'Все' },
                       { id: 'pending' as const, label: 'Ожидает' },
@@ -602,10 +629,12 @@ export default function InvitationsPage() {
                       <button
                         key={f.id}
                         onClick={() => setStatusFilter(f.id)}
-                        className={`px-3 py-1.5 rounded-md text-l font-medium transition-colors ${statusFilter === f.id
-                            ? 'bg-[var(--accent)]/60 text-white'
-                            : 'text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60'
-                          }`}
+                        className={[
+                          'px-3 py-1.5 rounded-md text-[12px] font-medium transition-all',
+                          statusFilter === f.id
+                            ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                            : 'text-[var(--text-primary)]/35 hover:text-[var(--text-primary)]/55',
+                        ].join(' ')}
                       >
                         {f.label}
                       </button>
@@ -614,50 +643,51 @@ export default function InvitationsPage() {
                 </div>
               </div>
 
-              {/* Список */}
+              {/* List */}
               {loading ? (
-                <div className="py-16 text-center">
-                  <Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin mx-auto" />
+                <div className="py-20 text-center">
+                  <Loader2 className="w-6 h-6 text-[var(--accent)] animate-spin mx-auto mb-3" />
+                  <p className="text-[14px] text-[var(--text-primary)]/30">Загрузка...</p>
                 </div>
               ) : filteredInvitations.length === 0 ? (
-                <div className="py-16 text-center">
-                  <Mail className="w-16 h-16 text-[var(--text-primary)]/10 mx-auto mb-4" />
-                  <p className="text-base text-[var(--text-primary)]/40">
+                <div className="py-20 text-center">
+                  <Mail className="w-12 h-12 text-[var(--text-primary)]/10 mx-auto mb-3" />
+                  <p className="text-[14px] font-medium text-[var(--text-primary)]/40 mb-1">
                     {statusFilter !== 'all' ? 'Нет приглашений с таким статусом' : 'Нет приглашений'}
                   </p>
+                  <p className="text-[12px] text-[var(--text-primary)]/25">Отправьте первое приглашение</p>
                 </div>
               ) : (
-                <div className="divide-y divide-white/[0.04]">
+                <div className="divide-y divide-[var(--border-color)]">
                   {filteredInvitations.map(inv => {
                     const status = getInvitationStatus(inv);
                     const roleMeta = getRoleMeta(inv.granted_roles?.[0] || inv.assigned_role);
                     const canRevoke = !inv.is_used && new Date(inv.expires_at) >= new Date();
 
                     return (
-                      <div
-                        key={inv.id}
-                        className="px-6 py-5 hover:bg-[var(--hover-1)] transition-colors"
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                          {/* Инфо */}
+                      <div key={inv.id} className="px-6 py-4 hover:bg-[var(--hover-1)] transition-colors group">
+                        <div className="flex items-center justify-between gap-4">
+                          {/* Left */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-2">
-                              <p className="text-base font-medium text-[var(--text-primary)] truncate">{inv.email}</p>
+                              <p className="text-[14px] font-medium text-[var(--text-primary)] truncate">{inv.email}</p>
+                              <span className="text-[12px] text-[var(--text-primary)]/20 shrink-0">·</span>
+                              <span className="text-[12px] text-[var(--text-primary)]/30 shrink-0">{timeAgo(inv.created_at)}</span>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              {/* Роль */}
-                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-l font-medium bg-[var(--hover-1)] ${roleMeta?.color || 'text-[var(--text-primary)]/50'}`}>
-                                {roleMeta?.icon || <User className="w-3.5 h-3.5" />}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {/* Role chip */}
+                              <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[12px] font-medium ${roleMeta?.bg || 'bg-[var(--hover-2)]'} ${roleMeta?.color || 'text-[var(--text-primary)]/45'}`}>
+                                {roleMeta?.icon || <User className="w-3 h-3" />}
                                 {roleMeta?.label || inv.granted_roles?.[0] || inv.assigned_role}
                               </span>
-                              {/* Статус */}
-                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-l font-medium ${status.cls}`}>
-                                <status.Icon className="w-3.5 h-3.5" />
+                              {/* Status chip */}
+                              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-medium ${status.cls}`}>
+                                <status.Icon className="w-3 h-3" />
                                 {status.label}
                               </span>
-                              {/* Контрагент */}
+                              {/* Counterparty */}
                               {inv.counterparty_id && (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-l bg-[var(--hover-1)] text-[var(--text-primary)]/40">
+                                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[12px] bg-[var(--hover-2)] text-[var(--text-primary)]/35">
                                   <Building2 className="w-3 h-3" />
                                   {counterparties.find(c => c.id === inv.counterparty_id)?.name || '...'}
                                 </span>
@@ -665,18 +695,17 @@ export default function InvitationsPage() {
                             </div>
                           </div>
 
-                          {/* Даты + действия */}
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            <div className="text-right">
-                              <p className="text-l text-[var(--text-primary)]/40">{formatDateTime(inv.created_at)}</p>
-                              <p className="text-[14px] text-[var(--text-primary)]/20 mt-0.5">
+                          {/* Right */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="text-right hidden sm:block">
+                              <p className="text-[12px] text-[var(--text-primary)]/25">
                                 до {formatDate(inv.expires_at)}
                               </p>
                             </div>
                             {canRevoke && (
                               <button
                                 onClick={() => setRevokeTarget(inv)}
-                                className="p-2.5 rounded-xl bg-[var(--accent)]/30 hover:bg-[var(--accent)]/50 text-[var(--text-primary)]/40 hover:text-[var(--accent)] transition-colors"
+                                className="p-2 rounded-xl opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-[var(--text-primary)]/25 hover:text-red-400 transition-all"
                                 title="Отозвать"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -690,25 +719,19 @@ export default function InvitationsPage() {
                 </div>
               )}
 
-              {/* Пагинация */}
+              {/* Pagination */}
               {totalPages > 1 && (
-                <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between">
-                  <span className="text-l text-[var(--text-primary)]/40">
+                <div className="px-6 py-3.5 border-t border-[var(--border-color)] flex items-center justify-between">
+                  <span className="text-[12px] text-[var(--text-primary)]/30">
                     Страница {page} из {totalPages}
                   </span>
                   <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      className="p-2 rounded-lg hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40 disabled:opacity-20 transition-colors"
-                    >
+                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                      className="p-2 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/35 disabled:opacity-20 transition-colors">
                       <ChevronLeft className="w-4 h-4" />
                     </button>
-                    <button
-                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                      disabled={page === totalPages}
-                      className="p-2 rounded-lg hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40 disabled:opacity-20 transition-colors"
-                    >
+                    <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                      className="p-2 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/35 disabled:opacity-20 transition-colors">
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -718,134 +741,133 @@ export default function InvitationsPage() {
           )}
         </div>
 
-        {/* ── Sidebar  */}
-        <div className="space-y-6">
+        {/* ── Sidebar ── */}
+        <div className="space-y-5">
 
-          {/* Статистика (видна на вкладке истории) */}
+          {/* Stats */}
           {activeTab === 'history' && invitations.length > 0 && (
-            <div className="bg-[var(--hover-1)] backdrop-blur-sm rounded-xl border border-white/10 p-5">
-              <h3 className="text-l font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-                <Users className="w-4 h-4 text-[var(--text-primary)]/50" />
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] p-5">
+              <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+                <Users className="w-4 h-4 text-[var(--text-primary)]/40" />
                 Статистика
               </h3>
               <div className="space-y-3">
                 {[
-                  { label: 'Всего', value: stats.total, color: 'text-[var(--text-primary)]', dot: 'bg-[var(--hover-1)]' },
-                  { label: 'Ожидает', value: stats.pending, color: 'text-[var(--warning)]', dot: 'bg-yellow-400' },
-                  { label: 'Принято', value: stats.used, color: 'text-[var(--success)]', dot: 'bg-green-400' },
-                  { label: 'Истекло', value: stats.expired, color: 'text-[var(--accent)]', dot: 'bg-red-400' },
+                  { label: 'Всего', value: stats.total, color: 'text-[var(--text-primary)]', dot: 'bg-[var(--text-primary)]/20' },
+                  { label: 'Ожидает', value: stats.pending, color: 'text-amber-400', dot: 'bg-amber-400' },
+                  { label: 'Принято', value: stats.used, color: 'text-emerald-400', dot: 'bg-emerald-400' },
+                  { label: 'Истекло', value: stats.expired, color: 'text-red-400', dot: 'bg-red-400' },
                 ].map(s => (
-                  <div key={s.label} className="flex items-center justify-between py-1.5">
-                    <span className="flex items-center gap-2 text-l text-[var(--text-primary)]/50">
+                  <div key={s.label} className="flex items-center justify-between py-1">
+                    <span className="flex items-center gap-2.5 text-[14px] text-[var(--text-primary)]/45">
                       <span className={`w-2 h-2 rounded-full ${s.dot}`} />
                       {s.label}
                     </span>
-                    <span className={`text-lg font-bold ${s.color}`}>{s.value}</span>
+                    <span className={`text-[16px] font-bold tabular-nums ${s.color}`}>{s.value}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Как это работает */}
-          <div className="bg-[var(--hover-1)] backdrop-blur-sm rounded-xl border border-white/10 p-5">
+          {/* How it works */}
+          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] p-5">
             <div className="flex items-center gap-2.5 mb-5">
-              <HelpCircle className="w-5 h-5 text-[var(--info)]" />
-              <h3 className="text-l font-bold text-[var(--text-primary)]">Как это работает?</h3>
+              <HelpCircle className="w-4.5 h-4.5 text-blue-400" />
+              <h3 className="text-[14px] font-bold text-[var(--text-primary)]">Как это работает?</h3>
             </div>
-            <div className="space-y-5">
+            <div className="space-y-4">
               {[
                 { n: '1', title: 'Отправьте приглашение', desc: 'Укажите email, роль и контрагента' },
                 { n: '2', title: 'Пользователь получит письмо', desc: 'Со ссылкой для регистрации' },
                 { n: '3', title: 'Регистрация', desc: 'Создаёт аккаунт и получает доступ' },
               ].map(step => (
                 <div key={step.n} className="flex gap-3.5">
-                  <div className="w-8 h-8 rounded-full bg-[var(--accent)]/25 flex items-center justify-center text-l font-bold text-[var(--accent)] flex-shrink-0">
+                  <div className="w-7 h-7 rounded-full bg-[var(--accent)]/15 flex items-center justify-center text-[12px] font-bold text-[var(--accent)] shrink-0">
                     {step.n}
                   </div>
                   <div>
-                    <p className="text-l font-medium text-[var(--text-primary)]">{step.title}</p>
-                    <p className="text-l text-[var(--text-primary)]/40">{step.desc}</p>
+                    <p className="text-[14px] font-medium text-[var(--text-primary)] leading-5">{step.title}</p>
+                    <p className="text-[12px] text-[var(--text-primary)]/35 leading-4 mt-0.5">{step.desc}</p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* О ролях */}
-          <div className="bg-[var(--hover-1)] backdrop-blur-sm rounded-xl border border-white/10 p-5">
+          {/* Roles info */}
+          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] p-5">
             <div className="flex items-center gap-2.5 mb-5">
-              <Shield className="w-5 h-5 text-[var(--info)]" />
-              <h3 className="text-l font-bold text-[var(--text-primary)]">О ролях</h3>
+              <Shield className="w-4.5 h-4.5 text-violet-400" />
+              <h3 className="text-[14px] font-bold text-[var(--text-primary)]">О ролях</h3>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               {ROLES.map(r => (
                 <div key={r.value} className="flex items-start gap-3">
-                  <span className={`mt-0.5 ${r.color}`}>{r.icon}</span>
+                  <div className={`w-8 h-8 rounded-lg ${r.bg} flex items-center justify-center shrink-0 mt-0.5`}>
+                    <span className={r.color}>{r.icon}</span>
+                  </div>
                   <div>
-                    <p className={`text-l font-medium ${r.color}`}>{r.label}</p>
-                    <p className="text-l text-[var(--text-primary)]/40">{r.desc}</p>
+                    <p className={`text-[14px] font-medium ${r.color} leading-5`}>{r.label}</p>
+                    <p className="text-[12px] text-[var(--text-primary)]/35 leading-4">{r.desc}</p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Важно */}
-          <div className="bg-yellow-500/5 rounded-xl border border-yellow-500/15 p-5">
-            <div className="flex items-center gap-2.5 mb-3">
-              <AlertCircle className="w-5 h-5 text-[var(--warning)]" />
-              <h3 className="text-l font-bold text-[var(--text-primary)]">Важно</h3>
+          {/* Notice */}
+          <div className="bg-amber-500/5 rounded-2xl border border-amber-500/15 p-5">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0">
+                <AlertCircle className="w-4 h-4 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-[14px] font-bold text-[var(--text-primary)] mb-1">Важно</h3>
+                <p className="text-[12px] text-[var(--text-primary)]/40 leading-5">
+                  Приглашение действительно <span className="text-[var(--text-primary)] font-medium">7 дней</span>.
+                  После истечения срока необходимо отправить новое.
+                </p>
+              </div>
             </div>
-            <p className="text-l text-[var(--text-primary)]/50 leading-relaxed">
-              Приглашение действительно <span className="text-[var(--text-primary)] font-medium">7 дней</span>.
-              После истечения срока необходимо отправить новое.
-            </p>
           </div>
         </div>
       </div>
-      {/* ── Модалка подтверждения отзыва ──────────────────────────────── */}
+
+      {/* ── Revoke modal ── */}
       {revokeTarget && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => !revoking && setRevokeTarget(null)}
-          />
-          <div
-            className="relative w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden"
-            style={{ boxShadow: 'var(--shadow-lg)' }}
-          >
-            {/* Иконка */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !revoking && setRevokeTarget(null)} />
+          <div className="relative w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden"
+            style={{ boxShadow: 'var(--shadow-lg)' }}>
+
             <div className="pt-8 flex justify-center">
-              <div className="w-16 h-16 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)]/15
-                              flex items-center justify-center">
-                <Trash2 className="w-8 h-8 text-[var(--accent)]" />
+              <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                <Trash2 className="w-7 h-7 text-red-400" />
               </div>
             </div>
 
-            {/* Текст */}
             <div className="px-7 pt-5 pb-2 text-center">
-              <h2 className="text-xl font-bold text-[var(--text-primary)] mb-3">Отозвать приглашение?</h2>
-              <p className="text-base text-[var(--text-primary)]/60 leading-relaxed">
+              <h2 className="text-[18px] font-bold text-[var(--text-primary)] mb-2">Отозвать приглашение?</h2>
+              <p className="text-[14px] text-[var(--text-primary)]/50 leading-relaxed">
                 Приглашение для{' '}
                 <span className="text-[var(--text-primary)] font-semibold">{revokeTarget.email}</span>{' '}
-                будет отменено. Пользователь больше не сможет зарегистрироваться по этой ссылке.
+                будет отменено.
               </p>
 
-              {/* Детали приглашения */}
               <div className="mt-4 p-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
-                <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
+                <div className="flex flex-wrap items-center justify-center gap-2">
                   {(() => {
                     const roleMeta = getRoleMeta(revokeTarget.granted_roles?.[0] || revokeTarget.assigned_role);
                     return (
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--hover-1)] font-medium ${roleMeta?.color || 'text-[var(--text-primary)]/50'}`}>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-medium ${roleMeta?.bg || 'bg-[var(--hover-2)]'} ${roleMeta?.color || 'text-[var(--text-primary)]/45'}`}>
                         {roleMeta?.icon || <User className="w-3.5 h-3.5" />}
                         {roleMeta?.label || revokeTarget.granted_roles?.[0] || revokeTarget.assigned_role}
                       </span>
                     );
                   })()}
                   {revokeTarget.counterparty_id && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--hover-1)] text-[var(--text-primary)]/40">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] bg-[var(--hover-2)] text-[var(--text-primary)]/35">
                       <Building2 className="w-3 h-3" />
                       {counterparties.find(c => c.id === revokeTarget.counterparty_id)?.name || '...'}
                     </span>
@@ -854,27 +876,14 @@ export default function InvitationsPage() {
               </div>
             </div>
 
-            {/* Кнопки */}
             <div className="flex gap-3 p-6">
-              <button
-                onClick={() => setRevokeTarget(null)}
-                disabled={revoking}
-                className="flex-1 px-4 py-3 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)]
-                           text-[var(--text-primary)]/70 text-base font-medium transition-colors disabled:opacity-50"
-              >
+              <button onClick={() => setRevokeTarget(null)} disabled={revoking}
+                className="flex-1 px-4 py-3 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/65 text-[14px] font-medium transition-colors disabled:opacity-50">
                 Отмена
               </button>
-              <button
-                onClick={handleRevoke}
-                disabled={revoking}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl
-                           bg-[var(--accent)]/20 hover:bg-[var(--accent)]/30 border border-[var(--accent)]/30
-                           text-[var(--accent)] text-base font-medium transition-all
-                           disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {revoking
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : <Trash2 className="w-4 h-4" />}
+              <button onClick={handleRevoke} disabled={revoking}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/25 text-red-400 text-[14px] font-medium transition-all disabled:opacity-50">
+                {revoking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 {revoking ? 'Отзываем...' : 'Отозвать'}
               </button>
             </div>
