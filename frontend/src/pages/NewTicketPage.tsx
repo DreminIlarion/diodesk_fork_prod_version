@@ -1,26 +1,30 @@
-﻿import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, Building2, Check, ChevronDown,
-  File, FolderOpen, Loader2, Plus, Search,
-  Sparkles, Upload, User, X, Send,
+  ArrowLeft, Sparkles, Loader2, Upload, X, File, Building2,
+  Plus, Search, FolderOpen, User, AlertCircle, Send, Check,
+  ChevronDown,
 } from 'lucide-react';
-import { Flame, SignalHigh, SignalLow, SignalMedium } from 'lucide-react';
+import { SignalLow, SignalMedium, SignalHigh, Flame } from 'lucide-react';
 
 import { useAuthStore } from '../stores/authStore';
 import { ticketsApi, counterpartiesApi, projectsApi, usersApi } from '../api/client';
 import { attachmentsApi } from '../api/attachments';
-import type { Counterparty, Project, TicketPriority, TicketTag, TicketType } from '../types';
+import type { Counterparty, TicketTag, TicketPriority, TicketType, Project } from '../types';
+import { SpellCheckField } from '../components/helpers/SpellCheckField';
+import {
+  TicketEditor, serializeBlocks, type DescriptionBlock,
+} from '../components/helpers/TicketEditor';
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════
    Constants
-   ══════════════════════════════════════════════ */
+   ══════════════════════════════════════════════════════════════ */
 
 const PRIORITIES = [
-  { value: 'low', label: 'Низкий', icon: <SignalLow className="w-4 h-4" />, color: 'emerald' },
-  { value: 'medium', label: 'Средний', icon: <SignalMedium className="w-4 h-4" />, color: 'yellow' },
-  { value: 'high', label: 'Высокий', icon: <SignalHigh className="w-4 h-4" />, color: 'orange' },
-  { value: 'critical', label: 'Критический', icon: <Flame className="w-4 h-4" />, color: 'red' },
+  { value: 'low', label: 'Низкий', icon: <SignalLow className="w-4 h-4" />, c: 'emerald' },
+  { value: 'medium', label: 'Средний', icon: <SignalMedium className="w-4 h-4" />, c: 'yellow' },
+  { value: 'high', label: 'Высокий', icon: <SignalHigh className="w-4 h-4" />, c: 'orange' },
+  { value: 'critical', label: 'Критический', icon: <Flame className="w-4 h-4" />, c: 'red' },
 ] as const;
 
 const TYPES: { value: TicketType; label: string }[] = [
@@ -45,175 +49,93 @@ const PRESET_TAGS: TicketTag[] = [
   { name: 'Срочное', color: '#dc2626' },
 ];
 
-const STAFF_ROLES = ['admin', 'support_agent', 'support_manager', 'executor'];
+const CAN_SELECT_COUNTERPARTY_ROLES = ['admin', 'support_agent', 'support_manager', 'executor'];
 
-/* ══════════════════════════════════════════════
-   Dropdown component
-   ══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════
+   Dropdown
+   ══════════════════════════════════════════════════════════════ */
 
-interface DropdownOption {
-  id: string;
-  label: string;
-  sub?: string;
-}
+interface DdOption { id: string; label: string; sub?: string }
 
-function Dropdown({
-  options,
-  value,
-  onChange,
-  placeholder,
-  searchPlaceholder,
-  loading,
-  icon,
-  emptyText = 'Ничего не найдено',
-  disabled = false,
-}: {
-  options: DropdownOption[];
-  value: string;
-  onChange: (id: string) => void;
-  placeholder: string;
-  searchPlaceholder?: string;
-  loading?: boolean;
-  icon?: JSX.Element;
-  emptyText?: string;
-  disabled?: boolean;
+function Dropdown({ options, value, onChange, placeholder, searchPh, loading, icon, empty = 'Пусто' }: {
+  options: DdOption[]; value: string; onChange: (id: string) => void;
+  placeholder: string; searchPh?: string; loading?: boolean;
+  icon?: JSX.Element; empty?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [q, setQ] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+  const sel = options.find(o => o.id === value);
 
-  const selected = options.find((o) => o.id === value);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return options;
-    return options.filter(
-      (o) =>
-        o.label.toLowerCase().includes(q) ||
-        (o.sub && o.sub.toLowerCase().includes(q))
+  const list = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return options;
+    return options.filter(o =>
+      o.label.toLowerCase().includes(s) || o.sub?.toLowerCase().includes(s)
     );
-  }, [options, query]);
+  }, [options, q]);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
   }, []);
 
   return (
-    <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => !disabled && setOpen(!open)}
-        className={`
-          w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border text-left transition-all text-sm
-          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-          ${open
-            ? 'border-red-500/50 bg-[var(--bg-primary)] ring-2 ring-red-500/20'
-            : 'border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-[var(--text-primary)]/25 hover:bg-[var(--hover-1)]'
-          }
-          ${selected ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/40'}
-        `}
-      >
-        {icon && (
-          <span className="flex-shrink-0 text-[var(--text-primary)]/40">{icon}</span>
-        )}
-        <span className="flex-1 truncate">
-          {selected ? selected.label : placeholder}
-        </span>
-        {loading ? (
-          <Loader2 className="w-4 h-4 animate-spin text-[var(--text-primary)]/30 flex-shrink-0" />
-        ) : (
-          <ChevronDown
-            className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform flex-shrink-0 ${
-              open ? 'rotate-180' : ''
-            }`}
-          />
-        )}
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen(!open)}
+        className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border text-left text-sm transition-all
+          ${open ? 'border-red-500/40 ring-2 ring-red-500/15 bg-[var(--bg-primary)]'
+            : 'border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-[var(--text-primary)]/20 hover:bg-[var(--hover-1)]'}
+          ${sel ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/40'}`}>
+        {icon && <span className="text-[var(--text-primary)]/35 flex-shrink-0">{icon}</span>}
+        <span className="flex-1 truncate">{sel ? sel.label : placeholder}</span>
+        {loading
+          ? <Loader2 className="w-4 h-4 animate-spin text-[var(--text-primary)]/25 flex-shrink-0" />
+          : <ChevronDown className={`w-4 h-4 text-[var(--text-primary)]/25 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />}
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1.5 w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl shadow-black/40 overflow-hidden">
-          {(searchPlaceholder || options.length > 5) && (
+        <div className="absolute z-50 mt-1 w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl shadow-black/40 overflow-hidden">
+          {(searchPh || options.length > 5) && (
             <div className="p-2 border-b border-[var(--border-color)]">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-primary)]/25" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={searchPlaceholder || 'Поиск...'}
-                  autoFocus
-                  className="w-full pl-9 pr-3 py-2 rounded-lg bg-[var(--hover-1)] border-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/30 focus:outline-none focus:ring-1 focus:ring-red-500/30"
-                />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/25" />
+                <input value={q} onChange={e => setQ(e.target.value)}
+                  placeholder={searchPh || 'Поиск...'} autoFocus
+                  className="w-full pl-8 pr-3 py-2 rounded-lg bg-[var(--hover-1)] border-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/25 focus:outline-none focus:ring-1 focus:ring-red-500/20" />
               </div>
             </div>
           )}
-
-          <div className="max-h-56 overflow-y-auto overscroll-contain">
+          <div className="max-h-52 overflow-y-auto overscroll-contain">
             {loading ? (
               <div className="flex items-center justify-center gap-2 py-8">
-                <Loader2 className="w-5 h-5 animate-spin text-[var(--text-primary)]/30" />
-                <span className="text-sm text-[var(--text-primary)]/40">Загрузка...</span>
+                <Loader2 className="w-4 h-4 animate-spin text-[var(--text-primary)]/25" />
+                <span className="text-xs text-[var(--text-primary)]/35">Загрузка...</span>
               </div>
-            ) : filtered.length === 0 ? (
-              <div className="py-6 text-center text-sm text-[var(--text-primary)]/40">
-                {emptyText}
-              </div>
-            ) : (
-              filtered.map((option) => {
-                const isSelected = option.id === value;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => {
-                      onChange(option.id);
-                      setOpen(false);
-                      setQuery('');
-                    }}
-                    className={`
-                      w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors
-                      ${isSelected
-                        ? 'bg-red-500/10 text-[var(--text-primary)]'
-                        : 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)] hover:text-[var(--text-primary)]'
-                      }
-                    `}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="truncate font-medium">{option.label}</div>
-                      {option.sub && (
-                        <div className="text-xs text-[var(--text-primary)]/40 truncate mt-0.5">
-                          {option.sub}
-                        </div>
-                      )}
-                    </div>
-                    {isSelected && (
-                      <Check className="w-4 h-4 text-red-400 flex-shrink-0" />
-                    )}
-                  </button>
-                );
-              })
-            )}
+            ) : list.length === 0 ? (
+              <div className="py-6 text-center text-sm text-[var(--text-primary)]/35">{empty}</div>
+            ) : list.map(o => (
+              <button key={o.id} type="button"
+                onClick={() => { onChange(o.id); setOpen(false); setQ(''); }}
+                className={`w-full flex items-center gap-2 px-3.5 py-2.5 text-left text-sm transition-colors
+                  ${o.id === value ? 'bg-red-500/10 text-[var(--text-primary)]' : 'text-[var(--text-primary)]/65 hover:bg-[var(--hover-1)] hover:text-[var(--text-primary)]'}`}>
+                <span className="flex-1 min-w-0">
+                  <span className="block truncate font-medium">{o.label}</span>
+                  {o.sub && <span className="block text-xs text-[var(--text-primary)]/35 truncate mt-0.5">{o.sub}</span>}
+                </span>
+                {o.id === value && <Check className="w-4 h-4 text-red-400 flex-shrink-0" />}
+              </button>
+            ))}
           </div>
-
-          {/* Clear selection */}
           {value && (
             <div className="border-t border-[var(--border-color)]">
-              <button
-                type="button"
-                onClick={() => {
-                  onChange('');
-                  setOpen(false);
-                  setQuery('');
-                }}
-                className="w-full px-4 py-2 text-left text-xs text-[var(--text-primary)]/40 hover:bg-[var(--hover-1)] hover:text-red-400 transition-colors"
-              >
-                Очистить выбор
+              <button type="button"
+                onClick={() => { onChange(''); setOpen(false); setQ(''); }}
+                className="w-full px-3.5 py-2 text-left text-xs text-[var(--text-primary)]/35 hover:bg-[var(--hover-1)] hover:text-red-400 transition-colors">
+                Очистить
               </button>
             </div>
           )}
@@ -223,138 +145,120 @@ function Dropdown({
   );
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════
    Types
-   ══════════════════════════════════════════════ */
+   ══════════════════════════════════════════════════════════════ */
 
-interface AttachedFile {
-  id: string;
-  file: File;
-  preview?: string;
+interface GeneralFile {
+  id: string; file: File; preview?: string;
+  status: 'pending' | 'uploading' | 'success' | 'error';
+  error?: string;
 }
 
 interface SimpleUser {
-  id: string;
-  username: string;
-  full_name: string | null;
-  email: string;
+  id: string; username: string; full_name: string | null; email: string; role?: string;
 }
 
-type BindType = 'none' | 'counterparty' | 'project';
+type SelectionType = 'project' | 'counterparty' | null;
 
 interface DraftData {
   title: string;
-  description: string;
-  bindType: BindType;
+  descriptionBlocks: DescriptionBlock[];
+  priority: string;
+  type: string;
+  tags: TicketTag[];
+  selectionType: SelectionType;
   counterpartyId: string;
   projectId: string;
   reporterId: string;
-  type: string;
-  priority: string;
-  tags: TicketTag[];
   savedAt: number;
 }
 
-/* ══════════════════════════════════════════════
-   Helper: priority styling
-   ══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════
+   Priority classes helper
+   ══════════════════════════════════════════════════════════════ */
 
-function getPriorityClasses(color: string, active: boolean) {
-  const styles: Record<string, { idle: string; active: string }> = {
-    emerald: {
-      idle: 'border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)]/50 hover:border-emerald-500/30 hover:text-emerald-400/70',
-      active: 'border-emerald-400/50 bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/20',
-    },
-    yellow: {
-      idle: 'border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)]/50 hover:border-yellow-500/30 hover:text-yellow-400/70',
-      active: 'border-yellow-400/50 bg-yellow-500/15 text-yellow-300 ring-1 ring-yellow-400/20',
-    },
-    orange: {
-      idle: 'border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)]/50 hover:border-orange-500/30 hover:text-orange-400/70',
-      active: 'border-orange-400/50 bg-orange-500/15 text-orange-300 ring-1 ring-orange-400/20',
-    },
-    red: {
-      idle: 'border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)]/50 hover:border-red-500/30 hover:text-red-400/70',
-      active: 'border-red-400/50 bg-red-500/15 text-red-300 ring-1 ring-red-400/20',
-    },
+function priClasses(color: string, active: boolean) {
+  const m: Record<string, [string, string]> = {
+    emerald: ['border-[var(--border-color)] text-[var(--text-primary)]/45 hover:border-emerald-500/30 hover:text-emerald-400',
+              'border-emerald-400/50 bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/20'],
+    yellow:  ['border-[var(--border-color)] text-[var(--text-primary)]/45 hover:border-yellow-500/30 hover:text-yellow-400',
+              'border-yellow-400/50 bg-yellow-500/15 text-yellow-300 ring-1 ring-yellow-400/20'],
+    orange:  ['border-[var(--border-color)] text-[var(--text-primary)]/45 hover:border-orange-500/30 hover:text-orange-400',
+              'border-orange-400/50 bg-orange-500/15 text-orange-300 ring-1 ring-orange-400/20'],
+    red:     ['border-[var(--border-color)] text-[var(--text-primary)]/45 hover:border-red-500/30 hover:text-red-400',
+              'border-red-400/50 bg-red-500/15 text-red-300 ring-1 ring-red-400/20'],
   };
-  const s = styles[color] || styles.yellow;
-  return active ? s.active : s.idle;
+  const [idle, act] = m[color] || m.yellow;
+  return active ? act : idle;
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════
    Section wrapper
-   ══════════════════════════════════════════════ */
+   ══════════════════════════════════════════════════════════════ */
 
-function Section({
-  title,
-  children,
-  className = '',
-}: {
-  title: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
+function SideSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className={`rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)]/50 ${className}`}>
-      <div className="px-4 py-2.5 border-b border-[var(--border-color)]">
-        <h3 className="text-xs font-semibold text-[var(--text-primary)]/50 uppercase tracking-wider">
-          {title}
-        </h3>
+    <div>
+      <div className="text-[11px] font-semibold text-[var(--text-primary)]/40 uppercase tracking-wider mb-2">
+        {title}
       </div>
-      <div className="p-4">{children}</div>
+      {children}
     </div>
   );
 }
 
-/* ══════════════════════════════════════════════
-   Page component
-   ══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════
+   Page
+   ══════════════════════════════════════════════════════════════ */
 
 export default function NewTicketPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const preselectedCounterpartyId = searchParams.get('counterparty_id');
+  const preselectedProjectId = searchParams.get('project_id');
   const { user } = useAuthStore();
 
   const currentUserId = (user as any)?.id ?? (user as any)?.user_id ?? '';
-  const preCounterpartyId = searchParams.get('counterparty_id') || '';
-  const preProjectId = searchParams.get('project_id') || '';
-
-  const isCustomer =
-    user?.roles?.some((r: string) => r === 'customer' || r === 'customer_admin') ?? false;
-  const canSelectBinding =
-    (!isCustomer && user?.roles?.some((r: string) => STAFF_ROLES.includes(r))) ?? false;
-  const canSelectReporter = !isCustomer;
-
   const draftKey = currentUserId ? `ticket-draft:${currentUserId}` : 'ticket-draft';
 
   // ── Form state ──
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [bindType, setBindType] = useState<BindType>('none');
-  const [counterpartyId, setCounterpartyId] = useState('');
-  const [projectId, setProjectId] = useState('');
-  const [reporterId, setReporterId] = useState('');
+  const [descriptionBlocks, setDescriptionBlocks] = useState<DescriptionBlock[]>([
+    { id: 'init', type: 'text', value: '' },
+  ]);
+  const description = serializeBlocks(descriptionBlocks);
+
+  const [priority, setPriority] = useState<TicketPriority>('medium' as TicketPriority);
   const [type, setType] = useState<TicketType>('Инцидент');
-  const [priority, setPriority] = useState('medium');
   const [tags, setTags] = useState<TicketTag[]>([]);
+  const [generalFiles, setGeneralFiles] = useState<GeneralFile[]>([]);
   const [newTagInput, setNewTagInput] = useState('');
-  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
 
-  // ── Data state ──
+  // ── Binding state ──
   const [customerCounterparty, setCustomerCounterparty] = useState<Counterparty | null>(null);
+  const [selectionType, setSelectionType] = useState<SelectionType>(null);
+  const [selectedCounterparty, setSelectedCounterparty] = useState<Counterparty | null>(null);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [users, setUsers] = useState<SimpleUser[]>([]);
-
-  // ── Loading state ──
+  const [counterpartySearch, setCounterpartySearch] = useState('');
+  const [showCounterpartyDropdown, setShowCounterpartyDropdown] = useState(false);
   const [loadingCounterparties, setLoadingCounterparties] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [projectSearch, setProjectSearch] = useState('');
+  const [users, setUsers] = useState<SimpleUser[]>([]);
+  const [selectedReporter, setSelectedReporter] = useState<SimpleUser | null>(null);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [showReporterDropdown, setShowReporterDropdown] = useState(false);
+  const [reporterSearch, setReporterSearch] = useState('');
 
-  // ── UI state ──
+  // ── AI ──
+  const [aiLoading, setAiLoading] = useState(false);
+
+  // ── UI ──
+  const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showDraftBanner, setShowDraftBanner] = useState(false);
   const [draftData, setDraftData] = useState<DraftData | null>(null);
@@ -363,92 +267,58 @@ export default function NewTicketPage() {
   const initDoneRef = useRef(false);
   const presetAppliedRef = useRef(false);
 
-  // ── Derived ──
-  const selectedCounterparty = counterparties.find((c) => c.id === counterpartyId) || null;
-  const selectedProject = projects.find((p) => p.id === projectId) || null;
+  const isCustomer = user?.roles?.some(r => r === 'customer' || r === 'customer_admin') ?? false;
+  const canSelectCounterparty = (!isCustomer && user?.roles?.some(r => CAN_SELECT_COUNTERPARTY_ROLES.includes(r))) ?? false;
+  const canSelectReporter = !isCustomer;
 
-  const relatedCounterpartyId =
-    selectedProject?.counterparty_id || counterpartyId || customerCounterparty?.id || '';
+  const counterpartyDropdownRef = useRef<HTMLDivElement>(null);
+  const projectDropdownRef = useRef<HTMLDivElement>(null);
+  const reporterDropdownRef = useRef<HTMLDivElement>(null);
 
-  const counterpartyName = (c: Counterparty) => c.name || c.legal_name || c.inn || '—';
-  const projectLabel = (p: Project) => `${p.key} — ${p.name}`;
-  const userName = (u: SimpleUser) => u.full_name || u.username || u.email;
+  const hasDescription = descriptionBlocks.some(
+    b => (b.type === 'text' && b.value.trim().length > 0) || (b.type === 'image' && b.localFile)
+  );
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1048576).toFixed(1)} MB`;
-  };
-
+  const cpName = (c: Counterparty) => c.name || c.legal_name || c.inn || '—';
+  const prjName = (p: Project) => `${p.key} - ${p.name}`;
+  const uName = (u: SimpleUser) => u.full_name || u.username || u.email;
+  const formatFileSize = (b: number) =>
+    b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(1)} MB`;
   const formatTime = (ts: number) =>
     new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
+  const clearError = (f: string) => setErrors(p => { const n = { ...p }; delete n[f]; return n; });
+
   // ── Dropdown options ──
-  const counterpartyOptions: DropdownOption[] = useMemo(
-    () =>
-      counterparties.map((c) => ({
-        id: c.id,
-        label: counterpartyName(c),
-        sub: c.inn ? `ИНН ${c.inn}` : undefined,
-      })),
-    [counterparties]
-  );
+  const typeOptions: DdOption[] = useMemo(() => TYPES.map(t => ({ id: t.value, label: t.label })), []);
 
-  const projectOptions: DropdownOption[] = useMemo(
-    () => projects.map((p) => ({ id: p.id, label: projectLabel(p) })),
-    [projects]
-  );
+  /* ══════════════════════════════════════════════════════════════
+     Draft
+     ══════════════════════════════════════════════════════════════ */
 
-  const userOptions: DropdownOption[] = useMemo(
-    () => users.map((u) => ({ id: u.id, label: userName(u), sub: u.email })),
-    [users]
-  );
-
-  const typeOptions: DropdownOption[] = useMemo(
-    () => TYPES.map((t) => ({ id: t.value, label: t.label })),
-    []
-  );
-
-  const clearError = (field: string) =>
-    setErrors((prev) => {
-      const next = { ...prev };
-      delete next[field];
-      return next;
-    });
-
-  /* ══════════════════════════════════════════════
-     Draft: check on mount
-     ══════════════════════════════════════════════ */
-
+  // Check on mount
   useEffect(() => {
     if (initDoneRef.current) return;
     initDoneRef.current = true;
-
     const raw = localStorage.getItem(draftKey);
     if (!raw) return;
-
     try {
-      const data: DraftData = JSON.parse(raw);
-      if (data.title || data.description || data.tags?.length) {
-        setDraftData(data);
+      const d: DraftData = JSON.parse(raw);
+      if (d.title || d.descriptionBlocks?.some(b => b.type === 'text' && b.value.trim()) || d.tags?.length) {
+        setDraftData(d);
         setShowDraftBanner(true);
       }
-    } catch {
-      /* ignore */
-    }
+    } catch { }
   }, [draftKey]);
 
   const restoreDraft = useCallback(() => {
     if (!draftData) return;
     setTitle(draftData.title || '');
-    setDescription(draftData.description || '');
-    setBindType(draftData.bindType || 'none');
-    setCounterpartyId(draftData.counterpartyId || '');
-    setProjectId(draftData.projectId || '');
-    setReporterId(draftData.reporterId || '');
-    setType((draftData.type as TicketType) || 'Инцидент');
-    setPriority(draftData.priority || 'medium');
+    if (draftData.descriptionBlocks?.length) setDescriptionBlocks(draftData.descriptionBlocks);
+    setPriority((draftData.priority || 'medium') as TicketPriority);
+    setType((draftData.type || 'Инцидент') as TicketType);
     setTags(draftData.tags || []);
+    setSelectionType(draftData.selectionType || null);
     setSavedAt(draftData.savedAt);
     setShowDraftBanner(false);
     presetAppliedRef.current = true;
@@ -459,334 +329,310 @@ export default function NewTicketPage() {
     localStorage.removeItem(draftKey);
   }, [draftKey]);
 
-  /* ══════════════════════════════════════════════
-     Draft: auto-save
-     ══════════════════════════════════════════════ */
-
+  // Auto-save
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!title.trim() && !description.trim() && !tags.length) return;
-
+      const hasContent = title.trim() || descriptionBlocks.some(b => b.type === 'text' && b.value.trim()) || tags.length;
+      if (!hasContent) return;
       const draft: DraftData = {
-        title,
-        description,
-        bindType,
-        counterpartyId,
-        projectId,
-        reporterId,
-        type,
-        priority,
-        tags,
+        title, descriptionBlocks, priority, type, tags, selectionType,
+        counterpartyId: selectedCounterparty?.id || '',
+        projectId: selectedProject?.id || '',
+        reporterId: selectedReporter?.id || '',
         savedAt: Date.now(),
       };
       localStorage.setItem(draftKey, JSON.stringify(draft));
       setSavedAt(Date.now());
     }, 800);
-
     return () => clearTimeout(timer);
-  }, [draftKey, title, description, bindType, counterpartyId, projectId, reporterId, type, priority, tags]);
+  }, [draftKey, title, descriptionBlocks, priority, type, tags, selectionType, selectedCounterparty, selectedProject, selectedReporter]);
 
   // beforeunload
   useEffect(() => {
-    const handler = (e: BeforeUnloadEvent) => {
-      if (title.trim() || description.trim()) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
+    const h = (e: BeforeUnloadEvent) => {
+      if (title.trim() || hasDescription) { e.preventDefault(); e.returnValue = ''; }
     };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [title, description]);
+    window.addEventListener('beforeunload', h);
+    return () => window.removeEventListener('beforeunload', h);
+  }, [title, hasDescription]);
 
-  /* ══════════════════════════════════════════════
-     API: load data
-     ══════════════════════════════════════════════ */
+  /* ══════════════════════════════════════════════════════════════
+     API Loaders (from original code)
+     ══════════════════════════════════════════════════════════════ */
 
-  // Customer counterparty
+  // Close dropdowns on outside click
   useEffect(() => {
-    if (!isCustomer || !user?.counterparty_id) return;
+    const h = (e: MouseEvent) => {
+      if (counterpartyDropdownRef.current && !counterpartyDropdownRef.current.contains(e.target as Node)) setShowCounterpartyDropdown(false);
+      if (projectDropdownRef.current && !projectDropdownRef.current.contains(e.target as Node)) setShowProjectDropdown(false);
+      if (reporterDropdownRef.current && !reporterDropdownRef.current.contains(e.target as Node)) setShowReporterDropdown(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
 
-    counterpartiesApi
-      .getById(user.counterparty_id)
-      .then(setCustomerCounterparty)
-      .catch((err) => console.error('Failed to load customer counterparty:', err));
-  }, [isCustomer, user]);
+  useEffect(() => { if (isCustomer && user?.counterparty_id) loadCustomerCounterparty(); }, [user]);
+  useEffect(() => { if (canSelectCounterparty) loadCounterparties(); }, [canSelectCounterparty]);
 
-  // Counterparties + projects for staff
   useEffect(() => {
-    if (!canSelectBinding) return;
+    if (selectionType === 'counterparty' && selectedCounterparty) loadProjects(selectedCounterparty.id);
+    else if (selectionType === 'project') loadProjectsForAll();
+    else setProjects([]);
+  }, [selectionType, selectedCounterparty]);
 
-    const loadAll = async () => {
-      setLoadingCounterparties(true);
-      setLoadingProjects(true);
+  useEffect(() => {
+    if (selectedCounterparty) loadUsers(selectedCounterparty.id);
+    else if (selectedProject?.counterparty_id) loadUsers(selectedProject.counterparty_id);
+    else { setUsers([]); setSelectedReporter(null); setReporterSearch(''); }
+  }, [selectedCounterparty, selectedProject]);
 
+  useEffect(() => {
+    if (!preselectedProjectId || !canSelectCounterparty) return;
+    const autoSelectProject = async () => {
+      setSelectionType('project');
       try {
-        const [cpResponse, projectResponse] = await Promise.all([
-          counterpartiesApi.getAll(1, 200),
-          projectsApi.getAll(1, 200),
-        ]);
-
-        console.log('Loaded counterparties:', cpResponse.items.length);
-        console.log('Loaded projects:', projectResponse.items.length);
-
-        setCounterparties(cpResponse.items);
-        setProjects(projectResponse.items);
-      } catch (err) {
-        console.error('Failed to load counterparties/projects:', err);
-      } finally {
-        setLoadingCounterparties(false);
-        setLoadingProjects(false);
-      }
+        const items = (await projectsApi.getAll(1, 100)).items;
+        setProjects(items);
+        const found = items.find(p => p.id === preselectedProjectId);
+        if (found) {
+          setSelectedProject(found);
+          setProjectSearch(`${found.key} - ${found.name}`);
+          if (found.counterparty_id) {
+            try {
+              const cp = await counterpartiesApi.getById(found.counterparty_id);
+              setSelectedCounterparty(cp);
+              setCounterpartySearch(cp.name || cp.legal_name || '');
+            } catch { }
+          }
+        }
+      } catch (err) { console.error('Failed to auto-select project:', err); }
+      finally { setLoadingProjects(false); }
     };
+    autoSelectProject();
+  }, [preselectedProjectId, canSelectCounterparty]);
 
-    loadAll();
-  }, [canSelectBinding]);
-
-  // URL presets
-  useEffect(() => {
-    if (presetAppliedRef.current || !canSelectBinding) return;
-    if (!counterparties.length && !projects.length) return;
-
-    if (preProjectId) {
-      const found = projects.find((p) => p.id === preProjectId);
-      if (found) {
-        setBindType('project');
-        setProjectId(preProjectId);
-        presetAppliedRef.current = true;
-        return;
-      }
-    }
-
-    if (preCounterpartyId) {
-      const found = counterparties.find((c) => c.id === preCounterpartyId);
-      if (found) {
-        setBindType('counterparty');
-        setCounterpartyId(preCounterpartyId);
-        presetAppliedRef.current = true;
-      }
-    }
-  }, [canSelectBinding, counterparties, projects, preCounterpartyId, preProjectId]);
-
-  // Users for reporter selection
-  useEffect(() => {
-    if (!canSelectReporter || !relatedCounterpartyId) {
-      setUsers([]);
-      return;
-    }
-
-    const loadUsers = async () => {
-      setLoadingUsers(true);
-      try {
-        const response = await usersApi.getCustomers(relatedCounterpartyId, 1, 100);
-        const items: SimpleUser[] = response.items.map((u: any) => ({
-          id: u.id,
-          username: u.username,
-          full_name: u.full_name,
-          email: u.email,
-        }));
-
-        const alreadyHasCurrentUser = items.some((u) => u.id === currentUserId);
-        const currentUserAsOption: SimpleUser | null = currentUserId
-          ? {
-              id: currentUserId,
-              username: (user as any)?.username || '',
-              full_name: (user as any)?.full_name || null,
-              email: (user as any)?.email || '',
-            }
-          : null;
-
-        setUsers(
-          alreadyHasCurrentUser || !currentUserAsOption
-            ? items
-            : [currentUserAsOption, ...items]
-        );
-      } catch (err) {
-        console.error('Failed to load users:', err);
-      } finally {
-        setLoadingUsers(false);
-      }
-    };
-
-    loadUsers();
-  }, [canSelectReporter, relatedCounterpartyId, currentUserId, user]);
-
-  // Reset reporter if users list changed
-  useEffect(() => {
-    if (reporterId && !users.some((u) => u.id === reporterId)) {
-      setReporterId('');
-    }
-  }, [users, reporterId]);
-
-  /* ══════════════════════════════════════════════
-     Handlers
-     ══════════════════════════════════════════════ */
-
-  const handleBindTypeChange = (value: BindType) => {
-    setBindType(value);
-    if (value !== 'counterparty') setCounterpartyId('');
-    if (value !== 'project') setProjectId('');
-    setReporterId('');
-    clearError('counterparty');
-    clearError('project');
+  const loadCustomerCounterparty = async () => {
+    if (!user?.counterparty_id) return;
+    try { setCustomerCounterparty(await counterpartiesApi.getById(user.counterparty_id)); } catch { }
   };
 
-  const toggleTag = (tag: TicketTag) => {
-    setTags((prev) =>
-      prev.some((t) => t.name === tag.name)
-        ? prev.filter((t) => t.name !== tag.name)
-        : [...prev, tag]
-    );
+  const loadCounterparties = async (search?: string) => {
+    setLoadingCounterparties(true);
+    try {
+      let items = (await counterpartiesApi.getAll(1, 50)).items;
+      if (search) {
+        const q = search.toLowerCase();
+        items = items.filter(c =>
+          c.name?.toLowerCase().includes(q) ||
+          c.legal_name?.toLowerCase().includes(q) ||
+          c.inn?.includes(search)
+        );
+      }
+      setCounterparties(items);
+      if (!search && preselectedCounterpartyId && !selectedCounterparty) {
+        const found = items.find(c => c.id === preselectedCounterpartyId);
+        if (found) {
+          setSelectionType('counterparty');
+          setSelectedCounterparty(found);
+          setCounterpartySearch(found.name || found.legal_name || '');
+        }
+      }
+    } catch { }
+    finally { setLoadingCounterparties(false); }
+  };
+
+  const loadProjects = async (cpId: string) => {
+    setLoadingProjects(true);
+    try { setProjects((await projectsApi.getByCounterparty(cpId, 1, 50)).items); }
+    catch { }
+    finally { setLoadingProjects(false); }
+  };
+
+  const loadProjectsForAll = async (): Promise<Project[]> => {
+    setLoadingProjects(true);
+    try {
+      const items = (await projectsApi.getAll(1, 100)).items;
+      setProjects(items);
+      return items;
+    } catch { return []; }
+    finally { setLoadingProjects(false); }
+  };
+
+  const loadUsers = async (cpId: string) => {
+    setLoadingUsers(true);
+    try {
+      const items = (await usersApi.getCustomers(cpId, 1, 100)).items.map(c => ({
+        id: c.id, username: c.username, full_name: c.full_name, email: c.email, role: c.role,
+      }));
+      let all = [...items];
+      if (!items.find(u => u.id === user?.user_id) && user?.user_id) {
+        all = [{ id: user.user_id, username: user.username || '', full_name: user.full_name || null, email: user.email || '', role: user.role }, ...items];
+      }
+      setUsers(all); setSelectedReporter(null); setReporterSearch('');
+    } catch { }
+    finally { setLoadingUsers(false); }
+  };
+
+  /* ══════════════════════════════════════════════════════════════
+     Handlers
+     ══════════════════════════════════════════════════════════════ */
+
+  const handleSelectionTypeChange = (t: SelectionType) => {
+    setSelectionType(t); setSelectedCounterparty(null); setSelectedProject(null);
+    setCounterpartySearch(''); setProjectSearch(''); setProjects([]);
+  };
+
+  const togglePresetTag = (tag: TicketTag) => {
+    setTags(p => p.some(t => t.name === tag.name) ? p.filter(t => t.name !== tag.name) : [...p, tag]);
   };
 
   const addCustomTag = () => {
-    const value = newTagInput.trim();
-    if (!value) return;
-    if (tags.some((t) => t.name.toLowerCase() === value.toLowerCase())) {
-      setNewTagInput('');
-      return;
-    }
-    setTags((prev) => [...prev, { name: value, color: '#64748b' }]);
+    const n = newTagInput.trim();
+    if (!n || tags.some(t => t.name.toLowerCase() === n.toLowerCase())) return;
+    setTags(p => [...p, { name: n, color: '#a1a1aa' }]);
     setNewTagInput('');
   };
 
-  const handleFileAdd = (fileList: File[]) => {
-    const newFiles: AttachedFile[] = fileList.map((file) => ({
-      id: `${file.name}_${Date.now()}_${Math.random()}`,
-      file,
-      preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
+  const removeTag = (name: string) => setTags(p => p.filter(t => t.name !== name));
+
+  const handleGeneralFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const newF: GeneralFile[] = files.map(f => ({
+      id: `${f.name}_${Date.now()}_${Math.random()}`, file: f,
+      preview: f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined, status: 'pending',
     }));
-    setAttachedFiles((prev) => [...prev, ...newFiles].slice(0, 10));
+    setGeneralFiles(p => [...p, ...newF].slice(0, 10));
+    e.target.value = '';
   };
 
-  const handleFileRemove = (id: string) => {
-    const found = attachedFiles.find((f) => f.id === id);
-    if (found?.preview) URL.revokeObjectURL(found.preview);
-    setAttachedFiles((prev) => prev.filter((f) => f.id !== id));
+  const handleGeneralDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files);
+    const newF: GeneralFile[] = files.map(f => ({
+      id: `${f.name}_${Date.now()}_${Math.random()}`, file: f,
+      preview: f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined, status: 'pending',
+    }));
+    setGeneralFiles(p => [...p, ...newF].slice(0, 10));
+  };
+
+  const removeGeneralFile = (id: string) => {
+    const f = generalFiles.find(x => x.id === id);
+    if (f?.preview) URL.revokeObjectURL(f.preview);
+    setGeneralFiles(p => p.filter(x => x.id !== id));
   };
 
   const handleAiSuggest = async () => {
-    if (!title.trim() || !description.trim()) {
-      if (!title.trim()) setErrors((p) => ({ ...p, title: 'Сначала укажите тему' }));
-      if (!description.trim()) setErrors((p) => ({ ...p, description: 'Сначала опишите проблему' }));
+    const t = title.trim();
+    const d = description.trim();
+    if (!t || !d) {
+      if (!t) setErrors(p => ({ ...p, title: 'Укажите тему для ИИ' }));
+      if (!d) setErrors(p => ({ ...p, description: 'Опишите проблему для ИИ' }));
       return;
     }
-
     setAiLoading(true);
     try {
-      const result = await ticketsApi.predict(title.trim(), description.trim());
-      if (result?.suggested_priority) setPriority(result.suggested_priority);
-      if (result?.suggested_tags?.length) {
-        setTags((prev) => {
+      const r = await ticketsApi.predict(t, d);
+      if (r?.suggested_priority) setPriority(r.suggested_priority);
+      if (r?.suggested_tags?.length) {
+        setTags(prev => {
           const map = new Map<string, TicketTag>();
-          [...prev, ...result.suggested_tags].forEach((t) =>
-            map.set(t.name.toLowerCase(), t)
-          );
+          [...prev, ...r.suggested_tags].forEach(tag => map.set(tag.name.toLowerCase(), tag));
           return Array.from(map.values());
         });
       }
-    } catch (err) {
-      console.error('AI prediction failed:', err);
-    } finally {
-      setAiLoading(false);
-    }
+    } catch (err) { console.error('AI failed:', err); }
+    finally { setAiLoading(false); }
   };
 
   const validate = (): boolean => {
-    const nextErrors: Record<string, string> = {};
-
-    if (!title.trim()) nextErrors.title = 'Укажите тему заявки';
-    if (!description.trim()) nextErrors.description = 'Опишите проблему';
-
-    if (canSelectBinding && bindType === 'counterparty' && !counterpartyId) {
-      nextErrors.counterparty = 'Выберите компанию';
-    }
-    if (canSelectBinding && bindType === 'project' && !projectId) {
-      nextErrors.project = 'Выберите проект';
-    }
-
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+    const e: Record<string, string> = {};
+    if (!title.trim()) e.title = 'Укажите тему заявки';
+    if (!hasDescription) e.description = 'Добавьте описание';
+    setErrors(e);
+    return !Object.keys(e).length;
   };
+
+  /* ══════════════════════════════════════════════════════════════
+     Submit (from original code)
+     ══════════════════════════════════════════════════════════════ */
 
   const handleSubmit = async () => {
     if (!validate()) return;
-
     setSubmitting(true);
     try {
-      const payload: any = {
-        title: title.trim(),
-        description: description.trim(),
-        priority,
-        type,
-        tags: tags.map((t) => ({ name: t.name, color: t.color || '#64748b' })),
-        reporter_id: reporterId || currentUserId,
+      const textOnlyDesc = descriptionBlocks
+        .filter((b): b is Extract<DescriptionBlock, { type: 'text' }> => b.type === 'text')
+        .map(b => b.value.trim()).filter(Boolean).join('\n\n');
+
+      const data: any = {
+        title, description: textOnlyDesc || '(описание с изображениями)',
+        priority, type,
+        tags: tags.map(t => ({ name: t.name, color: t.color || '#64748b' })),
+        reporter_id: user?.id,
       };
 
-      if (isCustomer && customerCounterparty) {
-        payload.counterparty_id = customerCounterparty.id;
-      } else if (bindType === 'project' && projectId) {
-        payload.project_id = projectId;
-      } else if (bindType === 'counterparty' && counterpartyId) {
-        payload.counterparty_id = counterpartyId;
+      if (isCustomer && customerCounterparty) data.counterparty_id = customerCounterparty.id;
+      else if (selectedProject) data.project_id = selectedProject.id;
+      else if (selectedCounterparty) data.counterparty_id = selectedCounterparty.id;
+      if (canSelectReporter && selectedReporter) data.reporter_id = selectedReporter.id;
+
+      const ticket = await ticketsApi.create(data);
+
+      const imageBlocks = descriptionBlocks.filter(
+        (b): b is Extract<DescriptionBlock, { type: 'image' }> => b.type === 'image' && !!b.localFile
+      );
+      const uploadMap: Record<string, string> = {};
+      for (const block of imageBlocks) {
+        try {
+          const att = await attachmentsApi.uploadAttachment(block.localFile!, 'ticket', ticket.id);
+          uploadMap[block.id] = att.id;
+        } catch (err) { console.error('Image upload failed:', block.id, err); }
+      }
+      if (imageBlocks.length > 0) {
+        let finalDesc = serializeBlocks(descriptionBlocks);
+        for (const [blockId, attachmentId] of Object.entries(uploadMap)) {
+          finalDesc = finalDesc.replaceAll(`![image](local:${blockId})`, `![image](media://${attachmentId})`);
+        }
+        finalDesc = finalDesc.replace(/!\[image\]\(local:[a-f0-9-]+\)\n*/gi, '');
+        await ticketsApi.update(ticket.id, { description: finalDesc });
       }
 
-      const ticket = await ticketsApi.create(payload);
-
-      // Upload files
-      for (const item of attachedFiles) {
-        try {
-          await attachmentsApi.uploadAttachment(item.file, 'ticket', ticket.id);
-        } catch (err) {
-          console.error('File upload failed:', item.file.name, err);
-        }
+      for (const f of generalFiles.filter(x => x.status === 'pending')) {
+        try { await attachmentsApi.uploadAttachment(f.file, 'ticket', ticket.id); }
+        catch (err) { console.error('File upload failed:', f.file.name, err); }
       }
 
       localStorage.removeItem(draftKey);
       navigate('/tickets');
-    } catch (err: any) {
-      console.error('Submit failed:', err?.response?.data || err);
-    } finally {
-      setSubmitting(false);
-    }
+    } catch (err: any) { console.error('Submit failed:', err?.response?.data || err); }
+    finally { setSubmitting(false); }
   };
 
-  /* ══════════════════════════════════════════════
+  /* ══════════════════════════════════════════════════════════════
      RENDER
-     ══════════════════════════════════════════════ */
+     ══════════════════════════════════════════════════════════════ */
 
   return (
     <div className="h-[calc(100vh-var(--header-height,64px))] flex flex-col overflow-hidden">
-      {/* ── Top bar ── */}
-      <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-[var(--border-color)] bg-[var(--bg-primary)]">
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => navigate('/tickets')}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--hover-1)] hover:bg-[var(--hover-2)] text-sm text-[var(--text-primary)]/60 hover:text-[var(--text-primary)] transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            К заявкам
-          </button>
-          <h1 className="text-lg font-semibold text-[var(--text-primary)]">Новая заявка</h1>
-        </div>
 
-        <div className="flex items-center gap-4">
+      {/* ── Top bar ── */}
+      <div className="flex-shrink-0 flex items-center justify-between px-5 py-2.5 border-b border-[var(--border-color)] bg-[var(--bg-primary)]">
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => navigate('/tickets')}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--hover-1)] hover:bg-[var(--hover-2)] text-sm text-[var(--text-primary)]/60 hover:text-[var(--text-primary)] transition-colors">
+            <ArrowLeft className="w-4 h-4" /> К заявкам
+          </button>
+          <h1 className="text-base font-semibold text-[var(--text-primary)]">Новая заявка</h1>
+        </div>
+        <div className="flex items-center gap-3">
           {savedAt && (
-            <span className="text-xs text-[var(--text-primary)]/35">
-              Сохранено · {formatTime(savedAt)}
+            <span className="text-xs text-[var(--text-primary)]/30">
+              Черновик · {formatTime(savedAt)}
             </span>
           )}
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-700 hover:bg-red-600 text-white text-sm font-semibold disabled:opacity-50 transition-colors shadow-lg shadow-red-900/25"
-          >
-            {submitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
+          <button type="button" onClick={handleSubmit} disabled={submitting}
+            className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-red-700 hover:bg-red-600 text-white text-sm font-semibold disabled:opacity-50 transition-colors shadow-lg shadow-red-900/25">
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             {submitting ? 'Создаём...' : 'Создать заявку'}
           </button>
         </div>
@@ -794,410 +640,356 @@ export default function NewTicketPage() {
 
       {/* ── Draft banner ── */}
       {showDraftBanner && draftData && (
-        <div className="flex-shrink-0 px-6 py-3 bg-amber-500/10 border-b border-amber-500/20">
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <span className="text-sm font-medium text-amber-300">Найден черновик: </span>
-              <span className="text-sm text-[var(--text-primary)]/60">
-                «{draftData.title || 'без темы'}» · сохранён в {formatTime(draftData.savedAt)}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={restoreDraft}
-              className="px-4 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-sm font-medium transition-colors"
-            >
-              Восстановить
-            </button>
-            <button
-              type="button"
-              onClick={dismissDraft}
-              className="px-4 py-1.5 rounded-lg hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40 text-sm transition-colors"
-            >
-              Удалить
-            </button>
+        <div className="flex-shrink-0 px-5 py-2.5 bg-amber-500/10 border-b border-amber-500/20 flex items-center gap-4">
+          <div className="flex-1 text-sm">
+            <span className="text-amber-300 font-medium">Черновик: </span>
+            <span className="text-[var(--text-primary)]/50">
+              «{draftData.title || 'без темы'}» · {formatTime(draftData.savedAt)}
+            </span>
           </div>
+          <button type="button" onClick={restoreDraft}
+            className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-sm font-medium transition-colors">
+            Восстановить
+          </button>
+          <button type="button" onClick={dismissDraft}
+            className="px-3 py-1.5 rounded-lg hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40 text-sm transition-colors">
+            Удалить
+          </button>
         </div>
       )}
 
       {/* ── Errors ── */}
       {Object.keys(errors).length > 0 && (
-        <div className="flex-shrink-0 px-6 py-2.5 bg-red-500/8 border-b border-red-500/20">
-          <div className="flex flex-wrap gap-x-6 gap-y-1">
-            {Object.values(errors).map((error, idx) => (
-              <span key={idx} className="text-sm text-red-400 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
-                {error}
-              </span>
-            ))}
-          </div>
+        <div className="flex-shrink-0 px-5 py-2 bg-red-500/8 border-b border-red-500/20 flex flex-wrap gap-x-6 gap-y-1">
+          {Object.values(errors).map((e, i) => (
+            <span key={i} className="text-sm text-red-400 flex items-center gap-2">
+              <AlertCircle className="w-3.5 h-3.5" /> {e}
+            </span>
+          ))}
         </div>
       )}
 
-      {/* ── Main area: two columns ── */}
+      {/* ── Main: two columns ── */}
       <div className="flex-1 flex overflow-hidden">
-        {/* ═══ LEFT COLUMN: title + description + files ═══ */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-3xl p-6 space-y-5">
+
+        {/* ═══ LEFT: Form ═══ */}
+        <div className="flex-1 overflow-y-auto p-5">
+          <div className="max-w-3xl space-y-5">
+
             {/* Title */}
-            <Section title="Тема заявки">
-              <input
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  clearError('title');
-                }}
-                placeholder="Коротко опишите проблему"
-                className={`w-full px-4 py-3 rounded-xl border bg-[var(--bg-primary)] text-base text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/25 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500/40 transition-all ${
-                  errors.title
-                    ? 'border-red-500/50 ring-1 ring-red-500/20'
-                    : 'border-[var(--border-color)]'
-                }`}
-              />
-            </Section>
+            <div>
+              <SpellCheckField value={title} onChange={(v) => { setTitle(v); clearError('title'); }} label="Тема заявки *">
+                <input type="text" value={title} onChange={e => { setTitle(e.target.value); clearError('title'); }}
+                  placeholder="Коротко опишите проблему..."
+                  className={`input-field py-3 text-lg w-full ${errors.title ? 'border-red-500 ring-1 ring-red-500/30' : ''}`} />
+              </SpellCheckField>
+            </div>
 
             {/* Description */}
-            <Section title="Описание проблемы">
-              <textarea
-                value={description}
-                onChange={(e) => {
-                  setDescription(e.target.value);
-                  clearError('description');
-                }}
-                placeholder="Что произошло, как воспроизвести, когда началось, что ожидалось..."
-                rows={10}
-                className={`w-full px-4 py-3 rounded-xl border bg-[var(--bg-primary)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/25 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500/40 transition-all resize-y min-h-[180px] ${
-                  errors.description
-                    ? 'border-red-500/50 ring-1 ring-red-500/20'
-                    : 'border-[var(--border-color)]'
-                }`}
-              />
-            </Section>
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-2">
+                Описание проблемы <span className="text-red-400">*</span>
+              </label>
+              <div className={errors.description ? 'ring-1 ring-red-500/30 rounded-2xl' : ''}>
+                <TicketEditor blocks={descriptionBlocks} onChange={(b) => { setDescriptionBlocks(b); clearError('description'); }} />
+              </div>
+            </div>
 
             {/* Files */}
-            <Section title={`Вложения${attachedFiles.length ? ` (${attachedFiles.length})` : ''}`}>
-              <div
-                onDrop={(e) => {
-                  e.preventDefault();
-                  handleFileAdd(Array.from(e.dataTransfer.files));
-                }}
-                onDragOver={(e) => e.preventDefault()}
-                className="flex items-center gap-4 px-4 py-3 rounded-xl border border-dashed border-[var(--border-color)] hover:border-[var(--text-primary)]/25 bg-[var(--bg-primary)] transition-colors"
-              >
-                <Upload className="w-5 h-5 text-[var(--text-primary)]/25 flex-shrink-0" />
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-2">
+                Вложения
+              </label>
+              <div onDrop={handleGeneralDrop} onDragOver={e => e.preventDefault()}
+                className="flex items-center gap-4 px-4 py-3 rounded-xl border border-dashed border-[var(--border-color)] hover:border-[var(--text-primary)]/20 bg-[var(--hover-1)]/50 transition-colors">
+                <Upload className="w-5 h-5 text-[var(--text-primary)]/20 flex-shrink-0" />
                 <span className="flex-1 text-sm text-[var(--text-primary)]/40">
                   Перетащите файлы сюда или
                 </span>
-                <label className="px-4 py-2 rounded-lg bg-[var(--hover-1)] hover:bg-[var(--hover-2)] text-sm text-[var(--text-primary)]/60 cursor-pointer transition-colors font-medium">
-                  <input
-                    type="file"
-                    multiple
-                    onChange={(e) => handleFileAdd(Array.from(e.target.files || []))}
-                    className="hidden"
-                  />
+                <label className="px-4 py-2 rounded-lg bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-sm text-[var(--text-primary)]/60 cursor-pointer transition-colors font-medium">
+                  <input type="file" multiple onChange={handleGeneralFileSelect} className="hidden" />
                   Выбрать файлы
                 </label>
               </div>
 
-              {attachedFiles.length > 0 && (
+              {generalFiles.length > 0 && (
                 <div className="mt-3 space-y-1.5">
-                  {attachedFiles.map((f) => (
-                    <div
-                      key={f.id}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)]"
-                    >
-                      {f.preview ? (
-                        <img
-                          src={f.preview}
-                          alt=""
-                          className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-lg bg-[var(--hover-1)] flex items-center justify-center flex-shrink-0">
+                  {generalFiles.map(f => (
+                    <div key={f.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--hover-1)] border border-[var(--border-color)]">
+                      {f.preview
+                        ? <img src={f.preview} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                        : <div className="w-10 h-10 rounded-lg bg-[var(--hover-2)] flex items-center justify-center">
                           <File className="w-4 h-4 text-[var(--text-primary)]/30" />
-                        </div>
-                      )}
+                        </div>}
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm text-[var(--text-primary)] truncate">
-                          {f.file.name}
-                        </div>
-                        <div className="text-xs text-[var(--text-primary)]/40">
-                          {formatFileSize(f.file.size)}
-                        </div>
+                        <p className="text-sm text-[var(--text-primary)] truncate">{f.file.name}</p>
+                        <p className="text-xs text-[var(--text-primary)]/40">{formatFileSize(f.file.size)}</p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleFileRemove(f.id)}
-                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--text-primary)]/30 hover:text-red-400 transition-colors"
-                      >
+                      <button onClick={() => removeGeneralFile(f.id)}
+                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--text-primary)]/30 hover:text-red-400 transition-colors">
                         <X className="w-4 h-4" />
                       </button>
                     </div>
                   ))}
                 </div>
               )}
-
-              <p className="mt-2 text-xs text-[var(--text-primary)]/30">
-                До 10 файлов, максимум 25 МБ каждый
-              </p>
-            </Section>
+              <p className="mt-2 text-xs text-[var(--text-primary)]/30">До 10 файлов, до 25 МБ каждый</p>
+            </div>
           </div>
         </div>
 
-        {/* ═══ RIGHT COLUMN: settings ═══ */}
-        <div className="w-80 xl:w-96 flex-shrink-0 border-l border-[var(--border-color)] overflow-y-auto bg-[var(--bg-secondary)]/30">
-          <div className="p-4 space-y-4">
-            {/* Binding */}
-            <Section title="Привязка">
+        {/* ═══ RIGHT: Sidebar ═══ */}
+        <div className="w-80 xl:w-[340px] flex-shrink-0 border-l border-[var(--border-color)] overflow-y-auto bg-[var(--bg-secondary)]/30">
+          <div className="p-4 space-y-5">
+
+            {/* ── Binding ── */}
+            <SideSection title="Привязка">
               {isCustomer && customerCounterparty && (
-                <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-blue-500/8 border border-blue-500/20 mb-3">
+                <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-blue-500/8 border border-blue-500/20 mb-3">
                   <Building2 className="w-4 h-4 text-blue-400 flex-shrink-0" />
                   <div className="min-w-0">
-                    <div className="text-sm text-[var(--text-primary)] font-medium truncate">
-                      {customerCounterparty.name}
-                    </div>
+                    <div className="text-sm text-[var(--text-primary)] font-medium truncate">{customerCounterparty.name}</div>
                     {customerCounterparty.inn && (
-                      <div className="text-xs text-[var(--text-primary)]/40">
-                        ИНН {customerCounterparty.inn}
-                      </div>
+                      <div className="text-xs text-[var(--text-primary)]/35">ИНН {customerCounterparty.inn}</div>
                     )}
                   </div>
                 </div>
               )}
 
-              {canSelectBinding && (
+              {canSelectCounterparty && (
                 <div className="space-y-3">
                   {/* Tabs */}
                   <div className="flex gap-1 p-1 rounded-xl bg-[var(--hover-1)]">
-                    {(
-                      [
-                        { value: 'none' as BindType, label: 'Нет' },
-                        { value: 'counterparty' as BindType, label: 'Компания' },
-                        { value: 'project' as BindType, label: 'Проект' },
-                      ] as const
-                    ).map((item) => (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => handleBindTypeChange(item.value)}
-                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all text-center ${
-                          bindType === item.value
+                    {([
+                      { v: null as SelectionType, l: 'Нет' },
+                      { v: 'counterparty' as SelectionType, l: 'Компания' },
+                      { v: 'project' as SelectionType, l: 'Проект' },
+                    ]).map(b => (
+                      <button key={String(b.v)} type="button" onClick={() => handleSelectionTypeChange(b.v)}
+                        className={`flex-1 px-2 py-2 rounded-lg text-sm font-medium transition-all text-center
+                          ${selectionType === b.v
                             ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm'
-                            : 'text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60'
-                        }`}
-                      >
-                        {item.label}
+                            : 'text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60'}`}>
+                        {b.l}
                       </button>
                     ))}
                   </div>
 
-                  {/* Counterparty dropdown */}
-                  {bindType === 'counterparty' && (
+                  {/* Counterparty search dropdown */}
+                  {selectionType === 'counterparty' && (
                     <div>
-                      <label className="block text-sm text-[var(--text-primary)]/60 mb-1.5">
-                        Компания
-                      </label>
-                      <Dropdown
-                        options={counterpartyOptions}
-                        value={counterpartyId}
-                        onChange={(id) => {
-                          setCounterpartyId(id);
-                          clearError('counterparty');
-                          setReporterId('');
-                        }}
-                        placeholder="Выберите компанию..."
-                        searchPlaceholder="Название или ИНН..."
-                        loading={loadingCounterparties}
-                        icon={<Building2 className="w-4 h-4" />}
-                        emptyText="Компании не найдены"
-                      />
-                      {loadingCounterparties && (
-                        <p className="mt-1.5 text-xs text-[var(--text-primary)]/30">
-                          Загружаем список компаний...
-                        </p>
+                      <div className="relative" ref={counterpartyDropdownRef}>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-primary)]/30" />
+                          <input value={counterpartySearch}
+                            onChange={e => { setCounterpartySearch(e.target.value); setShowCounterpartyDropdown(true); loadCounterparties(e.target.value); }}
+                            onFocus={() => { setShowCounterpartyDropdown(true); if (!counterparties.length) loadCounterparties(); }}
+                            placeholder="Поиск компании..."
+                            className="input-field w-full py-2.5 text-sm pl-9" />
+                        </div>
+                        {showCounterpartyDropdown && (
+                          <div className="absolute z-50 mt-1 w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl shadow-black/40 max-h-52 overflow-y-auto">
+                            {loadingCounterparties
+                              ? <div className="py-6 text-center"><Loader2 className="w-4 h-4 animate-spin mx-auto text-[var(--text-primary)]/30" /></div>
+                              : counterparties.length === 0
+                                ? <div className="py-4 text-center text-sm text-[var(--text-primary)]/35">Не найдено</div>
+                                : counterparties.map(cp => (
+                                  <button key={cp.id}
+                                    onClick={() => { setSelectedCounterparty(cp); setCounterpartySearch(cpName(cp)); setShowCounterpartyDropdown(false); }}
+                                    className={`w-full text-left px-3.5 py-2.5 text-sm transition-colors
+                                      ${selectedCounterparty?.id === cp.id ? 'bg-red-500/10 text-[var(--text-primary)]' : 'text-[var(--text-primary)]/65 hover:bg-[var(--hover-1)]'}`}>
+                                    <div className="font-medium">{cpName(cp)}</div>
+                                    {cp.inn && <div className="text-xs text-[var(--text-primary)]/35 mt-0.5">ИНН: {cp.inn}</div>}
+                                  </button>
+                                ))}
+                          </div>
+                        )}
+                      </div>
+                      {selectedCounterparty && (
+                        <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/8 border border-blue-500/20 text-sm text-blue-400">
+                          <Check className="w-3.5 h-3.5" /> {cpName(selectedCounterparty)}
+                        </div>
                       )}
                     </div>
                   )}
 
-                  {/* Project dropdown */}
-                  {bindType === 'project' && (
+                  {/* Project search dropdown */}
+                  {selectionType === 'project' && (
                     <div>
-                      <label className="block text-sm text-[var(--text-primary)]/60 mb-1.5">
-                        Проект
-                      </label>
-                      <Dropdown
-                        options={projectOptions}
-                        value={projectId}
-                        onChange={(id) => {
-                          setProjectId(id);
-                          clearError('project');
-                          setReporterId('');
-                        }}
-                        placeholder="Выберите проект..."
-                        searchPlaceholder="Ключ или название..."
-                        loading={loadingProjects}
-                        icon={<FolderOpen className="w-4 h-4" />}
-                        emptyText="Проекты не найдены"
-                      />
-                      {loadingProjects && (
-                        <p className="mt-1.5 text-xs text-[var(--text-primary)]/30">
-                          Загружаем проекты...
-                        </p>
-                      )}
+                      <div className="relative" ref={projectDropdownRef}>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-primary)]/30" />
+                          <input value={projectSearch}
+                            onChange={e => { setProjectSearch(e.target.value); setShowProjectDropdown(true); }}
+                            onFocus={() => { setShowProjectDropdown(true); if (!projects.length) loadProjectsForAll(); }}
+                            placeholder="Поиск проекта..."
+                            className="input-field w-full py-2.5 text-sm pl-9" />
+                        </div>
+                        {showProjectDropdown && (
+                          <div className="absolute z-50 mt-1 w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl shadow-black/40 max-h-52 overflow-y-auto">
+                            {loadingProjects
+                              ? <div className="py-6 text-center"><Loader2 className="w-4 h-4 animate-spin mx-auto text-[var(--text-primary)]/30" /></div>
+                              : projects
+                                .filter(p => !projectSearch || p.name.toLowerCase().includes(projectSearch.toLowerCase()) || p.key.toLowerCase().includes(projectSearch.toLowerCase()))
+                                .length === 0
+                                ? <div className="py-4 text-center text-sm text-[var(--text-primary)]/35">Не найдено</div>
+                                : projects
+                                  .filter(p => !projectSearch || p.name.toLowerCase().includes(projectSearch.toLowerCase()) || p.key.toLowerCase().includes(projectSearch.toLowerCase()))
+                                  .map(p => (
+                                    <button key={p.id}
+                                      onClick={() => { setSelectedProject(p); setProjectSearch(prjName(p)); setShowProjectDropdown(false); }}
+                                      className={`w-full text-left px-3.5 py-2.5 text-sm transition-colors
+                                        ${selectedProject?.id === p.id ? 'bg-red-500/10 text-[var(--text-primary)]' : 'text-[var(--text-primary)]/65 hover:bg-[var(--hover-1)]'}`}>
+                                      <span className="text-amber-400 font-medium">{p.key}</span>
+                                      <span className="text-[var(--text-primary)]/60"> — {p.name}</span>
+                                    </button>
+                                  ))}
+                          </div>
+                        )}
+                      </div>
                       {selectedProject && (
-                        <p className="mt-1.5 text-xs text-[var(--text-primary)]/40">
-                          Контрагент:{' '}
-                          {counterparties.find((c) => c.id === selectedProject.counterparty_id)
-                            ? counterpartyName(
-                                counterparties.find(
-                                  (c) => c.id === selectedProject.counterparty_id
-                                ) as Counterparty
-                              )
-                            : '—'}
-                        </p>
+                        <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/8 border border-amber-500/20 text-sm text-amber-400">
+                          <Check className="w-3.5 h-3.5" /> {prjName(selectedProject)}
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
               )}
-            </Section>
+            </SideSection>
 
-            {/* Reporter */}
-            {canSelectReporter && relatedCounterpartyId && (
-              <Section title="Инициатор">
-                <Dropdown
-                  options={userOptions}
-                  value={reporterId}
-                  onChange={setReporterId}
-                  placeholder="Я создаю заявку сам"
-                  searchPlaceholder="Имя или email..."
-                  loading={loadingUsers}
-                  icon={<User className="w-4 h-4" />}
-                  emptyText="Пользователи не найдены"
-                />
-                <p className="mt-1.5 text-xs text-[var(--text-primary)]/30">
-                  Оставьте пустым, если создаёте заявку от своего имени
-                </p>
-              </Section>
+            {/* ── Reporter ── */}
+            {canSelectReporter && (selectedCounterparty || selectedProject) && (
+              <SideSection title="Инициатор">
+                <div className="relative" ref={reporterDropdownRef}>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-primary)]/30" />
+                    <input value={reporterSearch}
+                      onChange={e => { setReporterSearch(e.target.value); setShowReporterDropdown(true); }}
+                      onFocus={() => setShowReporterDropdown(true)}
+                      placeholder="Я (по умолчанию)"
+                      className="input-field w-full py-2.5 text-sm pl-9" />
+                  </div>
+                  {showReporterDropdown && (
+                    <div className="absolute z-50 mt-1 w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl shadow-black/40 max-h-52 overflow-y-auto">
+                      {loadingUsers
+                        ? <div className="py-6 text-center"><Loader2 className="w-4 h-4 animate-spin mx-auto text-[var(--text-primary)]/30" /></div>
+                        : <>
+                          <button onClick={() => { setSelectedReporter(null); setReporterSearch(''); setShowReporterDropdown(false); }}
+                            className="w-full text-left px-3.5 py-2.5 text-sm hover:bg-[var(--hover-1)] text-[var(--text-primary)]">
+                            {user?.full_name || 'Вы'} <span className="text-[var(--text-primary)]/35">(я)</span>
+                          </button>
+                          {users
+                            .filter(u => !reporterSearch ||
+                              u.full_name?.toLowerCase().includes(reporterSearch.toLowerCase()) ||
+                              u.email.toLowerCase().includes(reporterSearch.toLowerCase()))
+                            .map(u => (
+                              <button key={u.id}
+                                onClick={() => { setSelectedReporter(u); setReporterSearch(uName(u)); setShowReporterDropdown(false); }}
+                                className="w-full text-left px-3.5 py-2.5 text-sm hover:bg-[var(--hover-1)] text-[var(--text-primary)]/65">
+                                <div className="font-medium text-[var(--text-primary)]">{uName(u)}</div>
+                                <div className="text-xs text-[var(--text-primary)]/35">{u.email}</div>
+                              </button>
+                            ))}
+                        </>}
+                    </div>
+                  )}
+                </div>
+                {selectedReporter && (
+                  <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/8 border border-green-500/20 text-sm text-green-400">
+                    <Check className="w-3.5 h-3.5" /> {uName(selectedReporter)}
+                  </div>
+                )}
+              </SideSection>
             )}
 
-            {/* Category */}
-            <Section title="Категория">
+            <div className="h-px bg-[var(--border-color)]" />
+
+            {/* ── Category ── */}
+            <SideSection title="Категория">
               <Dropdown
                 options={typeOptions}
                 value={type}
-                onChange={(v) => setType(v as TicketType)}
+                onChange={v => setType(v as TicketType)}
                 placeholder="Тип заявки"
               />
-            </Section>
+            </SideSection>
 
-            {/* Priority */}
-            <Section title="Срочность">
-              <div className="grid grid-cols-2 gap-2">
-                {PRIORITIES.map((p) => (
-                  <button
-                    key={p.value}
-                    type="button"
-                    onClick={() => setPriority(p.value)}
-                    className={`inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${getPriorityClasses(
-                      p.color,
-                      priority === p.value
-                    )}`}
-                  >
-                    {p.icon}
-                    {p.label}
+            {/* ── Priority ── */}
+            <SideSection title="Срочность">
+              <div className="grid grid-cols-2 gap-1.5">
+                {PRIORITIES.map(p => (
+                  <button key={p.value} type="button"
+                    onClick={() => setPriority(p.value as TicketPriority)}
+                    className={`inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all
+                      ${priClasses(p.c, priority === p.value)}`}>
+                    {p.icon} {p.label}
                   </button>
                 ))}
               </div>
-            </Section>
+            </SideSection>
 
-            {/* AI button */}
-            <button
-              type="button"
-              onClick={handleAiSuggest}
-              disabled={aiLoading}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm bg-amber-500/8 border border-amber-500/20 text-amber-300/80 hover:bg-amber-500/15 hover:text-amber-300 disabled:opacity-40 transition-colors font-medium"
-            >
-              {aiLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Sparkles className="w-4 h-4" />
-              )}
+            {/* ── AI button ── */}
+            <button type="button" onClick={handleAiSuggest} disabled={aiLoading}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm bg-amber-500/8 border border-amber-500/15 text-amber-300/80 hover:bg-amber-500/15 hover:text-amber-300 disabled:opacity-40 transition-colors font-medium">
+              {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               ИИ: подобрать приоритет и теги
             </button>
 
-            {/* Tags */}
-            <Section title="Теги">
+            <div className="h-px bg-[var(--border-color)]" />
+
+            {/* ── Tags ── */}
+            <SideSection title="Теги">
               <div className="flex flex-wrap gap-1.5 mb-3">
-                {PRESET_TAGS.map((tag) => {
-                  const active = tags.some((t) => t.name === tag.name);
+                {PRESET_TAGS.map(t => {
+                  const on = tags.some(x => x.name === t.name);
                   return (
-                    <button
-                      key={tag.name}
-                      type="button"
-                      onClick={() => toggleTag(tag)}
-                      className="px-3 py-1.5 rounded-lg border text-xs font-medium transition-all"
+                    <button key={t.name} type="button" onClick={() => togglePresetTag(t)}
+                      className="px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all"
                       style={{
-                        backgroundColor: active ? `${tag.color}20` : 'transparent',
-                        borderColor: active ? `${tag.color}60` : 'var(--border-color)',
-                        color: active ? tag.color : 'var(--text-primary)',
-                        opacity: active ? 1 : 0.5,
-                      }}
-                    >
-                      {tag.name}
+                        backgroundColor: on ? `${t.color}20` : 'transparent',
+                        borderColor: on ? `${t.color}60` : 'var(--border-color)',
+                        color: on ? t.color : 'var(--text-primary)',
+                        opacity: on ? 1 : 0.5,
+                      }}>
+                      {t.name}
                     </button>
                   );
                 })}
               </div>
 
-              <div className="flex gap-2">
-                <input
-                  value={newTagInput}
-                  onChange={(e) => setNewTagInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addCustomTag();
-                    }
-                  }}
+              <div className="flex gap-1.5">
+                <input value={newTagInput} onChange={e => setNewTagInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomTag(); } }}
                   placeholder="Свой тег..."
-                  className="flex-1 px-3 py-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/25 focus:outline-none focus:border-red-500/30 focus:ring-1 focus:ring-red-500/20"
-                />
-                <button
-                  type="button"
-                  onClick={addCustomTag}
-                  disabled={!newTagInput.trim()}
-                  className="px-3 py-2 rounded-lg bg-[var(--hover-1)] hover:bg-[var(--hover-2)] disabled:opacity-25 transition-colors"
-                >
-                  <Plus className="w-4 h-4 text-[var(--text-primary)]/50" />
+                  className="flex-1 px-3 py-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/25 focus:outline-none focus:border-red-500/30" />
+                <button type="button" onClick={addCustomTag} disabled={!newTagInput.trim()}
+                  className="px-2.5 py-2 rounded-lg bg-[var(--hover-1)] hover:bg-[var(--hover-2)] disabled:opacity-25 transition-colors">
+                  <Plus className="w-4 h-4 text-[var(--text-primary)]/40" />
                 </button>
               </div>
 
               {tags.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {tags.map((tag) => (
-                    <span
-                      key={tag.name}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium"
+                  {tags.map(t => (
+                    <span key={t.name}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium"
                       style={{
-                        backgroundColor: `${tag.color || '#64748b'}18`,
-                        borderColor: `${tag.color || '#64748b'}40`,
-                        color: tag.color || '#94a3b8',
-                      }}
-                    >
-                      {tag.name}
-                      <button
-                        type="button"
-                        onClick={() => setTags((p) => p.filter((t) => t.name !== tag.name))}
-                        className="hover:text-red-400 transition-colors"
-                      >
+                        backgroundColor: `${t.color || '#64748b'}18`,
+                        borderColor: `${t.color || '#64748b'}40`,
+                        color: t.color || '#94a3b8',
+                      }}>
+                      {t.name}
+                      <button type="button" onClick={() => removeTag(t.name)}
+                        className="hover:text-red-400 transition-colors">
                         <X className="w-3 h-3" />
                       </button>
                     </span>
                   ))}
                 </div>
               )}
-            </Section>
+            </SideSection>
+
           </div>
         </div>
       </div>
