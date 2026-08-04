@@ -1,129 +1,65 @@
-﻿// ── NewTicketPage — Вариант A: улучшенный UX/UI ──
-
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, Sparkles, Loader2, Upload, X, File, Building2,
-  Plus, Search, FolderOpen, User, AlertCircle, Check,
-  ChevronDown, Send, Tag as TagIcon,
+  ArrowLeft, ArrowRight, Sparkles, Loader2, FileText,
+  Tag, Upload, X, CheckCircle2, File, Building2, Zap, Plus,
+  Search, FolderOpen, User, AlertCircle,
 } from 'lucide-react';
 import { SignalLow, SignalMedium, SignalHigh, Flame } from 'lucide-react';
+import { MessageSquare, HelpCircle, AlertTriangle, CheckCircle, Edit3 } from 'lucide-react';
 
 import { useAuthStore } from '../stores/authStore';
 import { ticketsApi, counterpartiesApi, projectsApi, usersApi } from '../api/client';
 import { attachmentsApi } from '../api/attachments';
 import type { Counterparty, TicketTag, TicketPriority, TicketType, Project } from '../types';
 import { SpellCheckField } from '../components/helpers/SpellCheckField';
+import { TicketDescriptionContent } from '../components/helpers/TicketDescriptionContent';
 import {
   TicketEditor, serializeBlocks, type DescriptionBlock,
 } from '../components/helpers/TicketEditor';
 
-/* ═══ Constants ═══ */
+// ─── Константы ────
 
 const PRIORITIES = [
-  { value: 'low', label: 'Низкий', icon: <SignalLow className="w-4 h-4" />, c: 'emerald' },
-  { value: 'medium', label: 'Средний', icon: <SignalMedium className="w-4 h-4" />, c: 'yellow' },
-  { value: 'high', label: 'Высокий', icon: <SignalHigh className="w-4 h-4" />, c: 'orange' },
-  { value: 'critical', label: 'Критический', icon: <Flame className="w-4 h-4" />, c: 'red' },
-] as const;
-
-const TYPES: TicketType[] = [
-  'Инцидент', 'Запрос на услугу', 'Консультация', 'Жалоба',
-  'Задача', 'Проблема', 'Запрос на изменение', 'Улучшение', 'Прочее',
+  { value: 'low', label: 'Низкий', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40', activeColor: 'bg-emerald-500/30 text-[var(--text-primary)] border-emerald-400 ring-2 ring-emerald-500/50', icon: <SignalLow className="w-10 h-10" />, desc: 'Плановый порядок' },
+  { value: 'medium', label: 'Средний', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40', activeColor: 'bg-yellow-500/30 text-[var(--text-primary)] border-yellow-400 ring-2 ring-yellow-500/50', icon: <SignalMedium className="w-10 h-10" />, desc: 'Стандартный' },
+  { value: 'high', label: 'Высокий', color: 'bg-orange-500/20 text-orange-400 border-orange-500/40', activeColor: 'bg-orange-500/30 text-[var(--text-primary)] border-orange-400 ring-2 ring-orange-500/50', icon: <SignalHigh className="w-10 h-10" />, desc: 'Требует внимания' },
+  { value: 'critical', label: 'Критический', color: 'bg-red-500/20 text-red-400 border-red-500/40', activeColor: 'bg-red-500/30 text-[var(--text-primary)] border-red-400 ring-2 ring-red-500/50', icon: <Flame className="w-10 h-10" />, desc: 'Немедленно!' },
 ];
 
-const PRESET_TAGS: TicketTag[] = [
+const TICKET_TYPES = [
+  { value: 'Инцидент', label: 'Инцидент', icon: <AlertTriangle className="w-5 h-5" />, color: 'bg-red-500/20 text-red-400 border-red-500/40', activeColor: 'bg-red-500/30 text-[var(--text-primary)] border-red-400 ring-2 ring-red-500/50', desc: 'Сбой, ошибка' },
+  { value: 'Запрос на услугу', label: 'Запрос на услугу', icon: <CheckCircle className="w-5 h-5" />, color: 'bg-blue-500/20 text-blue-400 border-blue-500/40', activeColor: 'bg-blue-500/30 text-[var(--text-primary)] border-blue-400 ring-2 ring-blue-500/50', desc: 'Стандартная услуга' },
+  { value: 'Консультация', label: 'Консультация', icon: <HelpCircle className="w-5 h-5" />, color: 'bg-gray-500/20 text-gray-400 border-gray-500/40', activeColor: 'bg-gray-500/30 text-[var(--text-primary)] border-gray-400 ring-2 ring-gray-500/50', desc: 'Вопрос, консультация' },
+  { value: 'Жалоба', label: 'Жалоба', icon: <AlertTriangle className="w-5 h-5" />, color: 'bg-orange-500/20 text-orange-400 border-orange-500/40', activeColor: 'bg-orange-500/30 text-[var(--text-primary)]border-orange-400 ring-2 ring-orange-500/50', desc: 'Жалоба клиента' },
+  { value: 'Задача', label: 'Задача', icon: <CheckCircle className="w-5 h-5" />, color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40', activeColor: 'bg-emerald-500/30 text-[var(--text-primary)] border-emerald-400 ring-2 ring-emerald-500/50', desc: 'Планируемая работа' },
+  { value: 'Проблема', label: 'Проблема', icon: <AlertTriangle className="w-5 h-5" />, color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40', activeColor: 'bg-yellow-500/30 text-[var(--text-primary)] border-yellow-400 ring-2 ring-yellow-500/50', desc: 'Корневая причина' },
+  { value: 'Запрос на изменение', label: 'Запрос на изменение', icon: <Edit3 className="w-5 h-5" />, color: 'bg-blue-500/20 text-blue-400 border-blue-500/40', activeColor: 'bg-blue-500/30 text-[var(--text-primary)]border-blue-400 ring-2 ring-blue-500/50', desc: 'Изменение системы' },
+  { value: 'Улучшение', label: 'Улучшение', icon: <Sparkles className="w-5 h-5" />, color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40', activeColor: 'bg-emerald-500/30 text-[var(--text-primary)] border-emerald-400 ring-2 ring-emerald-500/50', desc: 'Предложение по улучшению' },
+  { value: 'Прочее', label: 'Прочее', icon: <MessageSquare className="w-5 h-5" />, color: 'bg-gray-500/20 text-gray-400 border-gray-500/40', activeColor: 'bg-gray-500/30 text-[var(--text-primary)] border-gray-400 ring-2 ring-gray-500/50', desc: 'Другое' },
+];
+
+const PRESET_TAGS = [
   { name: 'Инцидент', color: '#dc2626' }, { name: 'Консультация', color: '#2563eb' },
   { name: 'Доработка', color: '#059669' }, { name: 'Ошибка', color: '#ea580c' },
   { name: 'Интеграция', color: '#2563eb' }, { name: 'Обучение', color: '#059669' },
   { name: 'Срочное', color: '#dc2626' },
 ];
 
-const CAN_SELECT_COUNTERPARTY_ROLES = ['admin', 'support_agent', 'support_manager', 'executor'];
-
-/* ═══ Types ═══ */
-
 interface GeneralFile {
   id: string; file: File; preview?: string;
   status: 'pending' | 'uploading' | 'success' | 'error';
+  error?: string;
 }
 
 interface SimpleUser {
   id: string; username: string; full_name: string | null; email: string; role?: string;
 }
 
+const CAN_SELECT_COUNTERPARTY_ROLES = ['admin', 'support_agent', 'support_manager', 'executor'];
 type SelectionType = 'project' | 'counterparty' | null;
 
-interface DraftData {
-  title: string;
-  descriptionText: string;
-  priority: string;
-  type: string;
-  tags: TicketTag[];
-  selectionType: SelectionType;
-  savedAt: number;
-}
-
-/* ═══ Helpers ═══ */
-
-function priClasses(color: string, active: boolean) {
-  const m: Record<string, [string, string]> = {
-    emerald: [
-      'border-[var(--border-color)] text-emerald-400/50 hover:border-emerald-500/40 hover:text-emerald-400 hover:bg-emerald-500/5',
-      'border-emerald-400 bg-emerald-500/15 text-emerald-300 shadow-sm shadow-emerald-500/10'
-    ],
-    yellow: [
-      'border-[var(--border-color)] text-yellow-400/50 hover:border-yellow-500/40 hover:text-yellow-400 hover:bg-yellow-500/5',
-      'border-yellow-400 bg-yellow-500/15 text-yellow-300 shadow-sm shadow-yellow-500/10'
-    ],
-    orange: [
-      'border-[var(--border-color)] text-orange-400/50 hover:border-orange-500/40 hover:text-orange-400 hover:bg-orange-500/5',
-      'border-orange-400 bg-orange-500/15 text-orange-300 shadow-sm shadow-orange-500/10'
-    ],
-    red: [
-      'border-[var(--border-color)] text-red-400/50 hover:border-red-500/40 hover:text-red-400 hover:bg-red-500/5',
-      'border-red-400 bg-red-500/15 text-red-300 shadow-sm shadow-red-500/10'
-    ],
-  };
-  const [idle, act] = m[color] || m.yellow;
-  return active ? act : idle;
-}
-
-function SearchDropdown({ children, show }: { children: React.ReactNode; show: boolean }) {
-  if (!show) return null;
-  return (
-    <div className="absolute z-50 mt-1.5 w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl shadow-black/50 max-h-56 overflow-y-auto overscroll-contain">
-      {children}
-    </div>
-  );
-}
-
-function DropdownItem({ active, onClick, children }: { active?: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button type="button" onClick={onClick}
-      className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${active ? 'bg-red-500/10 text-[var(--text-primary)]' : 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)] hover:text-[var(--text-primary)]'}`}>
-      {children}
-    </button>
-  );
-}
-
-function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
-  return (
-    <label className="block text-[13px] font-medium text-[var(--text-primary)]/60 mb-2">
-      {children} {required && <span className="text-red-400">*</span>}
-    </label>
-  );
-}
-
-function formatFileSize(b: number) {
-  return b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(1)} MB`;
-}
-
-function formatTime(ts: number) {
-  return new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-}
-
-/* ═══ Page ═══ */
+// ─── Компонент ────
 
 export default function NewTicketPage() {
   const navigate = useNavigate();
@@ -131,25 +67,22 @@ export default function NewTicketPage() {
   const preselectedCounterpartyId = searchParams.get('counterparty_id');
   const preselectedProjectId = searchParams.get('project_id');
   const { user } = useAuthStore();
+  const pageRef = useRef<HTMLDivElement>(null);
 
-  const currentUserId = (user as any)?.id ?? (user as any)?.user_id ?? '';
-  const draftKey = currentUserId ? `ticket-draft-a:${currentUserId}` : 'ticket-draft-a';
-
-  // Form
+  const [step, setStep] = useState(1);
   const [title, setTitle] = useState('');
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
   const [descriptionBlocks, setDescriptionBlocks] = useState<DescriptionBlock[]>([
     { id: 'init', type: 'text', value: '' },
   ]);
   const description = serializeBlocks(descriptionBlocks);
 
-  const [priority, setPriority] = useState<TicketPriority>('medium' as TicketPriority);
+  const [priority, setPriority] = useState<TicketPriority>('Средний');
   const [type, setType] = useState<TicketType>('Инцидент');
   const [tags, setTags] = useState<TicketTag[]>([]);
   const [generalFiles, setGeneralFiles] = useState<GeneralFile[]>([]);
-  const [newTagInput, setNewTagInput] = useState('');
-  const [showTagInput, setShowTagInput] = useState(false);
 
-  // Binding
   const [customerCounterparty, setCustomerCounterparty] = useState<Counterparty | null>(null);
   const [selectionType, setSelectionType] = useState<SelectionType>(null);
   const [selectedCounterparty, setSelectedCounterparty] = useState<Counterparty | null>(null);
@@ -168,114 +101,49 @@ export default function NewTicketPage() {
   const [showReporterDropdown, setShowReporterDropdown] = useState(false);
   const [reporterSearch, setReporterSearch] = useState('');
 
-  // UI
   const [aiLoading, setAiLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [showDraftBanner, setShowDraftBanner] = useState(false);
-  const [draftData, setDraftData] = useState<DraftData | null>(null);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
-  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<any>(null);
+  const [aiSuggestedTags, setAiSuggestedTags] = useState<TicketTag[]>([]);
 
-  const initRef = useRef(false);
-  const presetRef = useRef(false);
+  /* ── Ключевое исправление: храним данные в ref, не в зависимостях ── */
+  const aiDoneRef = useRef(false);          // выполнен ли AI для текущего step=2
+  const aiAbortRef = useRef<AbortController | null>(null); // отмена текущего запроса
+  const titleRef = useRef('');
+  const descriptionRef = useRef('');
+
+  // Синхронизируем ref с актуальными данными
+  titleRef.current = title;
+  descriptionRef.current = description;
+
+  const [newTagInput, setNewTagInput] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [showCustomTagInput, setShowCustomTagInput] = useState(false);
+
+  const isCustomer = user?.roles?.some(r => r === 'customer' || r === 'customer_admin') ?? false;
+const canSelectCounterparty = (!isCustomer && user?.roles?.some(r => CAN_SELECT_COUNTERPARTY_ROLES.includes(r))) ?? false;
+  const canSelectReporter = !isCustomer;
+
   const counterpartyDropdownRef = useRef<HTMLDivElement>(null);
   const projectDropdownRef = useRef<HTMLDivElement>(null);
   const reporterDropdownRef = useRef<HTMLDivElement>(null);
-  const typeDropdownRef = useRef<HTMLDivElement>(null);
-
-  const isCustomer = user?.roles?.some(r => r === 'customer' || r === 'customer_admin') ?? false;
-  const canSelectCounterparty = (!isCustomer && user?.roles?.some(r => CAN_SELECT_COUNTERPARTY_ROLES.includes(r))) ?? false;
-  const canSelectReporter = !isCustomer;
 
   const hasDescription = descriptionBlocks.some(
     b => (b.type === 'text' && b.value.trim().length > 0) || (b.type === 'image' && b.localFile)
   );
 
-  const cpName = (c: Counterparty) => c.name || c.legal_name || c.inn || '—';
-  const prjName = (p: Project) => `${p.key} - ${p.name}`;
-  const uName = (u: SimpleUser) => u.full_name || u.username || u.email;
-  const clearError = (f: string) => setErrors(p => { const n = { ...p }; delete n[f]; return n; });
-
-  /* ─── Draft ─── */
-
-  useEffect(() => {
-    if (initRef.current) return;
-    initRef.current = true;
-    const raw = localStorage.getItem(draftKey);
-    if (!raw) return;
-    try {
-      const d: DraftData = JSON.parse(raw);
-      if (d.title || d.descriptionText || d.tags?.length) {
-        setDraftData(d);
-        setShowDraftBanner(true);
-      }
-    } catch { }
-  }, [draftKey]);
-
-  const restoreDraft = useCallback(() => {
-    if (!draftData) return;
-    setTitle(draftData.title || '');
-    if (draftData.descriptionText) {
-      setDescriptionBlocks([{ id: 'restored', type: 'text', value: draftData.descriptionText }]);
-    }
-    setPriority((draftData.priority || 'medium') as TicketPriority);
-    setType((draftData.type || 'Инцидент') as TicketType);
-    setTags(draftData.tags || []);
-    setSelectionType(draftData.selectionType || null);
-    setSavedAt(draftData.savedAt);
-    setShowDraftBanner(false);
-    presetRef.current = true;
-  }, [draftData]);
-
-  const dismissDraft = useCallback(() => {
-    setShowDraftBanner(false);
-    localStorage.removeItem(draftKey);
-  }, [draftKey]);
-
-  // Auto-save
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const descText = descriptionBlocks
-        .filter((b): b is Extract<DescriptionBlock, { type: 'text' }> => b.type === 'text')
-        .map(b => b.value).join('\n\n').trim();
-      const hasContent = title.trim() || descText || tags.length;
-      if (!hasContent) return;
-      const draft: DraftData = {
-        title,
-        descriptionText: descText,
-        priority, type, tags, selectionType,
-        savedAt: Date.now(),
-      };
-      localStorage.setItem(draftKey, JSON.stringify(draft));
-      setSavedAt(Date.now());
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [draftKey, title, descriptionBlocks, priority, type, tags, selectionType]);
-
-  useEffect(() => {
-    const h = (e: BeforeUnloadEvent) => {
-      if (title.trim() || hasDescription) { e.preventDefault(); e.returnValue = ''; }
-    };
-    window.addEventListener('beforeunload', h);
-    return () => window.removeEventListener('beforeunload', h);
-  }, [title, hasDescription]);
-
-  /* ─── Close dropdowns ─── */
+  // ─── Effects ───
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
       if (counterpartyDropdownRef.current && !counterpartyDropdownRef.current.contains(e.target as Node)) setShowCounterpartyDropdown(false);
       if (projectDropdownRef.current && !projectDropdownRef.current.contains(e.target as Node)) setShowProjectDropdown(false);
       if (reporterDropdownRef.current && !reporterDropdownRef.current.contains(e.target as Node)) setShowReporterDropdown(false);
-      if (typeDropdownRef.current && !typeDropdownRef.current.contains(e.target as Node)) setShowTypeDropdown(false);
     };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  /* ─── API Loaders ─── */
-
+  useEffect(() => { pageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, [step]);
   useEffect(() => { if (isCustomer && user?.counterparty_id) loadCustomerCounterparty(); }, [user]);
   useEffect(() => { if (canSelectCounterparty) loadCounterparties(); }, [canSelectCounterparty]);
 
@@ -310,11 +178,76 @@ export default function NewTicketPage() {
             } catch { }
           }
         }
-      } catch (err) { console.error('Failed to auto-select project:', err); }
-      finally { setLoadingProjects(false); }
+      } catch (err) {
+        console.error('Failed to auto-select project:', err);
+      } finally {
+        setLoadingProjects(false);
+      }
     };
     autoSelectProject();
   }, [preselectedProjectId, canSelectCounterparty]);
+
+  /* ══════════════════════════════════════════════════════════════════════
+     AI — исправленная логика без бесконечного цикла
+     ══════════════════════════════════════════════════════════════════════ */
+
+  useEffect(() => {
+    // Запускаем только когда переходим на шаг 2 и AI ещё не выполнялся
+    if (step !== 2) {
+      // При возврате на шаг 1 — сбрасываем флаг, чтобы при следующем переходе AI запустился снова
+      if (step === 1) {
+        aiDoneRef.current = false;
+        // Отменяем текущий запрос, если он был
+        aiAbortRef.current?.abort();
+        aiAbortRef.current = null;
+      }
+      return;
+    }
+
+    // Уже выполняли для этого захода на шаг 2
+    if (aiDoneRef.current) return;
+
+    const currentTitle = titleRef.current.trim();
+    const currentDesc = descriptionRef.current.trim();
+
+    // Нечего анализировать
+    if (!currentTitle || !currentDesc) {
+      return;
+    }
+
+    // Отменяем предыдущий запрос если был
+    aiAbortRef.current?.abort();
+    const controller = new AbortController();
+    aiAbortRef.current = controller;
+
+    aiDoneRef.current = true; // сразу ставим флаг — больше не запускаем
+    setAiLoading(true);
+    setAiSuggestion(null);
+
+    ticketsApi.predict(currentTitle, currentDesc)
+      .then(r => {
+        if (controller.signal.aborted) return;
+        setAiSuggestion(r);
+        setAiSuggestedTags(r.suggested_tags || []);
+        setPriority(r.suggested_priority);
+        setTags(r.suggested_tags || []);
+      })
+      .catch(err => {
+        if (controller.signal.aborted) return;
+        console.error('AI prediction failed:', err);
+      })
+      .finally(() => {
+        if (controller.signal.aborted) return;
+        setAiLoading(false);
+      });
+
+    // Cleanup при размонтировании или смене step
+    return () => {
+      controller.abort();
+    };
+  }, [step]); // ← ТОЛЬКО step в зависимостях — это ключевое исправление
+
+  // ─── Loaders ───
 
   const loadCustomerCounterparty = async () => {
     if (!user?.counterparty_id) return;
@@ -327,24 +260,40 @@ export default function NewTicketPage() {
       let items = (await counterpartiesApi.getAll(1, 50)).items;
       if (search) {
         const q = search.toLowerCase();
-        items = items.filter(c => c.name?.toLowerCase().includes(q) || c.legal_name?.toLowerCase().includes(q) || c.inn?.includes(search));
+        items = items.filter(c =>
+          c.name?.toLowerCase().includes(q) ||
+          c.legal_name?.toLowerCase().includes(q) ||
+          c.inn?.includes(search)
+        );
       }
       setCounterparties(items);
       if (!search && preselectedCounterpartyId && !selectedCounterparty) {
         const found = items.find(c => c.id === preselectedCounterpartyId);
-        if (found) { setSelectionType('counterparty'); setSelectedCounterparty(found); setCounterpartySearch(found.name || found.legal_name || ''); }
+        if (found) {
+          setSelectionType('counterparty');
+          setSelectedCounterparty(found);
+          setCounterpartySearch(found.name || found.legal_name || '');
+        }
       }
-    } catch { } finally { setLoadingCounterparties(false); }
+    } catch { }
+    finally { setLoadingCounterparties(false); }
   };
 
   const loadProjects = async (cpId: string) => {
     setLoadingProjects(true);
-    try { setProjects((await projectsApi.getByCounterparty(cpId, 1, 50)).items); } catch { } finally { setLoadingProjects(false); }
+    try { setProjects((await projectsApi.getByCounterparty(cpId, 1, 50)).items); }
+    catch { }
+    finally { setLoadingProjects(false); }
   };
 
-  const loadProjectsForAll = async () => {
+  const loadProjectsForAll = async (): Promise<Project[]> => {
     setLoadingProjects(true);
-    try { setProjects((await projectsApi.getAll(1, 100)).items); } catch { } finally { setLoadingProjects(false); }
+    try {
+      const items = (await projectsApi.getAll(1, 100)).items;
+      setProjects(items);
+      return items;
+    } catch { return []; }
+    finally { setLoadingProjects(false); }
   };
 
   const loadUsers = async (cpId: string) => {
@@ -358,10 +307,11 @@ export default function NewTicketPage() {
         all = [{ id: user.user_id, username: user.username || '', full_name: user.full_name || null, email: user.email || '', role: user.role }, ...items];
       }
       setUsers(all); setSelectedReporter(null); setReporterSearch('');
-    } catch { } finally { setLoadingUsers(false); }
+    } catch { }
+    finally { setLoadingUsers(false); }
   };
 
-  /* ─── Handlers ─── */
+  // ─── Handlers ──
 
   const handleSelectionTypeChange = (t: SelectionType) => {
     setSelectionType(t); setSelectedCounterparty(null); setSelectedProject(null);
@@ -377,7 +327,32 @@ export default function NewTicketPage() {
     if (!n || tags.some(t => t.name.toLowerCase() === n.toLowerCase())) return;
     setTags(p => [...p, { name: n, color: '#a1a1aa' }]);
     setNewTagInput('');
+    setShowCustomTagInput(false);
   };
+
+  const removeTag = (name: string) => setTags(p => p.filter(t => t.name !== name));
+
+  const validateStep1 = (): boolean => {
+    const errors: string[] = [];
+    if (!title.trim()) errors.push('Укажите тему заявки');
+    if (!hasDescription) errors.push('Добавьте описание заявки');
+    setValidationErrors(errors);
+    return errors.length === 0;
+  };
+
+  const handleNextStep = () => {
+    if (step === 1) {
+      if (!validateStep1()) return;
+    }
+    setValidationErrors([]);
+    setStep(step + 1);
+  };
+
+  useEffect(() => {
+    if (validationErrors.length > 0 && title.trim() && hasDescription) {
+      setValidationErrors([]);
+    }
+  }, [title, descriptionBlocks]);
 
   const handleGeneralFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -405,405 +380,735 @@ export default function NewTicketPage() {
     setGeneralFiles(p => p.filter(x => x.id !== id));
   };
 
-  const handleAiSuggest = async () => {
-    const t = title.trim(), d = description.trim();
-    if (!t || !d) {
-      if (!t) setErrors(p => ({ ...p, title: 'Укажите тему для ИИ' }));
-      if (!d) setErrors(p => ({ ...p, description: 'Опишите проблему для ИИ' }));
-      return;
-    }
-    setAiLoading(true);
-    try {
-      const r = await ticketsApi.predict(t, d);
-      if (r?.suggested_priority) setPriority(r.suggested_priority);
-      if (r?.suggested_tags?.length) {
-        setTags(prev => {
-          const map = new Map<string, TicketTag>();
-          [...prev, ...r.suggested_tags].forEach(tag => map.set(tag.name.toLowerCase(), tag));
-          return Array.from(map.values());
-        });
-      }
-    } catch { } finally { setAiLoading(false); }
-  };
+  const formatFileSize = (b: number) =>
+    b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(1)} MB`;
 
-  const validate = () => {
-    const e: Record<string, string> = {};
-    if (!title.trim()) e.title = 'Укажите тему заявки';
-    if (!hasDescription) e.description = 'Добавьте описание';
-    setErrors(e);
-    return !Object.keys(e).length;
-  };
+  // ─── Submit ────
 
   const handleSubmit = async () => {
-    if (!validate()) return;
-    setSubmitting(true);
-    try {
-      const textOnlyDesc = descriptionBlocks
-        .filter((b): b is Extract<DescriptionBlock, { type: 'text' }> => b.type === 'text')
-        .map(b => b.value.trim()).filter(Boolean).join('\n\n');
+  setSubmitting(true);
+  try {
+    const textOnlyDesc = descriptionBlocks
+      .filter((b): b is Extract<DescriptionBlock, { type: 'text' }> => b.type === 'text')
+      .map(b => b.value.trim())
+      .filter(Boolean)
+      .join('\n\n');
 
-      const data: any = {
-        title, description: textOnlyDesc || '(описание с изображениями)',
-        priority, type,
-        tags: tags.map(t => ({ name: t.name, color: t.color || '#64748b' })),
-        reporter_id: user?.id,
-      };
+    const data: any = {
+      title,
+      description: textOnlyDesc || '(описание с изображениями)',
+      priority,
+      type,
+      tags: tags.map(t => ({ name: t.name, color: t.color || '#64748b' })),
+      reporter_id: user?.id, // ← FIX: user.id вместо user.user_id
+    };
 
-      if (isCustomer && customerCounterparty) data.counterparty_id = customerCounterparty.id;
-      else if (selectedProject) data.project_id = selectedProject.id;
-      else if (selectedCounterparty) data.counterparty_id = selectedCounterparty.id;
-      if (canSelectReporter && selectedReporter) data.reporter_id = selectedReporter.id;
+    if (isCustomer && customerCounterparty) {
+      data.counterparty_id = customerCounterparty.id;
+    } else if (selectedProject) {
+      data.project_id = selectedProject.id;
+    } else if (selectedCounterparty) {
+      data.counterparty_id = selectedCounterparty.id;
+    }
 
-      const ticket = await ticketsApi.create(data);
+    if (canSelectReporter && selectedReporter) {
+      data.reporter_id = selectedReporter.id;
+    }
 
-      const imageBlocks = descriptionBlocks.filter(
-        (b): b is Extract<DescriptionBlock, { type: 'image' }> => b.type === 'image' && !!b.localFile
-      );
-      const uploadMap: Record<string, string> = {};
-      for (const block of imageBlocks) {
-        try { const att = await attachmentsApi.uploadAttachment(block.localFile!, 'ticket', ticket.id); uploadMap[block.id] = att.id; }
-        catch (err) { console.error('Image upload failed:', block.id, err); }
+      
+
+    const ticket = await ticketsApi.create(data);
+
+    // Загрузка вложений...
+    const imageBlocks = descriptionBlocks.filter(
+      (b): b is Extract<DescriptionBlock, { type: 'image' }> => b.type === 'image' && !!b.localFile
+    );
+
+    const uploadMap: Record<string, string> = {};
+    for (const block of imageBlocks) {
+      try {
+        const att = await attachmentsApi.uploadAttachment(block.localFile!, 'ticket', ticket.id);
+        uploadMap[block.id] = att.id;
+      } catch (err) {
+        console.error('Image upload failed:', block.id, err);
       }
-      if (imageBlocks.length > 0) {
-        let finalDesc = serializeBlocks(descriptionBlocks);
-        for (const [blockId, attachmentId] of Object.entries(uploadMap))
-          finalDesc = finalDesc.replaceAll(`![image](local:${blockId})`, `![image](media://${attachmentId})`);
-        finalDesc = finalDesc.replace(/!\[image\]\(local:[a-f0-9-]+\)\n*/gi, '');
-        await ticketsApi.update(ticket.id, { description: finalDesc });
+    }
+
+    if (imageBlocks.length > 0) {
+      let finalDesc = serializeBlocks(descriptionBlocks);
+      for (const [blockId, attachmentId] of Object.entries(uploadMap)) {
+        finalDesc = finalDesc.replaceAll(`![image](local:${blockId})`, `![image](media://${attachmentId})`);
       }
+      finalDesc = finalDesc.replace(/!\[image\]\(local:[a-f0-9-]+\)\n*/gi, '');
+      await ticketsApi.update(ticket.id, { description: finalDesc });
+    }
 
-      for (const f of generalFiles.filter(x => x.status === 'pending')) {
-        try { await attachmentsApi.uploadAttachment(f.file, 'ticket', ticket.id); }
-        catch (err) { console.error('File upload failed:', f.file.name, err); }
+    for (const f of generalFiles.filter(x => x.status === 'pending')) {
+      try {
+        await attachmentsApi.uploadAttachment(f.file, 'ticket', ticket.id);
+      } catch (err) {
+        console.error('File upload failed:', f.file.name, err);
       }
+    }
 
-      localStorage.removeItem(draftKey);
-      navigate('/tickets');
-    } catch (err: any) { console.error('Submit failed:', err?.response?.data || err); }
-    finally { setSubmitting(false); }
-  };
+    navigate('/tickets');
+  } catch (err: any) {
+    console.error('Submit failed:', err?.response?.data || err);
+  } finally {
+    setSubmitting(false);
+  }
+};
 
-  /* ─── Render ─── */
+  const cpName = (c: Counterparty) => c.name || c.legal_name || c.inn || '—';
+  const prjName = (p: Project) => `${p.key} - ${p.name}`;
+  const uName = (u: SimpleUser) => u.full_name || u.username || u.email;
+
+  // ─── Render ────
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-[var(--bg-primary)]">
-
-      {/* ═══ Top bar ═══ */}
-      <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] bg-[var(--bg-primary)]">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/tickets')}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--hover-1)] hover:bg-[var(--hover-2)] text-[13px] text-[var(--text-primary)]/60 hover:text-[var(--text-primary)] transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Назад
-          </button>
-          <h1 className="text-base font-semibold text-[var(--text-primary)]">Новая заявка</h1>
-          {savedAt && <span className="text-[11px] text-[var(--text-primary)]/25 ml-2">Сохранено · {formatTime(savedAt)}</span>}
-        </div>
-        <button onClick={handleSubmit} disabled={submitting}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-[13px] font-medium disabled:opacity-50 transition-colors shadow-lg shadow-red-900/20">
-          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          {submitting ? 'Создание...' : 'Создать'}
+    <div ref={pageRef} className="max-w-7xl mx-auto pb-12">
+      {/* Header */}
+      <div className="flex items-center gap-6 mb-8">
+        <button onClick={() => navigate(-1)}
+          className="p-3 rounded-xl bg-[var(--hover-1)] hover:bg-[var(--hover-2)] transition-colors">
+          <ArrowLeft className="w-6 h-6 text-[var(--text-primary)]" />
         </button>
+        <div>
+          <h1 className="text-4xl font-bold text-[var(--text-primary)]">Новая заявка</h1>
+          <p className="text-[var(--text-primary)]/60">Помощник проведёт вас шаг за шагом</p>
+        </div>
       </div>
 
-      {/* ═══ Draft banner ═══ */}
-      {showDraftBanner && draftData && (
-        <div className="flex-shrink-0 px-5 py-2 bg-amber-500/10 border-b border-amber-500/20 flex items-center gap-4">
-          <span className="text-[13px] text-amber-300 font-medium">Найден черновик</span>
-          <span className="text-[12px] text-[var(--text-primary)]/40">«{draftData.title || '...'}» · {formatTime(draftData.savedAt)}</span>
-          <div className="ml-auto flex gap-2">
-            <button onClick={restoreDraft} className="px-3 py-1 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[12px] font-medium">Восстановить</button>
-            <button onClick={dismissDraft} className="px-3 py-1 rounded-md hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40 text-[12px]">Удалить</button>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ Errors ═══ */}
-      {Object.keys(errors).length > 0 && (
-        <div className="flex-shrink-0 px-5 py-2 bg-red-500/8 border-b border-red-500/20 flex flex-wrap gap-x-4 gap-y-1">
-          {Object.values(errors).map((e, i) => (
-            <span key={i} className="text-[12px] text-red-400 flex items-center gap-1.5">
-              <AlertCircle className="w-3 h-3" /> {e}
-            </span>
+      {/* Progress */}
+      <div className="glass-card p-6 mb-10">
+        <div className="flex justify-center">
+          {[
+            { num: 1, label: 'Название и описание', icon: <FileText className="w-5 h-5" /> },
+            { num: 2, label: 'Тип, приоритет и теги', icon: <Tag className="w-5 h-5" /> },
+            { num: 3, label: 'Проверка и отправка', icon: <CheckCircle2 className="w-5 h-5" /> },
+          ].map((s, i) => (
+            <div key={s.num} className="flex items-center">
+              <div className={`flex items-center gap-4 ${step >= s.num ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/40'}`}>
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all
+                  ${step === s.num
+                    ? 'bg-red-700 border-red-500 scale-110'
+                    : step > s.num
+                      ? 'bg-emerald-600 border-emerald-500'
+                      : 'bg-[var(--hover-1)] border-[var(--border-color)]'
+                  }`}>
+                  {step > s.num ? <CheckCircle2 className="w-6 h-6" /> : s.icon}
+                </div>
+                <div>
+                  <div className="font-semibold text-lg">Шаг {s.num}</div>
+                  <div className="text-sm">{s.label}</div>
+                </div>
+              </div>
+              {i < 2 && (
+                <div className={`w-24 h-1 mx-6 rounded-full ${step > s.num ? 'bg-red-600' : 'bg-[var(--hover-1)]'}`} />
+              )}
+            </div>
           ))}
         </div>
-      )}
+      </div>
 
-      {/* ═══ Two-column layout ═══ */}
-      <div className="flex-1 overflow-hidden flex">
+      <div className="glass-card p-8 md:p-12">
 
-        {/* ─── Left: Main form (60%) ─── */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
-
-          {/* Binding */}
-          {canSelectCounterparty && (
-            <div className="glass-card p-4">
-              <Label>Привязка</Label>
-              <div className="flex gap-2 mb-3">
-                {([
-                  { v: null as SelectionType, l: 'Нет', icon: <X className="w-3.5 h-3.5" /> },
-                  { v: 'counterparty' as SelectionType, l: 'Компания', icon: <Building2 className="w-3.5 h-3.5" /> },
-                  { v: 'project' as SelectionType, l: 'Проект', icon: <FolderOpen className="w-3.5 h-3.5" /> },
-                ]).map(b => (
-                  <button key={String(b.v)} type="button" onClick={() => handleSelectionTypeChange(b.v)}
-                    className={`flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg border text-[13px] font-medium transition-all
-                      ${selectionType === b.v
-                        ? 'border-red-500/40 bg-red-500/10 text-[var(--text-primary)]'
-                        : 'border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-1)] hover:text-[var(--text-primary)]/70'}`}>
-                    {b.icon} {b.l}
-                  </button>
+        {/* ═══ Step 1 ═══ */}
+        {step === 1 && (
+          <div className="space-y-10">
+            {validationErrors.length > 0 && (
+              <div className="p-5 rounded-2xl bg-red-500/10 border border-red-500/30 space-y-2">
+                {validationErrors.map((err, i) => (
+                  <div key={i} className="flex items-center gap-3 text-red-400">
+                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                    <span className="text-base font-medium">{err}</span>
+                  </div>
                 ))}
               </div>
+            )}
 
-              {selectionType === 'counterparty' && (
+            {/* Привязка */}
+            {canSelectCounterparty && (
+              <>
+                <div>
+                  <label className="block text-2xl font-semibold text-[var(--text-primary)] mb-4">Привязать заявку к</label>
+                  <div className="flex gap-4">
+                    <button type="button" onClick={() => handleSelectionTypeChange('project')}
+                      className={`flex-1 flex items-center justify-center gap-3 px-6 py-4 rounded-xl border-2 transition-all
+                        ${selectionType === 'project'
+                          ? 'border-amber-500 bg-amber-500/20 text-[var(--text-primary)]'
+                          : 'border-[var(--border-color)] bg-[var(--hover-1)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'
+                        }`}>
+                      <FolderOpen className="w-6 h-6" />
+                      <span className="text-lg font-medium">Проекту</span>
+                    </button>
+                    <button type="button" onClick={() => handleSelectionTypeChange('counterparty')}
+                      className={`flex-1 flex items-center justify-center gap-3 px-6 py-4 rounded-xl border-2 transition-all
+                        ${selectionType === 'counterparty'
+                          ? 'border-blue-500 bg-blue-500/20 text-[var(--text-primary)]'
+                          : 'border-[var(--border-color)] bg-[var(--hover-1)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'
+                        }`}>
+                      <Building2 className="w-6 h-6" />
+                      <span className="text-lg font-medium">Контрагенту</span>
+                    </button>
+                  </div>
+                </div>
+                <button type="button" onClick={() => handleSelectionTypeChange(null)}
+                  className={`w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl border-2 transition-all
+                    ${selectionType === null
+                      ? 'border-white bg-[var(--hover-1)] text-[var(--text-primary)]'
+                      : 'border-[var(--border-color)] bg-[var(--hover-1)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'
+                    }`}>
+                  <X className="w-5 h-5" />
+                  <span className="text-lg font-medium">Без привязки</span>
+                </button>
+              </>
+            )}
+
+            {/* Контрагент */}
+            {canSelectCounterparty && selectionType === 'counterparty' && (
+              <div>
+                <label className="block text-2xl font-semibold text-[var(--text-primary)] mb-4">
+                  Контрагент <span className="text-red-400">*</span>
+                </label>
                 <div className="relative" ref={counterpartyDropdownRef}>
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-primary)]/40" />
                     <input value={counterpartySearch}
                       onChange={e => { setCounterpartySearch(e.target.value); setShowCounterpartyDropdown(true); loadCounterparties(e.target.value); }}
                       onFocus={() => { setShowCounterpartyDropdown(true); if (!counterparties.length) loadCounterparties(); }}
-                      placeholder="Поиск компании..." className="input-field w-full py-2 pl-9 text-[13px]" />
+                      placeholder="Поиск..."
+                      style={{ paddingLeft: '3.5rem' }}
+                      className="input-field py-5 text-lg w-full" />
                   </div>
-                  <SearchDropdown show={showCounterpartyDropdown}>
-                    {loadingCounterparties
-                      ? <div className="py-6 text-center"><Loader2 className="w-4 h-4 animate-spin mx-auto text-[var(--text-primary)]/25" /></div>
-                      : counterparties.length === 0
-                        ? <div className="py-4 text-center text-[13px] text-[var(--text-primary)]/35">Не найдено</div>
+                  {showCounterpartyDropdown && (
+                    <div className="absolute z-50 mt-2 w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl max-h-80 overflow-y-auto">
+                      {loadingCounterparties
+                        ? <div className="p-6 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[var(--text-primary)]/40" /></div>
                         : counterparties.map(cp => (
-                          <DropdownItem key={cp.id} active={selectedCounterparty?.id === cp.id}
-                            onClick={() => { setSelectedCounterparty(cp); setCounterpartySearch(cpName(cp)); setShowCounterpartyDropdown(false); }}>
-                            <div className="font-medium text-[13px]">{cpName(cp)}</div>
-                            {cp.inn && <div className="text-[11px] text-[var(--text-primary)]/35 mt-0.5">ИНН {cp.inn}</div>}
-                          </DropdownItem>
+                          <button key={cp.id}
+                            onClick={() => { setSelectedCounterparty(cp); setCounterpartySearch(cpName(cp)); setShowCounterpartyDropdown(false); }}
+                            className="w-full text-left p-4 hover:bg-[var(--hover-1)] border-b border-[var(--border-color)] last:border-0">
+                            <div className="font-semibold text-[var(--text-primary)]">{cpName(cp)}</div>
+                            {cp.inn && <div className="text-xs text-[var(--text-primary)]/40 mt-1">ИНН: {cp.inn}</div>}
+                          </button>
                         ))}
-                  </SearchDropdown>
-                  {selectedCounterparty && (
-                    <div className="mt-2 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[12px] text-blue-400">
-                      <Check className="w-3 h-3" /> {cpName(selectedCounterparty)}
                     </div>
                   )}
                 </div>
-              )}
+                {selectedCounterparty && (
+                  <div className="mt-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-500">
+                    ✓ {cpName(selectedCounterparty)}
+                  </div>
+                )}
+              </div>
+            )}
 
-              {selectionType === 'project' && (
+            {/* Проект */}
+            {canSelectCounterparty && selectionType === 'project' && (
+              <div>
+                <label className="block text-2xl font-semibold text-[var(--text-primary)] mb-4">
+                  Проект <span className="text-red-400">*</span>
+                </label>
                 <div className="relative" ref={projectDropdownRef}>
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-primary)]/40" />
                     <input value={projectSearch}
                       onChange={e => { setProjectSearch(e.target.value); setShowProjectDropdown(true); }}
                       onFocus={() => { setShowProjectDropdown(true); if (!projects.length) loadProjectsForAll(); }}
-                      placeholder="Поиск проекта..." className="input-field w-full py-2 pl-9 text-[13px]" />
+                      placeholder="Поиск..."
+                      style={{ paddingLeft: '3.5rem' }}
+                      className="input-field py-5 text-lg w-full" />
                   </div>
-                  <SearchDropdown show={showProjectDropdown}>
-                    {loadingProjects
-                      ? <div className="py-6 text-center"><Loader2 className="w-4 h-4 animate-spin mx-auto text-[var(--text-primary)]/25" /></div>
-                      : projects.filter(p => !projectSearch || p.name.toLowerCase().includes(projectSearch.toLowerCase()) || p.key.toLowerCase().includes(projectSearch.toLowerCase())).length === 0
-                        ? <div className="py-4 text-center text-[13px] text-[var(--text-primary)]/35">Не найдено</div>
-                        : projects.filter(p => !projectSearch || p.name.toLowerCase().includes(projectSearch.toLowerCase()) || p.key.toLowerCase().includes(projectSearch.toLowerCase())).map(p => (
-                          <DropdownItem key={p.id} active={selectedProject?.id === p.id}
-                            onClick={() => { setSelectedProject(p); setProjectSearch(prjName(p)); setShowProjectDropdown(false); }}>
-                            <span className="text-amber-400 font-medium text-[13px]">{p.key}</span> <span className="text-[13px]">— {p.name}</span>
-                          </DropdownItem>
-                        ))}
-                  </SearchDropdown>
-                  {selectedProject && (
-                    <div className="mt-2 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[12px] text-amber-400">
-                      <Check className="w-3 h-3" /> {prjName(selectedProject)}
+                  {showProjectDropdown && (
+                    <div className="absolute z-50 mt-2 w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl max-h-80 overflow-y-auto">
+                      {loadingProjects
+                        ? <div className="p-6 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[var(--text-primary)]/40" /></div>
+                        : projects
+                          .filter(p => !projectSearch || p.name.toLowerCase().includes(projectSearch.toLowerCase()) || p.key.toLowerCase().includes(projectSearch.toLowerCase()))
+                          .map(p => (
+                            <button key={p.id}
+                              onClick={() => { setSelectedProject(p); setProjectSearch(prjName(p)); setShowProjectDropdown(false); }}
+                              className="w-full text-left p-4 hover:bg-[var(--hover-1)] border-b border-[var(--border-color)] last:border-0">
+                              <span className="text-amber-400">{p.key}</span> — {p.name}
+                            </button>
+                          ))}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          )}
-
-          {isCustomer && customerCounterparty && (
-            <div className="glass-card p-3 flex items-center gap-3">
-              <Building2 className="w-4 h-4 text-blue-400" />
-              <div>
-                <div className="text-[13px] font-medium text-[var(--text-primary)]">{customerCounterparty.name}</div>
-                {customerCounterparty.inn && <div className="text-[11px] text-[var(--text-primary)]/40">ИНН {customerCounterparty.inn}</div>}
+                {selectedProject && (
+                  <div className="mt-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500">
+                    ✓ {prjName(selectedProject)}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Reporter */}
-          {canSelectReporter && (selectedCounterparty || selectedProject) && (
-            <div className="glass-card p-4">
-              <Label>Инициатор</Label>
-              <div className="relative" ref={reporterDropdownRef}>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+            {/* Customer контрагент */}
+            {isCustomer && customerCounterparty && (
+              <div className="p-6 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center gap-4">
+                <Building2 className="w-8 h-8 text-blue-400" />
+                <div>
+                  <p className="text-base font-semibold text-[var(--text-primary)]">{customerCounterparty.name}</p>
+                  {customerCounterparty.inn && (
+                    <p className="text-[var(--text-primary)]/50 text-sm">ИНН: {customerCounterparty.inn}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Инициатор */}
+            {canSelectReporter && (selectedCounterparty || selectedProject) && (
+              <div>
+                <label className="block text-2xl font-semibold text-[var(--text-primary)] mb-4">
+                  Инициатор <span className="text-[var(--text-primary)]/40 text-sm">(по умолчанию — вы)</span>
+                </label>
+                <div className="relative" ref={reporterDropdownRef}>
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-primary)]/40" />
                   <input value={reporterSearch}
                     onChange={e => { setReporterSearch(e.target.value); setShowReporterDropdown(true); }}
                     onFocus={() => setShowReporterDropdown(true)}
-                    placeholder="Я (по умолчанию)" className="input-field w-full py-2 pl-9 text-[13px]" />
-                </div>
-                <SearchDropdown show={showReporterDropdown}>
-                  {loadingUsers
-                    ? <div className="py-6 text-center"><Loader2 className="w-4 h-4 animate-spin mx-auto text-[var(--text-primary)]/25" /></div>
-                    : <>
-                      <DropdownItem onClick={() => { setSelectedReporter(null); setReporterSearch(''); setShowReporterDropdown(false); }}>
-                        <span className="text-[13px]">{user?.full_name || 'Вы'}</span> <span className="text-[11px] text-[var(--text-primary)]/35">(я)</span>
-                      </DropdownItem>
-                      {users
-                        .filter(u => !reporterSearch || u.full_name?.toLowerCase().includes(reporterSearch.toLowerCase()) || u.email.toLowerCase().includes(reporterSearch.toLowerCase()))
-                        .map(u => (
-                          <DropdownItem key={u.id} active={selectedReporter?.id === u.id}
-                            onClick={() => { setSelectedReporter(u); setReporterSearch(uName(u)); setShowReporterDropdown(false); }}>
-                            <div className="font-medium text-[13px]">{uName(u)}</div>
-                            <div className="text-[11px] text-[var(--text-primary)]/35">{u.email}</div>
-                          </DropdownItem>
-                        ))}
-                    </>}
-                </SearchDropdown>
-              </div>
-              <div className="mt-2 text-[11px] text-[var(--text-primary)]/40">
-                {selectedReporter ? uName(selectedReporter) : (user?.full_name || 'Вы')}
-              </div>
-            </div>
-          )}
-
-          {/* Title */}
-          <div className="glass-card p-4">
-            <SpellCheckField value={title} onChange={v => { setTitle(v); clearError('title'); }} label="Тема *">
-              <input type="text" value={title} onChange={e => { setTitle(e.target.value); clearError('title'); }}
-                placeholder="Коротко: что случилось"
-                className={`input-field py-2.5 text-[15px] w-full ${errors.title ? 'border-red-500 ring-1 ring-red-500/30' : ''}`} />
-            </SpellCheckField>
-          </div>
-
-          {/* Description */}
-          <div className="glass-card p-4">
-            <Label required>Описание</Label>
-            <div className={errors.description ? 'ring-1 ring-red-500/30 rounded-xl' : ''}>
-              <TicketEditor blocks={descriptionBlocks} onChange={b => { setDescriptionBlocks(b); clearError('description'); }} />
-            </div>
-          </div>
-
-          {/* Files */}
-          <div className="glass-card p-4">
-            <Label>Вложения</Label>
-            <div onDrop={handleGeneralDrop} onDragOver={e => e.preventDefault()}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-dashed border-[var(--border-color)] hover:border-[var(--text-primary)]/20 transition-colors">
-              <Upload className="w-4 h-4 text-[var(--text-primary)]/20" />
-              <span className="flex-1 text-[12px] text-[var(--text-primary)]/40">Перетащите файлы или</span>
-              <label className="px-3 py-1.5 rounded-md bg-[var(--hover-1)] hover:bg-[var(--hover-2)] text-[12px] text-[var(--text-primary)]/60 cursor-pointer font-medium">
-                <input type="file" multiple onChange={handleGeneralFileSelect} className="hidden" />
-                Выбрать
-              </label>
-            </div>
-            {generalFiles.length > 0 && (
-              <div className="mt-2 space-y-1">
-                {generalFiles.map(f => (
-                  <div key={f.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--hover-1)] border border-[var(--border-color)]">
-                    {f.preview
-                      ? <img src={f.preview} alt="" className="w-8 h-8 rounded object-cover" />
-                      : <div className="w-8 h-8 rounded bg-[var(--hover-2)] flex items-center justify-center"><File className="w-3.5 h-3.5 text-[var(--text-primary)]/30" /></div>}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[12px] text-[var(--text-primary)] truncate">{f.file.name}</p>
-                      <p className="text-[10px] text-[var(--text-primary)]/40">{formatFileSize(f.file.size)}</p>
+                    placeholder="Выберите..."
+                    style={{ paddingLeft: '3.5rem' }}
+                    className="input-field py-5 text-lg w-full" />
+                  {showReporterDropdown && (
+                    <div className="absolute z-50 mt-2 w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl max-h-80 overflow-y-auto">
+                      {loadingUsers
+                        ? <div className="p-6 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[var(--text-primary)]/40" /></div>
+                        : (
+                          <>
+                            <button onClick={() => { setSelectedReporter(null); setReporterSearch(''); setShowReporterDropdown(false); }}
+                              className="w-full text-left p-4 hover:bg-[var(--hover-1)] border-b border-[var(--border-color)]">
+                              <span className="text-[var(--text-primary)]">{user?.full_name || 'Вы'}</span>{' '}
+                              <span className="text-[var(--text-primary)]/40">(текущий)</span>
+                            </button>
+                            {users
+                              .filter(u => !reporterSearch ||
+                                u.full_name?.toLowerCase().includes(reporterSearch.toLowerCase()) ||
+                                u.email.toLowerCase().includes(reporterSearch.toLowerCase()))
+                              .map(u => (
+                                <button key={u.id}
+                                  onClick={() => { setSelectedReporter(u); setReporterSearch(uName(u)); setShowReporterDropdown(false); }}
+                                  className="w-full text-left p-4 hover:bg-[var(--hover-1)] border-b border-[var(--border-color)] last:border-0">
+                                  <div className="text-[var(--text-primary)]">{uName(u)}</div>
+                                  <div className="text-[var(--text-primary)]/40 text-sm">{u.email}</div>
+                                </button>
+                              ))}
+                          </>
+                        )}
                     </div>
-                    <button onClick={() => removeGeneralFile(f.id)}
-                      className="p-1 rounded hover:bg-red-500/10 text-[var(--text-primary)]/30 hover:text-red-400"><X className="w-3.5 h-3.5" /></button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-        </div>
-
-        {/* ─── Right: Meta info (40%) ─── */}
-        <div className="w-[380px] flex-shrink-0 border-l border-[var(--border-color)] overflow-y-auto px-4 py-5 space-y-4 bg-[var(--bg-secondary)]">
-
-          {/* Type + Priority */}
-          <div className="glass-card p-4">
-            <Label>Категория</Label>
-            <div className="relative mb-4" ref={typeDropdownRef}>
-              <button type="button" onClick={() => setShowTypeDropdown(!showTypeDropdown)}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-[var(--text-primary)]/20 text-[13px] text-[var(--text-primary)] transition-colors">
-                {type}
-                <ChevronDown className={`w-3.5 h-3.5 text-[var(--text-primary)]/30 transition-transform ${showTypeDropdown ? 'rotate-180' : ''}`} />
-              </button>
-              <SearchDropdown show={showTypeDropdown}>
-                {TYPES.map(t => (
-                  <DropdownItem key={t} active={type === t}
-                    onClick={() => { setType(t); setShowTypeDropdown(false); }}>
-                    <span className="text-[13px]">{t}</span>
-                  </DropdownItem>
-                ))}
-              </SearchDropdown>
-            </div>
-
-            <div className="flex items-center justify-between mb-2">
-              <Label>Приоритет</Label>
-              <button type="button" onClick={handleAiSuggest} disabled={aiLoading}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] bg-amber-500/10 border border-amber-500/20 text-amber-300 hover:bg-amber-500/15 disabled:opacity-40 transition-colors">
-                {aiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                ИИ
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {PRIORITIES.map(p => (
-                <button key={p.value} type="button"
-                  onClick={() => setPriority(p.value as TicketPriority)}
-                  className={`inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border text-[12px] font-medium transition-all ${priClasses(p.c, priority === p.value)}`}>
-                  {p.icon} {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Tags */}
-          <div className="glass-card p-4">
-            <Label>Теги</Label>
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {PRESET_TAGS.map(t => {
-                const on = tags.some(x => x.name === t.name);
-                return (
-                  <button key={t.name} type="button" onClick={() => togglePresetTag(t)}
-                    className="px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-all"
-                    style={{
-                      backgroundColor: on ? `${t.color}20` : 'transparent',
-                      borderColor: on ? `${t.color}60` : 'var(--border-color)',
-                      color: on ? t.color : 'var(--text-primary)',
-                      opacity: on ? 1 : 0.5,
-                    }}>
-                    {t.name}
-                  </button>
-                );
-              })}
-              <button type="button" onClick={() => setShowTagInput(!showTagInput)}
-                className="px-2.5 py-1 rounded-lg border border-dashed border-[var(--border-color)] text-[11px] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 hover:border-[var(--text-primary)]/30 transition-colors">
-                <Plus className="w-3 h-3 inline mr-0.5" />Свой
-              </button>
-            </div>
-            {showTagInput && (
-              <div className="flex gap-2 mb-3">
-                <input value={newTagInput} onChange={e => setNewTagInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addCustomTag()}
-                  placeholder="Название..." className="input-field flex-1 py-1.5 text-[12px]" />
-                <button onClick={addCustomTag} disabled={!newTagInput.trim()}
-                  className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-[11px] font-medium disabled:opacity-40">
-                  ОК
-                </button>
-              </div>
-            )}
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {tags.map(t => (
-                  <span key={t.name} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px]"
-                    style={{ backgroundColor: `${t.color || '#64748b'}18`, borderColor: `${t.color || '#64748b'}40`, color: t.color || '#94a3b8' }}>
-                    {t.name}
-                    <button type="button" onClick={() => setTags(p => p.filter(x => x.name !== t.name))}
-                      className="hover:text-red-400 transition-colors"><X className="w-3 h-3" /></button>
+                  )}
+                </div>
+                <div className="mt-3 p-4 rounded-xl bg-[var(--hover-1)] text-[var(--text-primary)]/60">
+                  Инициатор:{' '}
+                  <span className="text-[var(--text-primary)] font-medium">
+                    {selectedReporter ? uName(selectedReporter) : (user?.full_name || 'Вы')}
                   </span>
-                ))}
+                </div>
               </div>
             )}
+
+            {/* Тема */}
+            <SpellCheckField value={title} onChange={setTitle} label="Тема заявки *">
+              <input type="text" value={title} onChange={e => setTitle(e.target.value)}
+                placeholder="Кратко опишите проблему..."
+                className={`input-field py-5 text-2xl w-full ${validationErrors.includes('Укажите тему заявки') ? 'border-red-500 ring-1 ring-red-500/50' : ''}`} />
+            </SpellCheckField>
+
+            {/* Описание */}
+            <div>
+              <label className="block text-2xl font-semibold text-[var(--text-primary)] mb-4">
+                Подробное описание <span className="text-red-400">*</span>
+              </label>
+              <div className={validationErrors.includes('Добавьте описание заявки') ? 'ring-1 ring-red-500/50 rounded-2xl' : ''}>
+                <TicketEditor blocks={descriptionBlocks} onChange={setDescriptionBlocks} />
+              </div>
+            </div>
+
+            {/* Вложения */}
+            <div>
+              <label className="block text-2xl font-semibold text-[var(--text-primary)] mb-4">
+                <Upload className="inline w-6 h-6 mr-2 text-[var(--text-primary)]/40" />
+                Прикрепить файлы
+              </label>
+              <div onDrop={handleGeneralDrop} onDragOver={e => e.preventDefault()}
+                className="border-2 border-dashed border-[var(--border-color)] rounded-xl p-8 text-center hover:border-[var(--border-color)] transition-colors">
+                <Upload className="w-10 h-10 text-[var(--text-primary)]/20 mx-auto mb-3" />
+                <p className="text-lg text-[var(--text-primary)]/50 mb-2">Перетащите файлы сюда</p>
+                <label className="inline-block">
+                  <input type="file" multiple onChange={handleGeneralFileSelect} className="hidden" />
+                  <span className="px-5 py-2.5 rounded-xl bg-red-700 hover:bg-red-600 text-white text-base font-medium cursor-pointer transition-colors">
+                    Выбрать файлы
+                  </span>
+                </label>
+                <p className="mt-3 text-sm text-[var(--text-primary)]/40">До 10 файлов, максимум 25 МБ</p>
+              </div>
+
+              {generalFiles.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {generalFiles.map(f => (
+                    <div key={f.id} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)]">
+                      {f.preview
+                        ? <img src={f.preview} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                        : <div className="w-12 h-12 rounded-lg bg-[var(--hover-2)] flex items-center justify-center">
+                          <File className="w-5 h-5 text-[var(--text-primary)]/40" />
+                        </div>}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-base text-[var(--text-primary)] truncate">{f.file.name}</p>
+                        <p className="text-sm text-[var(--text-primary)]/40">{formatFileSize(f.file.size)}</p>
+                      </div>
+                      <button onClick={() => removeGeneralFile(f.id)}
+                        className="p-1.5 rounded-lg hover:bg-[var(--hover-3)] text-[var(--text-primary)]/40 hover:text-red-400 transition-colors">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
+        )}
 
+        {/* ═══ Step 2 ═══ */}
+        {step === 2 && (
+          <div className="space-y-12">
+
+            {/* AI Loading */}
+            {aiLoading && (
+              <div className="p-8 rounded-2xl bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 flex flex-col items-center gap-4">
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                    <Sparkles className="w-8 h-8 text-yellow-400 animate-pulse" />
+                  </div>
+                  <Loader2 className="w-16 h-16 text-yellow-400 animate-spin absolute inset-0" />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-xl font-semibold text-[var(--text-primary)]">ИИ анализирует вашу заявку...</h3>
+                  <p className="text-[var(--text-secondary)] mt-2">Подбираем оптимальный приоритет и теги</p>
+                </div>
+              </div>
+            )}
+
+            {/* AI Success */}
+            {aiSuggestion && !aiLoading && (
+              <div className="p-6 rounded-2xl bg-gradient-to-r from-yellow-500/20 to-orange-500/15
+                              border border-yellow-500/20 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                  <Zap className="w-5 h-5 text-yellow-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-[var(--text-primary)]">ИИ предложил приоритет и теги</h3>
+                  <p className="text-[var(--text-secondary)] mt-1">Проверьте и внесите правки при необходимости</p>
+                </div>
+              </div>
+            )}
+
+            <div className={aiLoading ? 'opacity-40 pointer-events-none transition-opacity' : 'transition-opacity'}>
+
+              {/* Тип */}
+              <div>
+                <label className="block text-2xl font-semibold text-[var(--text-primary)] mb-6">Тип заявки</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {TICKET_TYPES.map(t => {
+                    const isSelected = type === t.value;
+                    return (
+                      <button key={t.value} onClick={() => setType(t.value as TicketType)}
+                        className={`px-6 py-4 rounded-2xl text-left border transition-all
+                          ${isSelected
+                            ? `${t.activeColor} scale-[1.02] shadow-lg`
+                            : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--hover-2)]'
+                          }`}>
+                        <div className="flex items-start gap-3">
+                          <div className={`flex-shrink-0 mt-0.5 ${isSelected ? '' : 'opacity-50'}`}>{t.icon}</div>
+                          <div className="flex-1">
+                            <div className="font-semibold text-lg">{t.label}</div>
+                            <div className="text-sm opacity-70 mt-1">{t.desc}</div>
+                          </div>
+                          {isSelected && <CheckCircle2 className="w-6 h-6 flex-shrink-0 mt-0.5" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Приоритет */}
+              <div className="mt-12">
+                <label className="block text-2xl font-semibold text-[var(--text-primary)] mb-6">Приоритет</label>
+                <div className="flex flex-wrap gap-3">
+                  {PRIORITIES.map(p => {
+                    const isSelected = priority === p.value;
+                    return (
+                      <button key={p.value} onClick={() => setPriority(p.value as TicketPriority)}
+                        className={`px-8 py-5 rounded-2xl text-lg font-medium border flex-1 min-w-[200px] text-left transition-all
+                          ${isSelected
+                            ? `${p.activeColor} scale-[1.02] shadow-lg`
+                            : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'
+                          }`}>
+                        <div className="flex items-center gap-4">
+                          <div className={isSelected ? '' : 'opacity-40'}>{p.icon}</div>
+                          <div>
+                            <div className="font-semibold">{p.label}</div>
+                            <div className="text-sm opacity-70">{p.desc}</div>
+                          </div>
+                          {isSelected && <CheckCircle2 className="w-6 h-6 ml-auto flex-shrink-0" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Теги */}
+              <div className="mt-12">
+                <label className="block text-2xl font-semibold text-[var(--text-primary)] mb-6">Теги</label>
+
+                {aiSuggestedTags.length > 0 && (
+                  <div className="mb-6">
+                    <p className="text-[var(--text-primary)]/50 text-sm mb-3 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" /> Предложено ИИ
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      {aiSuggestedTags.map(t => {
+                        const isSelected = tags.some(x => x.name === t.name);
+                        return (
+                          <button key={t.name} onClick={() => togglePresetTag(t)}
+                            className={`px-6 py-3 rounded-2xl text-base font-medium border transition-all
+                              ${isSelected
+                                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 ring-1 ring-amber-500/30'
+                                : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'
+                              }`}>
+                            <span className="flex items-center gap-2">
+                              {isSelected && <CheckCircle2 className="w-4 h-4" />}
+                              {t.name}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-3 mb-6">
+                  {PRESET_TAGS.map(t => {
+                    const isSelected = tags.some(x => x.name === t.name);
+                    return (
+                      <button key={t.name} onClick={() => togglePresetTag(t)}
+                        className={`px-6 py-3 rounded-2xl text-base font-medium border transition-all
+                          ${isSelected ? '' : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'}`}
+                        style={{
+                          backgroundColor: isSelected ? `${t.color}25` : undefined,
+                          color: isSelected ? t.color : undefined,
+                          borderColor: isSelected ? `${t.color}80` : undefined,
+                        }}>
+                        <span className="flex items-center gap-2">
+                          {isSelected && <CheckCircle2 className="w-4 h-4" />}
+                          {t.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button onClick={() => setShowCustomTagInput(!showCustomTagInput)}
+                  className="text-blue-400 hover:text-blue-300 flex items-center gap-2 text-sm mb-4">
+                  <Plus className="w-4 h-4" />{showCustomTagInput ? 'Скрыть' : 'Свой тег'}
+                </button>
+
+                {showCustomTagInput && (
+                  <div className="flex gap-3 mb-6">
+                    <input value={newTagInput} onChange={e => setNewTagInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && addCustomTag()}
+                      placeholder="Тег..." className="input-field flex-1 py-4 text-lg" />
+                    <button onClick={addCustomTag} disabled={!newTagInput.trim()}
+                      className="px-6 py-3 rounded-xl bg-red-700 hover:bg-red-600 text-white font-medium disabled:opacity-40">
+                      Добавить
+                    </button>
+                  </div>
+                )}
+
+                {tags.length > 0 && (
+                  <div className="p-5 bg-[var(--hover-1)] rounded-2xl">
+                    <p className="text-[var(--text-primary)]/50 mb-3">Выбрано: {tags.length}</p>
+                    <div className="flex flex-wrap gap-3">
+                      {tags.map(t => (
+                        <div key={t.name} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl border"
+                          style={{
+                            backgroundColor: `${t.color || '#71717a'}20`,
+                            borderColor: `${t.color || '#71717a'}50`,
+                            color: t.color || '#d1d5db',
+                          }}>
+                          {t.name}
+                          <X className="w-4 h-4 cursor-pointer opacity-60 hover:opacity-100 hover:text-red-400 transition-all"
+                            onClick={() => removeTag(t.name)} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ Step 3 ═══ */}
+        {step === 3 && (
+          <div className="space-y-10">
+            <div className="text-center mb-10">
+              <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-12 h-12 text-green-400" />
+              </div>
+              <h2 className="text-3xl font-bold text-[var(--text-primary)] mb-2">Проверьте заявку</h2>
+              <p className="text-lg text-[var(--text-primary)]/60">Убедитесь, что всё правильно</p>
+            </div>
+
+            <div className="space-y-6 animate-in fade-in duration-500">
+              {selectedProject && (
+                <div className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-4">
+                  <FolderOpen className="w-8 h-8 text-amber-400" />
+                  <div>
+                    <p className="text-[var(--text-primary)] font-semibold">{prjName(selectedProject)}</p>
+                    <p className="text-[var(--text-primary)]/40 text-sm">контрагент из проекта</p>
+                  </div>
+                </div>
+              )}
+              {!selectedProject && selectedCounterparty && (
+                <div className="p-6 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center gap-4">
+                  <Building2 className="w-8 h-8 text-blue-400" />
+                  <p className="text-[var(--text-primary)] font-semibold">{cpName(selectedCounterparty)}</p>
+                </div>
+              )}
+              {isCustomer && customerCounterparty && !selectedProject && !selectedCounterparty && (
+                <div className="p-6 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center gap-4">
+                  <Building2 className="w-8 h-8 text-blue-400" />
+                  <p className="text-[var(--text-primary)] font-semibold">{customerCounterparty.name}</p>
+                </div>
+              )}
+              {canSelectCounterparty && selectionType === null && (
+                <div className="p-6 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-center">
+                  Без привязки
+                </div>
+              )}
+
+              <div className="p-6 rounded-2xl bg-green-500/10 border border-green-500/30 flex items-center gap-4">
+                <User className="w-8 h-8 text-green-400" />
+                <div>
+                  <p className="text-[var(--text-primary)] font-semibold">
+                    {selectedReporter ? uName(selectedReporter) : (user?.full_name || 'Вы')}
+                  </p>
+                  <p className="text-[var(--text-primary)]/40 text-sm">
+                    {selectedReporter ? selectedReporter.email : user?.email}
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-6 rounded-2xl bg-[var(--hover-1)]">
+                <p className="text-[var(--text-primary)]/50 mb-2">Тема</p>
+                <p className="text-[var(--text-primary)] font-semibold text-lg break-words">{title || '—'}</p>
+              </div>
+
+              <div className="p-6 rounded-2xl bg-[var(--hover-1)]">
+                <p className="text-[var(--text-primary)]/50 mb-4">Описание</p>
+                <div className="space-y-4">
+                  {descriptionBlocks.map(block => {
+                    if (block.type === 'text') {
+                      if (!block.value.trim()) return null;
+                      return (
+                        <TicketDescriptionContent key={block.id} text={block.value}
+                          className="text-[var(--text-primary)] text-base leading-relaxed" />
+                      );
+                    }
+                    if (block.type === 'image' && block.localPreview) {
+                      return (
+                        <img key={block.id} src={block.localPreview} alt="вложение"
+                          className="max-w-full max-h-[400px] rounded-2xl border border-[var(--border-color)] object-contain" />
+                      );
+                    }
+                    return null;
+                  })}
+                  {descriptionBlocks.every(b =>
+                    (b.type === 'text' && !b.value.trim()) ||
+                    (b.type === 'image' && !b.localPreview)
+                  ) && <p className="text-[var(--text-primary)]/40">—</p>}
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="p-6 rounded-2xl bg-[var(--hover-1)]">
+                  <p className="text-[var(--text-primary)]/50 mb-3">Тип</p>
+                  <div className={`inline-flex items-center gap-2 text-lg px-5 py-2.5 rounded-2xl ${TICKET_TYPES.find(t => t.value === type)?.color || ''}`}>
+                    {TICKET_TYPES.find(t => t.value === type)?.icon} {type}
+                  </div>
+                </div>
+                <div className="p-6 rounded-2xl bg-[var(--hover-1)]">
+                  <p className="text-[var(--text-primary)]/50 mb-3">Приоритет</p>
+                  <div className={`inline-flex items-center gap-3 text-lg px-5 py-2.5 rounded-2xl ${PRIORITIES.find(p => p.value === priority)?.color || ''}`}>
+                    {PRIORITIES.find(p => p.value === priority)?.icon} {PRIORITIES.find(p => p.value === priority)?.label || priority}
+                  </div>
+                </div>
+              </div>
+
+              {tags.length > 0 && (
+                <div className="p-6 rounded-2xl bg-[var(--hover-1)]">
+                  <p className="text-[var(--text-primary)]/50 mb-3">Теги</p>
+                  <div className="flex flex-wrap gap-2">
+                    {tags.map(t => (
+                      <span key={t.name} className="px-4 py-2 rounded-xl text-base font-medium"
+                        style={{
+                          backgroundColor: (t.color || '#71717a') + '30',
+                          color: t.color || '#d1d5db',
+                        }}>
+                        {t.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {generalFiles.length > 0 && (
+                <div className="p-6 rounded-2xl bg-[var(--hover-1)]">
+                  <p className="text-[var(--text-primary)]/50 mb-3">Вложения ({generalFiles.length})</p>
+                  <div className="space-y-2">
+                    {generalFiles.map(f => (
+                      <div key={f.id} className="flex items-center gap-3 text-[var(--text-primary)]">
+                        <File className="w-5 h-5 text-[var(--text-primary)]/40" />
+                        <span>{f.file.name}</span>
+                        <span className="text-yellow-400 text-sm">(загрузится при создании)</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Navigation */}
+        <div className="flex justify-between mt-12 pt-8 border-t border-[var(--border-color)]">
+          {step > 1 ? (
+            <button onClick={() => setStep(step - 1)}
+              className="flex items-center gap-3 px-8 py-4 rounded-2xl bg-[var(--hover-1)] hover:bg-[var(--hover-2)] text-lg font-medium transition-colors">
+              <ArrowLeft className="w-5 h-5" /> Назад
+            </button>
+          ) : <div />}
+
+          {step < 3 ? (
+            <button onClick={handleNextStep}
+              disabled={step === 1 && (!title.trim() || !hasDescription)}
+              className="px-10 py-4 rounded-2xl bg-red-700 hover:bg-red-600 text-white text-lg font-semibold ml-auto
+                         shadow-lg shadow-red-900/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-700">
+              Далее <ArrowRight className="w-5 h-5 inline ml-2" />
+            </button>
+          ) : (
+            <button onClick={handleSubmit} disabled={submitting}
+              className="px-12 py-4 rounded-2xl bg-red-700 hover:bg-red-600 text-white text-lg font-semibold
+                         flex items-center gap-3 ml-auto disabled:opacity-50 shadow-lg shadow-red-900/30">
+              {submitting
+                ? <Loader2 className="w-6 h-6 animate-spin" />
+                : <><FileText className="w-5 h-5" /> Создать заявку</>}
+            </button>
+          )}
         </div>
-
       </div>
     </div>
   );
