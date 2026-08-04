@@ -1,30 +1,26 @@
 ﻿import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, Building2, Check, ChevronDown, ChevronRight,
-  File, FolderOpen, Loader2, Plus, Search, Sparkles,
-  Upload, User, X, Send,
+  ArrowLeft, Building2, Check, ChevronDown,
+  File, FolderOpen, Loader2, Plus, Search,
+  Sparkles, Upload, User, X, Send,
 } from 'lucide-react';
 import { Flame, SignalHigh, SignalLow, SignalMedium } from 'lucide-react';
 
 import { useAuthStore } from '../stores/authStore';
-import {
-  ticketsApi, counterpartiesApi, projectsApi, usersApi,
-} from '../api/client';
+import { ticketsApi, counterpartiesApi, projectsApi, usersApi } from '../api/client';
 import { attachmentsApi } from '../api/attachments';
-import type {
-  Counterparty, Project, TicketPriority, TicketTag, TicketType,
-} from '../types';
+import type { Counterparty, Project, TicketPriority, TicketTag, TicketType } from '../types';
 
-/* ═══════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════
    Constants
-   ═══════════════════════════════════════════════════════════ */
+   ══════════════════════════════════════════════ */
 
 const PRIORITIES = [
-  { value: 'low', label: 'Низкий', icon: <SignalLow className="w-3.5 h-3.5" />, color: 'emerald' },
-  { value: 'medium', label: 'Средний', icon: <SignalMedium className="w-3.5 h-3.5" />, color: 'yellow' },
-  { value: 'high', label: 'Высокий', icon: <SignalHigh className="w-3.5 h-3.5" />, color: 'orange' },
-  { value: 'critical', label: 'Критический', icon: <Flame className="w-3.5 h-3.5" />, color: 'red' },
+  { value: 'low', label: 'Низкий', icon: <SignalLow className="w-4 h-4" />, color: 'emerald' },
+  { value: 'medium', label: 'Средний', icon: <SignalMedium className="w-4 h-4" />, color: 'yellow' },
+  { value: 'high', label: 'Высокий', icon: <SignalHigh className="w-4 h-4" />, color: 'orange' },
+  { value: 'critical', label: 'Критический', icon: <Flame className="w-4 h-4" />, color: 'red' },
 ] as const;
 
 const TYPES: { value: TicketType; label: string }[] = [
@@ -51,598 +47,1157 @@ const PRESET_TAGS: TicketTag[] = [
 
 const STAFF_ROLES = ['admin', 'support_agent', 'support_manager', 'executor'];
 
-/* ═══════════════════════════════════════════════════════════
-   Dropdown
-   ═══════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
+   Dropdown component
+   ══════════════════════════════════════════════ */
 
-interface DdOption { id: string; label: string; sub?: string }
+interface DropdownOption {
+  id: string;
+  label: string;
+  sub?: string;
+}
 
-function Dd({ options, value, onChange, placeholder, search: searchLabel, loading, icon, empty = 'Пусто' }: {
-  options: DdOption[]; value: string; onChange: (id: string) => void;
-  placeholder: string; search?: string; loading?: boolean;
-  icon?: JSX.Element; empty?: string;
+function Dropdown({
+  options,
+  value,
+  onChange,
+  placeholder,
+  searchPlaceholder,
+  loading,
+  icon,
+  emptyText = 'Ничего не найдено',
+  disabled = false,
+}: {
+  options: DropdownOption[];
+  value: string;
+  onChange: (id: string) => void;
+  placeholder: string;
+  searchPlaceholder?: string;
+  loading?: boolean;
+  icon?: JSX.Element;
+  emptyText?: string;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [q, setQ] = useState('');
-  const ref = useRef<HTMLDivElement>(null);
-  const sel = options.find(o => o.id === value);
+  const [query, setQuery] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const list = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return options;
-    return options.filter(o => o.label.toLowerCase().includes(s) || o.sub?.toLowerCase().includes(s));
-  }, [options, q]);
+  const selected = options.find((o) => o.id === value);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter(
+      (o) =>
+        o.label.toLowerCase().includes(q) ||
+        (o.sub && o.sub.toLowerCase().includes(q))
+    );
+  }, [options, query]);
 
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h);
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   return (
-    <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen(!open)}
-        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-left text-sm transition-all
-          ${open ? 'border-red-500/40 ring-1 ring-red-500/20 bg-[var(--bg-secondary)]'
-            : 'border-[var(--border-color)] bg-[var(--bg-secondary)] hover:border-[var(--text-primary)]/20'}
-          ${sel ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/40'}`}>
-        {icon && <span className="flex-shrink-0 text-[var(--text-primary)]/30">{icon}</span>}
-        <span className="flex-1 truncate">{sel ? sel.label : placeholder}</span>
-        <ChevronDown className={`w-3.5 h-3.5 text-[var(--text-primary)]/30 transition-transform ${open ? 'rotate-180' : ''}`} />
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen(!open)}
+        className={`
+          w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border text-left transition-all text-sm
+          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+          ${open
+            ? 'border-red-500/50 bg-[var(--bg-primary)] ring-2 ring-red-500/20'
+            : 'border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-[var(--text-primary)]/25 hover:bg-[var(--hover-1)]'
+          }
+          ${selected ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/40'}
+        `}
+      >
+        {icon && (
+          <span className="flex-shrink-0 text-[var(--text-primary)]/40">{icon}</span>
+        )}
+        <span className="flex-1 truncate">
+          {selected ? selected.label : placeholder}
+        </span>
+        {loading ? (
+          <Loader2 className="w-4 h-4 animate-spin text-[var(--text-primary)]/30 flex-shrink-0" />
+        ) : (
+          <ChevronDown
+            className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform flex-shrink-0 ${
+              open ? 'rotate-180' : ''
+            }`}
+          />
+        )}
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg shadow-2xl shadow-black/50 overflow-hidden">
-          {(searchLabel || options.length > 5) && (
-            <div className="p-1.5 border-b border-[var(--border-color)]">
+        <div className="absolute z-50 mt-1.5 w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl shadow-black/40 overflow-hidden">
+          {(searchPlaceholder || options.length > 5) && (
+            <div className="p-2 border-b border-[var(--border-color)]">
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/25" />
-                <input value={q} onChange={e => setQ(e.target.value)}
-                  placeholder={searchLabel || 'Поиск...'} autoFocus
-                  className="w-full pl-8 pr-2 py-1.5 rounded bg-[var(--hover-1)] border-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/25 focus:outline-none" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-primary)]/25" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={searchPlaceholder || 'Поиск...'}
+                  autoFocus
+                  className="w-full pl-9 pr-3 py-2 rounded-lg bg-[var(--hover-1)] border-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/30 focus:outline-none focus:ring-1 focus:ring-red-500/30"
+                />
               </div>
             </div>
           )}
-          <div className="max-h-48 overflow-y-auto overscroll-contain">
+
+          <div className="max-h-56 overflow-y-auto overscroll-contain">
             {loading ? (
-              <div className="flex justify-center py-6"><Loader2 className="w-4 h-4 animate-spin text-[var(--text-primary)]/25" /></div>
-            ) : list.length === 0 ? (
-              <div className="py-4 text-center text-xs text-[var(--text-primary)]/30">{empty}</div>
-            ) : list.map(o => (
-              <button key={o.id} type="button"
-                onClick={() => { onChange(o.id); setOpen(false); setQ(''); }}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors
-                  ${o.id === value ? 'bg-red-500/10 text-[var(--text-primary)]' : 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)]'}`}>
-                <span className="flex-1 min-w-0">
-                  <span className="block truncate">{o.label}</span>
-                  {o.sub && <span className="block text-xs text-[var(--text-primary)]/35 truncate">{o.sub}</span>}
-                </span>
-                {o.id === value && <Check className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />}
-              </button>
-            ))}
+              <div className="flex items-center justify-center gap-2 py-8">
+                <Loader2 className="w-5 h-5 animate-spin text-[var(--text-primary)]/30" />
+                <span className="text-sm text-[var(--text-primary)]/40">Загрузка...</span>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="py-6 text-center text-sm text-[var(--text-primary)]/40">
+                {emptyText}
+              </div>
+            ) : (
+              filtered.map((option) => {
+                const isSelected = option.id === value;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(option.id);
+                      setOpen(false);
+                      setQuery('');
+                    }}
+                    className={`
+                      w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors
+                      ${isSelected
+                        ? 'bg-red-500/10 text-[var(--text-primary)]'
+                        : 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)] hover:text-[var(--text-primary)]'
+                      }
+                    `}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate font-medium">{option.label}</div>
+                      {option.sub && (
+                        <div className="text-xs text-[var(--text-primary)]/40 truncate mt-0.5">
+                          {option.sub}
+                        </div>
+                      )}
+                    </div>
+                    {isSelected && (
+                      <Check className="w-4 h-4 text-red-400 flex-shrink-0" />
+                    )}
+                  </button>
+                );
+              })
+            )}
           </div>
+
+          {/* Clear selection */}
+          {value && (
+            <div className="border-t border-[var(--border-color)]">
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('');
+                  setOpen(false);
+                  setQuery('');
+                }}
+                className="w-full px-4 py-2 text-left text-xs text-[var(--text-primary)]/40 hover:bg-[var(--hover-1)] hover:text-red-400 transition-colors"
+              >
+                Очистить выбор
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-/* ═══════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════
    Types
-   ═══════════════════════════════════════════════════════════ */
+   ══════════════════════════════════════════════ */
 
-interface GFile { id: string; file: File; preview?: string }
-interface SUser { id: string; username: string; full_name: string | null; email: string }
-type Bind = 'none' | 'counterparty' | 'project';
-interface Draft {
-  title: string; description: string; bind: Bind;
-  cpId: string; pId: string; rId: string;
-  type: string; priority: string; tags: TicketTag[];
-  at: number;
+interface AttachedFile {
+  id: string;
+  file: File;
+  preview?: string;
 }
 
-/* ═══════════════════════════════════════════════════════════
-   Page
-   ═══════════════════════════════════════════════════════════ */
+interface SimpleUser {
+  id: string;
+  username: string;
+  full_name: string | null;
+  email: string;
+}
+
+type BindType = 'none' | 'counterparty' | 'project';
+
+interface DraftData {
+  title: string;
+  description: string;
+  bindType: BindType;
+  counterpartyId: string;
+  projectId: string;
+  reporterId: string;
+  type: string;
+  priority: string;
+  tags: TicketTag[];
+  savedAt: number;
+}
+
+/* ══════════════════════════════════════════════
+   Helper: priority styling
+   ══════════════════════════════════════════════ */
+
+function getPriorityClasses(color: string, active: boolean) {
+  const styles: Record<string, { idle: string; active: string }> = {
+    emerald: {
+      idle: 'border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)]/50 hover:border-emerald-500/30 hover:text-emerald-400/70',
+      active: 'border-emerald-400/50 bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/20',
+    },
+    yellow: {
+      idle: 'border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)]/50 hover:border-yellow-500/30 hover:text-yellow-400/70',
+      active: 'border-yellow-400/50 bg-yellow-500/15 text-yellow-300 ring-1 ring-yellow-400/20',
+    },
+    orange: {
+      idle: 'border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)]/50 hover:border-orange-500/30 hover:text-orange-400/70',
+      active: 'border-orange-400/50 bg-orange-500/15 text-orange-300 ring-1 ring-orange-400/20',
+    },
+    red: {
+      idle: 'border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)]/50 hover:border-red-500/30 hover:text-red-400/70',
+      active: 'border-red-400/50 bg-red-500/15 text-red-300 ring-1 ring-red-400/20',
+    },
+  };
+  const s = styles[color] || styles.yellow;
+  return active ? s.active : s.idle;
+}
+
+/* ══════════════════════════════════════════════
+   Section wrapper
+   ══════════════════════════════════════════════ */
+
+function Section({
+  title,
+  children,
+  className = '',
+}: {
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)]/50 ${className}`}>
+      <div className="px-4 py-2.5 border-b border-[var(--border-color)]">
+        <h3 className="text-xs font-semibold text-[var(--text-primary)]/50 uppercase tracking-wider">
+          {title}
+        </h3>
+      </div>
+      <div className="p-4">{children}</div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   Page component
+   ══════════════════════════════════════════════ */
 
 export default function NewTicketPage() {
   const navigate = useNavigate();
-  const [sp] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
 
-  const uid = (user as any)?.id ?? (user as any)?.user_id ?? '';
-  const preCpId = sp.get('counterparty_id') || '';
-  const prePId = sp.get('project_id') || '';
+  const currentUserId = (user as any)?.id ?? (user as any)?.user_id ?? '';
+  const preCounterpartyId = searchParams.get('counterparty_id') || '';
+  const preProjectId = searchParams.get('project_id') || '';
 
-  const isCust = user?.roles?.some((r: string) => r === 'customer' || r === 'customer_admin') ?? false;
-  const canSel = (!isCust && user?.roles?.some((r: string) => STAFF_ROLES.includes(r))) ?? false;
-  const canRep = !isCust;
+  const isCustomer =
+    user?.roles?.some((r: string) => r === 'customer' || r === 'customer_admin') ?? false;
+  const canSelectBinding =
+    (!isCustomer && user?.roles?.some((r: string) => STAFF_ROLES.includes(r))) ?? false;
+  const canSelectReporter = !isCustomer;
 
-  const dk = uid ? `td:${uid}` : 'td';
+  const draftKey = currentUserId ? `ticket-draft:${currentUserId}` : 'ticket-draft';
 
+  // ── Form state ──
   const [title, setTitle] = useState('');
-  const [desc, setDesc] = useState('');
-  const [bind, setBind] = useState<Bind>('none');
-  const [cpId, setCpId] = useState('');
-  const [pId, setPId] = useState('');
-  const [rId, setRId] = useState('');
+  const [description, setDescription] = useState('');
+  const [bindType, setBindType] = useState<BindType>('none');
+  const [counterpartyId, setCounterpartyId] = useState('');
+  const [projectId, setProjectId] = useState('');
+  const [reporterId, setReporterId] = useState('');
   const [type, setType] = useState<TicketType>('Инцидент');
-  const [pri, setPri] = useState('medium');
+  const [priority, setPriority] = useState('medium');
   const [tags, setTags] = useState<TicketTag[]>([]);
-  const [tagIn, setTagIn] = useState('');
-  const [files, setFiles] = useState<GFile[]>([]);
+  const [newTagInput, setNewTagInput] = useState('');
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
 
-  const [custCp, setCustCp] = useState<Counterparty | null>(null);
-  const [cps, setCps] = useState<Counterparty[]>([]);
-  const [prs, setPrs] = useState<Project[]>([]);
-  const [usrs, setUsrs] = useState<SUser[]>([]);
+  // ── Data state ──
+  const [customerCounterparty, setCustomerCounterparty] = useState<Counterparty | null>(null);
+  const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [users, setUsers] = useState<SimpleUser[]>([]);
 
-  const [lCp, setLCp] = useState(false);
-  const [lPr, setLPr] = useState(false);
-  const [lUs, setLUs] = useState(false);
-  const [aiL, setAiL] = useState(false);
-  const [sub, setSub] = useState(false);
-  const [errs, setErrs] = useState<Record<string, string>>({});
-  const [showDraft, setShowDraft] = useState(false);
-  const [draftD, setDraftD] = useState<Draft | null>(null);
-  const [saved, setSaved] = useState<number | null>(null);
+  // ── Loading state ──
+  const [loadingCounterparties, setLoadingCounterparties] = useState(false);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const initR = useRef(false);
-  const preR = useRef(false);
+  // ── UI state ──
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const [draftData, setDraftData] = useState<DraftData | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
 
-  const relCp = prs.find(p => p.id === pId)?.counterparty_id || cpId || custCp?.id || '';
+  const initDoneRef = useRef(false);
+  const presetAppliedRef = useRef(false);
 
-  const cpN = (c: Counterparty) => c.name || c.legal_name || c.inn || '—';
-  const pN = (p: Project) => `${p.key} — ${p.name}`;
-  const uN = (u: SUser) => u.full_name || u.username || u.email;
+  // ── Derived ──
+  const selectedCounterparty = counterparties.find((c) => c.id === counterpartyId) || null;
+  const selectedProject = projects.find((p) => p.id === projectId) || null;
 
-  const cpOpts: DdOption[] = useMemo(() => cps.map(c => ({ id: c.id, label: cpN(c), sub: c.inn ? `ИНН ${c.inn}` : undefined })), [cps]);
-  const pOpts: DdOption[] = useMemo(() => prs.map(p => ({ id: p.id, label: pN(p) })), [prs]);
-  const uOpts: DdOption[] = useMemo(() => usrs.map(u => ({ id: u.id, label: uN(u), sub: u.email })), [usrs]);
-  const tOpts: DdOption[] = useMemo(() => TYPES.map(t => ({ id: t.value, label: t.label })), []);
+  const relatedCounterpartyId =
+    selectedProject?.counterparty_id || counterpartyId || customerCounterparty?.id || '';
 
-  const fmtSize = (b: number) => b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(1)} MB`;
-  const fmtT = (t: number) => new Date(t).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const counterpartyName = (c: Counterparty) => c.name || c.legal_name || c.inn || '—';
+  const projectLabel = (p: Project) => `${p.key} — ${p.name}`;
+  const userName = (u: SimpleUser) => u.full_name || u.username || u.email;
 
-  const clrE = (f: string) => setErrs(p => { const n = { ...p }; delete n[f]; return n; });
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1048576).toFixed(1)} MB`;
+  };
 
-  // ── Draft restore ──
+  const formatTime = (ts: number) =>
+    new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+  // ── Dropdown options ──
+  const counterpartyOptions: DropdownOption[] = useMemo(
+    () =>
+      counterparties.map((c) => ({
+        id: c.id,
+        label: counterpartyName(c),
+        sub: c.inn ? `ИНН ${c.inn}` : undefined,
+      })),
+    [counterparties]
+  );
+
+  const projectOptions: DropdownOption[] = useMemo(
+    () => projects.map((p) => ({ id: p.id, label: projectLabel(p) })),
+    [projects]
+  );
+
+  const userOptions: DropdownOption[] = useMemo(
+    () => users.map((u) => ({ id: u.id, label: userName(u), sub: u.email })),
+    [users]
+  );
+
+  const typeOptions: DropdownOption[] = useMemo(
+    () => TYPES.map((t) => ({ id: t.value, label: t.label })),
+    []
+  );
+
+  const clearError = (field: string) =>
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+
+  /* ══════════════════════════════════════════════
+     Draft: check on mount
+     ══════════════════════════════════════════════ */
+
   useEffect(() => {
-    if (initR.current) return; initR.current = true;
-    const raw = localStorage.getItem(dk);
+    if (initDoneRef.current) return;
+    initDoneRef.current = true;
+
+    const raw = localStorage.getItem(draftKey);
     if (!raw) return;
+
     try {
-      const d: Draft = JSON.parse(raw);
-      if (d.title || d.description || d.tags?.length) { setDraftD(d); setShowDraft(true); }
-    } catch { }
-  }, [dk]);
+      const data: DraftData = JSON.parse(raw);
+      if (data.title || data.description || data.tags?.length) {
+        setDraftData(data);
+        setShowDraftBanner(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [draftKey]);
 
-  const restore = useCallback(() => {
-    if (!draftD) return;
-    setTitle(draftD.title || ''); setDesc(draftD.description || '');
-    setBind(draftD.bind || 'none'); setCpId(draftD.cpId || '');
-    setPId(draftD.pId || ''); setRId(draftD.rId || '');
-    setType((draftD.type as TicketType) || 'Инцидент');
-    setPri(draftD.priority || 'medium'); setTags(draftD.tags || []);
-    setSaved(draftD.at); setShowDraft(false); preR.current = true;
-  }, [draftD]);
+  const restoreDraft = useCallback(() => {
+    if (!draftData) return;
+    setTitle(draftData.title || '');
+    setDescription(draftData.description || '');
+    setBindType(draftData.bindType || 'none');
+    setCounterpartyId(draftData.counterpartyId || '');
+    setProjectId(draftData.projectId || '');
+    setReporterId(draftData.reporterId || '');
+    setType((draftData.type as TicketType) || 'Инцидент');
+    setPriority(draftData.priority || 'medium');
+    setTags(draftData.tags || []);
+    setSavedAt(draftData.savedAt);
+    setShowDraftBanner(false);
+    presetAppliedRef.current = true;
+  }, [draftData]);
 
-  const dismiss = useCallback(() => { setShowDraft(false); localStorage.removeItem(dk); }, [dk]);
+  const dismissDraft = useCallback(() => {
+    setShowDraftBanner(false);
+    localStorage.removeItem(draftKey);
+  }, [draftKey]);
 
-  // ── Auto-save ──
+  /* ══════════════════════════════════════════════
+     Draft: auto-save
+     ══════════════════════════════════════════════ */
+
   useEffect(() => {
-    const t = setTimeout(() => {
-      if (!title.trim() && !desc.trim() && !tags.length) return;
-      const d: Draft = { title, description: desc, bind, cpId, pId, rId, type, priority: pri, tags, at: Date.now() };
-      localStorage.setItem(dk, JSON.stringify(d)); setSaved(Date.now());
+    const timer = setTimeout(() => {
+      if (!title.trim() && !description.trim() && !tags.length) return;
+
+      const draft: DraftData = {
+        title,
+        description,
+        bindType,
+        counterpartyId,
+        projectId,
+        reporterId,
+        type,
+        priority,
+        tags,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem(draftKey, JSON.stringify(draft));
+      setSavedAt(Date.now());
     }, 800);
-    return () => clearTimeout(t);
-  }, [dk, title, desc, bind, cpId, pId, rId, type, pri, tags]);
 
+    return () => clearTimeout(timer);
+  }, [draftKey, title, description, bindType, counterpartyId, projectId, reporterId, type, priority, tags]);
+
+  // beforeunload
   useEffect(() => {
-    const h = (e: BeforeUnloadEvent) => { if (title.trim() || desc.trim()) { e.preventDefault(); e.returnValue = ''; } };
-    window.addEventListener('beforeunload', h); return () => window.removeEventListener('beforeunload', h);
-  }, [title, desc]);
+    const handler = (e: BeforeUnloadEvent) => {
+      if (title.trim() || description.trim()) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [title, description]);
 
-  // ── Load ──
+  /* ══════════════════════════════════════════════
+     API: load data
+     ══════════════════════════════════════════════ */
+
+  // Customer counterparty
   useEffect(() => {
-    if (isCust && user?.counterparty_id)
-      counterpartiesApi.getById(user.counterparty_id).then(setCustCp).catch(() => { });
-  }, [isCust, user]);
+    if (!isCustomer || !user?.counterparty_id) return;
 
+    counterpartiesApi
+      .getById(user.counterparty_id)
+      .then(setCustomerCounterparty)
+      .catch((err) => console.error('Failed to load customer counterparty:', err));
+  }, [isCustomer, user]);
+
+  // Counterparties + projects for staff
   useEffect(() => {
-    if (!canSel) return;
-    setLCp(true); setLPr(true);
-    Promise.all([counterpartiesApi.getAll(1, 200), projectsApi.getAll(1, 200)])
-      .then(([c, p]) => { setCps(c.items); setPrs(p.items); })
-      .catch(() => { }).finally(() => { setLCp(false); setLPr(false); });
-  }, [canSel]);
+    if (!canSelectBinding) return;
 
+    const loadAll = async () => {
+      setLoadingCounterparties(true);
+      setLoadingProjects(true);
+
+      try {
+        const [cpResponse, projectResponse] = await Promise.all([
+          counterpartiesApi.getAll(1, 200),
+          projectsApi.getAll(1, 200),
+        ]);
+
+        console.log('Loaded counterparties:', cpResponse.items.length);
+        console.log('Loaded projects:', projectResponse.items.length);
+
+        setCounterparties(cpResponse.items);
+        setProjects(projectResponse.items);
+      } catch (err) {
+        console.error('Failed to load counterparties/projects:', err);
+      } finally {
+        setLoadingCounterparties(false);
+        setLoadingProjects(false);
+      }
+    };
+
+    loadAll();
+  }, [canSelectBinding]);
+
+  // URL presets
   useEffect(() => {
-    if (preR.current || !canSel || (!cps.length && !prs.length)) return;
-    if (prePId && prs.find(p => p.id === prePId)) { setBind('project'); setPId(prePId); preR.current = true; }
-    else if (preCpId && cps.find(c => c.id === preCpId)) { setBind('counterparty'); setCpId(preCpId); preR.current = true; }
-  }, [canSel, cps, prs, preCpId, prePId]);
+    if (presetAppliedRef.current || !canSelectBinding) return;
+    if (!counterparties.length && !projects.length) return;
 
+    if (preProjectId) {
+      const found = projects.find((p) => p.id === preProjectId);
+      if (found) {
+        setBindType('project');
+        setProjectId(preProjectId);
+        presetAppliedRef.current = true;
+        return;
+      }
+    }
+
+    if (preCounterpartyId) {
+      const found = counterparties.find((c) => c.id === preCounterpartyId);
+      if (found) {
+        setBindType('counterparty');
+        setCounterpartyId(preCounterpartyId);
+        presetAppliedRef.current = true;
+      }
+    }
+  }, [canSelectBinding, counterparties, projects, preCounterpartyId, preProjectId]);
+
+  // Users for reporter selection
   useEffect(() => {
-    if (!canRep || !relCp) { setUsrs([]); return; }
-    setLUs(true);
-    usersApi.getCustomers(relCp, 1, 100).then(r => {
-      const items: SUser[] = r.items.map((u: any) => ({ id: u.id, username: u.username, full_name: u.full_name, email: u.email }));
-      const has = items.some(u => u.id === uid);
-      const me: SUser | null = uid ? { id: uid, username: (user as any)?.username || '', full_name: (user as any)?.full_name || null, email: (user as any)?.email || '' } : null;
-      setUsrs(has || !me ? items : [me, ...items]);
-    }).catch(() => { }).finally(() => setLUs(false));
-  }, [canRep, relCp, uid, user]);
-
-  useEffect(() => { if (rId && !usrs.some(u => u.id === rId)) setRId(''); }, [usrs, rId]);
-
-  // ── Handlers ──
-  const chBind = (v: Bind) => {
-    setBind(v);
-    if (v !== 'counterparty') setCpId('');
-    if (v !== 'project') setPId('');
-    setRId(''); clrE('counterparty'); clrE('project');
-  };
-
-  const togTag = (t: TicketTag) => setTags(p => p.some(x => x.name === t.name) ? p.filter(x => x.name !== t.name) : [...p, t]);
-  const addTag = () => {
-    const v = tagIn.trim();
-    if (!v || tags.some(t => t.name.toLowerCase() === v.toLowerCase())) { setTagIn(''); return; }
-    setTags(p => [...p, { name: v, color: '#64748b' }]); setTagIn('');
-  };
-
-  const addFiles = (fl: File[]) => {
-    const n: GFile[] = fl.map(f => ({
-      id: `${f.name}_${Date.now()}_${Math.random()}`, file: f,
-      preview: f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined,
-    }));
-    setFiles(p => [...p, ...n].slice(0, 10));
-  };
-
-  const rmFile = (id: string) => {
-    const f = files.find(x => x.id === id);
-    if (f?.preview) URL.revokeObjectURL(f.preview);
-    setFiles(p => p.filter(x => x.id !== id));
-  };
-
-  const doAi = async () => {
-    if (!title.trim() || !desc.trim()) {
-      if (!title.trim()) setErrs(p => ({ ...p, title: 'Нужна тема' }));
-      if (!desc.trim()) setErrs(p => ({ ...p, desc: 'Нужно описание' }));
+    if (!canSelectReporter || !relatedCounterpartyId) {
+      setUsers([]);
       return;
     }
-    setAiL(true);
+
+    const loadUsers = async () => {
+      setLoadingUsers(true);
+      try {
+        const response = await usersApi.getCustomers(relatedCounterpartyId, 1, 100);
+        const items: SimpleUser[] = response.items.map((u: any) => ({
+          id: u.id,
+          username: u.username,
+          full_name: u.full_name,
+          email: u.email,
+        }));
+
+        const alreadyHasCurrentUser = items.some((u) => u.id === currentUserId);
+        const currentUserAsOption: SimpleUser | null = currentUserId
+          ? {
+              id: currentUserId,
+              username: (user as any)?.username || '',
+              full_name: (user as any)?.full_name || null,
+              email: (user as any)?.email || '',
+            }
+          : null;
+
+        setUsers(
+          alreadyHasCurrentUser || !currentUserAsOption
+            ? items
+            : [currentUserAsOption, ...items]
+        );
+      } catch (err) {
+        console.error('Failed to load users:', err);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+
+    loadUsers();
+  }, [canSelectReporter, relatedCounterpartyId, currentUserId, user]);
+
+  // Reset reporter if users list changed
+  useEffect(() => {
+    if (reporterId && !users.some((u) => u.id === reporterId)) {
+      setReporterId('');
+    }
+  }, [users, reporterId]);
+
+  /* ══════════════════════════════════════════════
+     Handlers
+     ══════════════════════════════════════════════ */
+
+  const handleBindTypeChange = (value: BindType) => {
+    setBindType(value);
+    if (value !== 'counterparty') setCounterpartyId('');
+    if (value !== 'project') setProjectId('');
+    setReporterId('');
+    clearError('counterparty');
+    clearError('project');
+  };
+
+  const toggleTag = (tag: TicketTag) => {
+    setTags((prev) =>
+      prev.some((t) => t.name === tag.name)
+        ? prev.filter((t) => t.name !== tag.name)
+        : [...prev, tag]
+    );
+  };
+
+  const addCustomTag = () => {
+    const value = newTagInput.trim();
+    if (!value) return;
+    if (tags.some((t) => t.name.toLowerCase() === value.toLowerCase())) {
+      setNewTagInput('');
+      return;
+    }
+    setTags((prev) => [...prev, { name: value, color: '#64748b' }]);
+    setNewTagInput('');
+  };
+
+  const handleFileAdd = (fileList: File[]) => {
+    const newFiles: AttachedFile[] = fileList.map((file) => ({
+      id: `${file.name}_${Date.now()}_${Math.random()}`,
+      file,
+      preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
+    }));
+    setAttachedFiles((prev) => [...prev, ...newFiles].slice(0, 10));
+  };
+
+  const handleFileRemove = (id: string) => {
+    const found = attachedFiles.find((f) => f.id === id);
+    if (found?.preview) URL.revokeObjectURL(found.preview);
+    setAttachedFiles((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const handleAiSuggest = async () => {
+    if (!title.trim() || !description.trim()) {
+      if (!title.trim()) setErrors((p) => ({ ...p, title: 'Сначала укажите тему' }));
+      if (!description.trim()) setErrors((p) => ({ ...p, description: 'Сначала опишите проблему' }));
+      return;
+    }
+
+    setAiLoading(true);
     try {
-      const r = await ticketsApi.predict(title.trim(), desc.trim());
-      if (r?.suggested_priority) setPri(r.suggested_priority);
-      if (r?.suggested_tags?.length) {
-        setTags(prev => {
-          const m = new Map<string, TicketTag>();
-          [...prev, ...r.suggested_tags].forEach(t => m.set(t.name.toLowerCase(), t));
-          return Array.from(m.values());
+      const result = await ticketsApi.predict(title.trim(), description.trim());
+      if (result?.suggested_priority) setPriority(result.suggested_priority);
+      if (result?.suggested_tags?.length) {
+        setTags((prev) => {
+          const map = new Map<string, TicketTag>();
+          [...prev, ...result.suggested_tags].forEach((t) =>
+            map.set(t.name.toLowerCase(), t)
+          );
+          return Array.from(map.values());
         });
       }
-    } catch { } finally { setAiL(false); }
+    } catch (err) {
+      console.error('AI prediction failed:', err);
+    } finally {
+      setAiLoading(false);
+    }
   };
 
-  const validate = () => {
-    const e: Record<string, string> = {};
-    if (!title.trim()) e.title = 'Укажите тему';
-    if (!desc.trim()) e.desc = 'Опишите проблему';
-    if (canSel && bind === 'counterparty' && !cpId) e.counterparty = 'Выберите компанию';
-    if (canSel && bind === 'project' && !pId) e.project = 'Выберите проект';
-    setErrs(e); return !Object.keys(e).length;
+  const validate = (): boolean => {
+    const nextErrors: Record<string, string> = {};
+
+    if (!title.trim()) nextErrors.title = 'Укажите тему заявки';
+    if (!description.trim()) nextErrors.description = 'Опишите проблему';
+
+    if (canSelectBinding && bindType === 'counterparty' && !counterpartyId) {
+      nextErrors.counterparty = 'Выберите компанию';
+    }
+    if (canSelectBinding && bindType === 'project' && !projectId) {
+      nextErrors.project = 'Выберите проект';
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
-  const doSubmit = async () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
-    setSub(true);
+
+    setSubmitting(true);
     try {
-      const pay: any = {
-        title: title.trim(), description: desc.trim(), priority: pri, type,
-        tags: tags.map(t => ({ name: t.name, color: t.color || '#64748b' })),
-        reporter_id: rId || uid,
+      const payload: any = {
+        title: title.trim(),
+        description: description.trim(),
+        priority,
+        type,
+        tags: tags.map((t) => ({ name: t.name, color: t.color || '#64748b' })),
+        reporter_id: reporterId || currentUserId,
       };
-      if (isCust && custCp) pay.counterparty_id = custCp.id;
-      else if (bind === 'project' && pId) pay.project_id = pId;
-      else if (bind === 'counterparty' && cpId) pay.counterparty_id = cpId;
 
-      const ticket = await ticketsApi.create(pay);
-      for (const f of files) {
-        try { await attachmentsApi.uploadAttachment(f.file, 'ticket', ticket.id); } catch { }
+      if (isCustomer && customerCounterparty) {
+        payload.counterparty_id = customerCounterparty.id;
+      } else if (bindType === 'project' && projectId) {
+        payload.project_id = projectId;
+      } else if (bindType === 'counterparty' && counterpartyId) {
+        payload.counterparty_id = counterpartyId;
       }
-      localStorage.removeItem(dk);
+
+      const ticket = await ticketsApi.create(payload);
+
+      // Upload files
+      for (const item of attachedFiles) {
+        try {
+          await attachmentsApi.uploadAttachment(item.file, 'ticket', ticket.id);
+        } catch (err) {
+          console.error('File upload failed:', item.file.name, err);
+        }
+      }
+
+      localStorage.removeItem(draftKey);
       navigate('/tickets');
-    } catch (e: any) { console.error('Fail', e?.response?.data || e); }
-    finally { setSub(false); }
+    } catch (err: any) {
+      console.error('Submit failed:', err?.response?.data || err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const priColor = (c: string, active: boolean) => {
-    const map: Record<string, { bg: string; border: string; text: string; activeBg: string; activeBorder: string; activeText: string }> = {
-      emerald: { bg: 'bg-emerald-500/5', border: 'border-emerald-500/20', text: 'text-emerald-400/60', activeBg: 'bg-emerald-500/20', activeBorder: 'border-emerald-400', activeText: 'text-emerald-300' },
-      yellow:  { bg: 'bg-yellow-500/5',  border: 'border-yellow-500/20',  text: 'text-yellow-400/60',  activeBg: 'bg-yellow-500/20',  activeBorder: 'border-yellow-400',  activeText: 'text-yellow-300' },
-      orange:  { bg: 'bg-orange-500/5',  border: 'border-orange-500/20',  text: 'text-orange-400/60',  activeBg: 'bg-orange-500/20',  activeBorder: 'border-orange-400',  activeText: 'text-orange-300' },
-      red:     { bg: 'bg-red-500/5',     border: 'border-red-500/20',     text: 'text-red-400/60',     activeBg: 'bg-red-500/20',     activeBorder: 'border-red-400',     activeText: 'text-red-300' },
-    };
-    const m = map[c] || map.yellow;
-    return active
-      ? `${m.activeBg} ${m.activeBorder} ${m.activeText} ring-1 ring-current/20`
-      : `${m.bg} ${m.border} ${m.text} hover:${m.text.replace('/60', '')}`;
-  };
-
-  /* ═══════════════════════════════════════════════════════════
+  /* ══════════════════════════════════════════════
      RENDER
-     ═══════════════════════════════════════════════════════════ */
+     ══════════════════════════════════════════════ */
 
   return (
     <div className="h-[calc(100vh-var(--header-height,64px))] flex flex-col overflow-hidden">
-
       {/* ── Top bar ── */}
-      <div className="flex-shrink-0 flex items-center justify-between gap-4 px-6 py-3 border-b border-[var(--border-color)] bg-[var(--bg-primary)]">
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={() => navigate('/tickets')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--hover-1)] hover:bg-[var(--hover-2)] text-xs text-[var(--text-primary)]/60 hover:text-[var(--text-primary)] transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" /> К заявкам
+      <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-[var(--border-color)] bg-[var(--bg-primary)]">
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => navigate('/tickets')}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--hover-1)] hover:bg-[var(--hover-2)] text-sm text-[var(--text-primary)]/60 hover:text-[var(--text-primary)] transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            К заявкам
           </button>
           <h1 className="text-lg font-semibold text-[var(--text-primary)]">Новая заявка</h1>
         </div>
-        <div className="flex items-center gap-3">
-          {saved && <span className="text-xs text-[var(--text-primary)]/30">черновик · {fmtT(saved)}</span>}
-          <button type="button" onClick={doSubmit} disabled={sub}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-700 hover:bg-red-600 text-white text-sm font-medium disabled:opacity-50 transition-colors shadow-lg shadow-red-900/20">
-            {sub ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            {sub ? 'Создаём...' : 'Создать'}
+
+        <div className="flex items-center gap-4">
+          {savedAt && (
+            <span className="text-xs text-[var(--text-primary)]/35">
+              Сохранено · {formatTime(savedAt)}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-700 hover:bg-red-600 text-white text-sm font-semibold disabled:opacity-50 transition-colors shadow-lg shadow-red-900/25"
+          >
+            {submitting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+            {submitting ? 'Создаём...' : 'Создать заявку'}
           </button>
         </div>
       </div>
 
       {/* ── Draft banner ── */}
-      {showDraft && draftD && (
-        <div className="flex-shrink-0 px-6 py-2 bg-amber-500/10 border-b border-amber-500/20 flex items-center gap-3">
-          <div className="flex-1 text-sm">
-            <span className="text-amber-300 font-medium">Черновик:</span>{' '}
-            <span className="text-[var(--text-primary)]/60">«{draftD.title || 'без темы'}» · {fmtT(draftD.at)}</span>
+      {showDraftBanner && draftData && (
+        <div className="flex-shrink-0 px-6 py-3 bg-amber-500/10 border-b border-amber-500/20">
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <span className="text-sm font-medium text-amber-300">Найден черновик: </span>
+              <span className="text-sm text-[var(--text-primary)]/60">
+                «{draftData.title || 'без темы'}» · сохранён в {formatTime(draftData.savedAt)}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={restoreDraft}
+              className="px-4 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-sm font-medium transition-colors"
+            >
+              Восстановить
+            </button>
+            <button
+              type="button"
+              onClick={dismissDraft}
+              className="px-4 py-1.5 rounded-lg hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40 text-sm transition-colors"
+            >
+              Удалить
+            </button>
           </div>
-          <button type="button" onClick={restore}
-            className="px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-medium transition-colors">
-            Восстановить
-          </button>
-          <button type="button" onClick={dismiss}
-            className="px-3 py-1 rounded-lg hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40 text-xs transition-colors">
-            Удалить
-          </button>
         </div>
       )}
 
       {/* ── Errors ── */}
-      {Object.keys(errs).length > 0 && (
-        <div className="flex-shrink-0 px-6 py-2 bg-red-500/8 border-b border-red-500/20 flex flex-wrap gap-x-4 gap-y-1">
-          {Object.values(errs).map((e, i) => (
-            <span key={i} className="text-xs text-red-400 flex items-center gap-1.5">
-              <span className="w-1 h-1 rounded-full bg-red-400" /> {e}
-            </span>
-          ))}
+      {Object.keys(errors).length > 0 && (
+        <div className="flex-shrink-0 px-6 py-2.5 bg-red-500/8 border-b border-red-500/20">
+          <div className="flex flex-wrap gap-x-6 gap-y-1">
+            {Object.values(errors).map((error, idx) => (
+              <span key={idx} className="text-sm text-red-400 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
+                {error}
+              </span>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* ── Main content ── */}
+      {/* ── Main area: two columns ── */}
       <div className="flex-1 flex overflow-hidden">
-
-        {/* ═══ LEFT: Main form ═══ */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-3xl space-y-4">
-
+        {/* ═══ LEFT COLUMN: title + description + files ═══ */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-3xl p-6 space-y-5">
             {/* Title */}
-            <div>
-              <input value={title}
-                onChange={e => { setTitle(e.target.value); clrE('title'); }}
-                placeholder="Тема: что случилось"
-                className={`w-full bg-transparent border-none text-xl font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/20 focus:outline-none focus:ring-0 p-0
-                  ${errs.title ? 'placeholder:text-red-400/40' : ''}`}
+            <Section title="Тема заявки">
+              <input
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  clearError('title');
+                }}
+                placeholder="Коротко опишите проблему"
+                className={`w-full px-4 py-3 rounded-xl border bg-[var(--bg-primary)] text-base text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/25 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500/40 transition-all ${
+                  errors.title
+                    ? 'border-red-500/50 ring-1 ring-red-500/20'
+                    : 'border-[var(--border-color)]'
+                }`}
               />
-              <div className="mt-1 h-px bg-[var(--border-color)]" />
-            </div>
+            </Section>
 
             {/* Description */}
-            <div>
-              <textarea value={desc}
-                onChange={e => { setDesc(e.target.value); clrE('desc'); }}
-                placeholder="Опишите проблему подробнее: что произошло, как воспроизвести, когда началось..."
-                className={`w-full bg-transparent border-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/20 focus:outline-none focus:ring-0 p-0 resize-none min-h-[200px]
-                  ${errs.desc ? 'placeholder:text-red-400/40' : ''}`}
-                style={{ height: Math.max(200, desc.split('\n').length * 22) }}
+            <Section title="Описание проблемы">
+              <textarea
+                value={description}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  clearError('description');
+                }}
+                placeholder="Что произошло, как воспроизвести, когда началось, что ожидалось..."
+                rows={10}
+                className={`w-full px-4 py-3 rounded-xl border bg-[var(--bg-primary)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/25 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500/40 transition-all resize-y min-h-[180px] ${
+                  errors.description
+                    ? 'border-red-500/50 ring-1 ring-red-500/20'
+                    : 'border-[var(--border-color)]'
+                }`}
               />
-            </div>
+            </Section>
 
             {/* Files */}
-            <div className="pt-2">
+            <Section title={`Вложения${attachedFiles.length ? ` (${attachedFiles.length})` : ''}`}>
               <div
-                onDrop={e => { e.preventDefault(); addFiles(Array.from(e.dataTransfer.files)); }}
-                onDragOver={e => e.preventDefault()}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-dashed border-[var(--border-color)] hover:border-[var(--text-primary)]/20 transition-colors"
+                onDrop={(e) => {
+                  e.preventDefault();
+                  handleFileAdd(Array.from(e.dataTransfer.files));
+                }}
+                onDragOver={(e) => e.preventDefault()}
+                className="flex items-center gap-4 px-4 py-3 rounded-xl border border-dashed border-[var(--border-color)] hover:border-[var(--text-primary)]/25 bg-[var(--bg-primary)] transition-colors"
               >
-                <Upload className="w-4 h-4 text-[var(--text-primary)]/20 flex-shrink-0" />
-                <span className="flex-1 text-xs text-[var(--text-primary)]/35">
-                  {files.length ? `${files.length} файл(ов) · перетащите ещё` : 'Перетащите файлы сюда'}
+                <Upload className="w-5 h-5 text-[var(--text-primary)]/25 flex-shrink-0" />
+                <span className="flex-1 text-sm text-[var(--text-primary)]/40">
+                  Перетащите файлы сюда или
                 </span>
-                <label className="px-2.5 py-1 rounded bg-[var(--hover-1)] hover:bg-[var(--hover-2)] text-xs text-[var(--text-primary)]/50 cursor-pointer transition-colors">
-                  <input type="file" multiple onChange={e => addFiles(Array.from(e.target.files || []))} className="hidden" />
-                  выбрать
+                <label className="px-4 py-2 rounded-lg bg-[var(--hover-1)] hover:bg-[var(--hover-2)] text-sm text-[var(--text-primary)]/60 cursor-pointer transition-colors font-medium">
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(e) => handleFileAdd(Array.from(e.target.files || []))}
+                    className="hidden"
+                  />
+                  Выбрать файлы
                 </label>
               </div>
 
-              {files.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {files.map(f => (
-                    <div key={f.id} className="group relative">
+              {attachedFiles.length > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  {attachedFiles.map((f) => (
+                    <div
+                      key={f.id}
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)]"
+                    >
                       {f.preview ? (
-                        <img src={f.preview} alt="" className="w-16 h-16 rounded-lg object-cover border border-[var(--border-color)]" />
+                        <img
+                          src={f.preview}
+                          alt=""
+                          className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                        />
                       ) : (
-                        <div className="w-16 h-16 rounded-lg bg-[var(--hover-1)] border border-[var(--border-color)] flex flex-col items-center justify-center">
-                          <File className="w-4 h-4 text-[var(--text-primary)]/25" />
-                          <span className="text-[8px] text-[var(--text-primary)]/30 mt-0.5 max-w-[50px] truncate">{f.file.name.split('.').pop()}</span>
+                        <div className="w-10 h-10 rounded-lg bg-[var(--hover-1)] flex items-center justify-center flex-shrink-0">
+                          <File className="w-4 h-4 text-[var(--text-primary)]/30" />
                         </div>
                       )}
-                      <button type="button" onClick={() => rmFile(f.id)}
-                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow">
-                        <X className="w-3 h-3" />
-                      </button>
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 rounded-b-lg px-1 py-0.5 text-[7px] text-white/70 truncate text-center">
-                        {fmtSize(f.file.size)}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-[var(--text-primary)] truncate">
+                          {f.file.name}
+                        </div>
+                        <div className="text-xs text-[var(--text-primary)]/40">
+                          {formatFileSize(f.file.size)}
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => handleFileRemove(f.id)}
+                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--text-primary)]/30 hover:text-red-400 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+
+              <p className="mt-2 text-xs text-[var(--text-primary)]/30">
+                До 10 файлов, максимум 25 МБ каждый
+              </p>
+            </Section>
           </div>
         </div>
 
-        {/* ═══ RIGHT: Sidebar ═══ */}
-        <div className="w-72 xl:w-80 flex-shrink-0 border-l border-[var(--border-color)] overflow-y-auto bg-[var(--bg-secondary)]/50">
-          <div className="p-4 space-y-5">
-
+        {/* ═══ RIGHT COLUMN: settings ═══ */}
+        <div className="w-80 xl:w-96 flex-shrink-0 border-l border-[var(--border-color)] overflow-y-auto bg-[var(--bg-secondary)]/30">
+          <div className="p-4 space-y-4">
             {/* Binding */}
-            <div>
-              <div className="text-xs font-semibold text-[var(--text-primary)]/40 uppercase tracking-wider mb-2">Привязка</div>
-
-              {isCust && custCp && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/8 border border-blue-500/15 mb-2">
-                  <Building2 className="w-3.5 h-3.5 text-blue-400" />
-                  <span className="text-xs text-[var(--text-primary)]">{custCp.name}</span>
+            <Section title="Привязка">
+              {isCustomer && customerCounterparty && (
+                <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-blue-500/8 border border-blue-500/20 mb-3">
+                  <Building2 className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-sm text-[var(--text-primary)] font-medium truncate">
+                      {customerCounterparty.name}
+                    </div>
+                    {customerCounterparty.inn && (
+                      <div className="text-xs text-[var(--text-primary)]/40">
+                        ИНН {customerCounterparty.inn}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
-              {canSel && (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-3 gap-1 p-0.5 rounded-lg bg-[var(--hover-1)]">
-                    {([
-                      { v: 'none' as Bind, l: 'Нет' },
-                      { v: 'counterparty' as Bind, l: 'Компания' },
-                      { v: 'project' as Bind, l: 'Проект' },
-                    ]).map(b => (
-                      <button key={b.v} type="button" onClick={() => chBind(b.v)}
-                        className={`px-2 py-1.5 rounded-md text-xs font-medium transition-all text-center
-                          ${bind === b.v
+              {canSelectBinding && (
+                <div className="space-y-3">
+                  {/* Tabs */}
+                  <div className="flex gap-1 p-1 rounded-xl bg-[var(--hover-1)]">
+                    {(
+                      [
+                        { value: 'none' as BindType, label: 'Нет' },
+                        { value: 'counterparty' as BindType, label: 'Компания' },
+                        { value: 'project' as BindType, label: 'Проект' },
+                      ] as const
+                    ).map((item) => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => handleBindTypeChange(item.value)}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all text-center ${
+                          bindType === item.value
                             ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm'
-                            : 'text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60'}`}>
-                        {b.l}
+                            : 'text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60'
+                        }`}
+                      >
+                        {item.label}
                       </button>
                     ))}
                   </div>
 
-                  {bind === 'counterparty' && (
-                    <Dd options={cpOpts} value={cpId}
-                      onChange={v => { setCpId(v); clrE('counterparty'); setRId(''); }}
-                      placeholder="Компания..." search="Название, ИНН..."
-                      loading={lCp} icon={<Building2 className="w-3.5 h-3.5" />} />
+                  {/* Counterparty dropdown */}
+                  {bindType === 'counterparty' && (
+                    <div>
+                      <label className="block text-sm text-[var(--text-primary)]/60 mb-1.5">
+                        Компания
+                      </label>
+                      <Dropdown
+                        options={counterpartyOptions}
+                        value={counterpartyId}
+                        onChange={(id) => {
+                          setCounterpartyId(id);
+                          clearError('counterparty');
+                          setReporterId('');
+                        }}
+                        placeholder="Выберите компанию..."
+                        searchPlaceholder="Название или ИНН..."
+                        loading={loadingCounterparties}
+                        icon={<Building2 className="w-4 h-4" />}
+                        emptyText="Компании не найдены"
+                      />
+                      {loadingCounterparties && (
+                        <p className="mt-1.5 text-xs text-[var(--text-primary)]/30">
+                          Загружаем список компаний...
+                        </p>
+                      )}
+                    </div>
                   )}
 
-                  {bind === 'project' && (
-                    <Dd options={pOpts} value={pId}
-                      onChange={v => { setPId(v); clrE('project'); setRId(''); }}
-                      placeholder="Проект..." search="Ключ, название..."
-                      loading={lPr} icon={<FolderOpen className="w-3.5 h-3.5" />} />
+                  {/* Project dropdown */}
+                  {bindType === 'project' && (
+                    <div>
+                      <label className="block text-sm text-[var(--text-primary)]/60 mb-1.5">
+                        Проект
+                      </label>
+                      <Dropdown
+                        options={projectOptions}
+                        value={projectId}
+                        onChange={(id) => {
+                          setProjectId(id);
+                          clearError('project');
+                          setReporterId('');
+                        }}
+                        placeholder="Выберите проект..."
+                        searchPlaceholder="Ключ или название..."
+                        loading={loadingProjects}
+                        icon={<FolderOpen className="w-4 h-4" />}
+                        emptyText="Проекты не найдены"
+                      />
+                      {loadingProjects && (
+                        <p className="mt-1.5 text-xs text-[var(--text-primary)]/30">
+                          Загружаем проекты...
+                        </p>
+                      )}
+                      {selectedProject && (
+                        <p className="mt-1.5 text-xs text-[var(--text-primary)]/40">
+                          Контрагент:{' '}
+                          {counterparties.find((c) => c.id === selectedProject.counterparty_id)
+                            ? counterpartyName(
+                                counterparties.find(
+                                  (c) => c.id === selectedProject.counterparty_id
+                                ) as Counterparty
+                              )
+                            : '—'}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
-            </div>
+            </Section>
 
             {/* Reporter */}
-            {canRep && relCp && (
-              <div>
-                <div className="text-xs font-semibold text-[var(--text-primary)]/40 uppercase tracking-wider mb-2">Инициатор</div>
-                <Dd options={uOpts} value={rId} onChange={setRId}
-                  placeholder="Я (по умолчанию)" search="Имя, email..."
-                  loading={lUs} icon={<User className="w-3.5 h-3.5" />} />
-              </div>
+            {canSelectReporter && relatedCounterpartyId && (
+              <Section title="Инициатор">
+                <Dropdown
+                  options={userOptions}
+                  value={reporterId}
+                  onChange={setReporterId}
+                  placeholder="Я создаю заявку сам"
+                  searchPlaceholder="Имя или email..."
+                  loading={loadingUsers}
+                  icon={<User className="w-4 h-4" />}
+                  emptyText="Пользователи не найдены"
+                />
+                <p className="mt-1.5 text-xs text-[var(--text-primary)]/30">
+                  Оставьте пустым, если создаёте заявку от своего имени
+                </p>
+              </Section>
             )}
 
-            {/* Divider */}
-            <div className="h-px bg-[var(--border-color)]" />
-
-            {/* Type */}
-            <div>
-              <div className="text-xs font-semibold text-[var(--text-primary)]/40 uppercase tracking-wider mb-2">Категория</div>
-              <Dd options={tOpts} value={type}
-                onChange={v => setType(v as TicketType)}
-                placeholder="Тип заявки" />
-            </div>
+            {/* Category */}
+            <Section title="Категория">
+              <Dropdown
+                options={typeOptions}
+                value={type}
+                onChange={(v) => setType(v as TicketType)}
+                placeholder="Тип заявки"
+              />
+            </Section>
 
             {/* Priority */}
-            <div>
-              <div className="text-xs font-semibold text-[var(--text-primary)]/40 uppercase tracking-wider mb-2">Срочность</div>
-              <div className="grid grid-cols-2 gap-1.5">
-                {PRIORITIES.map(p => (
-                  <button key={p.value} type="button" onClick={() => setPri(p.value)}
-                    className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${priColor(p.color, pri === p.value)}`}>
-                    {p.icon} {p.label}
+            <Section title="Срочность">
+              <div className="grid grid-cols-2 gap-2">
+                {PRIORITIES.map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setPriority(p.value)}
+                    className={`inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${getPriorityClasses(
+                      p.color,
+                      priority === p.value
+                    )}`}
+                  >
+                    {p.icon}
+                    {p.label}
                   </button>
                 ))}
               </div>
-            </div>
+            </Section>
 
-            {/* AI */}
-            <button type="button" onClick={doAi} disabled={aiL}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs bg-amber-500/8 border border-amber-500/15 text-amber-300/80 hover:bg-amber-500/15 hover:text-amber-300 disabled:opacity-40 transition-colors">
-              {aiL ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+            {/* AI button */}
+            <button
+              type="button"
+              onClick={handleAiSuggest}
+              disabled={aiLoading}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm bg-amber-500/8 border border-amber-500/20 text-amber-300/80 hover:bg-amber-500/15 hover:text-amber-300 disabled:opacity-40 transition-colors font-medium"
+            >
+              {aiLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4" />
+              )}
               ИИ: подобрать приоритет и теги
             </button>
 
-            {/* Divider */}
-            <div className="h-px bg-[var(--border-color)]" />
-
             {/* Tags */}
-            <div>
-              <div className="text-xs font-semibold text-[var(--text-primary)]/40 uppercase tracking-wider mb-2">Теги</div>
-
-              <div className="flex flex-wrap gap-1 mb-2">
-                {PRESET_TAGS.map(t => {
-                  const on = tags.some(x => x.name === t.name);
+            <Section title="Теги">
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {PRESET_TAGS.map((tag) => {
+                  const active = tags.some((t) => t.name === tag.name);
                   return (
-                    <button key={t.name} type="button" onClick={() => togTag(t)}
-                      className="px-2 py-1 rounded text-[11px] font-medium border transition-all"
+                    <button
+                      key={tag.name}
+                      type="button"
+                      onClick={() => toggleTag(tag)}
+                      className="px-3 py-1.5 rounded-lg border text-xs font-medium transition-all"
                       style={{
-                        backgroundColor: on ? `${t.color}20` : 'transparent',
-                        borderColor: on ? `${t.color}50` : 'var(--border-color)',
-                        color: on ? t.color : 'var(--text-primary)',
-                        opacity: on ? 1 : 0.45,
-                      }}>
-                      {t.name}
+                        backgroundColor: active ? `${tag.color}20` : 'transparent',
+                        borderColor: active ? `${tag.color}60` : 'var(--border-color)',
+                        color: active ? tag.color : 'var(--text-primary)',
+                        opacity: active ? 1 : 0.5,
+                      }}
+                    >
+                      {tag.name}
                     </button>
                   );
                 })}
               </div>
 
-              <div className="flex gap-1">
-                <input value={tagIn} onChange={e => setTagIn(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+              <div className="flex gap-2">
+                <input
+                  value={newTagInput}
+                  onChange={(e) => setNewTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addCustomTag();
+                    }
+                  }}
                   placeholder="Свой тег..."
-                  className="flex-1 px-2 py-1.5 rounded-lg bg-[var(--hover-1)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/20 focus:outline-none focus:border-red-500/30" />
-                <button type="button" onClick={addTag} disabled={!tagIn.trim()}
-                  className="px-2 py-1.5 rounded-lg bg-[var(--hover-1)] hover:bg-[var(--hover-2)] disabled:opacity-20 transition-colors">
-                  <Plus className="w-3.5 h-3.5 text-[var(--text-primary)]/40" />
+                  className="flex-1 px-3 py-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/25 focus:outline-none focus:border-red-500/30 focus:ring-1 focus:ring-red-500/20"
+                />
+                <button
+                  type="button"
+                  onClick={addCustomTag}
+                  disabled={!newTagInput.trim()}
+                  className="px-3 py-2 rounded-lg bg-[var(--hover-1)] hover:bg-[var(--hover-2)] disabled:opacity-25 transition-colors"
+                >
+                  <Plus className="w-4 h-4 text-[var(--text-primary)]/50" />
                 </button>
               </div>
 
               {tags.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {tags.map(t => (
-                    <span key={t.name}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] border"
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag.name}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium"
                       style={{
-                        backgroundColor: `${t.color || '#64748b'}15`,
-                        borderColor: `${t.color || '#64748b'}35`,
-                        color: t.color || '#94a3b8',
-                      }}>
-                      {t.name}
-                      <button type="button" onClick={() => setTags(p => p.filter(x => x.name !== t.name))}
-                        className="hover:text-red-400"><X className="w-2.5 h-2.5" /></button>
+                        backgroundColor: `${tag.color || '#64748b'}18`,
+                        borderColor: `${tag.color || '#64748b'}40`,
+                        color: tag.color || '#94a3b8',
+                      }}
+                    >
+                      {tag.name}
+                      <button
+                        type="button"
+                        onClick={() => setTags((p) => p.filter((t) => t.name !== tag.name))}
+                        className="hover:text-red-400 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     </span>
                   ))}
                 </div>
               )}
-            </div>
+            </Section>
           </div>
         </div>
       </div>
