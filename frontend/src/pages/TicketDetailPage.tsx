@@ -64,7 +64,7 @@ function hasAnyRole(userRoles: string[] | undefined, targetRoles: string[]): boo
    ═══════════════════════════════════════════════════════════════════ */
 
 const STATUS_TRANSITIONS: Record<string, string[]> = {
-  'new': ['pending_approval', 'cancelled'],
+  'new': ['pending_approval', 'canceled'],
   'pending_approval': ['open', 'rejected'],
   'open': ['in_progress'],
   'in_progress': ['waiting', 'resolved'],
@@ -85,7 +85,7 @@ const STATUS_LABELS: Record<string, string> = {
   'closed': 'Закрыт',
   'reopened': 'Переоткрыт',
   'rejected': 'Отклонён',
-  'cancelled': 'Отменён',
+  'canceled': 'Отменён',
 };
 
 const STATUS_PERMISSIONS: Record<string, string[]> = {
@@ -98,7 +98,7 @@ const STATUS_PERMISSIONS: Record<string, string[]> = {
   'closed': ['admin', 'support_agent', 'support_manager'],
   'reopened': ['admin', 'support_agent', 'support_manager'],
   'rejected': ['admin', 'support_agent', 'support_manager'],
-  'cancelled': ['admin', 'support_agent', 'support_manager'], 
+  'canceled': ['admin', 'support_agent', 'support_manager'], 
 };
 
 const STATUS_DESCRIPTIONS: Record<string, string> = {
@@ -111,7 +111,7 @@ const STATUS_DESCRIPTIONS: Record<string, string> = {
   'closed': 'Тикет закрыт',
   'reopened': 'Тикет переоткрыт',
   'rejected': 'Тикет отклонён',
-  'cancelled': 'Тикет отменён',
+  'canceled': 'Тикет отменён',
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -908,7 +908,7 @@ const handleStatusChange = useCallback(async (s: string) => {
       'closed': 'status-closed',
       'reopened': 'status-reopened',
       'rejected': 'status-rejected',
-      'cancelled': 'status-closed',
+      'canceled': 'status-closed',
     };
     return map[s] || 'status-closed';
   }, []);
@@ -1418,7 +1418,7 @@ const handleStatusChange = useCallback(async (s: string) => {
                           'closed': 'status-closed',
                           'reopened': 'status-reopened',
                           'rejected': 'status-rejected',
-                          'cancelled': 'status-closed',
+                          'canceled': 'status-closed',
                         };
                         const cls = statusBtnMap[status] || 'bg-[var(--hover-1)] text-[var(--text-primary)]';
                         return (
