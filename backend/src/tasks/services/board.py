@@ -39,8 +39,10 @@ class TaskBoardService:
             kwargs = {"assignee_id": context.assignee_id}
 
         elif context.type == "my":
-            kwargs = {"created_by": current_user.id}
-            print(f"🔍 DEBUG my tasks: created_by={current_user.id}")
+            kwargs = {
+                "created_by": current_user.id,
+                "assignee_id": current_user.id,
+            }
             
 
         kwargs.update({"priorities": filters.priorities, "overdue_only": filters.overdue_only})

@@ -148,12 +148,15 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
         if ticket_id is not None:
             conditions.append(self.model.ticket_id == ticket_id)
 
-        if assignee_id is not None:
+        if assignee_id is not None and created_by is not None:
+            # Мои задачи: создатель ИЛИ исполнитель
+            conditions.append(
+                (self.model.assignee_id == assignee_id) | (self.model.created_by == created_by)
+            )
+        elif assignee_id is not None:
             conditions.append(self.model.assignee_id == assignee_id)
-        # ✅ Добавить фильтр по создателю
-        if created_by is not None:
-            conditions.append(self.model.created_by == created_by)
-            print(f"🔍 DEBUG repo: filtering by created_by={created_by}")    
+        elif created_by is not None:
+            conditions.append(self.model.created_by == created_by)   
 
         if priorities is not None:
             conditions.append(self.model.priority.in_(priorities))
