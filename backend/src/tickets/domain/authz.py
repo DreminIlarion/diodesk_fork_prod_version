@@ -83,7 +83,7 @@ class TicketAuthZService:
     async def can_archive_ticket(self, subject: Subject, ticket: Ticket) -> PermissionResult:
         rules = [
             IsAdminRule(subject),
-            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER])
+            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT])
         ]
 
         if ticket.project_id:
@@ -159,7 +159,7 @@ class TicketAuthZService:
                 HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_AGENT]),
                 IsTicketAssigneeRule(subject, ticket),
             ),
-            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.ADMIN]),
+            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.ADMIN, UserRole.SUPPORT_AGENT]),
         ]
 
         return AnyOf(*rules).check()
@@ -188,7 +188,6 @@ class TicketAuthZService:
             rules.append(
                 HasAnyMemberRoleRule(member, required_roles=[MemberRole.OWNER, MemberRole.MANAGER])
             )
-        else:
-            rules.append(HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER]))
+        
 
         return AnyOf(*rules).check()

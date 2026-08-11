@@ -98,6 +98,7 @@ const STATUS_PERMISSIONS: Record<string, string[]> = {
   'closed': ['admin', 'support_agent', 'support_manager'],
   'reopened': ['admin', 'support_agent', 'support_manager'],
   'rejected': ['admin', 'support_agent', 'support_manager'],
+  'cancelled': ['admin', 'support_agent', 'support_manager'], 
 };
 
 const STATUS_DESCRIPTIONS: Record<string, string> = {
@@ -283,7 +284,7 @@ export default function TicketDetailPage() {
     if (!ticket || !user) return false;
     if (ticket.is_archived) return false;
     const isCreatorOrReporter = user.user_id === ticket.created_by || user.user_id === ticket.reporter_id;
-    const staff = hasAnyRole(userRoles, ['admin', 'support_manager']);
+    const staff = hasAnyRole(userRoles, ['admin', 'support_manager', 'support_agent']);
     return isCreatorOrReporter || staff;
   }, [ticket, user, userRoles]);
 
