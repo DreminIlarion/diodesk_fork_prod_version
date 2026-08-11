@@ -35,7 +35,7 @@ class TaskAuthZService:
         return auth_policy.check()
 
     async def can_edit_task(self, subject: Subject, task: Task) -> PermissionResult:
-        rules = [AnyOf(TaskEditingRule(subject, task), IsAdminRule(subject))]
+        rules = [IsAdminRule(subject), IsTaskCreator(subject, task)]
 
         if task.project_id is not None:
             project_member = await self.project_membership_repo.find(task.project_id, subject.id)
@@ -43,7 +43,8 @@ class TaskAuthZService:
                 AllOf(
                     IsMemberExistsRule(project_member),
                     IsProjectOwnerOrManagerRule(project_member)
-                )
+                ),
+                TaskEditingRule(subject, task),
             ])
 
         auth_policy = AnyOf(*rules)
@@ -52,7 +53,7 @@ class TaskAuthZService:
     async def can_change_status(
             self, subject: Subject, task: Task, new_status: TaskStatus
     ) -> PermissionResult:
-        rules = [IsAdminRule(subject)]
+        rules = [IsAdminRule(subject), IsTaskCreator(subject, task)]
 
         if task.project_id is not None:
             project_member = await self.project_membership_repo.find(task.project_id, subject.id)
