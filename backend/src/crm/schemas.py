@@ -13,7 +13,7 @@ class ContactPersonIn(BaseModel):
     last_name: str = Field(..., description="Фамилия")
     middle_name: str | None = Field(None, description="Отчество")
     phone: str = Field(..., description="Номер телефона", examples=["88005553535", "+78005553535"])
-    email: EmailStr = Field(..., description="Адрес электронной почты")
+    email: EmailStr | None = Field(None, description="Адрес электронной почты")
     messengers: dict[str, str] = Field(
         default_factory=dict,
         description="Контакты в мессенджерах",
@@ -26,7 +26,7 @@ class ContactPersonOut(BaseModel):
 
     full_name: str = Field(..., description="ФИО лица", examples=["Иванов Иван Иванович"])
     phone: str = Field(..., description="Номер телефона", examples=["88005553535", "+78005553535"])
-    email: EmailStr = Field(..., description="Адрес электронной почты")
+    email: EmailStr | None = Field(None, description="Адрес электронной почты")
     messengers: dict[str, str] = Field(
         default_factory=dict,
         description="Контакты в мессенджерах",
@@ -46,7 +46,7 @@ class CounterpartyBase(BaseModel):
         description="ОКПО — Общероссийский классификатор предприятий и организаций",
     )
     phone: str = Field(..., description="Номер телефона", examples=["88005553535", "+78005553535"])
-    email: EmailStr = Field(..., description="Адрес электронной почты")
+    email: EmailStr | None = Field(None, description="Адрес электронной почты")
     address: str | None = Field(None, description="Фактический адрес компании")
 
 
