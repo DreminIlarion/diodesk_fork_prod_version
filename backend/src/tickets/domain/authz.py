@@ -2,171 +2,192 @@ from uuid import UUID
 
 from src.iam.domain.authz import AllOf, AnyOf, PermissionResult, Subject
 from src.iam.domain.entities import User
-from src.iam.domain.rules import IsAdminRule, IsStaffRule
+from src.iam.domain.rules import HasAnyUserRoleRule, IsAdminRule, IsStaffRule, IsSupportRule
+from src.iam.domain.vo import UserRole
 from src.projects.domain.repos import ProjectMemberRepository
-from src.projects.domain.rules import IsProjectOwnerOrManagerRule, IsMemberExistsRule
-
-from .entities import Task
-from .rules import (
+from src.projects.domain.rules import (
+    HasAnyMemberRoleRule,
+    IsMemberExistsRule,
+    IsProjectOwnerOrManagerRule,
     IsProjectStaffRule,
-    IsTaskCreator,
-    IsTaskReviewer,
-    TaskAssigneeStatusRule,
-    TaskEditingRule,
-    TaskReviewerStatusRule,
 )
-from .vo import TaskStatus
+from src.projects.domain.vo import MemberRole
+
+from .entities import Ticket
+from .rules import (
+    IsTicketAssigneeRule,
+    IsTicketCreatorRule,
+    IsTicketReporterRule,
+    SameCounterpartyRule,
+)
 
 
-class TaskAuthZService:
-    def __init__(self, project_membership_repo: ProjectMemberRepository) -> None:
-        self.project_membership_repo = project_membership_repo
+class TicketAuthZService:
+    def __init__(self, member_repo: ProjectMemberRepository) -> None:
+        self.member_repo = member_repo
 
-    async def can_create_task(
-            self, subject: Subject, project_id: UUID | None = None
+    async def can_create_ticket(
+            self,
+            subject: Subject,
+            counterparty_id: UUID | None = None,
+            project_id: UUID | None = None,
     ) -> PermissionResult:
-        rules = [IsStaffRule(subject)]
+        rules = [IsAdminRule(subject), SameCounterpartyRule(subject, counterparty_id)]
 
-        if project_id is not None:
-            project_membership = await self.project_membership_repo.find(project_id, subject.id)
-            rules.append(IsProjectStaffRule(project_membership))
+        if project_id:
+            member = await self.member_repo.find(project_id, subject.id)
+            rules.append(IsMemberExistsRule(member))
 
-        auth_policy = AnyOf(*rules)
-        return auth_policy.check()
+        return AnyOf(*rules).check()
 
-    async def can_edit_task(self, subject: Subject, task: Task) -> PermissionResult:
-        rules = [IsAdminRule(subject), TaskEditingRule(subject, task)]
-
-        if task.project_id is not None:
-            project_member = await self.project_membership_repo.find(task.project_id, subject.id)
-            rules.extend([
-                AllOf(
-                    IsMemberExistsRule(project_member),
-                    IsProjectOwnerOrManagerRule(project_member)
-                ),
-            ])
-
-        auth_policy = AnyOf(*rules)
-        return auth_policy.check()
-
-    async def can_change_status(
-            self, subject: Subject, task: Task, new_status: TaskStatus
-    ) -> PermissionResult:
-        rules = [IsAdminRule(subject), IsTaskCreator(subject, task)]
-
-        if task.project_id is not None:
-            project_member = await self.project_membership_repo.find(task.project_id, subject.id)
-            rules.append(
-                AnyOf(
-                    AllOf(
-                        IsMemberExistsRule(project_member),
-                        IsProjectOwnerOrManagerRule(project_member),
-                    ),
-                    AllOf(
-                        IsMemberExistsRule(project_member),
-                        IsProjectStaffRule(project_member),
-                    ),
-                )
-            )
-
-            auth_policy = AnyOf(*rules)
-            return auth_policy.check()
-
-        rules.extend((
+    async def can_access_ticket(self, subject: Subject, ticket: Ticket) -> PermissionResult:
+        rules = [
             IsStaffRule(subject),
-            AnyOf(
-                TaskAssigneeStatusRule(subject, task, new_status),
-                TaskReviewerStatusRule(subject, task, new_status)
+            IsTicketReporterRule(subject, ticket),
+            IsTicketCreatorRule(subject, ticket),
+        ]
+        customer_admin_rule = AllOf(
+            HasAnyUserRoleRule(subject, required_roles=[UserRole.CUSTOMER_ADMIN]),
+            SameCounterpartyRule(subject, ticket.counterparty_id)
+        )
+        rules.append(customer_admin_rule)
+
+        if ticket.project_id:
+            member = await self.member_repo.find(ticket.project_id, subject.id)
+            rules.append(IsMemberExistsRule(member))
+
+        return AnyOf(*rules).check()
+
+    async def can_assign_ticket(
+            self, subject: Subject, ticket: Ticket, assignee: User,
+    ) -> PermissionResult:
+        users_rule = AllOf(
+            *[AnyOf(IsAdminRule(user), IsSupportRule(user)) for user in (subject, assignee)]
+        )
+        rules = [users_rule]
+
+        if ticket.project_id:
+            assigner_member = await self.member_repo.find(ticket.project_id, subject.id)
+            assignee_member = await self.member_repo.find(ticket.project_id, assignee.id)
+
+            members_rule = AllOf(
+                *[
+                    AllOf(IsMemberExistsRule(member), IsProjectStaffRule(member))
+                    for member in (assigner_member, assignee_member)
+                  ]
             )
-        ))
+            rules.append(members_rule)
 
-        auth_policy = AnyOf(*rules)
-        return auth_policy.check()
+        return AnyOf(*rules).check()
 
-    async def can_assign_task(
-            self, subject: Subject, task: Task, assignee: User
-    ) -> PermissionResult:
-        rules = [IsAdminRule(subject), IsTaskCreator(subject, task), IsStaffRule(subject), IsStaffRule(assignee)]
+    async def can_archive_ticket(self, subject: Subject, ticket: Ticket) -> PermissionResult:
+        rules = [
+            IsAdminRule(subject),
+            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT])
+        ]
 
-        if task.project_id is not None:
-            current_member = await self.project_membership_repo.find(task.project_id, subject.id)
-            assignee_member = await self.project_membership_repo.find(task.project_id, assignee.id)
-
-            member_rules = []
-            for member in [current_member, assignee_member]:
-                member_rules.extend((
-                    IsMemberExistsRule(member),
-                    IsProjectStaffRule(member),
-                ))
-
-            rules.append(AllOf(*member_rules))
-
-        auth_policy = AnyOf(*rules)
-        return auth_policy.check()
-
-    async def can_request_review(
-            self, subject: Subject, task: Task, reviewer: User
-    ) -> PermissionResult:
-        rules = [IsAdminRule(subject), IsTaskCreator(subject, task), IsStaffRule(subject)]
-
-        if task.project_id is not None:
-            current_member = await self.project_membership_repo.find(task.project_id, subject.id)
-            reviewer_member = await self.project_membership_repo.find(task.project_id, reviewer.id)
-            member_rules = []
-            for member in [current_member, reviewer_member]:
-                
-                member_rules.extend((
-                    IsMemberExistsRule(member),
-                    IsProjectStaffRule(member),
-                ))
-
-            rules.append(AllOf(*member_rules))
-
-        auth_policy = AnyOf(*rules)
-        return auth_policy.check()
-
-    async def can_review_task(self, subject: Subject, task: Task) -> PermissionResult:
-        rules = [IsAdminRule(subject), IsTaskCreator(subject, task)]
-
-        if task.project_id is not None:
-            project_member = await self.project_membership_repo.find(task.project_id, subject.id)
+        if ticket.project_id:
+            member = await self.member_repo.find(ticket.project_id, subject.id)
             rules.append(
-                AllOf(
-                    IsMemberExistsRule(project_member),
-                    IsProjectOwnerOrManagerRule(project_member),
+                AllOf(IsMemberExistsRule(member), IsProjectOwnerOrManagerRule(member))
+            )
+
+        return AnyOf(*rules).check()
+
+    @staticmethod
+    def can_edit_ticket(subject: Subject, ticket: Ticket) -> PermissionResult:
+        rules = [
+            IsAdminRule(subject),
+            IsTicketReporterRule(subject, ticket),
+            IsTicketCreatorRule(subject, ticket),
+            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT]),
+        ]
+        return AnyOf(*rules).check()
+
+    async def can_track_ticket(self, subject: Subject, ticket: Ticket) -> PermissionResult:
+        """
+        Может использоваться для авторизации действий:
+         - start_progress
+         - resolve
+         - pause
+        """
+
+        rules = [
+        IsAdminRule(subject),
+        IsTicketAssigneeRule(subject, ticket),
+        HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT]),  # ← добавил сюда
+        ]
+
+        if ticket.project_id:
+            member = await self.member_repo.find(ticket.project_id, subject.id)
+            rules.append(
+                HasAnyMemberRoleRule(
+                    member, required_roles=[MemberRole.OWNER, MemberRole.MANAGER]
                 )
             )
 
-        rules.append(IsTaskReviewer(subject, task))
+        return AnyOf(*rules).check()
 
-        auth_policy = AnyOf(*rules)
-        return auth_policy.check()
+    async def can_close_ticket(self, subject: Subject, ticket: Ticket) -> PermissionResult:
+        if ticket.project_id:
+            member = await self.member_repo.find(ticket.project_id, subject.id)
 
-    async def can_archive_task(self, subject: Subject, task: Task) -> PermissionResult:
-        rules = [IsAdminRule(subject), IsTaskCreator(subject, task)]
-
-        if task.project_id is not None:
-            project_member = await self.project_membership_repo.find(task.project_id, subject.id)
-            rules.append(
+            project_rules = [
                 AllOf(
-                    IsMemberExistsRule(project_member),
-                    IsProjectOwnerOrManagerRule(project_member),
-                )
+                    HasAnyMemberRoleRule(member, required_roles=[MemberRole.CUSTOMER]),
+                    IsTicketReporterRule(subject, ticket),
+                ),
+                AllOf(
+                    HasAnyMemberRoleRule(member, required_roles=[MemberRole.CUSTOMER_MANAGER]),
+                    SameCounterpartyRule(subject, ticket.counterparty_id)
+                ),
+                IsProjectStaffRule(member),
+            ]
+
+            return AnyOf(*project_rules).check()
+
+        rules = [
+            AllOf(
+                HasAnyUserRoleRule(subject, required_roles=[UserRole.CUSTOMER]),
+                IsTicketReporterRule(subject, ticket),
+            ),
+            AllOf(
+                HasAnyUserRoleRule(subject, required_roles=[UserRole.CUSTOMER_ADMIN]),
+                SameCounterpartyRule(subject, ticket.counterparty_id),
+            ),
+            AllOf(
+                HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_AGENT]),
+                IsTicketAssigneeRule(subject, ticket),
+            ),
+            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.ADMIN, UserRole.SUPPORT_AGENT]),
+        ]
+
+        return AnyOf(*rules).check()
+
+    async def can_cancel_ticket(self, subject: Subject, ticket: Ticket) -> PermissionResult:
+        rules = [
+            IsTicketCreatorRule(subject, ticket),
+            IsTicketReporterRule(subject, ticket),
+            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.ADMIN, UserRole.SUPPORT_AGENT]),
+        ]
+
+        if ticket.project_id:
+            member = await self.member_repo.find(ticket.project_id, subject.id)
+            rules.append(IsProjectOwnerOrManagerRule(member))
+
+        return AnyOf(*rules).check()
+
+    async def can_resolve_ticket(self, subject: Subject, ticket: Ticket) -> PermissionResult:
+        rules = [
+            IsTicketAssigneeRule(subject, ticket),
+            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT]), 
+            ]
+
+        if ticket.project_id:
+            member = await self.member_repo.find(ticket.project_id, subject.id)
+            rules.append(
+                HasAnyMemberRoleRule(member, required_roles=[MemberRole.OWNER, MemberRole.MANAGER])
             )
+        
 
-        auth_policy = AnyOf(*rules)
-        return auth_policy.check()
-
-    async def can_view_task(
-            self, subject: Subject, project_id: UUID | None = None
-    ) -> PermissionResult:
-        if project_id is not None:
-            project_member = await self.project_membership_repo.find(project_id, subject.id)
-            auth_policy = AllOf(
-                IsMemberExistsRule(project_member),
-                IsProjectStaffRule(project_member),
-            )
-            return auth_policy.check()
-
-        auth_policy = IsStaffRule(subject)
-        return auth_policy.check()
+        return AnyOf(*rules).check()
