@@ -11,7 +11,7 @@ import {
   RefreshCw, Archive, FolderOpen, Ticket, Zap,
   Star, User, ChevronRight, Layers, UserCheck,
   GitPullRequest, ThumbsUp, ThumbsDown, Pencil, Save,
-  Milestone, AlertTriangle, ChevronLeft,
+  Milestone, AlertTriangle, ChevronLeft, List, LayoutGrid,
 } from 'lucide-react';
 import { tasksApi, projectsApi, ticketsApi, usersApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
@@ -26,6 +26,9 @@ import { TASK_PRIORITY_LIST } from '../types';
 /* ═══════════════════════════════════════════════════════════════════
    CONSTANTS
    ═══════════════════════════════════════════════════════════════════ */
+
+// Fibonacci sequence for Story Points
+const STORY_POINTS_OPTIONS = [1, 2, 3, 5, 8, 13, 21];
 
 const PRIORITY_LABELS: Record<TaskPriority, string> = {
   'low': 'Низкий',
@@ -223,7 +226,7 @@ const CTX_TABS: {
     { id: 'internal', label: 'Все задачи', icon: Layers, staffOnly: true },
     { id: 'project', label: 'Проект', icon: FolderOpen },
     { id: 'assignee', label: 'Исполнитель', icon: UserCheck, staffOnly: true },
-    { id: 'ticket', label: 'Заявка', icon: Ticket, staffOnly: true },
+    { id: 'ticket', label: 'Заявка', icon: Ticket, staffOnly: true }, // Changed label to Заявка
   ];
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -236,7 +239,6 @@ const initials = (n?: string | null) =>
 
 const isTaskOverdue = (task: TaskKanbanItem) => {
   if (!task.due_date) return false;
-  // Если задача в колонке "Выполнено" или "Отменено", она не считается просроченной
   if (task.status === 'done' || task.status === 'cancelled') return false;
   return new Date(task.due_date) < new Date();
 };
@@ -349,7 +351,7 @@ function getStatusChangeError(
 }
 
 const INPUT_CLS =
-  'w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl ' +
+  'w-full px-4 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl ' +
   'text-[var(--text-primary)] text-base placeholder-[var(--text-primary)]/25 ' +
   'focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all appearance-none';
 
@@ -380,7 +382,7 @@ function useDropdownPosition(
     setStyle({
       position: 'fixed',
       left: rect.left,
-      width: rect.width,
+      width: rect.width, // Match trigger width
       zIndex: 9999,
       ...(openUp
         ? { bottom: window.innerHeight - rect.top + 4 }
@@ -483,7 +485,7 @@ function CustomSelect({
   ) : null;
 
   return (
-    <div ref={triggerRef} className="relative">
+    <div ref={triggerRef} className="relative w-full">
       <div role="button" tabIndex={disabled ? -1 : 0}
         onClick={() => !disabled && setOpen(v => !v)}
         onKeyDown={e => { if (!disabled && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setOpen(v => !v); } }}
@@ -644,7 +646,7 @@ function AsyncSelect({
   ) : null;
 
   return (
-    <div ref={triggerRef} className="relative">
+    <div ref={triggerRef} className="relative w-full">
       <div role="button" tabIndex={disabled ? -1 : 0}
         onClick={() => !disabled && setOpen(v => !v)}
         onKeyDown={e => { if (!disabled && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setOpen(v => !v); } }}
@@ -696,8 +698,99 @@ function SPBadge({ v }: { v: number }) {
   return (
     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium border bg-[var(--hover-3)] text-[var(--text-primary)]/50 border-[var(--border-color)] whitespace-nowrap">
       <Star className="w-2.5 h-2.5" />
-      Сложность {v}
+      {v}
     </span>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   LIST VIEW
+   ═══════════════════════════════════════════════════════════════════ */
+
+function TaskListView({
+  tasks,
+  userMap,
+  onView,
+}: {
+  tasks: TaskKanbanItem[];
+  userMap: Map<string, SimpleUser | CounterpartyCustomer>;
+  onView: (t: TaskKanbanItem) => void;
+}) {
+  if (tasks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-[var(--text-primary)]/40">
+        <Layers className="w-12 h-12 mb-3 opacity-50" />
+        <p>Задачи не найдены</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-[var(--hover-1)] border-b border-[var(--border-color)] text-[var(--text-primary)]/50">
+            <tr>
+              <th className="px-4 py-3 font-medium">Задача</th>
+              <th className="px-4 py-3 font-medium">Статус</th>
+              <th className="px-4 py-3 font-medium">Исполнитель</th>
+              <th className="px-4 py-3 font-medium">Срок</th>
+              <th className="px-4 py-3 font-medium text-right">Сложность</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--border-color)]">
+            {tasks.map(task => {
+              const a = task.assignee_id ? userMap.get(task.assignee_id) : null;
+              const cm = COL[task.status];
+              const od = isTaskOverdue(task);
+
+              return (
+                <tr
+                  key={task.id}
+                  onClick={() => onView(task)}
+                  className="hover:bg-[var(--hover-1)] cursor-pointer transition-colors group"
+                >
+                  <td className="px-4 py-3 max-w-[400px]">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[var(--text-primary)]/40 text-xs">#{task.number}</span>
+                      <span className="font-medium text-[var(--text-primary)] truncate">{task.title}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border ${cm.chip}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${cm.dot}`} />
+                      {STATUS_LABELS[task.status]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {a ? (
+                      <div className="flex items-center gap-2">
+                        <Ava name={a.full_name || a.username} url={a.avatar_url} size="xs" />
+                        <span className="text-[var(--text-primary)]/70 truncate max-w-[150px]">
+                          {(a.full_name || a.username || '').split(' ')[0]}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-[var(--text-primary)]/30">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {task.due_date && (
+                      <span className={`text-xs font-medium ${od ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/50'}`}>
+                        {fmtDue(task.due_date)}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {task.story_points != null && <SPBadge v={task.story_points} />}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
@@ -1175,7 +1268,7 @@ function CreateModal({
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
   const [pri, setPri] = useState<TaskPriority>('medium');
-  const [sp, setSp] = useState('');
+  const [sp, setSp] = useState(''); // Now stores string value of SP
   const [eh, setEh] = useState('');
   const [dd, setDd] = useState('');
   const [todo, setTodo] = useState(initialStatus === 'todo');
@@ -1197,6 +1290,7 @@ function CreateModal({
     };
   }, [onClose, saving]);
 
+  // Clear Ticket if Project changes
   useEffect(() => { setTid(''); }, [pid]);
 
   const loadProjects = useCallback(async (search: string, page: number) => {
@@ -1225,6 +1319,7 @@ function CreateModal({
   }, []);
 
   const loadTickets = useCallback(async (search: string, page: number) => {
+    // Filter tickets by selected project ID (pid)
     const res = await ticketsApi.getAllWithFilters(page, 20, { project_id: pid || undefined });
     const filtered = search
       ? res.items.filter(t => t.title.toLowerCase().includes(search.toLowerCase()) || String(t.number).includes(search))
@@ -1272,7 +1367,7 @@ function CreateModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !saving && onClose()} />
-      <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden"
+      <div className="relative w-full max-w-3xl max-h-[90vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden"
         style={{ boxShadow: 'var(--shadow-lg)' }} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
@@ -1294,10 +1389,10 @@ function CreateModal({
 
         {/* Content */}
         <div className="flex-1 min-h-0 overflow-y-auto p-6">
-          <div className="grid lg:grid-cols-2 gap-6">
+          <div className="grid lg:grid-cols-12 gap-6">
 
-            {/* ЛЕВАЯ КОЛОНКА */}
-            <div className="space-y-5">
+            {/* Left Column (Main Info) */}
+            <div className="lg:col-span-7 space-y-5">
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
                   Название <span className="text-[var(--accent)]">*</span>
@@ -1334,8 +1429,8 @@ function CreateModal({
               </div>
             </div>
 
-            {/* ПРАВАЯ КОЛОНКА */}
-            <div className="space-y-5">
+            {/* Right Column (Details) */}
+            <div className="lg:col-span-5 space-y-5">
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Проект</label>
                 <AsyncSelect value={pid} onChange={setPid} loadOptions={loadProjects}
@@ -1351,8 +1446,13 @@ function CreateModal({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Сложность</label>
-                  <input type="number" min={1} max={21} value={sp} onChange={e => setSp(e.target.value)}
-                    placeholder="1-21" className={INPUT_CLS} />
+                  {/* Changed to CustomSelect with Fibonacci values */}
+                  <CustomSelect 
+                    value={sp} 
+                    onChange={setSp} 
+                    options={STORY_POINTS_OPTIONS.map(v => ({ value: String(v), label: String(v) }))} 
+                    placeholder="—" 
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Оценка, ч.</label>
@@ -1369,9 +1469,9 @@ function CreateModal({
 
               {context.type !== 'ticket' && (
                 <div>
-                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Тикет</label>
+                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Заявка</label>
                   <AsyncSelect value={tid} onChange={setTid} loadOptions={loadTickets}
-                    placeholder="Без тикета" icon={Ticket} />
+                    placeholder="Без заявки" icon={Ticket} />
                 </div>
               )}
             </div>
@@ -1855,6 +1955,9 @@ export default function TasksPage() {
   const [assignBeforeTask, setAssignBeforeTask] = useState<TaskKanbanItem | null>(null);
   const [assignBeforeLoading, setAssignBeforeLoading] = useState(false);
 
+  // New View Mode State
+  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
+
   const fpRef = useRef(fp);
   const foRef = useRef(fo);
   fpRef.current = fp;
@@ -2307,7 +2410,27 @@ export default function TasksPage() {
         )}
       </div>
 
-      {/* Board */}
+      {/* View Mode Toggle */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1 p-0.5 bg-[var(--hover-2)] rounded-xl border border-[var(--border-color)]">
+          <button
+            onClick={() => setViewMode('kanban')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all
+              ${viewMode === 'kanban' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]'}`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5" /> Доска
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all
+              ${viewMode === 'list' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]'}`}
+          >
+            <List className="w-3.5 h-3.5" /> Список
+          </button>
+        </div>
+      </div>
+
+      {/* Board / List */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
@@ -2315,6 +2438,12 @@ export default function TasksPage() {
             <p className="text-[var(--text-primary)]/40 text-base">Загрузка...</p>
           </div>
         </div>
+      ) : viewMode === 'list' ? (
+         <TaskListView 
+            tasks={disp.flatMap(c => c.tasks.items)} 
+            userMap={umap} 
+            onView={setView} 
+         />
       ) : !cols.length ? (
         <div className="flex items-center justify-center py-20">
           <div className="text-center max-w-xs">
