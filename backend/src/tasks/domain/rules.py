@@ -38,7 +38,7 @@ class TaskEditingRule:
         self.task = task
 
     def check(self) -> PermissionResult:
-        if self.subject.id in {self.task.assignee_id, self.task.created_by}:
+        if str(self.subject.id) in {str(self.task.assignee_id), str(self.task.created_by)}:
             return PermissionResult(True)
 
         return PermissionResult(False, "Only assignee or creator can edit this task")
@@ -62,7 +62,7 @@ class TaskReviewerStatusRule:
         self.new_status = new_status
 
     def check(self) -> PermissionResult:
-        if self.task.reviewer_id != self.subject.id:
+        if str(self.task.reviewer_id) != str(self.subject.id):
             return PermissionResult(False, "You are not the reviewer for this task")
 
         if self.task.status != TaskStatus.TO_REVIEW:
@@ -101,7 +101,7 @@ class TaskAssigneeStatusRule:
         self.new_status = new_status
 
     def check(self) -> PermissionResult:
-        if self.task.assignee_id != self.subject.id:
+        if str(self.task.assignee_id) != str(self.subject.id):
             return PermissionResult(False, "You are not the assignee of this task")
 
         if self.new_status not in self.ALLOWED_NEXT_STATUSES:
@@ -120,7 +120,7 @@ class IsTaskReviewer:
         self.task = task
 
     def check(self) -> PermissionResult:
-        if self.subject.id == self.task.reviewer_id:
+        if str(self.subject.id) == str(self.task.reviewer_id):
             return PermissionResult(True)
 
         return PermissionResult(False, "You are not the reviewer for this task")
@@ -132,7 +132,7 @@ class IsTaskCreator:
         self.task = task
 
     def check(self) -> PermissionResult:
-        if self.subject.id == self.task.created_by:
+        if str(self.subject.id) == str(self.task.created_by):
             return PermissionResult(True)
 
         return PermissionResult(False, "You are not the creator of this task")
