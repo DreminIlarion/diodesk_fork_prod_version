@@ -49,24 +49,24 @@ const ASSIGN_OK: Set<TaskStatus> = new Set(['backlog', 'todo', 'in_progress', 'p
 const COL_ORDER: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'paused', 'blocked', 'to_review', 'to_fix', 'to_test', 'done', 'cancelled'];
 
 const CM: Record<string, { icon: React.ComponentType<{ className?: string }>; tc: string; dot: string; brd: string; chip: string; empty: string }> = {
-  backlog: { icon: Circle, tc: 'text-[var(--text-primary)]/60', dot: 'bg-gray-400', brd: 'border-[var(--border-color)]', chip: 'bg-[var(--hover-2)] text-[var(--text-primary)]/60 border-[var(--border-color)]', empty: 'Пусто' },
-  todo: { icon: AlertCircle, tc: 'text-blue-400', dot: 'bg-blue-500', brd: 'border-blue-500/30', chip: 'bg-blue-500/15 text-blue-400 border-blue-500/30', empty: 'Пусто' },
-  in_progress: { icon: Timer, tc: 'text-yellow-400', dot: 'bg-yellow-400', brd: 'border-yellow-500/30', chip: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30', empty: 'Пусто' },
-  paused: { icon: Ban, tc: 'text-[var(--text-primary)]/50', dot: 'bg-gray-400', brd: 'border-[var(--border-color)]', chip: 'bg-[var(--hover-2)] text-[var(--text-primary)]/50 border-[var(--border-color)]', empty: 'Пусто' },
-  blocked: { icon: Ban, tc: 'text-red-400', dot: 'bg-red-400', brd: 'border-red-500/30', chip: 'bg-red-500/10 text-red-400 border-red-500/30', empty: 'Пусто' },
-  to_review: { icon: Eye, tc: 'text-violet-400', dot: 'bg-violet-400', brd: 'border-violet-500/30', chip: 'bg-violet-500/15 text-violet-400 border-violet-500/30', empty: 'Пусто' },
-  to_fix: { icon: AlertCircle, tc: 'text-orange-400', dot: 'bg-orange-400', brd: 'border-orange-500/30', chip: 'bg-orange-500/15 text-orange-400 border-orange-500/30', empty: 'Пусто' },
-  to_test: { icon: CheckCircle2, tc: 'text-cyan-400', dot: 'bg-cyan-400', brd: 'border-cyan-500/30', chip: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30', empty: 'Пусто' },
-  done: { icon: CheckCircle2, tc: 'text-emerald-400', dot: 'bg-emerald-500', brd: 'border-emerald-500/30', chip: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', empty: 'Пусто' },
-  cancelled: { icon: RotateCcw, tc: 'text-[var(--text-primary)]/40', dot: 'bg-gray-500/60', brd: 'border-[var(--border-color)]', chip: 'bg-[var(--hover-2)] text-[var(--text-primary)]/40 border-[var(--border-color)]', empty: 'Пусто' },
-  review: { icon: Eye, tc: 'text-violet-400', dot: 'bg-violet-400', brd: 'border-violet-500/30', chip: 'bg-violet-500/15 text-violet-400 border-violet-500/30', empty: 'Пусто' },
+  backlog: { icon: Circle, tc: 'text-gray-400', dot: 'bg-gray-400', brd: 'border-gray-400/30', chip: 'bg-gray-400/10 text-gray-400 border-gray-400/20', empty: 'Пусто' },
+  todo: { icon: AlertCircle, tc: 'text-blue-500', dot: 'bg-blue-500', brd: 'border-blue-500/30', chip: 'bg-blue-500/10 text-blue-500 border-blue-500/20', empty: 'Пусто' },
+  in_progress: { icon: Timer, tc: 'text-amber-500', dot: 'bg-amber-500', brd: 'border-amber-500/30', chip: 'bg-amber-500/10 text-amber-500 border-amber-500/20', empty: 'Пусто' },
+  paused: { icon: Ban, tc: 'text-gray-400', dot: 'bg-gray-400', brd: 'border-gray-400/30', chip: 'bg-gray-400/10 text-gray-400 border-gray-400/20', empty: 'Пусто' },
+  blocked: { icon: Ban, tc: 'text-red-500', dot: 'bg-red-500', brd: 'border-red-500/30', chip: 'bg-red-500/10 text-red-500 border-red-500/20', empty: 'Пусто' },
+  to_review: { icon: Eye, tc: 'text-violet-500', dot: 'bg-violet-500', brd: 'border-violet-500/30', chip: 'bg-violet-500/10 text-violet-500 border-violet-500/20', empty: 'Пусто' },
+  to_fix: { icon: AlertCircle, tc: 'text-orange-500', dot: 'bg-orange-500', brd: 'border-orange-500/30', chip: 'bg-orange-500/10 text-orange-500 border-orange-500/20', empty: 'Пусто' },
+  to_test: { icon: CheckCircle2, tc: 'text-cyan-500', dot: 'bg-cyan-500', brd: 'border-cyan-500/30', chip: 'bg-cyan-500/10 text-cyan-500 border-cyan-500/20', empty: 'Пусто' },
+  done: { icon: CheckCircle2, tc: 'text-emerald-500', dot: 'bg-emerald-500', brd: 'border-emerald-500/30', chip: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20', empty: 'Пусто' },
+  cancelled: { icon: RotateCcw, tc: 'text-gray-400', dot: 'bg-gray-400', brd: 'border-gray-400/30', chip: 'bg-gray-400/10 text-gray-400 border-gray-400/20', empty: 'Пусто' },
+  review: { icon: Eye, tc: 'text-violet-500', dot: 'bg-violet-500', brd: 'border-violet-500/30', chip: 'bg-violet-500/10 text-violet-500 border-violet-500/20', empty: 'Пусто' },
 };
 
 const PM: Record<TaskPriority, { c: string; bg: string; brd: string; dot: string; icon: React.ReactNode }> = {
-  low: { c: 'text-emerald-400', bg: 'bg-emerald-500/10', brd: 'border-emerald-500/30', dot: 'bg-emerald-400', icon: <Flag className="w-3 h-3" /> },
-  medium: { c: 'text-yellow-400', bg: 'bg-yellow-500/10', brd: 'border-yellow-500/30', dot: 'bg-yellow-400', icon: <Flag className="w-3 h-3" /> },
-  high: { c: 'text-orange-400', bg: 'bg-orange-500/10', brd: 'border-orange-500/30', dot: 'bg-orange-400', icon: <Flag className="w-3 h-3" /> },
-  critical: { c: 'text-red-400', bg: 'bg-red-500/10', brd: 'border-red-500/20', dot: 'bg-red-400', icon: <Zap className="w-3 h-3" /> },
+  low: { c: 'text-emerald-500', bg: 'bg-emerald-500/10', brd: 'border-emerald-500/20', dot: 'bg-emerald-500', icon: <Flag className="w-3.5 h-3.5" /> },
+  medium: { c: 'text-yellow-500', bg: 'bg-yellow-500/10', brd: 'border-yellow-500/20', dot: 'bg-yellow-500', icon: <Flag className="w-3.5 h-3.5" /> },
+  high: { c: 'text-orange-500', bg: 'bg-orange-500/10', brd: 'border-orange-500/20', dot: 'bg-orange-500', icon: <Flag className="w-3.5 h-3.5" /> },
+  critical: { c: 'text-red-500', bg: 'bg-red-500/10', brd: 'border-red-500/20', dot: 'bg-red-500', icon: <Zap className="w-3.5 h-3.5" /> },
 };
 
 type CtxMode = 'my' | 'internal' | 'project' | 'assignee' | 'ticket';
@@ -86,7 +86,7 @@ function statusErr(err: any, task: TaskKanbanItem, to: TaskStatus) {
   return { title: `Ошибка перевода в «${ST_LABEL[to]}»`, description: raw };
 }
 
-const INP = 'w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-sm placeholder-[var(--text-primary)]/30 focus:outline-none focus:border-[var(--accent)]/40 focus:ring-1 focus:ring-[var(--accent-ring)] transition-all';
+const INP = 'w-full px-4 py-3 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none focus:border-[var(--accent)]/50 focus:ring-2 focus:ring-[var(--accent)]/10 transition-all';
 
 /* ── dropdown primitives ── */
 interface DDOpt { value: string; label: string; sublabel?: string; icon?: React.ReactNode; dotColor?: string }
@@ -96,8 +96,8 @@ function useDDPos(ref: React.RefObject<HTMLDivElement | null>, open: boolean, wi
   useEffect(() => {
     if (!open || !ref.current) return;
     const r = ref.current.getBoundingClientRect();
-    const up = window.innerHeight - r.bottom < 300;
-    setS({ position: 'fixed', left: Math.max(8, r.left), width: wide ? Math.max(r.width, 380) : r.width, zIndex: 9999, ...(up ? { bottom: window.innerHeight - r.top + 4 } : { top: r.bottom + 4 }) });
+    const up = window.innerHeight - r.bottom < 350;
+    setS({ position: 'fixed', left: Math.max(12, r.left), width: wide ? Math.max(r.width, 400) : r.width, zIndex: 9999, ...(up ? { bottom: window.innerHeight - r.top + 8 } : { top: r.bottom + 8 }) });
   }, [open, wide]);
   return s;
 }
@@ -118,20 +118,20 @@ function SelectDD({ value, onChange, options, placeholder, icon: LI, searchable,
   const fl = q ? options.filter(o => o.label.toLowerCase().includes(q.toLowerCase()) || (o.sublabel || '').toLowerCase().includes(q.toLowerCase())) : options;
 
   const dd = open ? createPortal(
-    <div ref={dRef} style={pos} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden">
-      {searchable && <div className="p-2 border-b border-[var(--border-color)]"><div className="relative"><Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/20" /><input ref={iRef} value={q} onChange={e => setQ(e.target.value)} placeholder="Поиск..." className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/30 focus:outline-none" /></div></div>}
-      <div className="overflow-y-auto max-h-[240px] p-1">
-        <div role="button" tabIndex={0} onClick={() => { onChange(''); setOpen(false); }} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${!value ? 'bg-[var(--accent)]/8' : 'hover:bg-[var(--hover-2)]'} text-[var(--text-primary)]/50`}>
-          <span>—</span><span className="flex-1">Не выбрано</span>{!value && <Check className="w-3.5 h-3.5 text-[var(--accent)]" />}
+    <div ref={dRef} style={pos} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl overflow-hidden">
+      {searchable && <div className="p-3 border-b border-[var(--border-color)]"><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-primary)]/30" /><input ref={iRef} value={q} onChange={e => setQ(e.target.value)} placeholder="Поиск..." className="w-full pl-10 pr-3 py-2.5 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none focus:border-[var(--accent)]/40" /></div></div>}
+      <div className="overflow-y-auto max-h-[280px] p-2">
+        <div role="button" tabIndex={0} onClick={() => { onChange(''); setOpen(false); }} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer ${!value ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]/50'}`}>
+          <span>—</span><span className="flex-1">Не выбрано</span>{!value && <Check className="w-4 h-4 text-[var(--accent)]" />}
         </div>
-        {fl.length === 0 && q && <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">Не найдено</div>}
+        {fl.length === 0 && q && <div className="px-3 py-6 text-center text-[var(--text-primary)]/40">Не найдено</div>}
         {fl.map(o => (
           <div key={o.value} role="button" tabIndex={0} onClick={() => { onChange(o.value); setOpen(false); }}
-            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${o.value === value ? 'bg-[var(--accent)]/8' : 'hover:bg-[var(--hover-2)]'} text-[var(--text-primary)]/80`}>
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer ${o.value === value ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'}`}>
             {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
             {o.icon && <span className="shrink-0">{o.icon}</span>}
-            <div className="flex-1 min-w-0"><span className="block truncate">{o.label}</span>{o.sublabel && <span className="block text-xs text-[var(--text-primary)]/35 truncate">{o.sublabel}</span>}</div>
-            {o.value === value && <Check className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />}
+            <div className="flex-1 min-w-0"><span className="block truncate font-medium">{o.label}</span>{o.sublabel && <span className="block text-xs text-[var(--text-primary)]/40 truncate mt-0.5">{o.sublabel}</span>}</div>
+            {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
           </div>
         ))}
       </div>
@@ -140,11 +140,11 @@ function SelectDD({ value, onChange, options, placeholder, icon: LI, searchable,
   return (
     <div ref={tRef} className="relative w-full">
       <div role="button" tabIndex={disabled ? -1 : 0} onClick={() => !disabled && setOpen(v => !v)}
-        className={`w-full flex items-center gap-2 px-3.5 py-2.5 bg-[var(--hover-2)] border rounded-xl text-sm text-left select-none transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'} ${open ? 'border-[var(--accent)]/40 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}>
-        {LI && <LI className="w-4 h-4 text-[var(--text-primary)]/30 shrink-0" />}
-        <span className={`flex-1 truncate ${sel ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/30'}`}>{sel ? sel.label : (placeholder || '—')}</span>
-        {sel && value && <span role="button" tabIndex={0} onClick={e => { e.stopPropagation(); onChange(''); setOpen(false); }} className="p-0.5 rounded text-[var(--text-primary)]/20 hover:text-[var(--text-primary)]/50 shrink-0"><X className="w-3.5 h-3.5" /></span>}
-        <ChevronDown className={`w-3.5 h-3.5 text-[var(--text-primary)]/20 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+        className={`w-full flex items-center gap-3 px-4 py-3 bg-[var(--hover-2)] border rounded-xl text-left select-none transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'} ${open ? 'border-[var(--accent)]/50 ring-2 ring-[var(--accent)]/10' : 'border-[var(--border-color)]'}`}>
+        {LI && <LI className="w-4 h-4 text-[var(--text-primary)]/40 shrink-0" />}
+        <span className={`flex-1 truncate ${sel ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-primary)]/40'}`}>{sel ? sel.label : (placeholder || '—')}</span>
+        {sel && value && <span role="button" tabIndex={0} onClick={e => { e.stopPropagation(); onChange(''); setOpen(false); }} className="p-1 rounded-md text-[var(--text-primary)]/30 hover:text-[var(--text-primary)] hover:bg-[var(--hover-3)] shrink-0"><X className="w-4 h-4" /></span>}
+        <ChevronDown className={`w-4 h-4 text-[var(--text-primary)]/30 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </div>
       {dd}
     </div>
@@ -186,38 +186,38 @@ function AsyncDD({ value, onChange, loadFn, placeholder, icon: LI, disabled, wid
   }, [value, opts, loadFn]);
 
   const dd = open ? createPortal(
-    <div ref={dRef} style={pos} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden">
-      <div className="p-2 border-b border-[var(--border-color)]"><div className="relative"><Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/20" /><input ref={iRef} value={q} onChange={e => setQ(e.target.value)} placeholder="Поиск..." className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/30 focus:outline-none" /></div></div>
-      <div className="overflow-y-auto max-h-[280px] p-1">
-        <div role="button" tabIndex={0} onClick={() => { onChange(''); setOpen(false); }} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${!value ? 'bg-[var(--accent)]/8' : 'hover:bg-[var(--hover-2)]'} text-[var(--text-primary)]/50`}>
-          <span>—</span><span className="flex-1">Не выбрано</span>{!value && <Check className="w-3.5 h-3.5 text-[var(--accent)]" />}
+    <div ref={dRef} style={pos} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl overflow-hidden">
+      <div className="p-3 border-b border-[var(--border-color)]"><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-primary)]/30" /><input ref={iRef} value={q} onChange={e => setQ(e.target.value)} placeholder="Поиск..." className="w-full pl-10 pr-3 py-2.5 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none focus:border-[var(--accent)]/40" /></div></div>
+      <div className="overflow-y-auto max-h-[320px] p-2">
+        <div role="button" tabIndex={0} onClick={() => { onChange(''); setOpen(false); }} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer ${!value ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]/50'}`}>
+          <span>—</span><span className="flex-1">Не выбрано</span>{!value && <Check className="w-4 h-4 text-[var(--accent)]" />}
         </div>
-        {ld && <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin text-[var(--text-primary)]/20" /></div>}
-        {!ld && opts.length === 0 && <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">{q ? 'Не найдено' : 'Нет данных'}</div>}
+        {ld && <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-[var(--accent)]" /></div>}
+        {!ld && opts.length === 0 && <div className="px-3 py-6 text-center text-[var(--text-primary)]/40">{q ? 'Не найдено' : 'Нет данных'}</div>}
         {!ld && opts.map(o => (
           <div key={o.value} role="button" tabIndex={0} onClick={() => { onChange(o.value); setSelLbl(o.label); setOpen(false); }}
-            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm cursor-pointer ${o.value === value ? 'bg-[var(--accent)]/8' : 'hover:bg-[var(--hover-2)]'} text-[var(--text-primary)]/80`}>
+            className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer ${o.value === value ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'}`}>
             {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
             {o.icon && <span className="shrink-0">{o.icon}</span>}
             <div className="flex-1 min-w-0">
-              <span className="block leading-snug" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{o.label}</span>
-              {o.sublabel && <span className="block text-xs text-[var(--text-primary)]/35 truncate mt-0.5">{o.sublabel}</span>}
+              <span className="block leading-snug font-medium" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{o.label}</span>
+              {o.sublabel && <span className="block text-xs text-[var(--text-primary)]/40 truncate mt-1">{o.sublabel}</span>}
             </div>
-            {o.value === value && <Check className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />}
+            {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
           </div>
         ))}
-        {!ld && more && <div role="button" tabIndex={0} onClick={() => !ldMore && doLoad(q, pg + 1, true)} className="flex items-center justify-center gap-1.5 py-2 text-sm text-[var(--text-primary)]/40 hover:bg-[var(--hover-2)] rounded-lg cursor-pointer">{ldMore ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronDown className="w-3.5 h-3.5" />} Ещё</div>}
+        {!ld && more && <div role="button" tabIndex={0} onClick={() => !ldMore && doLoad(q, pg + 1, true)} className="flex items-center justify-center gap-2 py-2.5 text-[var(--text-primary)]/40 hover:bg-[var(--hover-2)] rounded-lg cursor-pointer font-medium">{ldMore ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronDown className="w-4 h-4" />} Ещё</div>}
       </div>
     </div>, document.body) : null;
 
   return (
     <div ref={tRef} className="relative w-full">
       <div role="button" tabIndex={disabled ? -1 : 0} onClick={() => !disabled && setOpen(v => !v)}
-        className={`w-full flex items-center gap-2 px-3.5 py-2.5 bg-[var(--hover-2)] border rounded-xl text-sm text-left select-none transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'} ${open ? 'border-[var(--accent)]/40 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}>
-        {LI && <LI className="w-4 h-4 text-[var(--text-primary)]/30 shrink-0" />}
-        <span className={`flex-1 truncate ${selLbl ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/30'}`}>{selLbl || (placeholder || '—')}</span>
-        {value && <span role="button" tabIndex={0} onClick={e => { e.stopPropagation(); onChange(''); setSelLbl(''); setOpen(false); }} className="p-0.5 rounded text-[var(--text-primary)]/20 hover:text-[var(--text-primary)]/50 shrink-0"><X className="w-3.5 h-3.5" /></span>}
-        <ChevronDown className={`w-3.5 h-3.5 text-[var(--text-primary)]/20 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+        className={`w-full flex items-center gap-3 px-4 py-3 bg-[var(--hover-2)] border rounded-xl text-left select-none transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'} ${open ? 'border-[var(--accent)]/50 ring-2 ring-[var(--accent)]/10' : 'border-[var(--border-color)]'}`}>
+        {LI && <LI className="w-4 h-4 text-[var(--text-primary)]/40 shrink-0" />}
+        <span className={`flex-1 truncate ${selLbl ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-primary)]/40'}`}>{selLbl || (placeholder || '—')}</span>
+        {value && <span role="button" tabIndex={0} onClick={e => { e.stopPropagation(); onChange(''); setSelLbl(''); setOpen(false); }} className="p-1 rounded-md text-[var(--text-primary)]/30 hover:text-[var(--text-primary)] hover:bg-[var(--hover-3)] shrink-0"><X className="w-4 h-4" /></span>}
+        <ChevronDown className={`w-4 h-4 text-[var(--text-primary)]/30 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </div>
       {dd}
     </div>
@@ -225,35 +225,36 @@ function AsyncDD({ value, onChange, loadFn, placeholder, icon: LI, disabled, wid
 }
 
 /* ── atoms ── */
-function Ava({ name, url, sz = 'sm' }: { name?: string | null; url?: string | null; sz?: 'xs' | 'sm' }) {
-  const c = sz === 'xs' ? 'w-5 h-5 text-[9px]' : 'w-6 h-6 text-[10px]';
+function Ava({ name, url, sz = 'sm' }: { name?: string | null; url?: string | null; sz?: 'xs' | 'sm' | 'md' }) {
+  const c = sz === 'xs' ? 'w-6 h-6 text-[10px]' : sz === 'md' ? 'w-10 h-10 text-sm' : 'w-8 h-8 text-xs';
   if (url) return <img src={url} alt="" className={`${c} rounded-full object-cover shrink-0`} />;
-  return <div className={`${c} rounded-full bg-[var(--accent)] flex items-center justify-center font-bold text-white shrink-0 select-none`}>{ini(name)}</div>;
+  return <div className={`${c} rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent)]/70 flex items-center justify-center font-bold text-white shrink-0 select-none`}>{ini(name)}</div>;
 }
 
-function PriBadge({ p }: { p: TaskPriority }) {
+function PriBadge({ p, size = 'sm' }: { p: TaskPriority; size?: 'sm' | 'md' }) {
   const m = PM[p];
-  return <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${m.bg} ${m.c} ${m.brd}`}>{m.icon}{PRI_LABEL[p]}</span>;
+  const classes = size === 'md' ? 'px-2.5 py-1 text-xs' : 'px-2 py-0.5 text-xs';
+  return <span className={`inline-flex items-center gap-1.5 ${classes} rounded-lg font-semibold border ${m.bg} ${m.c} ${m.brd}`}>{m.icon}{PRI_LABEL[p]}</span>;
 }
 
 function SpBadge({ v }: { v: number }) {
-  return <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--hover-3)] text-[var(--text-primary)]/50 border border-[var(--border-color)]"><Star className="w-2.5 h-2.5" />{v}</span>;
+  return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold bg-purple-500/10 text-purple-500 border border-purple-500/20"><Star className="w-3 h-3" />{v}</span>;
 }
 
 /* ── list view ── */
 function ListView({ tasks, umap, onView }: { tasks: TaskKanbanItem[]; umap: Map<string, SimpleUser | CounterpartyCustomer>; onView: (t: TaskKanbanItem) => void }) {
-  if (!tasks.length) return <div className="flex flex-col items-center justify-center py-16 text-[var(--text-primary)]/30"><Layers className="w-10 h-10 mb-2" /><p className="text-sm">Задач нет</p></div>;
+  if (!tasks.length) return <div className="flex flex-col items-center justify-center py-24 text-[var(--text-primary)]/30"><Layers className="w-12 h-12 mb-3" /><p className="text-base">Задач нет</p></div>;
   return (
     <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden">
-      <table className="w-full text-left text-sm">
+      <table className="w-full text-left">
         <thead className="bg-[var(--hover-1)] border-b border-[var(--border-color)]">
-          <tr className="text-[var(--text-primary)]/40 text-xs">
-            <th className="px-4 py-2.5 font-medium">Задача</th>
-            <th className="px-3 py-2.5 font-medium">Статус</th>
-            <th className="px-3 py-2.5 font-medium">Приоритет</th>
-            <th className="px-3 py-2.5 font-medium">Исполнитель</th>
-            <th className="px-3 py-2.5 font-medium">Срок</th>
-            <th className="px-3 py-2.5 font-medium text-right">SP</th>
+          <tr className="text-[var(--text-primary)]/50 text-sm">
+            <th className="px-5 py-4 font-semibold">Задача</th>
+            <th className="px-4 py-4 font-semibold">Статус</th>
+            <th className="px-4 py-4 font-semibold">Приоритет</th>
+            <th className="px-4 py-4 font-semibold">Исполнитель</th>
+            <th className="px-4 py-4 font-semibold">Срок</th>
+            <th className="px-4 py-4 font-semibold text-right">SP</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-[var(--border-color)]">
@@ -262,12 +263,12 @@ function ListView({ tasks, umap, onView }: { tasks: TaskKanbanItem[]; umap: Map<
             const cm = CM[t.status]; const od = overdue(t);
             return (
               <tr key={t.id} onClick={() => onView(t)} className="hover:bg-[var(--hover-1)] cursor-pointer transition-colors">
-                <td className="px-4 py-2.5"><div className="flex items-center gap-2 min-w-0"><span className="font-mono text-[var(--text-primary)]/30 text-xs shrink-0">#{t.number}</span><span className="text-[var(--text-primary)] truncate max-w-[300px]">{t.title}</span></div></td>
-                <td className="px-3 py-2.5"><span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${cm.chip}`}><span className={`w-1.5 h-1.5 rounded-full ${cm.dot}`} />{ST_LABEL[t.status]}</span></td>
-                <td className="px-3 py-2.5"><PriBadge p={t.priority} /></td>
-                <td className="px-3 py-2.5">{a ? <div className="flex items-center gap-1.5"><Ava name={a.full_name || a.username} url={a.avatar_url} sz="xs" /><span className="text-[var(--text-primary)]/60 truncate max-w-[120px] text-xs">{(a.full_name || a.username || '').split(' ')[0]}</span></div> : <span className="text-[var(--text-primary)]/20">—</span>}</td>
-                <td className="px-3 py-2.5">{t.due_date ? <span className={`text-xs ${od ? 'text-red-400' : 'text-[var(--text-primary)]/40'}`}>{fmtDue(t.due_date)}</span> : null}</td>
-                <td className="px-3 py-2.5 text-right">{t.story_points != null ? <SpBadge v={t.story_points} /> : null}</td>
+                <td className="px-5 py-4"><div className="flex items-center gap-3 min-w-0"><span className="font-mono text-[var(--text-primary)]/40 text-sm shrink-0">#{t.number}</span><span className="text-[var(--text-primary)] font-medium truncate max-w-[400px]">{t.title}</span></div></td>
+                <td className="px-4 py-4"><span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${cm.chip}`}><span className={`w-2 h-2 rounded-full ${cm.dot}`} />{ST_LABEL[t.status]}</span></td>
+                <td className="px-4 py-4"><PriBadge p={t.priority} /></td>
+                <td className="px-4 py-4">{a ? <div className="flex items-center gap-2"><Ava name={a.full_name || a.username} url={a.avatar_url} sz="xs" /><span className="text-[var(--text-primary)]/70 truncate max-w-[150px]">{(a.full_name || a.username || '').split(' ')[0]}</span></div> : <span className="text-[var(--text-primary)]/30">—</span>}</td>
+                <td className="px-4 py-4">{t.due_date ? <span className={`text-sm ${od ? 'text-red-500 font-semibold' : 'text-[var(--text-primary)]/50'}`}>{fmtDue(t.due_date)}</span> : null}</td>
+                <td className="px-4 py-4 text-right">{t.story_points != null ? <SpBadge v={t.story_points} /> : null}</td>
               </tr>
             );
           })}
@@ -287,18 +288,18 @@ function TCard({ task: t, umap, dragging, onDS, onDE, onView }: {
     <motion.div layout draggable
       onDragStart={e => { (e as any).dataTransfer.effectAllowed = 'move'; onDS(t.id, t.status); }}
       onDragEnd={onDE} onClick={() => onView(t)}
-      className={`group bg-[var(--bg-card)] border rounded-xl p-3 cursor-pointer transition-all hover:bg-[var(--hover-1)] ${dragging ? 'opacity-40 rotate-1 scale-105' : ''} ${od ? 'border-red-500/30' : 'border-[var(--border-color)]'}`}>
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <span className="px-1.5 py-0.5 rounded text-[11px] font-mono bg-[var(--hover-2)] text-[var(--text-primary)]/50 shrink-0">#{t.number}</span>
+      className={`group bg-[var(--bg-card)] border rounded-xl p-4 cursor-pointer transition-all hover:shadow-md hover:border-[var(--accent)]/30 ${dragging ? 'opacity-40 rotate-2 scale-105 shadow-xl' : ''} ${od ? 'border-red-500/40 bg-red-500/5' : 'border-[var(--border-color)]'}`}>
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <span className="px-2 py-0.5 rounded-md text-xs font-mono bg-[var(--hover-2)] text-[var(--text-primary)]/60 shrink-0">#{t.number}</span>
         <PriBadge p={t.priority} />
         {t.story_points != null && <SpBadge v={t.story_points} />}
       </div>
-      <h4 className="text-sm font-medium text-[var(--text-primary)] mb-2 leading-snug line-clamp-2">{t.title}</h4>
-      <div className="flex items-center justify-between">
-        {a ? <div className="flex items-center gap-1.5 min-w-0"><Ava name={a.full_name || a.username} url={a.avatar_url} sz="xs" /><span className="text-xs text-[var(--text-primary)]/50 truncate">{(a.full_name || a.username || '').split(' ')[0]}</span></div> : <span className="text-xs text-[var(--text-primary)]/20">—</span>}
-        <div className="flex items-center gap-1.5">
-          {t.ticket_id && <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/25" />}
-          {t.due_date && <span className={`text-[10px] font-medium ${od ? 'text-red-400' : 'text-[var(--text-primary)]/30'}`}>{fmtDue(t.due_date)}</span>}
+      <h4 className="text-base font-semibold text-[var(--text-primary)] mb-3 leading-snug line-clamp-2">{t.title}</h4>
+      <div className="flex items-center justify-between gap-2">
+        {a ? <div className="flex items-center gap-2 min-w-0"><Ava name={a.full_name || a.username} url={a.avatar_url} sz="xs" /><span className="text-sm text-[var(--text-primary)]/60 truncate font-medium">{(a.full_name || a.username || '').split(' ')[0]}</span></div> : <span className="text-sm text-[var(--text-primary)]/30">—</span>}
+        <div className="flex items-center gap-2 shrink-0">
+          {t.ticket_id && <Ticket className="w-4 h-4 text-[var(--text-primary)]/30" />}
+          {t.due_date && <span className={`text-xs font-semibold ${od ? 'text-red-500' : 'text-[var(--text-primary)]/40'}`}>{fmtDue(t.due_date)}</span>}
         </div>
       </div>
     </motion.div>
@@ -315,24 +316,24 @@ function KCol({ col, umap, isDO, dragId, ldMore, onDS, onDE, onDO, onDL, onDrop,
   const m = CM[col.status]; const I = m.icon;
   return (
     <div onDragOver={e => onDO(e, col.status)} onDragLeave={onDL} onDrop={e => onDrop(e, col.status)}
-      className={`bg-[var(--hover-1)]/50 rounded-xl flex flex-col min-h-[400px] w-[280px] shrink-0 transition-colors ${isDO ? 'ring-2 ring-[var(--accent)]/40 bg-[var(--accent)]/5' : ''}`}
-      style={{ maxHeight: 'calc(100vh - 240px)' }}>
-      <div className="px-3 py-2.5 flex items-center justify-between border-b border-[var(--border-color)]/50 shrink-0">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <I className={`w-3.5 h-3.5 shrink-0 ${m.tc}`} />
-          <span className="text-sm font-medium text-[var(--text-primary)]/80 truncate">{ST_LABEL[col.status]}</span>
-          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--hover-2)] text-[var(--text-primary)]/40 shrink-0">{col.tasks.total_items}</span>
+      className={`bg-[var(--hover-1)]/60 rounded-2xl flex flex-col min-h-[500px] w-[320px] shrink-0 transition-all ${isDO ? 'ring-2 ring-[var(--accent)] bg-[var(--accent)]/10 scale-[1.02]' : ''}`}
+      style={{ maxHeight: 'calc(100vh - 220px)' }}>
+      <div className="px-4 py-4 flex items-center justify-between border-b border-[var(--border-color)]/60 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <I className={`w-4 h-4 shrink-0 ${m.tc}`} />
+          <span className="text-base font-bold text-[var(--text-primary)] truncate">{ST_LABEL[col.status]}</span>
+          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[var(--hover-3)] text-[var(--text-primary)]/50 shrink-0">{col.tasks.total_items}</span>
         </div>
-        <button onClick={() => onAdd(col.status)} className="p-1 rounded-lg hover:bg-[var(--hover-3)] text-[var(--text-primary)]/25 hover:text-[var(--accent)]"><Plus className="w-3.5 h-3.5" /></button>
+        <button onClick={() => onAdd(col.status)} className="p-1.5 rounded-lg hover:bg-[var(--hover-3)] text-[var(--text-primary)]/30 hover:text-[var(--accent)] transition-colors"><Plus className="w-4 h-4" /></button>
       </div>
-      <div className="p-2 flex-1 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent">
+      <div className="p-3 flex-1 space-y-3 overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent">
         {col.tasks.items.length === 0 && !isDO ? (
-          <div className="h-24 flex items-center justify-center text-[var(--text-primary)]/20 border border-dashed border-[var(--border-color)]/50 rounded-lg"><span className="text-xs">{m.empty}</span></div>
+          <div className="h-32 flex items-center justify-center text-[var(--text-primary)]/25 border-2 border-dashed border-[var(--border-color)]/50 rounded-xl"><span className="text-sm">{m.empty}</span></div>
         ) : (
           <AnimatePresence mode="popLayout">{col.tasks.items.map(t => <TCard key={t.id} task={t} umap={umap} dragging={dragId === t.id} onDS={onDS} onDE={onDE} onView={onView} />)}</AnimatePresence>
         )}
-        {isDO && col.tasks.items.length === 0 && <div className="h-20 flex items-center justify-center border border-dashed border-[var(--accent)]/40 rounded-lg bg-[var(--accent)]/5"><span className="text-xs text-[var(--accent)]">Отпустите</span></div>}
-        {col.tasks.has_next && <button onClick={() => onMore(col.status)} disabled={ldMore} className="w-full flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--text-primary)]/30 hover:bg-[var(--hover-2)] text-xs disabled:opacity-40">{ldMore ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronDown className="w-3.5 h-3.5" />}Ещё ({col.tasks.total_items - col.tasks.items.length})</button>}
+        {isDO && col.tasks.items.length === 0 && <div className="h-24 flex items-center justify-center border-2 border-dashed border-[var(--accent)] rounded-xl bg-[var(--accent)]/10"><span className="text-sm font-semibold text-[var(--accent)]">Отпустите</span></div>}
+        {col.tasks.has_next && <button onClick={() => onMore(col.status)} disabled={ldMore} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[var(--text-primary)]/40 hover:bg-[var(--hover-2)] font-medium disabled:opacity-40">{ldMore ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronDown className="w-4 h-4" />}Ещё {col.tasks.total_items - col.tasks.items.length}</button>}
       </div>
     </div>
   );
@@ -344,19 +345,19 @@ function DragPanel({ task, onDrop }: { task: { id: string; from: TaskStatus; tit
   if (!task) return null;
   const al = TRANSITIONS[task.from]; if (!al.length) return null;
   return createPortal(
-    <motion.div initial={{ x: '100%', opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: '100%', opacity: 0 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }} className="fixed right-3 top-0 h-full z-[100] flex items-center" style={{ pointerEvents: 'none' }}>
-      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden" style={{ pointerEvents: 'all', width: 200 }}>
-        <div className="px-3 py-2.5 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
-          <p className="text-[10px] uppercase tracking-widest text-[var(--text-primary)]/30 mb-0.5">Перетащить</p>
-          <p className="text-xs font-medium text-[var(--text-primary)] truncate">#{task.number}</p>
+    <motion.div initial={{ x: '100%', opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: '100%', opacity: 0 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }} className="fixed right-4 top-0 h-full z-[100] flex items-center" style={{ pointerEvents: 'none' }}>
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-2xl overflow-hidden" style={{ pointerEvents: 'all', width: 240 }}>
+        <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
+          <p className="text-xs uppercase tracking-wider text-[var(--text-primary)]/40 mb-1">Перетащить</p>
+          <p className="text-sm font-bold text-[var(--text-primary)] truncate">#{task.number}</p>
         </div>
-        <div className="p-1.5 space-y-0.5">
+        <div className="p-2 space-y-1">
           {al.map(s => {
             const c = CM[s]; const I = c.icon; const h = hov === s; return (
               <div key={s} onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setHov(s); }} onDragLeave={() => setHov(null)} onDrop={e => { setHov(null); onDrop(e, s); }}
-                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border transition-all ${h ? `${c.brd} bg-[var(--accent)]/5 scale-[1.02]` : 'border-transparent hover:bg-[var(--hover-2)]'}`}>
-                <I className={`w-3.5 h-3.5 ${c.tc}`} /><span className={`text-xs font-medium truncate ${h ? c.tc : 'text-[var(--text-primary)]/60'}`}>{ST_LABEL[s]}</span>
-                {h && <Check className={`w-3 h-3 ml-auto ${c.tc}`} />}
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all ${h ? `${c.brd} bg-[var(--accent)]/10 scale-[1.02] shadow-sm` : 'border-transparent hover:bg-[var(--hover-2)]'}`}>
+                <I className={`w-4 h-4 ${c.tc}`} /><span className={`text-sm font-semibold truncate ${h ? c.tc : 'text-[var(--text-primary)]/70'}`}>{ST_LABEL[s]}</span>
+                {h && <Check className={`w-4 h-4 ml-auto ${c.tc}`} />}
               </div>
             );
           })}
@@ -372,19 +373,19 @@ function AssignModal({ task, umap, loading, onClose, onOk }: { task: TaskKanbanI
   useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) onClose(); }; document.addEventListener('keydown', h); document.body.style.overflow = 'hidden'; return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; }; }, [onClose, loading]);
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !loading && onClose()} />
-      <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-xl" onClick={e => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-[var(--border-color)]">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">Назначьте исполнителя</h2>
-          <p className="text-xs text-[var(--text-primary)]/40 mt-0.5">Обязательно для статуса «В работе»</p>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !loading && onClose()} />
+      <div className="relative w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-5 border-b border-[var(--border-color)]">
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">Назначьте исполнителя</h2>
+          <p className="text-sm text-[var(--text-primary)]/50 mt-1">Обязательно для статуса «В работе»</p>
         </div>
-        <div className="p-5 space-y-4">
-          <div className="rounded-lg bg-[var(--hover-1)] p-3"><span className="text-xs font-mono text-[var(--text-primary)]/40">{task.number}</span><p className="text-sm font-medium text-[var(--text-primary)] mt-0.5">{task.title}</p></div>
-          <SelectDD value={aid} onChange={setAid} options={opts} placeholder="Выберите" icon={UserCheck} searchable />
+        <div className="p-6 space-y-5">
+          <div className="rounded-xl bg-[var(--hover-1)] p-4 border border-[var(--border-color)]"><span className="text-xs font-mono text-[var(--text-primary)]/50">{task.number}</span><p className="text-base font-semibold text-[var(--text-primary)] mt-1">{task.title}</p></div>
+          <SelectDD value={aid} onChange={setAid} options={opts} placeholder="Выберите исполнителя" icon={UserCheck} searchable />
         </div>
-        <div className="flex justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
-          <button onClick={onClose} disabled={loading} className="px-3.5 py-2 rounded-lg bg-[var(--hover-2)] text-[var(--text-primary)]/60 text-sm disabled:opacity-50">Отмена</button>
-          <button onClick={() => onOk(aid)} disabled={!aid || loading} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-40">{loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}Назначить</button>
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--hover-1)]/30">
+          <button onClick={onClose} disabled={loading} className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 font-medium hover:bg-[var(--hover-3)] disabled:opacity-50">Отмена</button>
+          <button onClick={() => onOk(aid)} disabled={!aid || loading} className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[var(--accent)] text-white font-bold disabled:opacity-40 hover:bg-[var(--accent)]/90">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}Назначить</button>
         </div>
       </div>
     </div>
@@ -412,7 +413,7 @@ function CreateModal({ initSt, context, umap, onClose, onOk }: { initSt: TaskSta
 
   const ldProj = useCallback(async (q: string, p: number) => {
     const r = await projectsApi.getAll(p, 20); const f = q ? r.items.filter(x => x.name.toLowerCase().includes(q.toLowerCase()) || x.key.toLowerCase().includes(q.toLowerCase())) : r.items;
-    return { items: f.map(x => ({ value: x.id, label: x.name, sublabel: x.key, icon: <FolderOpen className="w-3.5 h-3.5 text-amber-400" /> })), hasNext: r.items.length === 20 };
+    return { items: f.map(x => ({ value: x.id, label: x.name, sublabel: x.key, icon: <FolderOpen className="w-4 h-4 text-amber-400" /> })), hasNext: r.items.length === 20 };
   }, []);
   const ldUsers = useCallback(async (q: string, p: number) => {
     let items: any[] = []; try { items = (await usersApi.getAllUsers(p, 20)).items; } catch { }
@@ -436,93 +437,95 @@ function CreateModal({ initSt, context, umap, onClose, onOk }: { initSt: TaskSta
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !saving && onClose()} />
-      <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-color)] shrink-0">
-          <h2 className="text-base font-semibold text-[var(--text-primary)]">Новая задача</h2>
-          <button onClick={() => !saving && onClose()} className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/30"><X className="w-4 h-4" /></button>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !saving && onClose()} />
+      <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border-color)] shrink-0">
+          <h2 className="text-xl font-bold text-[var(--text-primary)]">Новая задача</h2>
+          <button onClick={() => !saving && onClose()} className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"><X className="w-5 h-5" /></button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
           {/* Название */}
           <div>
-            <label className="block text-xs font-medium text-[var(--text-primary)]/50 mb-1">Название *</label>
+            <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">Название *</label>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Что нужно сделать?" autoFocus className={INP} />
           </div>
 
           {/* Описание */}
           <div>
-            <label className="block text-xs font-medium text-[var(--text-primary)]/50 mb-1">Описание</label>
-            <textarea value={desc} onChange={e => setDesc(e.target.value)} placeholder="Подробности…" rows={3} className={`${INP} resize-none`} />
+            <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">Описание</label>
+            <textarea value={desc} onChange={e => setDesc(e.target.value)} placeholder="Подробности…" rows={4} className={`${INP} resize-none`} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-5">
+            {/* Проект */}
+            <div>
+              <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">Проект</label>
+              <AsyncDD value={pid} onChange={setPid} loadFn={ldProj} placeholder="Не выбран" icon={FolderOpen} />
+            </div>
+
+            {/* Заявка */}
+            {context.type !== 'ticket' && (
+              <div>
+                <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">Заявка</label>
+                <AsyncDD value={tid} onChange={setTid} loadFn={ldTickets} placeholder="Без заявки" icon={Ticket} wide />
+              </div>
+            )}
           </div>
 
           {/* Приоритет */}
           <div>
-            <label className="block text-xs font-medium text-[var(--text-primary)]/50 mb-1.5">Приоритет</label>
-            <div className="flex gap-1.5">
+            <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">Приоритет</label>
+            <div className="flex gap-2">
               {PRI_LIST.map(p => {
                 const m = PM[p.value]; return (
                   <button key={p.value} onClick={() => setPri(p.value)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium border transition-all ${pri === p.value ? `${m.bg} ${m.c} ${m.brd}` : 'bg-[var(--hover-1)] text-[var(--text-primary)]/40 border-[var(--border-color)] hover:bg-[var(--hover-2)]'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />{p.label}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold border transition-all ${pri === p.value ? `${m.bg} ${m.c} ${m.brd} scale-105` : 'bg-[var(--hover-1)] text-[var(--text-primary)]/40 border-[var(--border-color)] hover:bg-[var(--hover-2)]'}`}>
+                    <span className={`w-2 h-2 rounded-full ${m.dot}`} />{p.label}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Проект */}
-          <div>
-            <label className="block text-xs font-medium text-[var(--text-primary)]/50 mb-1">Проект</label>
-            <AsyncDD value={pid} onChange={setPid} loadFn={ldProj} placeholder="Не выбран" icon={FolderOpen} />
-          </div>
-
-          {/* Заявка */}
-          {context.type !== 'ticket' && (
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-primary)]/50 mb-1">Заявка</label>
-              <AsyncDD value={tid} onChange={setTid} loadFn={ldTickets} placeholder="Без заявки" icon={Ticket} wide />
-            </div>
-          )}
-
           {/* Строка: Сложность + Оценка + Срок */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-5">
             <div>
-              <label className="block text-xs font-medium text-[var(--text-primary)]/50 mb-1.5">Сложность</label>
-              <div className="flex flex-wrap gap-1">
+              <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">Сложность (SP)</label>
+              <div className="flex flex-wrap gap-2">
                 {SP_SERIES.map(v => (
                   <button key={v} onClick={() => setSp(sp === v ? null : v)}
-                    className={`w-8 h-8 rounded-lg text-xs font-medium border transition-all ${sp === v ? 'bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30' : 'bg-[var(--hover-1)] text-[var(--text-primary)]/40 border-[var(--border-color)] hover:bg-[var(--hover-2)]'}`}>{v}</button>
+                    className={`w-10 h-10 rounded-xl font-bold border transition-all ${sp === v ? 'bg-purple-500/20 text-purple-500 border-purple-500/40 scale-110' : 'bg-[var(--hover-1)] text-[var(--text-primary)]/40 border-[var(--border-color)] hover:bg-[var(--hover-2)]'}`}>{v}</button>
                 ))}
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-[var(--text-primary)]/50 mb-1">Оценка, ч.</label>
+              <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">Оценка, ч.</label>
               <input type="number" min={0} step={0.5} value={eh} onChange={e => setEh(e.target.value)} placeholder="—" className={INP} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-[var(--text-primary)]/50 mb-1">Срок</label>
+              <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">Срок</label>
               <input type="date" value={dd} onChange={e => setDd(e.target.value)} min={new Date().toISOString().split('T')[0]} className={INP} />
             </div>
           </div>
 
           {/* Исполнитель */}
           <div>
-            <label className="block text-xs font-medium text-[var(--text-primary)]/50 mb-1">Исполнитель</label>
+            <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">Исполнитель</label>
             <AsyncDD value={aid} onChange={setAid} loadFn={ldUsers} placeholder="Не назначен" icon={UserCheck} />
           </div>
 
           {/* Чекбокс todo */}
           <button onClick={() => setTodo(v => !v)}
-            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border transition-all text-sm ${todo ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/40 hover:bg-[var(--hover-2)]'}`}>
-            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${todo ? 'bg-blue-500 border-blue-600' : 'border-[var(--border-color)]'}`}>{todo && <Check className="w-3 h-3 text-white" />}</div>
+            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all font-semibold ${todo ? 'bg-blue-500/15 border-blue-500/40 text-blue-500' : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}>
+            <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 ${todo ? 'bg-blue-500 border-blue-600' : 'border-[var(--border-color)]'}`}>{todo && <Check className="w-3.5 h-3.5 text-white" />}</div>
             Сразу «{ST_LABEL.todo}»
           </button>
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-[var(--border-color)] shrink-0">
-          <button onClick={() => !saving && onClose()} disabled={saving} className="px-4 py-2 rounded-lg bg-[var(--hover-2)] text-[var(--text-primary)]/60 text-sm disabled:opacity-50">Отмена</button>
-          <button onClick={submit} disabled={!title.trim() || saving} className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-40">{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}Создать</button>
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--hover-1)]/30 shrink-0">
+          <button onClick={() => !saving && onClose()} disabled={saving} className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 font-medium hover:bg-[var(--hover-3)] disabled:opacity-50">Отмена</button>
+          <button onClick={submit} disabled={!title.trim() || saving} className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[var(--accent)] text-white font-bold disabled:opacity-40 hover:bg-[var(--accent)]/90">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Создать</button>
         </div>
       </div>
     </div>
@@ -582,136 +585,136 @@ function DetailModal({ task: t, umap, onClose, onRefresh, onNeedAssign }: {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md max-h-[90vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-xl" onClick={e => e.stopPropagation()}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
         {/* header */}
-        <div className="flex items-start justify-between px-5 py-3.5 border-b border-[var(--border-color)] shrink-0">
-          <div className="flex-1 min-w-0 pr-3">
-            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-              <span className="font-mono text-xs text-[var(--text-primary)]/40">{t.number}</span>
-              <PriBadge p={t.priority} />
+        <div className="flex items-start justify-between px-6 py-5 border-b border-[var(--border-color)] shrink-0">
+          <div className="flex-1 min-w-0 pr-4">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className="font-mono text-sm text-[var(--text-primary)]/50">{t.number}</span>
+              <PriBadge p={t.priority} size="md" />
               {t.story_points != null && <SpBadge v={t.story_points} />}
-              {canEdit && <button onClick={() => setEditing(v => !v)} className={`p-1 rounded-lg ml-auto ${editing ? 'bg-[var(--accent)]/15 text-[var(--accent)]' : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]/30'}`}><Pencil className="w-3 h-3" /></button>}
+              {canEdit && <button onClick={() => setEditing(v => !v)} className={`ml-auto p-1.5 rounded-lg ${editing ? 'bg-[var(--accent)]/20 text-[var(--accent)]' : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40'}`}><Pencil className="w-4 h-4" /></button>}
             </div>
-            <h2 className="text-sm font-semibold text-[var(--text-primary)] leading-snug">{t.title}</h2>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] leading-snug">{t.title}</h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/30"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"><X className="w-5 h-5" /></button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-3">
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
           {t.status === 'in_progress' && !t.assignee_id && (
-            <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400">⚠ Нет исполнителя</div>
+            <div className="px-4 py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-sm text-amber-500 font-semibold">⚠ Нет исполнителя</div>
           )}
 
           {editing && canEdit && (
-            <div className="p-3 rounded-lg bg-[var(--hover-1)] border border-[var(--border-color)] space-y-2.5">
+            <div className="p-5 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)] space-y-4">
               <input value={eTitle} onChange={e => setETitle(e.target.value)} className={INP} />
-              <div className="flex gap-1">{TASK_PRIORITY_LIST.map(p => { const m = PM[p]; return <button key={p} onClick={() => setEPri(p)} className={`flex-1 py-1.5 rounded-lg text-xs font-medium border ${ePri === p ? `${m.bg} ${m.c} ${m.brd}` : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40 border-[var(--border-color)]'}`}>{PRI_LABEL[p]}</button>; })}</div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="flex gap-2">{TASK_PRIORITY_LIST.map(p => { const m = PM[p]; return <button key={p} onClick={() => setEPri(p)} className={`flex-1 py-2.5 rounded-xl font-semibold border ${ePri === p ? `${m.bg} ${m.c} ${m.brd}` : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40 border-[var(--border-color)]'}`}>{PRI_LABEL[p]}</button>; })}</div>
+              <div className="grid grid-cols-2 gap-3">
                 <input type="number" min={1} max={21} value={eSp} onChange={e => setESp(e.target.value)} placeholder="SP" className={INP} />
                 <input type="date" value={eDd} onChange={e => setEDd(e.target.value)} className={INP} />
               </div>
-              <div className="flex justify-end gap-2"><button onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-lg bg-[var(--hover-2)] text-[var(--text-primary)]/50 text-xs">Отмена</button><button onClick={saveEdit} disabled={busy === 'edit' || !eTitle.trim()} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-xs font-medium disabled:opacity-40">{busy === 'edit' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}Сохранить</button></div>
+              <div className="flex justify-end gap-2"><button onClick={() => setEditing(false)} className="px-4 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/60 font-medium">Отмена</button><button onClick={saveEdit} disabled={busy === 'edit' || !eTitle.trim()} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-[var(--accent)] text-white font-bold disabled:opacity-40">{busy === 'edit' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}Сохранить</button></div>
             </div>
           )}
 
           {/* info grid */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-[var(--hover-1)] rounded-lg p-2.5">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/30 mb-1">Статус</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-[var(--hover-1)] rounded-xl p-4 border border-[var(--border-color)]">
+              <p className="text-xs uppercase tracking-wider text-[var(--text-primary)]/40 mb-2 font-semibold">Статус</p>
               <div className="relative">
-                <button onClick={() => allowed.length > 0 && setShowSt(v => !v)} disabled={busy !== '' || !allowed.length} className={`flex items-center gap-1 text-xs font-medium ${cm.tc} disabled:opacity-40`}>
-                  {busy === 'st' ? <Loader2 className="w-3 h-3 animate-spin" /> : <SI className="w-3 h-3" />}{ST_LABEL[t.status]}{allowed.length > 0 && <ChevronDown className="w-3 h-3 opacity-40" />}
+                <button onClick={() => allowed.length > 0 && setShowSt(v => !v)} disabled={busy !== '' || !allowed.length} className={`flex items-center gap-2 font-semibold ${cm.tc} disabled:opacity-40`}>
+                  {busy === 'st' ? <Loader2 className="w-4 h-4 animate-spin" /> : <SI className="w-4 h-4" />}{ST_LABEL[t.status]}{allowed.length > 0 && <ChevronDown className="w-4 h-4 opacity-50" />}
                 </button>
                 {showSt && <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowSt(false)} />
-                  <div className="absolute left-0 top-full mt-1 z-20 w-48 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg overflow-hidden shadow-xl">
-                    <div className="p-1">{allowed.map(s => { const sm = CM[s]; const SII = sm.icon; return <button key={s} onClick={() => chSt(s)} className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]"><span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`} /><SII className={`w-3 h-3 ${sm.tc}`} /><span className="flex-1 text-left">{ST_LABEL[s]}</span></button>; })}</div>
+                  <div className="absolute left-0 top-full mt-2 z-20 w-56 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-2xl">
+                    <div className="p-2">{allowed.map(s => { const sm = CM[s]; const SII = sm.icon; return <button key={s} onClick={() => chSt(s)} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] font-medium"><span className={`w-2 h-2 rounded-full ${sm.dot}`} /><SII className={`w-4 h-4 ${sm.tc}`} /><span className="flex-1 text-left">{ST_LABEL[s]}</span></button>; })}</div>
                   </div>
                 </>}
               </div>
             </div>
-            <div className="bg-[var(--hover-1)] rounded-lg p-2.5">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/30 mb-1">Срок</p>
-              {t.due_date ? <span className={`flex items-center gap-1 text-xs font-medium ${overdue(t) ? 'text-red-400' : 'text-[var(--text-primary)]/60'}`}><Calendar className="w-3 h-3" />{fmtDue(t.due_date)}</span> : <span className="text-xs text-[var(--text-primary)]/20">—</span>}
+            <div className="bg-[var(--hover-1)] rounded-xl p-4 border border-[var(--border-color)]">
+              <p className="text-xs uppercase tracking-wider text-[var(--text-primary)]/40 mb-2 font-semibold">Срок</p>
+              {t.due_date ? <span className={`flex items-center gap-2 font-semibold ${overdue(t) ? 'text-red-500' : 'text-[var(--text-primary)]/70'}`}><Calendar className="w-4 h-4" />{fmtDue(t.due_date)}</span> : <span className="text-[var(--text-primary)]/30">—</span>}
             </div>
-            <div className="bg-[var(--hover-1)] rounded-lg p-2.5">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/30 mb-1">Исполнитель</p>
-              {assignee ? <div className="flex items-center gap-1.5"><Ava name={assignee.full_name || assignee.username} url={assignee.avatar_url} sz="xs" /><span className="text-xs text-[var(--text-primary)]/60 truncate">{assignee.full_name || assignee.username}</span></div> : <span className="text-xs text-[var(--text-primary)]/20">—</span>}
+            <div className="bg-[var(--hover-1)] rounded-xl p-4 border border-[var(--border-color)]">
+              <p className="text-xs uppercase tracking-wider text-[var(--text-primary)]/40 mb-2 font-semibold">Исполнитель</p>
+              {assignee ? <div className="flex items-center gap-2"><Ava name={assignee.full_name || assignee.username} url={assignee.avatar_url} /><span className="text-[var(--text-primary)]/70 truncate font-medium">{assignee.full_name || assignee.username}</span></div> : <span className="text-[var(--text-primary)]/30">—</span>}
             </div>
-            <div className="bg-[var(--hover-1)] rounded-lg p-2.5">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/30 mb-1">Создана</p>
-              <span className="text-xs text-[var(--text-primary)]/60">{new Date(t.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+            <div className="bg-[var(--hover-1)] rounded-xl p-4 border border-[var(--border-color)]">
+              <p className="text-xs uppercase tracking-wider text-[var(--text-primary)]/40 mb-2 font-semibold">Создана</p>
+              <span className="text-[var(--text-primary)]/70 font-medium">{new Date(t.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
             </div>
           </div>
 
           {/* assign */}
           {canAssign && (
-            <div className="rounded-lg border border-[var(--border-color)] overflow-hidden">
-              <button onClick={() => setShowAssign(v => !v)} className="w-full flex items-center justify-between px-3.5 py-2 bg-[var(--hover-1)] text-xs text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]">
-                <span className="flex items-center gap-1.5 font-medium"><UserCheck className="w-3.5 h-3.5" />{t.assignee_id ? 'Сменить исполнителя' : 'Назначить исполнителя'}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAssign ? 'rotate-180' : ''}`} />
+            <div className="rounded-xl border border-[var(--border-color)] overflow-hidden">
+              <button onClick={() => setShowAssign(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-[var(--hover-1)] text-sm text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] font-semibold">
+                <span className="flex items-center gap-2"><UserCheck className="w-4 h-4" />{t.assignee_id ? 'Сменить исполнителя' : 'Назначить исполнителя'}</span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${showAssign ? 'rotate-180' : ''}`} />
               </button>
-              {showAssign && <div className="px-3.5 py-2.5 border-t border-[var(--border-color)] space-y-2">
+              {showAssign && <div className="px-4 py-4 border-t border-[var(--border-color)] space-y-3 bg-[var(--hover-1)]/50">
                 <SelectDD value={aId} onChange={setAId} options={uOpts} placeholder="Выберите" icon={UserCheck} searchable />
-                <button onClick={() => act('assign', () => tasksApi.assign(t.id, { assignee_id: aId }), 'Назначен')} disabled={!aId || busy === 'assign'} className="w-full py-2 rounded-lg bg-[var(--accent)] text-white text-xs font-medium disabled:opacity-40">{busy === 'assign' ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : 'Назначить'}</button>
+                <button onClick={() => act('assign', () => tasksApi.assign(t.id, { assignee_id: aId }), 'Назначен')} disabled={!aId || busy === 'assign'} className="w-full py-2.5 rounded-xl bg-[var(--accent)] text-white font-bold disabled:opacity-40">{busy === 'assign' ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Назначить'}</button>
               </div>}
             </div>
           )}
 
           {/* request review */}
           {canRR && users.length > 0 && (
-            <div className="rounded-lg border border-violet-500/20 overflow-hidden">
-              <button onClick={() => setShowRR(v => !v)} className="w-full flex items-center justify-between px-3.5 py-2 bg-violet-500/5 text-xs text-violet-400 font-medium hover:bg-violet-500/8">
-                <span className="flex items-center gap-1.5"><GitPullRequest className="w-3.5 h-3.5" />Ревью</span>
-                <ChevronDown className={`w-3.5 h-3.5 opacity-50 transition-transform ${showRR ? 'rotate-180' : ''}`} />
+            <div className="rounded-xl border border-violet-500/30 overflow-hidden">
+              <button onClick={() => setShowRR(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-violet-500/10 text-sm text-violet-500 font-bold hover:bg-violet-500/15">
+                <span className="flex items-center gap-2"><GitPullRequest className="w-4 h-4" />Ревью</span>
+                <ChevronDown className={`w-4 h-4 opacity-70 transition-transform ${showRR ? 'rotate-180' : ''}`} />
               </button>
-              {showRR && <div className="px-3.5 py-2.5 border-t border-violet-500/20 space-y-2">
+              {showRR && <div className="px-4 py-4 border-t border-violet-500/30 space-y-3 bg-violet-500/5">
                 <SelectDD value={rvId} onChange={setRvId} options={uOpts} placeholder="Ревьюер" searchable />
-                <button onClick={() => act('rr', () => tasksApi.requestReview(t.id, { reviewer_id: rvId }), 'Запрошено')} disabled={!rvId || busy === 'rr'} className="w-full py-2 rounded-lg bg-violet-500/20 border border-violet-500/30 text-violet-400 text-xs font-medium disabled:opacity-40">Отправить</button>
+                <button onClick={() => act('rr', () => tasksApi.requestReview(t.id, { reviewer_id: rvId }), 'Запрошено')} disabled={!rvId || busy === 'rr'} className="w-full py-2.5 rounded-xl bg-violet-500/20 border border-violet-500/40 text-violet-500 font-bold disabled:opacity-40">Отправить</button>
               </div>}
             </div>
           )}
 
           {/* review actions */}
           {canReview && (
-            <div className="flex gap-2">
-              <button onClick={() => act('rv', () => tasksApi.review(t.id, { decision: 'done' }), 'Принято')} disabled={busy === 'rv'} className="flex-1 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium disabled:opacity-50"><ThumbsUp className="w-3.5 h-3.5 inline mr-1" />Принять</button>
-              <button onClick={() => act('rv', () => tasksApi.review(t.id, { decision: 'to_fix' }), 'Возвращено')} disabled={busy === 'rv'} className="flex-1 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium disabled:opacity-50"><ThumbsDown className="w-3.5 h-3.5 inline mr-1" />Вернуть</button>
+            <div className="flex gap-3">
+              <button onClick={() => act('rv', () => tasksApi.review(t.id, { decision: 'done' }), 'Принято')} disabled={busy === 'rv'} className="flex-1 py-3 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-500 font-bold disabled:opacity-50"><ThumbsUp className="w-4 h-4 inline mr-2" />Принять</button>
+              <button onClick={() => act('rv', () => tasksApi.review(t.id, { decision: 'to_fix' }), 'Возвращено')} disabled={busy === 'rv'} className="flex-1 py-3 rounded-xl bg-red-500/15 border border-red-500/40 text-red-500 font-bold disabled:opacity-50"><ThumbsDown className="w-4 h-4 inline mr-2" />Вернуть</button>
             </div>
           )}
 
           {/* links */}
           {t.ticket_id && (
-            <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-[var(--hover-1)]">
-              <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/20" />
-              <span className="flex-1 text-xs text-[var(--text-primary)]/40">Заявка</span>
-              <Link to={`/tickets/${t.ticket_id}`} onClick={onClose} className="text-xs text-[var(--accent)] flex items-center gap-0.5">Открыть<ArrowUpRight className="w-3 h-3" /></Link>
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
+              <Ticket className="w-4 h-4 text-[var(--text-primary)]/30" />
+              <span className="flex-1 text-sm text-[var(--text-primary)]/50 font-medium">Заявка</span>
+              <Link to={`/tickets/${t.ticket_id}`} onClick={onClose} className="text-sm text-[var(--accent)] flex items-center gap-1 font-semibold">Открыть<ArrowUpRight className="w-4 h-4" /></Link>
             </div>
           )}
           {t.project_id && (
-            <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-[var(--hover-1)]">
-              <FolderOpen className="w-3.5 h-3.5 text-[var(--text-primary)]/20" />
-              <span className="flex-1 text-xs text-[var(--text-primary)]/40">Проект</span>
-              <Link to={`/projects/${t.project_id}`} onClick={onClose} className="text-xs text-[var(--accent)] flex items-center gap-0.5">Открыть<ArrowUpRight className="w-3 h-3" /></Link>
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
+              <FolderOpen className="w-4 h-4 text-[var(--text-primary)]/30" />
+              <span className="flex-1 text-sm text-[var(--text-primary)]/50 font-medium">Проект</span>
+              <Link to={`/projects/${t.project_id}`} onClick={onClose} className="text-sm text-[var(--accent)] flex items-center gap-1 font-semibold">Открыть<ArrowUpRight className="w-4 h-4" /></Link>
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-between px-5 py-3 border-t border-[var(--border-color)] shrink-0">
-          <button onClick={() => setShowArchive(true)} disabled={busy === 'arch'} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-[var(--text-primary)]/40 hover:bg-[var(--hover-2)]"><Archive className="w-3.5 h-3.5" />Архив</button>
-          <button onClick={onClose} className="px-3.5 py-1.5 rounded-lg bg-[var(--hover-2)] text-[var(--text-primary)]/60 text-xs">Закрыть</button>
+        <div className="flex items-center justify-between px-6 py-4 border-t border-[var(--border-color)] bg-[var(--hover-1)]/30 shrink-0">
+          <button onClick={() => setShowArchive(true)} disabled={busy === 'arch'} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)] font-medium"><Archive className="w-4 h-4" />Архив</button>
+          <button onClick={onClose} className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 font-medium hover:bg-[var(--hover-3)]">Закрыть</button>
         </div>
       </div>
 
       {showArchive && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowArchive(false)} />
-          <div className="relative w-full max-w-xs bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-xl">
-            <div className="p-5 text-center"><Archive className="w-8 h-8 text-[var(--text-primary)]/20 mx-auto mb-2" /><p className="text-sm font-medium text-[var(--text-primary)]">Архивировать?</p><p className="text-xs text-[var(--text-primary)]/40 mt-1">«{t.title}»</p></div>
+          <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl">
+            <div className="p-6 text-center"><Archive className="w-10 h-10 text-[var(--text-primary)]/30 mx-auto mb-3" /><p className="text-base font-bold text-[var(--text-primary)]">Архивировать?</p><p className="text-sm text-[var(--text-primary)]/50 mt-2">«{t.title}»</p></div>
             <div className="flex border-t border-[var(--border-color)]">
-              <button onClick={() => setShowArchive(false)} className="flex-1 py-2.5 text-xs text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]">Отмена</button>
-              <button onClick={() => { setShowArchive(false); act('arch', () => tasksApi.archive(t.id), 'Архивировано'); }} className="flex-1 py-2.5 text-xs font-medium text-red-400 hover:bg-red-500/10 border-l border-[var(--border-color)]">Да</button>
+              <button onClick={() => setShowArchive(false)} className="flex-1 py-3 text-sm text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)] font-medium">Отмена</button>
+              <button onClick={() => { setShowArchive(false); act('arch', () => tasksApi.archive(t.id), 'Архивировано'); }} className="flex-1 py-3 text-sm font-bold text-red-500 hover:bg-red-500/10 border-l border-[var(--border-color)]">Да</button>
             </div>
           </div>
         </div>
@@ -818,12 +821,13 @@ export default function TasksPage() {
   ];
 
   const ldTicketsAsync = useCallback(async (q: string, p: number) => {
-    const r = await ticketsApi.getAllWithFilters(p, 20, {}); const f = q ? r.items.filter(t => t.title.toLowerCase().includes(q.toLowerCase()) || String(t.number).includes(q)) : r.items;
+    const r = await ticketsApi.getAllWithFilters(p, 20, { project_id: selP || undefined });
+    const f = q ? r.items.filter(t => t.title.toLowerCase().includes(q.toLowerCase()) || String(t.number).includes(q)) : r.items;
     return { items: f.map(t => ({ value: t.id, label: `#${t.number} — ${t.title}` })), hasNext: r.items.length === 20 };
-  }, []);
+  }, [selP]);
   const ldProjAsync = useCallback(async (q: string, p: number) => {
     const r = await projectsApi.getAll(p, 20); const f = q ? r.items.filter(x => x.name.toLowerCase().includes(q.toLowerCase()) || x.key.toLowerCase().includes(q.toLowerCase())) : r.items;
-    return { items: f.map(x => ({ value: x.id, label: x.name, sublabel: x.key, icon: <FolderOpen className="w-3.5 h-3.5 text-amber-400" /> })), hasNext: r.items.length === 20 };
+    return { items: f.map(x => ({ value: x.id, label: x.name, sublabel: x.key, icon: <FolderOpen className="w-4 h-4 text-amber-400" /> })), hasNext: r.items.length === 20 };
   }, []);
   const ldAssAsync = useCallback(async (q: string, p: number) => {
     let items: any[] = []; try { items = (await usersApi.getAllUsers(p, 20)).items; } catch { }
@@ -834,66 +838,68 @@ export default function TasksPage() {
   const dragInfo = drag ? (() => { const t = cols.flatMap(c => c.tasks.items).find(x => x.id === drag.id); return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null; })() : null;
 
   return (
-    <div className="space-y-3 animate-in fade-in duration-500" onDragEnd={onDE}>
+    <div className="space-y-5 animate-in fade-in duration-500" onDragEnd={onDE}>
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Задачи</h1>
-          {!loading && <span className="text-sm text-[var(--text-primary)]/30">{total - done} активных · {done} завершено</span>}
-          {refreshing && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--text-primary)]/30" />}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-[var(--text-primary)]">Задачи</h1>
+          {!loading && <span className="text-base text-[var(--text-primary)]/40">{total - done} активных · {done} завершено</span>}
+          {refreshing && <Loader2 className="w-4 h-4 animate-spin text-[var(--accent)]" />}
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/20" />
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Поиск…" className="w-40 pl-8 pr-7 py-1.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30 transition-all" />
-            {q && <button onClick={() => setQ('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/20 hover:text-[var(--text-primary)]"><X className="w-3 h-3" /></button>}
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-primary)]/30" />
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Поиск…" className="w-56 pl-10 pr-9 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-primary)]/30 focus:outline-none focus:border-[var(--accent)]/50 focus:ring-2 focus:ring-[var(--accent)]/10 transition-all" />
+            {q && <button onClick={() => setQ('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/30 hover:text-[var(--text-primary)]"><X className="w-4 h-4" /></button>}
           </div>
           <div className="relative">
-            <button onClick={() => setSf(v => !v)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium ${hf ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--accent)]' : 'bg-[var(--hover-2)] border-[var(--border-color)] text-[var(--text-primary)]/40'}`}><Filter className="w-3 h-3" />Фильтры{hf && <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />}</button>
+            <button onClick={() => setSf(v => !v)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-semibold transition-all ${hf ? 'bg-[var(--accent)]/15 border-[var(--accent)]/40 text-[var(--accent)]' : 'bg-[var(--hover-2)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-3)]'}`}><Filter className="w-4 h-4" />Фильтры{hf && <span className="w-2 h-2 rounded-full bg-[var(--accent)]" />}</button>
             {sf && <>
               <div className="fixed inset-0 z-10" onClick={() => setSf(false)} />
-              <div className="absolute right-0 top-full mt-1 z-20 w-52 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl p-2.5 space-y-2">
-                <p className="text-[10px] uppercase tracking-widest text-[var(--text-primary)]/25 px-1">Приоритет</p>
-                <div className="flex flex-wrap gap-1">{PRI_LIST.map(p => { const m = PM[p.value]; return <button key={p.value} onClick={() => setFp(v => v.includes(p.value) ? v.filter(x => x !== p.value) : [...v, p.value])} className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border ${fp.includes(p.value) ? `${m.bg} ${m.c} ${m.brd}` : 'bg-[var(--hover-1)] text-[var(--text-primary)]/35 border-[var(--border-color)]'}`}><span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />{p.label}</button>; })}</div>
-                <button onClick={() => setFo(v => !v)} className={`w-full flex items-center gap-2 py-1 px-1 rounded text-xs ${fo ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'}`}><div className={`w-3 h-3 rounded border flex items-center justify-center ${fo ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'}`}>{fo && <Check className="w-2 h-2 text-white" />}</div>Просроченные</button>
-                {hf && <button onClick={() => { setFp([]); setFo(false); }} className="w-full text-center text-xs text-[var(--accent)] pt-1">Сбросить</button>}
+              <div className="absolute right-0 top-full mt-2 z-20 w-64 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl p-4 space-y-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-[var(--text-primary)]/40 mb-2 font-semibold">Приоритет</p>
+                  <div className="flex flex-wrap gap-2">{PRI_LIST.map(p => { const m = PM[p.value]; return <button key={p.value} onClick={() => setFp(v => v.includes(p.value) ? v.filter(x => x !== p.value) : [...v, p.value])} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-semibold border ${fp.includes(p.value) ? `${m.bg} ${m.c} ${m.brd}` : 'bg-[var(--hover-1)] text-[var(--text-primary)]/40 border-[var(--border-color)]'}`}><span className={`w-2 h-2 rounded-full ${m.dot}`} />{p.label}</button>; })}</div>
+                </div>
+                <button onClick={() => setFo(v => !v)} className={`w-full flex items-center gap-2.5 py-2 px-2 rounded-lg font-semibold ${fo ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/50'}`}><div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center ${fo ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'}`}>{fo && <Check className="w-3 h-3 text-white" />}</div>Просроченные</button>
+                {hf && <button onClick={() => { setFp([]); setFo(false); }} className="w-full text-center text-sm text-[var(--accent)] pt-2 font-semibold">Сбросить</button>}
               </div>
             </>}
           </div>
-          <button onClick={() => fetchBoard(true)} disabled={refreshing || loading} className="p-1.5 rounded-lg bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/30 hover:text-[var(--text-primary)] disabled:opacity-40"><RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} /></button>
-          <button onClick={() => setCreate('backlog')} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-sm font-medium"><Plus className="w-3.5 h-3.5" />Задача</button>
+          <button onClick={() => fetchBoard(true)} disabled={refreshing || loading} className="p-2.5 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)] hover:bg-[var(--hover-3)] disabled:opacity-40"><RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /></button>
+          <button onClick={() => setCreate('backlog')} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--accent)] text-white font-bold hover:bg-[var(--accent)]/90 transition-all"><Plus className="w-4 h-4" />Задача</button>
         </div>
       </div>
 
       {/* Tabs row: context + view mode */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-0.5 p-0.5 bg-[var(--hover-1)] rounded-lg">
-            {ctxTabs.map(t => { const I = t.icon; return <button key={t.id} onClick={() => setMode(t.id)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${mode === t.id ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60'}`}><I className="w-3 h-3" />{t.label}</button>; })}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 p-1 bg-[var(--hover-1)] rounded-xl border border-[var(--border-color)]">
+            {ctxTabs.map(t => { const I = t.icon; return <button key={t.id} onClick={() => setMode(t.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all whitespace-nowrap ${mode === t.id ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-md' : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70'}`}><I className="w-4 h-4" />{t.label}</button>; })}
           </div>
-          {mode === 'project' && <div className="w-56"><AsyncDD value={selP} onChange={setSelP} loadFn={ldProjAsync} placeholder="Проект" icon={FolderOpen} /></div>}
-          {mode === 'ticket' && <div className="w-72"><AsyncDD value={selT} onChange={setSelT} loadFn={ldTicketsAsync} placeholder="Заявка" icon={Ticket} wide /></div>}
-          {mode === 'assignee' && <div className="w-56"><AsyncDD value={selA} onChange={setSelA} loadFn={ldAssAsync} placeholder="Исполнитель" icon={UserCheck} /></div>}
+          {mode === 'project' && <div className="w-64"><AsyncDD value={selP} onChange={setSelP} loadFn={ldProjAsync} placeholder="Проект" icon={FolderOpen} /></div>}
+          {mode === 'ticket' && <div className="w-80"><AsyncDD value={selT} onChange={setSelT} loadFn={ldTicketsAsync} placeholder="Заявка" icon={Ticket} wide /></div>}
+          {mode === 'assignee' && <div className="w-64"><AsyncDD value={selA} onChange={setSelA} loadFn={ldAssAsync} placeholder="Исполнитель" icon={UserCheck} /></div>}
         </div>
-        <div className="flex items-center gap-0.5 p-0.5 bg-[var(--hover-1)] rounded-lg">
-          <button onClick={() => setViewMode('kanban')} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium ${viewMode === 'kanban' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/40'}`}><LayoutGrid className="w-3 h-3" />Доска</button>
-          <button onClick={() => setViewMode('list')} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium ${viewMode === 'list' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/40'}`}><List className="w-3 h-3" />Список</button>
+        <div className="flex items-center gap-1 p-1 bg-[var(--hover-1)] rounded-xl border border-[var(--border-color)]">
+          <button onClick={() => setViewMode('kanban')} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold ${viewMode === 'kanban' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-md' : 'text-[var(--text-primary)]/50'}`}><LayoutGrid className="w-4 h-4" />Доска</button>
+          <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold ${viewMode === 'list' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-md' : 'text-[var(--text-primary)]/50'}`}><List className="w-4 h-4" />Список</button>
         </div>
       </div>
 
       {/* Content */}
       {loading ? (
-        <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 text-[var(--accent)] animate-spin" /></div>
+        <div className="flex items-center justify-center py-24"><Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" /></div>
       ) : viewMode === 'list' ? (
         <ListView tasks={disp.flatMap(c => c.tasks.items)} umap={umap} onView={setView} />
       ) : !cols.length ? (
-        <div className="flex flex-col items-center justify-center py-20 text-[var(--text-primary)]/30">
-          <FolderOpen className="w-10 h-10 mb-2" />
-          <p className="text-sm">{mode === 'project' && !selP ? 'Выберите проект' : mode === 'assignee' && !selA ? 'Выберите исполнителя' : mode === 'ticket' && !selT ? 'Выберите заявку' : 'Нет задач'}</p>
+        <div className="flex flex-col items-center justify-center py-24 text-[var(--text-primary)]/30">
+          <FolderOpen className="w-12 h-12 mb-3" />
+          <p className="text-base">{mode === 'project' && !selP ? 'Выберите проект' : mode === 'assignee' && !selA ? 'Выберите исполнителя' : mode === 'ticket' && !selT ? 'Выберите заявку' : 'Нет задач'}</p>
         </div>
       ) : (
-        <div className="overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent" style={{ minHeight: 'calc(100vh - 200px)' }}>
-          <div className="flex gap-3">
+        <div className="overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent" style={{ minHeight: 'calc(100vh - 240px)' }}>
+          <div className="flex gap-4">
             {disp.map(c => <KCol key={c.status} col={c} umap={umap} isDO={dragO === c.status} dragId={drag?.id ?? null} ldMore={moreCol === c.status} onDS={onDS} onDE={onDE} onDO={onDO} onDL={onDL} onDrop={onDrop} onAdd={setCreate} onView={setView} onMore={more} />)}
           </div>
         </div>
