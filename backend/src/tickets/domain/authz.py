@@ -100,6 +100,7 @@ class TicketAuthZService:
             IsAdminRule(subject),
             IsTicketReporterRule(subject, ticket),
             IsTicketCreatorRule(subject, ticket),
+            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT]),
         ]
         return AnyOf(*rules).check()
 
@@ -124,7 +125,7 @@ class TicketAuthZService:
                 )
             )
         else:
-            rules.append(HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER]))
+            rules.append(HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT]))
 
         return AnyOf(*rules).check()
 
