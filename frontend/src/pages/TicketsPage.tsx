@@ -27,7 +27,7 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
   'closed': { label: 'Закрыт', color: 'status-closed' },
   'reopened': { label: 'Переоткрыт', color: 'status-reopened' },
   'rejected': { label: 'Отклонён', color: 'status-rejected' },
-  'cancelled': { label: 'Отменён', color: 'status-closed' },
+  'canceled': { label: 'Отменён', color: 'status-closed' },
 };
 
 const STATUS_OPTIONS = Object.entries(STATUS_MAP).map(([value, { label, color }]) => ({

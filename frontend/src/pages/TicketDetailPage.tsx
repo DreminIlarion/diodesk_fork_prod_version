@@ -942,6 +942,8 @@ const handleStatusChange = useCallback(async (s: string) => {
     if (diffDays < 7) return `${diffDays} дн. назад`;
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
   }, []);
+  
+  const canEdit = ['new', 'pending_approval', 'open', 'reopened'].includes(ticket?.status || '');
 
   /* ═══════════════════════════════════════════════════════════════════
      RENDER GUARDS
@@ -985,7 +987,7 @@ const handleStatusChange = useCallback(async (s: string) => {
                 <Archive className="w-4 h-4" /> Архив
               </span>
             )}
-            {!ticket.is_archived && (user?.user_id === ticket.created_by || user?.user_id === ticket.reporter_id || isStaff) && (
+            {!ticket.is_archived && canEdit && (user?.user_id === ticket.created_by || user?.user_id === ticket.reporter_id || isStaff) && (
               <button onClick={openEditModal}
                 className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-base bg-[var(--hover-2)] hover:bg-[var(--hover-3)] border border-[var(--border-color)] text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] transition-colors">
                 <Edit className="w-4 h-4" /> Редактировать
