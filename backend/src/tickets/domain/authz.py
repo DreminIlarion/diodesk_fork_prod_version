@@ -113,8 +113,9 @@ class TicketAuthZService:
         """
 
         rules = [
-            IsAdminRule(subject),
-            IsTicketAssigneeRule(subject, ticket),
+        IsAdminRule(subject),
+        IsTicketAssigneeRule(subject, ticket),
+        HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT]),  # ← добавил сюда
         ]
 
         if ticket.project_id:
@@ -124,8 +125,6 @@ class TicketAuthZService:
                     member, required_roles=[MemberRole.OWNER, MemberRole.MANAGER]
                 )
             )
-        else:
-            rules.append(HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT]))
 
         return AnyOf(*rules).check()
 
@@ -166,22 +165,23 @@ class TicketAuthZService:
         return AnyOf(*rules).check()
 
     async def can_cancel_ticket(self, subject: Subject, ticket: Ticket) -> PermissionResult:
-        rules = [IsTicketCreatorRule(subject, ticket), IsTicketReporterRule(subject, ticket)]
+        rules = [
+            IsTicketCreatorRule(subject, ticket),
+            IsTicketReporterRule(subject, ticket),
+            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.ADMIN, UserRole.SUPPORT_AGENT]),
+        ]
 
         if ticket.project_id:
             member = await self.member_repo.find(ticket.project_id, subject.id)
             rules.append(IsProjectOwnerOrManagerRule(member))
-        else:
-            rules.append(
-                HasAnyUserRoleRule(
-                    subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.ADMIN]
-                )
-            )
 
         return AnyOf(*rules).check()
 
     async def can_resolve_ticket(self, subject: Subject, ticket: Ticket) -> PermissionResult:
-        rules = [IsTicketAssigneeRule(subject, ticket)]
+        rules = [
+            IsTicketAssigneeRule(subject, ticket),
+            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT]), 
+            ]
 
         if ticket.project_id:
             member = await self.member_repo.find(ticket.project_id, subject.id)

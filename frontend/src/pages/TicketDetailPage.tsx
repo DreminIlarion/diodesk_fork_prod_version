@@ -719,19 +719,20 @@ export default function TicketDetailPage() {
     finally { setDownloadingId(null); }
   }, [toast]);
 
-  const handleStatusChange = useCallback(async (s: string) => {
-    if (!canChangeStatus || !ticket) return;
-    setUpdatingStatus(true);
-    try {
-      const updated = await ticketsApi.updateTicketStatus(ticket.id, s as any);
-      setTicket(updated);
-      toast({ title: 'Успешно', description: `Статус: ${STATUS_LABELS[s] || s}` });
-    } catch (e: any) {
-      toast({ title: 'Ошибка', description: e.response?.status === 403 ? 'Нет прав' : 'Ошибка', variant: 'destructive' });
-    } finally {
-      setUpdatingStatus(false);
-    }
-  }, [canChangeStatus, ticket, toast]);
+const handleStatusChange = useCallback(async (s: string) => {
+  if (!canChangeStatus || !ticket) return;
+  setUpdatingStatus(true);
+  try {
+    const updated = await ticketsApi.updateTicketStatus(ticket.id, s as any);
+    setTicket(updated);
+    // Сразу обновляем availableStatuses для нового статуса
+    toast({ title: 'Успешно', description: `Статус: ${STATUS_LABELS[s] || s}` });
+  } catch (e: any) {
+    toast({ title: 'Ошибка', description: e.response?.status === 403 ? 'Нет прав' : 'Ошибка', variant: 'destructive' });
+  } finally {
+    setUpdatingStatus(false);
+  }
+}, [canChangeStatus, ticket, toast]);
 
   const handleAssign = useCallback(async (aid: string | null) => {
     if (!ticket) return;
