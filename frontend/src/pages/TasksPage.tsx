@@ -2611,7 +2611,7 @@ export default function TasksPage() {
   const [editTask, setEditTask] = useState<TaskViewItem | null>(null);
   const [create, setCreate] = useState<TaskStatus | null>(null);
 
-  const [assignTask, setAssignTask] = useState<TaskViewItem | null>(null);
+  const [assignIntent, setAssignIntent] = useState<AssignIntent | null>(null);
   const [assignLd, setAssignLd] = useState(false);
 
   const [completeIntent, setCompleteIntent] = useState<CompleteIntent | null>(null);
