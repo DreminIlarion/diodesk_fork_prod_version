@@ -142,7 +142,7 @@ class TaskAuthZService:
         auth_policy = AnyOf(*rules)
         return auth_policy.check()
     async def can_archive_task(self, subject: Subject, task: Task) -> PermissionResult:
-        rules = [IsAdminRule(subject), IsTaskCreator(subject, task)]
+        rules = [IsAdminRule(subject), IsTaskCreator(subject, task), IsStaffRule(subject)]
 
         if task.project_id is not None:
             project_member = await self.project_membership_repo.find(task.project_id, subject.id)
