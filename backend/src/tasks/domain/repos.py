@@ -23,10 +23,10 @@ class TaskView:
 
     number: TaskNumber
     title: str
-    description: str | None = None 
 
     status: TaskStatus
     priority: Priority
+
     assignee_id: UUID | None = None
     due_date: datetime | None = None
     story_points: Decimal | None = None
