@@ -20,10 +20,11 @@ class TaskView:
     id: UUID
     created_at: datetime
     updated_at: datetime
-    description: str | None = None 
 
     number: TaskNumber
     title: str
+    description: str | None = None 
+
     status: TaskStatus
     priority: Priority
     assignee_id: UUID | None = None
