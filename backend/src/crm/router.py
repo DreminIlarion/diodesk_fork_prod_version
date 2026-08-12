@@ -142,8 +142,10 @@ async def add_contact_person(
 async def delete_contact_person(
         counterparty_id: UUID,
         phone: Annotated[str, Query(..., description="Номер телефона")],
-        email: Annotated[EmailStr | None, Query(None, description="Email адрес")],
+        
         service: CounterpartyServiceDep,
+        email: EmailStr | None = Query(None, description="Email адрес"),
+
 ) -> CounterpartyResponse:
     return await service.delete_contact_person(counterparty_id, phone, email)
 
