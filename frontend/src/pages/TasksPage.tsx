@@ -872,7 +872,8 @@ function Ava({
   url?: string | null;
   sz?: 'xs' | 'sm';
 }) {
-  const c = sz === 'xs' ? 'w-6 h-6 text-xs' : 'w-8 h-8 text-sm';
+  // Для sz="xs" используем text-[10px]
+  const c = sz === 'xs' ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-sm';
 
   if (url) return <img src={url} alt="" className={`${c} rounded-full object-cover shrink-0`} />;
   return (
@@ -1093,6 +1094,7 @@ function TCard({
 
   return (
     <motion.div
+      layout
       draggable
       onDragStart={(e) => {
         (e as any).dataTransfer.effectAllowed = 'move';
@@ -1100,40 +1102,44 @@ function TCard({
       }}
       onDragEnd={onDE}
       onClick={() => onView(t)}
-      animate={{
-        rotate: dragging ? 3 : 0, // Наклон в другую сторону (вправо)
-        scale: dragging ? 1.04 : 1,
-        opacity: dragging ? 0.4 : 1,
-        zIndex: dragging ? 50 : 1,
-      }}
-      transition={{ type: 'spring', damping: 25, stiffness: 400 }}
-      className={`group bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer transition-colors hover:bg-[var(--hover-1)] hover:border-[var(--accent)]/30 shadow-sm min-h-[140px] flex flex-col ${
-        od ? 'border-red-500/40 bg-red-500/5' : 'border-[var(--border-color)]'
-      }`}
+      // Убрали прыжок (translate-y). Оставили только смену фона на более яркий (--hover-2) и рамку.
+      // Анимация при взятии (drag) осталась быстрой на чистом CSS (rotate-2 scale-[1.02])
+      className={`group bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer transition-all duration-200 shadow-sm min-h-[140px] flex flex-col relative
+        hover:bg-[var(--hover-2)] hover:border-[var(--accent)]/40
+        ${
+          dragging
+            ? 'opacity-40 rotate-2 scale-[1.02] shadow-xl z-50 ring-1 ring-[var(--accent)]'
+            : od
+            ? 'border-red-500/40 bg-red-500/5 hover:bg-red-500/15'
+            : 'border-[var(--border-color)]'
+        }
+      `}
     >
-      {/* 1. Номер задачи — теперь чётко виден */}
+      {/* 1. Номер задачи */}
       <span className="text-xs font-mono text-[var(--text-primary)]/45 mb-1.5 leading-none">
         #{t.number}
       </span>
 
-      {/* 2. Название — самый жирный акцент */}
+      {/* 2. Название */}
       <h4 className="text-[15px] font-bold text-[var(--text-primary)] leading-snug tracking-tight line-clamp-2 mb-3">
         {t.title}
       </h4>
 
-      {/* 3. Бейджи */}
+      {/* 3. Бейджи (Приоритет и Сложность) */}
       <div className="flex items-center gap-2 mb-3.5 flex-wrap">
         <PriBadge p={t.priority} />
         {t.story_points != null && <ComplexityBadge v={t.story_points} />}
       </div>
 
-      {/* 4. Низ карточки: Аватар + Фамилия (13px) | Иконки + Срок */}
+      {/* 4. Низ карточки */}
       <div className="flex items-center justify-between border-t border-[var(--border-color)] pt-3 mt-auto">
+        
+        {/* Аватар + Фамилия (текст в кружке 10px, фамилия 13px) */}
         <div className="flex items-center gap-2 min-w-0">
           {a ? (
             <>
               <Ava name={a.full_name || a.username} url={a.avatar_url} sz="xs" />
-              <span className="text-[10px] text-[var(--text-primary)]/70 font-medium truncate max-w-[100px]">
+              <span className="text-[13px] text-[var(--text-primary)]/75 font-medium truncate max-w-[100px]">
                 {assigneeSurname}
               </span>
             </>
@@ -1142,6 +1148,7 @@ function TCard({
           )}
         </div>
 
+        {/* Иконки привязок + Дата */}
         <div className="flex items-center gap-1.5 shrink-0">
           {t.ticket_id && (
             <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
@@ -1163,7 +1170,6 @@ function TCard({
     </motion.div>
   );
 }
-
 /* ───────────────── kanban column ───────────────── */
 
 function KCol({
