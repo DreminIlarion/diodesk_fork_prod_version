@@ -141,7 +141,6 @@ class TaskAuthZService:
 
         auth_policy = AnyOf(*rules)
         return auth_policy.check()
-
     async def can_archive_task(self, subject: Subject, task: Task) -> PermissionResult:
         rules = [IsAdminRule(subject), IsTaskCreator(subject, task)]
 
