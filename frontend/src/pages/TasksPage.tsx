@@ -86,6 +86,11 @@ type CompleteIntent = {
   mode: 'status_done' | 'review_done';
 };
 
+type AssignIntent = {
+  task: TaskViewItem;
+  targetStatus: 'todo' | 'in_progress';
+};
+
 /* ───────────────── constants ───────────────── */
 
 const SP_SERIES = [1, 2, 3, 5, 8, 13, 21];
@@ -392,6 +397,13 @@ const getTaskTicketPath = (task: TaskViewItem) => {
 function statusErr(err: any, task: TaskViewItem, to: TaskStatus) {
   const raw = apiErr(err);
   const lw = raw.toLowerCase();
+
+  if (to === 'todo' && (!task.assignee_id || lw.includes('assignee'))) {
+    return {
+      title: 'Нужен исполнитель',
+      description: 'Назначьте исполнителя перед переводом задачи в «Готово к выполнению».',
+    };
+  }
 
   if (to === 'in_progress' && (!task.assignee_id || lw.includes('assignee'))) {
     return {
@@ -1347,12 +1359,14 @@ function DragPanel({
 
 function AssignModal({
   task,
+  targetStatus,
   umap,
   loading,
   onClose,
   onOk,
 }: {
   task: TaskViewItem;
+  targetStatus: 'todo' | 'in_progress';
   umap: Map<string, SimpleUser | CounterpartyCustomer>;
   loading: boolean;
   onClose: () => void;
@@ -1588,7 +1602,11 @@ function TaskEditorModal({
   const [projectId, setProjectId] = useState(
     task?.project_id ?? (context.type === 'project' ? context.project_id : ''),
   );
-  const [todo, setTodo] = useState(initSt === 'todo');
+  const [todo, setTodo] = useState(initSt === 'todo' && !!assigneeId);
+
+useEffect(() => {
+  if (!assigneeId && todo) setTodo(false);
+}, [assigneeId, todo]);
   const [saving, setSaving] = useState(false);
 
   const firstProjectChange = useRef(true);
@@ -1968,25 +1986,26 @@ function TaskEditorModal({
                 />
               </div>
 
-              {mode === 'create' && (
-                <div className="pt-1">
-                  <button
-                    onClick={() => setTodo((v) => !v)}
-                    className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border transition-all text-sm font-medium ${todo
-                      ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
-                      : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
-                      }`}
-                  >
-                    <div
-                      className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${todo ? 'bg-blue-500 border-blue-500' : 'border-[var(--border-color)]'
-                        }`}
-                    >
-                      {todo && <Check className="w-3 h-3 text-white" />}
-                    </div>
-                    Сразу к выполнению (статус «{ST_LABEL.todo}»)
-                  </button>
-                </div>
-              )}
+              {mode === 'create' && !!assigneeId && (
+  <div className="pt-1">
+    <button
+      onClick={() => setTodo((v) => !v)}
+      className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border transition-all text-sm font-medium ${todo
+        ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+        : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
+        }`}
+    >
+      <div
+        className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+          todo ? 'bg-blue-500 border-blue-500' : 'border-[var(--border-color)]'
+        }`}
+      >
+        {todo && <Check className="w-3 h-3 text-white" />}
+      </div>
+      Сразу к выполнению (статус «{ST_LABEL.todo}»)
+    </button>
+  </div>
+)}
             </div>
           </div>
         </div>
@@ -2035,7 +2054,7 @@ function DetailModal({
   umap: Map<string, SimpleUser | CounterpartyCustomer>;
   onClose: () => void;
   onRefresh: () => Promise<void>;
-  onNeedAssign: (t: TaskViewItem) => void;
+  onNeedAssign: (t: TaskViewItem, targetStatus: 'todo' | 'in_progress') => void;
   onEdit: (t: TaskViewItem) => void;
   onNeedComplete: (t: TaskViewItem, mode: 'status_done' | 'review_done') => void;
 }) {
@@ -2107,9 +2126,15 @@ function DetailModal({
   };
 
   const chSt = async (s: TaskStatus) => {
+    if (s === 'todo' && t.status === 'backlog' && !t.assignee_id) {
+      setShowSt(false);
+      onNeedAssign(t, 'todo');
+      return;
+    }
+
     if (s === 'in_progress' && !t.assignee_id) {
       setShowSt(false);
-      onNeedAssign(t);
+      onNeedAssign(t, 'in_progress');
       return;
     }
 
@@ -2723,8 +2748,13 @@ export default function TasksPage() {
       const task = src?.tasks.items.find((x) => x.id === id);
       if (!task) return;
 
+      if (to === 'todo' && from === 'backlog' && !task.assignee_id) {
+        setAssignIntent({ task, targetStatus: 'todo' });
+        return;
+      }
+
       if (to === 'in_progress' && !task.assignee_id) {
-        setAssignTask(task);
+        setAssignIntent({ task, targetStatus: 'in_progress' });
         return;
       }
 
@@ -2792,30 +2822,34 @@ export default function TasksPage() {
     [cols, toast],
   );
 
-  const handleAssignProgress = useCallback(
-    async (aid: string) => {
-      if (!assignTask) return;
+const handleAssignAndMove = useCallback(
+  async (aid: string) => {
+    if (!assignIntent) return;
 
-      setAssignLd(true);
-      try {
-        await tasksApi.assign(assignTask.id, { assignee_id: aid });
-        await tasksApi.changeStatus(assignTask.id, 'in_progress');
-        toast({ title: 'Задача переведена в работу' });
-        setAssignTask(null);
-        await fetchBoard(true);
-      } catch (e: any) {
-        toast({
-          title: 'Ошибка',
-          description: apiErr(e),
-          variant: 'destructive',
-        });
-        await fetchBoard(true);
-      } finally {
-        setAssignLd(false);
-      }
-    },
-    [assignTask, fetchBoard, toast],
-  );
+    setAssignLd(true);
+    try {
+      await tasksApi.assign(assignIntent.task.id, { assignee_id: aid });
+      await tasksApi.changeStatus(assignIntent.task.id, assignIntent.targetStatus });
+
+      toast({
+        title: `Задача переведена в «${ST_LABEL[assignIntent.targetStatus]}»`,
+      });
+
+      setAssignIntent(null);
+      await fetchBoard(true);
+    } catch (e: any) {
+      toast({
+        title: 'Ошибка',
+        description: apiErr(e),
+        variant: 'destructive',
+      });
+      await fetchBoard(true);
+    } finally {
+      setAssignLd(false);
+    }
+  },
+  [assignIntent, fetchBoard, toast],
+);
 
   const handleComplete = useCallback(
     async (actualHours: number) => {
@@ -3145,19 +3179,16 @@ export default function TasksPage() {
           </div>
 
           {mode === 'project' && (
-            <div className="w-72">
-              <AsyncDD
-                value={selP}
-                onChange={(v) => {
-                  setSelT(v);
-                  setSelTLabel(v ? (ticketLabelsRef.current[v] ?? '') : '');
-                }}
-                loadFn={ldProjAsync}
-                placeholder="Выберите проект"
-                icon={FolderOpen}
-              />
-            </div>
-          )}
+          <div className="w-72">
+            <AsyncDD
+              value={selP}
+              onChange={setSelP}
+              loadFn={ldProjAsync}
+              placeholder="Выберите проект"
+              icon={FolderOpen}
+            />
+          </div>
+        )}
 
           {mode === 'ticket' && (
             <div className="w-80">
@@ -3267,9 +3298,9 @@ export default function TasksPage() {
           umap={umap}
           onClose={() => setView(null)}
           onRefresh={() => fetchBoard(true)}
-          onNeedAssign={(t) => {
+          onNeedAssign={(t, targetStatus) => {
             setView(null);
-            setAssignTask(t);
+            setAssignIntent({ task: t, targetStatus });
           }}
           onEdit={(t) => {
             setView(null);
@@ -3309,15 +3340,16 @@ export default function TasksPage() {
         />
       )}
 
-      {assignTask && (
+      {assignIntent && (
         <AssignModal
-          task={assignTask}
+          task={assignIntent.task}
+          targetStatus={assignIntent.targetStatus}
           umap={umap}
           loading={assignLd}
           onClose={() => {
-            if (!assignLd) setAssignTask(null);
+            if (!assignLd) setAssignIntent(null);
           }}
-          onOk={handleAssignProgress}
+          onOk={handleAssignAndMove}
         />
       )}
 
