@@ -20,6 +20,7 @@ class TaskView:
     id: UUID
     created_at: datetime
     updated_at: datetime
+    description: str | None = None 
 
     number: TaskNumber
     title: str
@@ -28,6 +29,8 @@ class TaskView:
     assignee_id: UUID | None = None
     due_date: datetime | None = None
     story_points: Decimal | None = None
+    estimated_hours: Decimal | None = None 
+    actual_hours: Decimal | None = None
 
     project_id: UUID | None = None
     ticket_id: UUID | None = None
