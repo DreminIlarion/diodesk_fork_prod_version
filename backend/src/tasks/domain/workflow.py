@@ -141,6 +141,37 @@ task_workflow = (
         TaskStatus.TO_REVIEW, TaskStatus.CANCELLED,
         Task.unassign, Task.reset_reviewer,
     )
+
+    # ===============================
+    # Переходы из на доработку
+    # ===============================
+    .allow(
+        TaskStatus.TO_FIX, TaskStatus.IN_PROGRESS,
+        Task.start_work,
+    )
+    .allow(
+        TaskStatus.TO_FIX, TaskStatus.TO_REVIEW,
+        Task.finish_work,
+    )
+    .allow(
+        TaskStatus.TO_FIX, TaskStatus.CANCELLED,
+        Task.unassign, Task.reset_reviewer,
+    )
+    # ===============================
+    # Переходы из на тестировании
+    # ===============================
+    .allow(
+        TaskStatus.TO_TEST, TaskStatus.IN_PROGRESS,
+        Task.start_work,
+    )
+    .allow(
+        TaskStatus.TO_TEST, TaskStatus.DONE,
+        Task.complete,
+    )
+    .allow(
+        TaskStatus.TO_TEST, TaskStatus.CANCELLED,
+        Task.unassign, Task.reset_reviewer,
+    )
     # ===============================
     # Переходы из выполнено
     # ===============================

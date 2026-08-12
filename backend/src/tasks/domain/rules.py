@@ -90,6 +90,7 @@ class TaskAssigneeStatusRule:
         TaskStatus.BLOCKED,
         TaskStatus.PAUSED,
         TaskStatus.TO_REVIEW,
+        TaskStatus.TO_FIX, 
         TaskStatus.TO_TEST,
         TaskStatus.DONE,
         TaskStatus.CANCELLED,
