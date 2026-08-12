@@ -580,8 +580,9 @@ export default function NewCounterpartyPage() {
         legal_name: formData.legal_name.trim(),
         inn: formData.inn,
         phone: companyPhone.rawValue,
-        email: formData.email.trim(),
+        
       };
+      if (formData.email?.trim()) payload.email = formData.email.trim();
       if (formData.counterparty_type === 'Юридическое лицо') {
         if (formData.kpp) payload.kpp = formData.kpp;
       } else {
@@ -597,7 +598,7 @@ export default function NewCounterpartyPage() {
           const p: any = { first_name: cp.first_name, last_name: cp.last_name };
           if (cp.middle_name) p.middle_name = cp.middle_name;
           if (cp.phone) p.phone = cp.phone;
-          if (cp.email) p.email = cp.email;
+          if (cp.email?.trim()) p.email = cp.email.trim();
           const m: any = {};
           if (cp.messengers?.telegram) m.telegram = cp.messengers.telegram;
           if (cp.messengers?.vk) m.vk = cp.messengers.vk;
@@ -718,6 +719,10 @@ export default function NewCounterpartyPage() {
   );
 
   const isStep2Valid = companyPhone.isComplete
+
+  const isStep3Valid = !includeContacts || contactPersons.every(cp => 
+    cp.last_name && cp.first_name && cp.middle_name && cp.phone
+  );
 
   const totalSteps = formData.counterparty_type === 'Юридическое лицо' ? 5 : 4;
   const productsStep = formData.counterparty_type === 'Юридическое лицо' ? 5 : 4;
@@ -991,7 +996,7 @@ export default function NewCounterpartyPage() {
             <div>
               <label className={labelCls}>
                 <Mail className="w-4 h-4 inline mr-1.5 text-[var(--text-primary)]/40" />
-                Email <span className="text-[var(--accent)]">(необяз.)</span>
+                Email <span class="text-[var(--text-primary)]/40 text-sm font-normal">(необяз.)</span>
               </label>
               <EmailInput
                 value={formData.email}
@@ -1085,18 +1090,18 @@ export default function NewCounterpartyPage() {
                     onChange={e => updateContactPerson(i, { ...cp, first_name: e.target.value })}
                     placeholder="Введите имя" className={inputCls()} />
                 </div>
-                <div>
-                  <label className={labelCls}>Отчество</label>
-                  <input type="text" value={cp.middle_name}
-                    onChange={e => updateContactPerson(i, { ...cp, middle_name: e.target.value })}
-                    placeholder="Введите отчество" className={inputCls()} />
-                </div>
+                  <div>
+                    <label className={labelCls}>Отчество <span className="text-[var(--accent)]">*</span></label>
+                    <input type="text" value={cp.middle_name}
+                      onChange={e => updateContactPerson(i, { ...cp, middle_name: e.target.value })}
+                      placeholder="Введите отчество" className={inputCls()} />
+                  </div>
               </div>
 
               {/* Телефон + Email контакта */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={labelCls}>Телефон</label>
+                  <label className={labelCls}>Телефон <span className="text-[var(--accent)]">*</span></label>
                   <ContactPhoneInput
                     value={cp.phone}
                     onChange={(raw) => updateContactPerson(i, { ...cp, phone: raw })}
@@ -1169,8 +1174,10 @@ export default function NewCounterpartyPage() {
               Назад
             </button>
             <button onClick={() => setStep(4)}
+              disabled={includeContacts && contactPersons.some(cp => !cp.last_name || !cp.first_name || !cp.middle_name || !cp.phone)}
               className="px-6 py-3 text-base font-semibold text-white bg-[var(--accent)]
-                         hover:bg-[var(--accent-light)] rounded-xl transition-all shadow-[var(--shadow-md)]">
+                        hover:bg-[var(--accent-light)] rounded-xl transition-all shadow-[var(--shadow-md)]
+                        disabled:opacity-40 disabled:cursor-not-allowed">
               Далее
             </button>
           </div>
