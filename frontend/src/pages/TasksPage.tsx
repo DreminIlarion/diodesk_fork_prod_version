@@ -2829,7 +2829,7 @@ const handleAssignAndMove = useCallback(
     setAssignLd(true);
     try {
       await tasksApi.assign(assignIntent.task.id, { assignee_id: aid });
-      await tasksApi.changeStatus(assignIntent.task.id, assignIntent.targetStatus });
+      await tasksApi.changeStatus(assignIntent.task.id, assignIntent.targetStatus );
 
       toast({
         title: `Задача переведена в «${ST_LABEL[assignIntent.targetStatus]}»`,
