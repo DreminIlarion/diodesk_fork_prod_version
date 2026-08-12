@@ -165,9 +165,14 @@ task_workflow = (
         Task.start_work,
     )
     .allow(
+        TaskStatus.TO_TEST, TaskStatus.TO_REVIEW,
+        Task.start_work,
+    )
+    .allow(
         TaskStatus.TO_TEST, TaskStatus.DONE,
         Task.complete,
     )
+
     .allow(
         TaskStatus.TO_TEST, TaskStatus.CANCELLED,
         Task.unassign, Task.reset_reviewer,

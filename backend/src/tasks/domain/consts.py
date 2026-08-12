@@ -73,7 +73,13 @@ ALLOWED_STATUS_TRANSITIONS: dict[TaskStatus: set[TaskStatus]] = {
 
 # Разрешённые статусы для редактирования задачи
 ALLOWED_EDIT_STATUSES: set[TaskStatus] = {
-    TaskStatus.BACKLOG, TaskStatus.TODO,
+    TaskStatus.BACKLOG,
+    TaskStatus.TODO,
+    TaskStatus.IN_PROGRESS,
+    TaskStatus.PAUSED,
+    TaskStatus.BLOCKED,
+    TaskStatus.TO_FIX,
+    TaskStatus.TO_TEST,
 }
 
 # Разрешённые статусы для назначения задачи
