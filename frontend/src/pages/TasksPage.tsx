@@ -106,7 +106,7 @@ const PRI_LIST: { value: TaskPriority; label: string }[] = [
 
 const ST_LABEL: Record<TaskStatus, string> = {
   backlog: 'В резерве',
-  todo: 'К выполнению',
+  todo: 'Готово к выполнению',
   in_progress: 'В работе',
   paused: 'На паузе',
   blocked: 'Приостановлено',
@@ -1097,12 +1097,12 @@ function TCard({
 }) {
   const od = overdue(t);
   const a = t.assignee_id ? umap.get(t.assignee_id) : null;
-  const ticketNo = getTaskTicketNumber(t);
-  const tags = getTaskTags(t);
+  const assigneeSurname = a
+    ? (a.full_name || a.username || '').split(' ')[0]
+    : null;
 
   return (
-    <motion.div
-      layout
+    <div
       draggable
       onDragStart={(e) => {
         (e as any).dataTransfer.effectAllowed = 'move';
@@ -1110,86 +1110,51 @@ function TCard({
       }}
       onDragEnd={onDE}
       onClick={() => onView(t)}
-      className={`group bg-[var(--bg-card)] border rounded-xl p-3.5 cursor-pointer transition-all hover:bg-[var(--hover-1)] hover:border-[var(--accent)]/30 shadow-sm ${
-        dragging ? 'opacity-40 rotate-1 scale-105 shadow-xl' : ''
+      className={`bg-[var(--bg-card)] border rounded-xl p-3.5 cursor-pointer transition-all hover:bg-[var(--hover-1)] hover:border-[var(--accent)]/30 shadow-sm min-h-[120px] flex flex-col ${
+        dragging ? 'opacity-40 scale-[1.02]' : ''
       } ${od ? 'border-red-500/40 bg-red-500/5' : 'border-[var(--border-color)]'}`}
     >
-      <div className="flex items-center gap-2 mb-2 flex-wrap">
-        <span className="px-1.5 py-0.5 rounded-md text-xs font-mono bg-[var(--hover-2)] text-[var(--text-primary)]/50 shrink-0">
-          #{t.number}
-        </span>
+      {/* Row 1: номер */}
+      <span className="px-1.5 py-0.5 rounded-md text-xs font-mono bg-[var(--hover-2)] text-[var(--text-primary)]/50 self-start mb-1.5">
+        #{t.number}
+      </span>
+
+      {/* Row 2: название */}
+      <h4 className="text-sm font-semibold text-[var(--text-primary)] leading-snug line-clamp-2 mb-2 flex-1">
+        {t.title}
+      </h4>
+
+      {/* Row 3: приоритет + сложность */}
+      <div className="flex items-center gap-2 mb-2.5 flex-wrap">
         <PriBadge p={t.priority} />
         {t.story_points != null && <ComplexityBadge v={t.story_points} />}
       </div>
 
-      <h4 className="text-sm font-medium text-[var(--text-primary)] mb-1.5 leading-snug line-clamp-2">
-        {t.title}
-      </h4>
+      {/* Row 4: черта, фамилия слева, иконки+дата справа */}
+      <div className="flex items-center justify-between border-t border-[var(--border-color)] pt-2 mt-auto">
+        <span className="text-xs text-[var(--text-primary)]/60 truncate max-w-[120px]">
+          {assigneeSurname ?? '—'}
+        </span>
 
-      {t.description && (
-        <p className="text-xs text-[var(--text-primary)]/45 line-clamp-2 mb-2.5">
-          {t.description}
-        </p>
-      )}
-
-      {(t.estimated_hours != null || t.actual_hours != null) && (
-        <div className="flex flex-wrap gap-1.5 mb-2.5">
-          {t.estimated_hours != null && (
-            <HoursBadge label="Трудозатраты" value={t.estimated_hours} title="Плановые трудозатраты" />
+        <div className="flex items-center gap-1.5 shrink-0">
+          {t.project_id && (
+            <FolderOpen className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
           )}
-          {t.actual_hours != null && <HoursBadge label="Факт" value={t.actual_hours} tone="accent" />}
-        </div>
-      )}
-
-      {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-2.5">
-          {tags.slice(0, 3).map((tag) => (
-            <span
-              key={`${tag.name}-${tag.color ?? 'x'}`}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] border"
-              style={{
-                borderColor: tag.color ?? 'var(--border-color)',
-                color: tag.color ?? 'var(--text-primary)',
-                background: `${tag.color ?? '#888'}14`,
-              }}
-            >
-              <span
-                className="w-1.5 h-1.5 rounded-full"
-                style={{ background: tag.color ?? '#888' }}
-              />
-              {tag.name}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="flex items-center justify-between border-t border-[var(--border-color)] pt-2">
-        {a ? (
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Ava name={a.full_name || a.username} url={a.avatar_url} sz="xs" />
-            <span className="text-xs text-[var(--text-primary)]/60 truncate">
-              {(a.full_name || a.username || '').split(' ')[0]}
-            </span>
-          </div>
-        ) : (
-          <span className="text-xs text-[var(--text-primary)]/30">—</span>
-        )}
-
-        <div className="flex items-center gap-2 shrink-0">
-          {ticketNo && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text-primary)]/35">
-              <Ticket className="w-3.5 h-3.5" />
-              {ticketNo}
-            </span>
+          {t.ticket_id && (
+            <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
           )}
           {t.due_date && (
-            <span className={`text-xs font-medium ${od ? 'text-red-400' : 'text-[var(--text-primary)]/40'}`}>
+            <span
+              className={`text-xs font-medium ml-0.5 ${
+                od ? 'text-red-400' : 'text-[var(--text-primary)]/40'
+              }`}
+            >
               {fmtDue(t.due_date)}
             </span>
           )}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -1686,32 +1651,24 @@ function TaskEditorModal({
     };
   }, []);
 
-  const loadTickets = useCallback(
-    async (q: string, p: number) => {
-      const r = await ticketsApi.getAllWithFilters(p, 20, {
-        project_id: projectId || undefined,
-      });
+const loadTickets = useCallback(
+  async (q: string, p: number) => {
+    const r = await ticketsApi.getAll(p, 20, {
+      project_ids: projectId ? [projectId] : undefined,
+      query: q || undefined,
+    });
 
-      const f = q
-        ? r.items.filter(
-            (t: any) =>
-              String(t.title || '')
-                .toLowerCase()
-                .includes(q.toLowerCase()) || String(t.number).includes(q),
-          )
-        : r.items;
-
-      return {
-        items: f.map((t: any) => ({
-          value: t.id,
-          label: `${t.number} — ${t.title}`,
-          icon: <Ticket className="w-4 h-4 text-[var(--text-primary)]/40" />,
-        })),
-        hasNext: r.items.length === 20,
-      };
-    },
-    [projectId],
-  );
+    return {
+      items: r.items.map((t: any) => ({
+        value: t.id,
+        label: `${t.number} — ${t.title}`,
+        icon: <Ticket className="w-4 h-4 text-[var(--text-primary)]/40" />,
+      })),
+      hasNext: r.items.length === 20,
+    };
+  },
+  [projectId],
+);
 
   const submit = async () => {
     if (!title.trim()) return;
@@ -2941,31 +2898,23 @@ export default function TasksPage() {
     ...(staff ? [{ id: 'ticket' as CtxMode, label: 'Заявка', icon: Ticket }] : []),
   ];
 
-  const ldTicketsAsync = useCallback(
-    async (search: string, p: number) => {
-      const r = await ticketsApi.getAllWithFilters(p, 20, {
-        project_id: selP || undefined,
-      });
+const ldTicketsAsync = useCallback(
+  async (search: string, p: number) => {
+    const r = await ticketsApi.getAll(p, 20, {
+      project_ids: selP ? [selP] : undefined,
+      query: search || undefined,
+    });
 
-      const f = search
-        ? r.items.filter(
-            (t: any) =>
-              String(t.title || '')
-                .toLowerCase()
-                .includes(search.toLowerCase()) || String(t.number).includes(search),
-          )
-        : r.items;
-
-      return {
-        items: f.map((t: any) => ({
-          value: t.id,
-          label: `${t.number} — ${t.title}`,
-        })),
-        hasNext: r.items.length === 20,
-      };
-    },
-    [selP],
-  );
+    return {
+      items: r.items.map((t: any) => ({
+        value: t.id,
+        label: `${t.number} — ${t.title}`,
+      })),
+      hasNext: r.items.length === 20,
+    };
+  },
+  [selP],
+);
 
   const ldProjAsync = useCallback(async (search: string, p: number) => {
     const r = await projectsApi.getAll(p, 20);
