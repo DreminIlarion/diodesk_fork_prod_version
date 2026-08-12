@@ -6,6 +6,7 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from typing_extensions import Doc
+from typing import Any
 
 from src.media.domain.entities import Attachment
 from src.shared.domain.entities import AggregateRoot
@@ -407,7 +408,7 @@ class Task(AggregateRoot):
         self.completed_at = None
         self.started_at = current_datetime()
 
-    def reset_reviewer(self) -> None:
+    def reset_reviewer(self, *args: Any) -> None:
         """
         Убрать ревьювера с задачи.
         """
