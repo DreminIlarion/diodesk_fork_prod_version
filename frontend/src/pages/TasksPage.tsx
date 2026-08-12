@@ -1,30 +1,75 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Plus, Search, Filter, Calendar, Loader2, X, Check, Circle, Timer, Eye,
-  ArrowUpRight, ChevronDown, Flag, AlertCircle, CheckCircle2, Ban, RotateCcw,
-  RefreshCw, Archive, FolderOpen, Ticket, Zap, Star, User,
-  Layers, UserCheck, GitPullRequest, ThumbsUp, ThumbsDown, Pencil,
-  Milestone, List, LayoutGrid,
+  Plus,
+  Search,
+  Filter,
+  Calendar,
+  Loader2,
+  X,
+  Check,
+  Circle,
+  Timer,
+  Eye,
+  ArrowUpRight,
+  ChevronDown,
+  Flag,
+  AlertCircle,
+  CheckCircle2,
+  Ban,
+  RotateCcw,
+  RefreshCw,
+  Archive,
+  FolderOpen,
+  Ticket,
+  Zap,
+  Star,
+  User,
+  Layers,
+  UserCheck,
+  GitPullRequest,
+  ThumbsUp,
+  ThumbsDown,
+  Pencil,
+  List,
+  LayoutGrid,
+  Clock3,
+  FileText,
 } from 'lucide-react';
 import { tasksApi, projectsApi, ticketsApi, usersApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import { useToast } from '../components/ui/use-toast';
 import type {
-  TaskKanbanItem, TaskKanbanColumn, TaskStatus, TaskPriority,
-  TaskCreateInput, TaskUpdateInput, TaskKanbanContext,
-  SimpleUser, CounterpartyCustomer,
+  TaskKanbanItem,
+  TaskKanbanColumn,
+  TaskStatus,
+  TaskPriority,
+  TaskCreateInput,
+  TaskUpdateInput,
+  TaskKanbanContext,
+  SimpleUser,
+  CounterpartyCustomer,
 } from '../types';
 
 /* ───────────────── types ───────────────── */
+
+type TaskTag = {
+  name: string;
+  color?: string | null;
+};
 
 type TaskViewItem = TaskKanbanItem & {
   description?: string | null;
   estimated_hours?: number | string | null;
   actual_hours?: number | string | null;
+  reviewer_id?: string | null;
   ticket_number?: string | null;
+  ticket_title?: string | null;
+  project_name?: string | null;
+  tags?: TaskTag[] | null;
+  tag?: TaskTag[] | null;
 };
 
 type TaskViewColumn = Omit<TaskKanbanColumn, 'tasks'> & {
@@ -38,10 +83,12 @@ type ViewMode = 'kanban' | 'list';
 
 type CompleteIntent = {
   task: TaskViewItem;
-  mode: 'done' | 'review_done';
+  mode: 'status_done' | 'review_done';
 };
 
 /* ───────────────── constants ───────────────── */
+
+const SP_SERIES = [1, 2, 3, 5, 8, 13, 21];
 
 const PRI_LABEL: Record<TaskPriority, string> = {
   low: 'Низкий',
@@ -83,7 +130,6 @@ const TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   cancelled: [],
 };
 
-const EDIT_OK: Set<TaskStatus> = new Set(['backlog', 'todo']);
 const ASSIGN_OK: Set<TaskStatus> = new Set([
   'backlog',
   'todo',
@@ -94,6 +140,8 @@ const ASSIGN_OK: Set<TaskStatus> = new Set([
   'to_fix',
   'to_test',
 ]);
+
+const EDIT_OK: Set<TaskStatus> = new Set(['backlog', 'todo', 'paused']);
 
 const COL_ORDER: TaskStatus[] = [
   'backlog',
@@ -244,7 +292,7 @@ const PM: Record<
 };
 
 const INP =
-  'w-full px-3 py-2 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-sm placeholder-[var(--text-primary)]/40 focus:outline-none focus:border-[var(--accent)]/50 focus:ring-1 focus:ring-[var(--accent-ring)] transition-all';
+  'w-full px-3 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-sm placeholder-[var(--text-primary)]/40 focus:outline-none focus:border-[var(--accent)]/50 focus:ring-1 focus:ring-[var(--accent-ring)] transition-all';
 
 /* ───────────────── helpers ───────────────── */
 
@@ -267,7 +315,7 @@ const overdue = (t: TaskViewItem) =>
 
 const fmtDue = (d: string) => {
   const diff = Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
-  if (diff < 0) return `${-diff}д. просрочено`;
+  if (diff < 0) return `${-diff} дн. просрочено`;
   if (diff === 0) return 'Сегодня';
   if (diff === 1) return 'Завтра';
   return new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
@@ -281,35 +329,64 @@ const apiErr = (e: any) =>
   'Неизвестная ошибка';
 
 const snapCols = (c: TaskViewColumn[]) =>
-  c.map((x) => ({ ...x, tasks: { ...x.tasks, items: [...x.tasks.items] } }));
+  c.map((x) => ({
+    ...x,
+    tasks: { ...x.tasks, items: [...x.tasks.items] },
+  }));
 
-const toNum = (v: unknown): number | null => {
+const getTaskTags = (t: TaskViewItem): TaskTag[] => t.tags ?? t.tag ?? [];
+
+const normalizeDecimalString = (value: string) => {
+  const v = value.trim().replace(',', '.');
+  const m = v.match(/^([+-]?)(\d+)(?:\.(\d+))?$/);
+  if (!m) return value;
+
+  const sign = m[1] === '-' ? '-' : '';
+  let intPart = m[2].replace(/^0+(?=\d)/, '');
+  if (!intPart) intPart = '0';
+
+  const frac = (m[3] ?? '').replace(/0+$/, '');
+  return frac ? `${sign}${intPart}.${frac}` : `${sign}${intPart}`;
+};
+
+const toNumberOrNull = (v: unknown): number | null => {
   if (v == null || v === '') return null;
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
 
-  const raw = String(v).replace(',', '.').trim();
-  const parsed = Number(raw);
+  const normalized = normalizeDecimalString(String(v));
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
 };
 
 const fmtHours = (v: unknown) => {
-  const n = toNum(v);
-  if (n == null) return '—';
-  return n.toLocaleString('ru-RU', { maximumFractionDigits: 1 });
+  if (v == null || v === '') return '—';
+  const n = toNumberOrNull(v);
+  if (n != null) {
+    return `${n.toLocaleString('ru-RU', {
+      maximumFractionDigits: 2,
+    })} ч`;
+  }
+
+  const s = normalizeDecimalString(String(v));
+  return s.length > 18 ? `${s.slice(0, 18)}… ч` : `${s} ч`;
 };
 
-const getTicketNumberFromTask = (t: TaskViewItem) => {
-  if (t.ticket_number) return t.ticket_number;
-  if (!t.ticket_id || !t.number) return null;
+const getTaskTicketNumber = (task: TaskViewItem) => {
+  const explicit = String(task.ticket_number ?? '').trim();
+  if (explicit) return explicit;
 
-  const parts = String(t.number).split('-');
+  if (!task.ticket_id || !task.number) return null;
+
+  const parts = String(task.number).split('-');
   if (parts.length < 2) return null;
+
   return parts.slice(0, -1).join('-');
 };
 
-const getTicketPathFromTask = (t: TaskViewItem) => {
-  const ticketNumber = getTicketNumberFromTask(t);
-  return ticketNumber ? `/tickets/${ticketNumber}` : null;
+const getTaskTicketPath = (task: TaskViewItem) => {
+  const number = getTaskTicketNumber(task);
+  if (number) return `/tickets/${number}`;
+  return task.ticket_id ? `/tickets/${task.ticket_id}` : null;
 };
 
 function statusErr(err: any, task: TaskViewItem, to: TaskStatus) {
@@ -319,14 +396,14 @@ function statusErr(err: any, task: TaskViewItem, to: TaskStatus) {
   if (to === 'in_progress' && (!task.assignee_id || lw.includes('assignee'))) {
     return {
       title: 'Нужен исполнитель',
-      description: 'Назначьте исполнителя для перевода задачи в работу.',
+      description: 'Назначьте исполнителя перед переводом задачи в работу.',
     };
   }
 
   if (lw.includes('transition') || lw.includes('cannot')) {
     return {
       title: 'Переход недоступен',
-      description: `Из «${ST_LABEL[task.status]}» нельзя в «${ST_LABEL[to]}».`,
+      description: `Из «${ST_LABEL[task.status]}» нельзя перейти в «${ST_LABEL[to]}».`,
     };
   }
 
@@ -353,6 +430,7 @@ function useDDPos(ref: React.RefObject<HTMLDivElement | null>, open: boolean, wi
     if (!open || !ref.current) return;
     const r = ref.current.getBoundingClientRect();
     const up = window.innerHeight - r.bottom < 300;
+
     setS({
       position: 'fixed',
       left: Math.max(8, r.left),
@@ -438,6 +516,7 @@ function SelectDD({
               </div>
             </div>
           )}
+
           <div className="overflow-y-auto max-h-[240px] p-1">
             <div
               role="button"
@@ -503,9 +582,7 @@ function SelectDD({
         onClick={() => !disabled && setOpen((v) => !v)}
         className={`w-full flex items-center gap-2 px-3 py-2.5 bg-[var(--hover-2)] border rounded-xl text-sm text-left select-none transition-all ${
           disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'
-        } ${
-          open ? 'border-[var(--accent)]/50 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'
-        }`}
+        } ${open ? 'border-[var(--accent)]/50 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}
       >
         {LI && <LI className="w-4 h-4 text-[var(--text-primary)]/40 shrink-0" />}
         <span
@@ -515,6 +592,7 @@ function SelectDD({
         >
           {sel ? sel.label : placeholder || '—'}
         </span>
+
         {sel && value && (
           <span
             role="button"
@@ -529,6 +607,7 @@ function SelectDD({
             <X className="w-3.5 h-3.5" />
           </span>
         )}
+
         <ChevronDown
           className={`w-4 h-4 text-[var(--text-primary)]/30 shrink-0 transition-transform ${
             open ? 'rotate-180' : ''
@@ -586,15 +665,13 @@ function AsyncDD({
   }, [open]);
 
   const doLoad = useCallback(
-    async (s: string, p: number, append = false) => {
+    async (search: string, page: number, append = false) => {
       append ? setLdMore(true) : setLd(true);
       try {
-        const r = await loadFn(s, p);
+        const r = await loadFn(search, page);
         setOpts((prev) => (append ? [...prev, ...r.items] : r.items));
         setMore(r.hasNext);
-        setPg(p);
-      } catch {
-        //
+        setPg(page);
       } finally {
         setLd(false);
         setLdMore(false);
@@ -756,9 +833,7 @@ function AsyncDD({
         onClick={() => !disabled && setOpen((v) => !v)}
         className={`w-full flex items-center gap-2 px-3 py-2.5 bg-[var(--hover-2)] border rounded-xl text-sm text-left select-none transition-all ${
           disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'
-        } ${
-          open ? 'border-[var(--accent)]/50 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'
-        }`}
+        } ${open ? 'border-[var(--accent)]/50 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}
       >
         {LI && <LI className="w-4 h-4 text-[var(--text-primary)]/40 shrink-0" />}
         <span
@@ -768,6 +843,7 @@ function AsyncDD({
         >
           {selLbl || placeholder || '—'}
         </span>
+
         {value && (
           <span
             role="button"
@@ -783,6 +859,7 @@ function AsyncDD({
             <X className="w-3.5 h-3.5" />
           </span>
         )}
+
         <ChevronDown
           className={`w-4 h-4 text-[var(--text-primary)]/30 shrink-0 transition-transform ${
             open ? 'rotate-180' : ''
@@ -805,7 +882,8 @@ function Ava({
   url?: string | null;
   sz?: 'xs' | 'sm';
 }) {
-  const c = sz === 'xs' ? 'w-6 h-6 text-xs' : 'w-7 h-7 text-sm';
+  const c = sz === 'xs' ? 'w-6 h-6 text-xs' : 'w-8 h-8 text-sm';
+
   if (url) return <img src={url} alt="" className={`${c} rounded-full object-cover shrink-0`} />;
   return (
     <div
@@ -836,6 +914,33 @@ function ComplexityBadge({ v }: { v: number }) {
     >
       <Star className="w-3 h-3" />
       {v}
+    </span>
+  );
+}
+
+function HoursBadge({
+  label,
+  value,
+  tone = 'default',
+  title,
+}: {
+  label: string;
+  value: unknown;
+  tone?: 'default' | 'accent';
+  title?: string;
+}) {
+  const cls =
+    tone === 'accent'
+      ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+      : 'bg-[var(--hover-2)] text-[var(--text-primary)]/55 border-[var(--border-color)]';
+
+  return (
+    <span
+      title={title}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border ${cls}`}
+    >
+      <Clock3 className="w-3 h-3" />
+      {label}: {fmtHours(value)}
     </span>
   );
 }
@@ -871,31 +976,47 @@ function ListView({
               <th className="px-4 py-3 font-medium">Приоритет</th>
               <th className="px-4 py-3 font-medium">Исполнитель</th>
               <th className="px-4 py-3 font-medium">Срок</th>
-              <th className="px-4 py-3 font-medium text-right">Сложность</th>
+              <th className="px-4 py-3 font-medium">Трудозатраты</th>
+              <th className="px-4 py-3 font-medium">Факт</th>
             </tr>
           </thead>
+
           <tbody className="divide-y divide-[var(--border-color)]">
             {tasks.map((t) => {
               const a = t.assignee_id ? umap.get(t.assignee_id) : null;
               const cm = CM[t.status];
               const od = overdue(t);
+              const ticketNo = getTaskTicketNumber(t);
 
               return (
                 <tr
                   key={t.id}
                   onClick={() => onView(t)}
-                  className="hover:bg-[var(--hover-1)] cursor-pointer transition-colors"
+                  className="hover:bg-[var(--hover-1)] cursor-pointer transition-colors align-top"
                 >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-mono text-[var(--text-primary)]/40 text-xs shrink-0">
-                        #{t.number}
-                      </span>
-                      {t.project_id && <FolderOpen className="w-3.5 h-3.5 text-[var(--text-primary)]/25 shrink-0" />}
-                      {t.ticket_id && <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/25 shrink-0" />}
-                      <span className="text-[var(--text-primary)] font-medium truncate max-w-[320px]">
+                  <td className="px-4 py-3 min-w-[320px]">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                        <span className="font-mono text-[var(--text-primary)]/40 text-xs shrink-0">
+                          #{t.number}
+                        </span>
+                        {ticketNo && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-[var(--hover-2)] text-[var(--text-primary)]/45 border border-[var(--border-color)]">
+                            <Ticket className="w-3 h-3" />
+                            {ticketNo}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="text-[var(--text-primary)] font-medium leading-snug">
                         {t.title}
-                      </span>
+                      </div>
+
+                      {t.description && (
+                        <div className="text-xs text-[var(--text-primary)]/45 line-clamp-2 max-w-[420px]">
+                          {t.description}
+                        </div>
+                      )}
                     </div>
                   </td>
 
@@ -909,15 +1030,18 @@ function ListView({
                   </td>
 
                   <td className="px-4 py-3">
-                    <PriBadge p={t.priority} />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <PriBadge p={t.priority} />
+                      {t.story_points != null && <ComplexityBadge v={t.story_points} />}
+                    </div>
                   </td>
 
                   <td className="px-4 py-3">
                     {a ? (
                       <div className="flex items-center gap-2">
                         <Ava name={a.full_name || a.username} url={a.avatar_url} sz="xs" />
-                        <span className="text-[var(--text-primary)]/70 truncate max-w-[120px] text-sm">
-                          {(a.full_name || a.username || '').split(' ')[0]}
+                        <span className="text-[var(--text-primary)]/70 truncate max-w-[140px] text-sm">
+                          {a.full_name || a.username}
                         </span>
                       </div>
                     ) : (
@@ -937,8 +1061,12 @@ function ListView({
                     )}
                   </td>
 
-                  <td className="px-4 py-3 text-right">
-                    {t.story_points != null ? <ComplexityBadge v={t.story_points} /> : null}
+                  <td className="px-4 py-3 text-[var(--text-primary)]/60 whitespace-nowrap" title="Плановые трудозатраты">
+                    {fmtHours(t.estimated_hours)}
+                  </td>
+
+                  <td className="px-4 py-3 text-[var(--text-primary)]/60 whitespace-nowrap">
+                    {fmtHours(t.actual_hours)}
                   </td>
                 </tr>
               );
@@ -969,9 +1097,12 @@ function TCard({
 }) {
   const od = overdue(t);
   const a = t.assignee_id ? umap.get(t.assignee_id) : null;
+  const ticketNo = getTaskTicketNumber(t);
+  const tags = getTaskTags(t);
 
   return (
-    <div
+    <motion.div
+      layout
       draggable
       onDragStart={(e) => {
         (e as any).dataTransfer.effectAllowed = 'move';
@@ -980,7 +1111,7 @@ function TCard({
       onDragEnd={onDE}
       onClick={() => onView(t)}
       className={`group bg-[var(--bg-card)] border rounded-xl p-3.5 cursor-pointer transition-all hover:bg-[var(--hover-1)] hover:border-[var(--accent)]/30 shadow-sm ${
-        dragging ? 'opacity-40' : ''
+        dragging ? 'opacity-40 rotate-1 scale-105 shadow-xl' : ''
       } ${od ? 'border-red-500/40 bg-red-500/5' : 'border-[var(--border-color)]'}`}
     >
       <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -988,16 +1119,49 @@ function TCard({
           #{t.number}
         </span>
         <PriBadge p={t.priority} />
-
-        <div className="ml-auto flex items-center gap-1.5">
-          {t.project_id && <FolderOpen className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />}
-          {t.ticket_id && <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />}
-        </div>
+        {t.story_points != null && <ComplexityBadge v={t.story_points} />}
       </div>
 
-      <h4 className="text-[15px] font-semibold text-[var(--text-primary)] mb-3 leading-snug line-clamp-2">
+      <h4 className="text-sm font-medium text-[var(--text-primary)] mb-1.5 leading-snug line-clamp-2">
         {t.title}
       </h4>
+
+      {t.description && (
+        <p className="text-xs text-[var(--text-primary)]/45 line-clamp-2 mb-2.5">
+          {t.description}
+        </p>
+      )}
+
+      {(t.estimated_hours != null || t.actual_hours != null) && (
+        <div className="flex flex-wrap gap-1.5 mb-2.5">
+          {t.estimated_hours != null && (
+            <HoursBadge label="Трудозатраты" value={t.estimated_hours} title="Плановые трудозатраты" />
+          )}
+          {t.actual_hours != null && <HoursBadge label="Факт" value={t.actual_hours} tone="accent" />}
+        </div>
+      )}
+
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2.5">
+          {tags.slice(0, 3).map((tag) => (
+            <span
+              key={`${tag.name}-${tag.color ?? 'x'}`}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] border"
+              style={{
+                borderColor: tag.color ?? 'var(--border-color)',
+                color: tag.color ?? 'var(--text-primary)',
+                background: `${tag.color ?? '#888'}14`,
+              }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: tag.color ?? '#888' }}
+              />
+              {tag.name}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="flex items-center justify-between border-t border-[var(--border-color)] pt-2">
         {a ? (
@@ -1012,6 +1176,12 @@ function TCard({
         )}
 
         <div className="flex items-center gap-2 shrink-0">
+          {ticketNo && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text-primary)]/35">
+              <Ticket className="w-3.5 h-3.5" />
+              {ticketNo}
+            </span>
+          )}
           {t.due_date && (
             <span className={`text-xs font-medium ${od ? 'text-red-400' : 'text-[var(--text-primary)]/40'}`}>
               {fmtDue(t.due_date)}
@@ -1019,7 +1189,7 @@ function TCard({
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -1062,7 +1232,7 @@ function KCol({
       onDragOver={(e) => onDO(e, col.status)}
       onDragLeave={onDL}
       onDrop={(e) => onDrop(e, col.status)}
-      className={`bg-[var(--hover-1)] rounded-xl flex flex-col w-[300px] shrink-0 border transition-all h-full ${
+      className={`bg-[var(--hover-1)] rounded-xl flex flex-col w-[320px] shrink-0 border transition-all h-full ${
         isDO ? 'border-[var(--accent)] bg-[var(--accent)]/5 scale-[1.01]' : 'border-[var(--border-color)]'
       }`}
     >
@@ -1074,6 +1244,7 @@ function KCol({
             {col.tasks.total_items}
           </span>
         </div>
+
         <button
           onClick={() => onAdd(col.status)}
           className="p-1.5 rounded-lg hover:bg-[var(--hover-3)] text-[var(--text-primary)]/40 hover:text-[var(--accent)] transition-colors"
@@ -1085,21 +1256,23 @@ function KCol({
       <div className="p-2.5 flex-1 space-y-2.5 overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent">
         {col.tasks.items.length === 0 && !isDO ? (
           <div className="h-24 flex flex-col items-center justify-center text-[var(--text-primary)]/30 border border-dashed border-[var(--border-color)] rounded-xl">
-            <Milestone className="w-5 h-5 mb-1 opacity-50" />
+            <Layers className="w-5 h-5 mb-1 opacity-50" />
             <span className="text-xs">{m.empty}</span>
           </div>
         ) : (
-          col.tasks.items.map((t) => (
-            <TCard
-              key={t.id}
-              task={t}
-              umap={umap}
-              dragging={dragId === t.id}
-              onDS={onDS}
-              onDE={onDE}
-              onView={onView}
-            />
-          ))
+          <AnimatePresence mode="popLayout">
+            {col.tasks.items.map((t) => (
+              <TCard
+                key={t.id}
+                task={t}
+                umap={umap}
+                dragging={dragId === t.id}
+                onDS={onDS}
+                onDE={onDE}
+                onView={onView}
+              />
+            ))}
+          </AnimatePresence>
         )}
 
         {isDO && col.tasks.items.length === 0 && (
@@ -1115,7 +1288,7 @@ function KCol({
             className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[var(--text-primary)]/40 hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] text-xs font-medium transition-colors disabled:opacity-40"
           >
             {ldMore ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronDown className="w-4 h-4" />}
-            Ещё ({col.tasks.total_items - col.tasks.items.length})
+            Ещё ({Math.max(col.tasks.total_items - col.tasks.items.length, 0)})
           </button>
         )}
       </div>
@@ -1133,6 +1306,7 @@ function DragPanel({
   onDrop: (e: React.DragEvent, to: TaskStatus) => void;
 }) {
   const [hov, setHov] = useState<TaskStatus | null>(null);
+
   if (!task) return null;
 
   const al = TRANSITIONS[task.from];
@@ -1156,11 +1330,13 @@ function DragPanel({
           </p>
           <p className="text-sm font-bold text-[var(--text-primary)] truncate">#{task.number}</p>
         </div>
+
         <div className="p-1.5 space-y-1">
           {al.map((s) => {
             const c = CM[s];
             const I = c.icon;
             const h = hov === s;
+
             return (
               <div
                 key={s}
@@ -1209,7 +1385,8 @@ function AssignModal({
   onClose: () => void;
   onOk: (id: string) => Promise<void>;
 }) {
-  const [aid, setAid] = useState('');
+  const [aid, setAid] = useState(task.assignee_id ?? '');
+
   const opts: DDOpt[] = Array.from(umap.values()).map((u) => ({
     value: u.id,
     label: u.full_name || u.username || u.email,
@@ -1229,8 +1406,9 @@ function AssignModal({
   }, [onClose, loading]);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !loading && onClose()} />
+
       <div
         className="relative w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -1241,11 +1419,12 @@ function AssignModal({
               <UserCheck className="w-5 h-5 text-amber-500" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-[var(--text-primary)]">Назначьте исполнителя</h2>
-              <p className="text-sm text-[var(--text-primary)]/50">Обязательно для статуса «В работе»</p>
+              <h2 className="text-base font-bold text-[var(--text-primary)]">Назначить исполнителя</h2>
+              <p className="text-sm text-[var(--text-primary)]/50">Это обязательно для перевода в «В работе»</p>
             </div>
           </div>
         </div>
+
         <div className="p-5 space-y-4">
           <div className="rounded-xl bg-[var(--hover-2)] p-3 border border-[var(--border-color)]">
             <span className="text-xs font-mono text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
@@ -1253,6 +1432,7 @@ function AssignModal({
             </span>
             <p className="text-sm font-medium text-[var(--text-primary)] mt-1.5">{task.title}</p>
           </div>
+
           <div>
             <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">
               Исполнитель <span className="text-red-400">*</span>
@@ -1267,6 +1447,7 @@ function AssignModal({
             />
           </div>
         </div>
+
         <div className="flex justify-end gap-2.5 px-5 py-3.5 border-t border-[var(--border-color)] bg-[var(--hover-1)]">
           <button
             onClick={onClose}
@@ -1281,7 +1462,7 @@ function AssignModal({
             className="flex items-center gap-2 px-5 py-2 rounded-xl bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-40 hover:bg-[var(--accent)]/90"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
-            Назначить
+            Сохранить
           </button>
         </div>
       </div>
@@ -1302,10 +1483,8 @@ function CompleteModal({
   onClose: () => void;
   onOk: (actualHours: number) => Promise<void>;
 }) {
-  const initialActual =
-    toNum(task.estimated_hours) != null ? String(toNum(task.estimated_hours)) : '';
-
-  const [actual, setActual] = useState(initialActual);
+  const defaultActual = toNumberOrNull(task.estimated_hours);
+  const [actual, setActual] = useState(defaultActual != null ? String(defaultActual) : '');
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -1323,7 +1502,7 @@ function CompleteModal({
   const valid = actualNum != null && Number.isFinite(actualNum) && actualNum >= 0;
 
   return (
-    <div className="fixed inset-0 z-[85] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !loading && onClose()} />
       <div
         className="relative w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
@@ -1349,31 +1528,31 @@ function CompleteModal({
             <p className="text-sm font-medium text-[var(--text-primary)] mt-1.5">{task.title}</p>
           </div>
 
-          <div className="rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)] p-3">
+          <div className="rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-3">
             <div className="text-xs text-[var(--text-primary)]/45 mb-1" title="Плановые трудозатраты">
               Трудозатраты (ч)
             </div>
             <div className="text-sm font-medium text-[var(--text-primary)]">
-              {toNum(task.estimated_hours) != null ? `${fmtHours(task.estimated_hours)} ч` : '—'}
+              {fmtHours(task.estimated_hours)}
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">
+            <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
               Факт (ч) <span className="text-red-400">*</span>
             </label>
             <input
               type="number"
-              min={0}
-              step={0.5}
+              min="0"
+              step="0.5"
               value={actual}
               onChange={(e) => setActual(e.target.value)}
-              autoFocus
               className={INP}
+              autoFocus
               placeholder="Введите фактические трудозатраты"
             />
             <p className="mt-1.5 text-xs text-[var(--text-primary)]/40">
-              По умолчанию подставлено значение из плановых трудозатрат.
+              По умолчанию подставлены плановые трудозатраты.
             </p>
           </div>
         </div>
@@ -1392,7 +1571,7 @@ function CompleteModal({
             className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-500 text-white text-sm font-medium disabled:opacity-40 hover:bg-emerald-500/90"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            Выполнить
+            Завершить
           </button>
         </div>
       </div>
@@ -1400,37 +1579,44 @@ function CompleteModal({
   );
 }
 
-/* ───────────────── create modal ───────────────── */
+/* ───────────────── task editor modal ───────────────── */
 
-function CreateModal({
+function TaskEditorModal({
+  mode,
+  task,
   initSt,
   context,
-  umap,
   onClose,
-  onOk,
+  onSaved,
 }: {
-  initSt: TaskStatus;
+  mode: 'create' | 'edit';
+  task?: TaskViewItem | null;
+  initSt?: TaskStatus;
   context: TaskKanbanContext;
-  umap: Map<string, SimpleUser | CounterpartyCustomer>;
   onClose: () => void;
-  onOk: () => void;
+  onSaved: () => Promise<void> | void;
 }) {
   const { toast } = useToast();
-  const [title, setTitle] = useState('');
-  const [desc, setDesc] = useState('');
-  const [pri, setPri] = useState<TaskPriority>('medium');
-  const [sp, setSp] = useState<number | null>(null);
-  const [eh, setEh] = useState('');
-  const [dd, setDd] = useState('');
+
+  const [title, setTitle] = useState(task?.title ?? '');
+  const [desc, setDesc] = useState(task?.description ?? '');
+  const [pri, setPri] = useState<TaskPriority>(task?.priority ?? 'medium');
+  const [sp, setSp] = useState(task?.story_points != null ? String(task.story_points) : '');
+  const [estimatedHours, setEstimatedHours] = useState(
+    task?.estimated_hours != null ? String(toNumberOrNull(task.estimated_hours) ?? '') : '',
+  );
+  const [dueDate, setDueDate] = useState(task?.due_date ?? '');
+  const [assigneeId, setAssigneeId] = useState(task?.assignee_id ?? '');
+  const [ticketId, setTicketId] = useState(
+    task?.ticket_id ?? (context.type === 'ticket' ? context.ticket_id : ''),
+  );
+  const [projectId, setProjectId] = useState(
+    task?.project_id ?? (context.type === 'project' ? context.project_id : ''),
+  );
   const [todo, setTodo] = useState(initSt === 'todo');
-  const [aid, setAid] = useState('');
-  const [tid, setTid] = useState('');
-  const [pid, setPid] = useState(context.type === 'project' ? context.project_id : '');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (context.type === 'ticket') setTid(context.ticket_id);
-  }, [context]);
+  const firstProjectChange = useRef(true);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -1438,6 +1624,7 @@ function CreateModal({
     };
     document.addEventListener('keydown', h);
     document.body.style.overflow = 'hidden';
+
     return () => {
       document.removeEventListener('keydown', h);
       document.body.style.overflow = '';
@@ -1445,10 +1632,14 @@ function CreateModal({
   }, [onClose, saving]);
 
   useEffect(() => {
-    setTid('');
-  }, [pid]);
+    if (firstProjectChange.current) {
+      firstProjectChange.current = false;
+      return;
+    }
+    setTicketId('');
+  }, [projectId]);
 
-  const ldProj = useCallback(async (q: string, p: number) => {
+  const loadProjects = useCallback(async (q: string, p: number) => {
     const r = await projectsApi.getAll(p, 20);
     const f = q
       ? r.items.filter(
@@ -1457,6 +1648,7 @@ function CreateModal({
             x.key.toLowerCase().includes(q.toLowerCase()),
         )
       : r.items;
+
     return {
       items: f.map((x) => ({
         value: x.id,
@@ -1468,13 +1660,14 @@ function CreateModal({
     };
   }, []);
 
-  const ldUsers = useCallback(async (q: string, p: number) => {
+  const loadUsers = useCallback(async (q: string, p: number) => {
     let items: any[] = [];
     try {
       items = (await usersApi.getAllUsers(p, 20)).items;
     } catch {
-      //
+      items = [];
     }
+
     const f = q
       ? items.filter(
           (u) =>
@@ -1482,6 +1675,7 @@ function CreateModal({
             u.email.toLowerCase().includes(q.toLowerCase()),
         )
       : items;
+
     return {
       items: f.map((u) => ({
         value: u.id,
@@ -1492,27 +1686,31 @@ function CreateModal({
     };
   }, []);
 
-  const ldTickets = useCallback(
+  const loadTickets = useCallback(
     async (q: string, p: number) => {
       const r = await ticketsApi.getAllWithFilters(p, 20, {
-        project_id: pid || undefined,
+        project_id: projectId || undefined,
       });
+
       const f = q
         ? r.items.filter(
             (t: any) =>
-              String(t.title || '').toLowerCase().includes(q.toLowerCase()) ||
-              String(t.number).includes(q),
+              String(t.title || '')
+                .toLowerCase()
+                .includes(q.toLowerCase()) || String(t.number).includes(q),
           )
         : r.items;
+
       return {
         items: f.map((t: any) => ({
           value: t.id,
-          label: `#${t.number} — ${t.title}`,
+          label: `${t.number} — ${t.title}`,
+          icon: <Ticket className="w-4 h-4 text-[var(--text-primary)]/40" />,
         })),
         hasNext: r.items.length === 20,
       };
     },
-    [pid],
+    [projectId],
   );
 
   const submit = async () => {
@@ -1520,51 +1718,109 @@ function CreateModal({
     setSaving(true);
 
     try {
-      const payload: Record<string, any> = {
-        title: title.trim(),
-        priority: pri,
-      };
+      if (mode === 'create') {
+        const payload: Record<string, any> = {
+          title: title.trim(),
+          priority: pri,
+        };
 
-      if (desc.trim()) payload.description = desc.trim();
-      if (pid) payload.project_id = pid;
-      if (tid) payload.ticket_id = tid;
-      if (sp != null) payload.story_points = sp;
-      if (eh) payload.estimated_hours = parseFloat(eh);
-      if (dd) payload.due_date = dd;
-      if (aid) payload.assignee_id = aid;
+        if (desc.trim()) payload.description = desc.trim();
+        if (projectId) payload.project_id = projectId;
+        if (ticketId) payload.ticket_id = ticketId;
+        if (sp) payload.story_points = Number(sp);
+        if (estimatedHours) payload.estimated_hours = Number(estimatedHours);
+        if (assigneeId) payload.assignee_id = assigneeId;
+        if (dueDate) payload.due_date = dueDate;
 
-      const t = await tasksApi.create(payload as TaskCreateInput);
+        const created = await tasksApi.create(payload as TaskCreateInput);
 
-      if (todo) {
-        await tasksApi.changeStatus(t.id, 'todo');
+        if (todo) {
+          await tasksApi.changeStatus(created.id, 'todo');
+        }
+
+        toast({
+          title: 'Задача создана',
+          description: `${created.number} — ${created.title}`,
+        });
+      } else if (task) {
+        const payload: Record<string, any> = {};
+
+        if (title.trim() !== task.title) payload.title = title.trim();
+        if ((desc.trim() || '') !== (task.description?.trim() || '')) {
+          payload.description = desc.trim() || null;
+        }
+        if (pri !== task.priority) payload.priority = pri;
+
+        const currentSP = task.story_points != null ? String(task.story_points) : '';
+        if (sp !== currentSP) payload.story_points = sp ? Number(sp) : null;
+
+        const currentEst =
+          task.estimated_hours != null ? String(toNumberOrNull(task.estimated_hours) ?? '') : '';
+        if (estimatedHours !== currentEst) {
+          payload.estimated_hours = estimatedHours ? Number(estimatedHours) : null;
+        }
+
+        if (dueDate !== (task.due_date ?? '')) payload.due_date = dueDate || null;
+        if (assigneeId !== (task.assignee_id ?? '')) payload.assignee_id = assigneeId || null;
+        if (projectId !== (task.project_id ?? '')) payload.project_id = projectId || null;
+        if (ticketId !== (task.ticket_id ?? '')) payload.ticket_id = ticketId || null;
+
+        if (Object.keys(payload).length > 0) {
+          await tasksApi.update(task.id, payload as TaskUpdateInput);
+        }
+
+        toast({
+          title: 'Задача обновлена',
+          description: `${task.number} — ${title.trim()}`,
+        });
       }
 
-      toast({ title: 'Задача создана', description: `${t.number} — ${t.title}` });
-      onOk();
+      await onSaved();
+      onClose();
     } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      toast({
+        title: 'Ошибка',
+        description: apiErr(e),
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }
   };
 
+  const titleText = mode === 'create' ? 'Создание задачи' : 'Редактирование задачи';
+  const subtitleText =
+    mode === 'create'
+      ? 'Все основные поля вынесены прямо в форму.'
+      : `Изменение задачи ${task?.number ?? ''}`;
+
+  const lockTicket = context.type === 'ticket' && mode === 'create';
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !saving && onClose()} />
+
       <div
-        className="relative w-full max-w-2xl max-h-[85vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
+        className="relative w-full max-w-4xl max-h-[88vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center">
-              <Plus className="w-4 h-4 text-[var(--accent)]" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-[var(--text-primary)]">Новая задача</h2>
-              <p className="text-xs text-[var(--text-primary)]/50">В статус «{ST_LABEL[initSt]}»</p>
+        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
+                {mode === 'create' ? (
+                  <Plus className="w-4 h-4 text-[var(--accent)]" />
+                ) : (
+                  <Pencil className="w-4 h-4 text-[var(--accent)]" />
+                )}
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-[var(--text-primary)]">{titleText}</h2>
+                <p className="text-sm text-[var(--text-primary)]/50">{subtitleText}</p>
+              </div>
             </div>
           </div>
+
           <button
             onClick={() => !saving && onClose()}
             className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"
@@ -1574,11 +1830,11 @@ function CreateModal({
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-5">
-          <div className="grid md:grid-cols-2 gap-5">
+          <div className="grid lg:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">
-                  Название *
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
+                  Название <span className="text-red-400">*</span>
                 </label>
                 <input
                   value={title}
@@ -1590,20 +1846,20 @@ function CreateModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
                   Описание
                 </label>
                 <textarea
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
-                  placeholder="Подробности…"
-                  rows={4}
+                  placeholder="Опиши задачу обычным человеческим текстом"
+                  rows={7}
                   className={`${INP} resize-none`}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
                   Приоритет
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1613,107 +1869,155 @@ function CreateModal({
                       <button
                         key={p.value}
                         onClick={() => setPri(p.value)}
-                        className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-sm font-medium border transition-all ${
+                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${
                           pri === p.value
                             ? `${m.bg} ${m.c} ${m.brd}`
-                            : 'bg-[var(--hover-1)] text-[var(--text-primary)]/40 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                            : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
                         }`}
                       >
-                        <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
+                        <span className={`w-2 h-2 rounded-full ${m.dot}`} />
                         {p.label}
                       </button>
                     );
                   })}
                 </div>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
+                  Сложность
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {SP_SERIES.map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => setSp(String(v))}
+                      className={`px-3 py-2 rounded-xl text-sm border transition-all ${
+                        sp === String(v)
+                          ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                          : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                      }`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setSp('')}
+                    className={`px-3 py-2 rounded-xl text-sm border transition-all ${
+                      sp === ''
+                        ? 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30'
+                        : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                    }`}
+                  >
+                    Без сложности
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
                   Проект
                 </label>
-                <AsyncDD value={pid} onChange={setPid} loadFn={ldProj} placeholder="Не выбран" icon={FolderOpen} />
+                <AsyncDD
+                  value={projectId}
+                  onChange={setProjectId}
+                  loadFn={loadProjects}
+                  placeholder="Не выбран"
+                  icon={FolderOpen}
+                />
               </div>
 
-              {context.type !== 'ticket' && (
+              {!lockTicket && (
                 <div>
-                  <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">
+                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
                     Заявка
                   </label>
-                  <AsyncDD value={tid} onChange={setTid} loadFn={ldTickets} placeholder="Без заявки" icon={Ticket} wide />
+                  <AsyncDD
+                    value={ticketId}
+                    onChange={setTicketId}
+                    loadFn={loadTickets}
+                    placeholder={projectId ? 'Выберите заявку' : 'Сначала можно выбрать проект'}
+                    icon={Ticket}
+                    wide
+                  />
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">
-                    Сложность
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={21}
-                    value={sp || ''}
-                    onChange={(e) => setSp(e.target.value ? parseInt(e.target.value) : null)}
-                    placeholder="Сложность"
-                    className={INP}
-                  />
+              {lockTicket && (
+                <div className="rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-3 text-sm text-[var(--text-primary)]/60">
+                  Задача будет привязана к текущей заявке.
                 </div>
+              )}
 
+              <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label
-                    className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5"
+                    className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5"
                     title="Плановые трудозатраты"
                   >
                     Трудозатраты (ч)
                   </label>
                   <input
                     type="number"
-                    min={0}
-                    step={0.5}
-                    value={eh}
-                    onChange={(e) => setEh(e.target.value)}
-                    placeholder="Часы"
+                    min="0"
+                    step="0.5"
+                    value={estimatedHours}
+                    onChange={(e) => setEstimatedHours(e.target.value)}
+                    placeholder="Например 4"
+                    className={INP}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
+                    Срок
+                  </label>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
                     className={INP}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">
-                  Срок
-                </label>
-                <input type="date" value={dd} onChange={(e) => setDd(e.target.value)} className={INP} />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
                   Исполнитель
                 </label>
-                <AsyncDD value={aid} onChange={setAid} loadFn={ldUsers} placeholder="Не назначен" icon={UserCheck} />
+                <AsyncDD
+                  value={assigneeId}
+                  onChange={setAssigneeId}
+                  loadFn={loadUsers}
+                  placeholder="Не назначен"
+                  icon={UserCheck}
+                />
               </div>
-            </div>
-          </div>
 
-          <div className="mt-5 pt-4 border-t border-[var(--border-color)]">
-            <button
-              onClick={() => setTodo((v) => !v)}
-              className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border transition-all text-sm font-medium ${
-                todo
-                  ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
-                  : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
-              }`}
-            >
-              <div
-                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                  todo ? 'bg-blue-500 border-blue-500' : 'border-[var(--border-color)]'
-                }`}
-              >
-                {todo && <Check className="w-3 h-3 text-white" />}
-              </div>
-              Сразу к выполнению (статус «{ST_LABEL.todo}»)
-            </button>
+              {mode === 'create' && (
+                <div className="pt-1">
+                  <button
+                    onClick={() => setTodo((v) => !v)}
+                    className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border transition-all text-sm font-medium ${
+                      todo
+                        ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                        : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                        todo ? 'bg-blue-500 border-blue-500' : 'border-[var(--border-color)]'
+                      }`}
+                    >
+                      {todo && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                    Сразу к выполнению (статус «{ST_LABEL.todo}»)
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1725,13 +2029,20 @@ function CreateModal({
           >
             Отмена
           </button>
+
           <button
             onClick={submit}
             disabled={!title.trim() || saving}
             className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[var(--accent)] text-white font-medium disabled:opacity-40 hover:bg-[var(--accent)]/90 text-sm shadow-sm"
           >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            Создать
+            {saving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : mode === 'create' ? (
+              <Plus className="w-4 h-4" />
+            ) : (
+              <Check className="w-4 h-4" />
+            )}
+            {mode === 'create' ? 'Создать задачу' : 'Сохранить изменения'}
           </button>
         </div>
       </div>
@@ -1747,6 +2058,7 @@ function DetailModal({
   onClose,
   onRefresh,
   onNeedAssign,
+  onEdit,
   onNeedComplete,
 }: {
   task: TaskViewItem;
@@ -1754,48 +2066,44 @@ function DetailModal({
   onClose: () => void;
   onRefresh: () => Promise<void>;
   onNeedAssign: (t: TaskViewItem) => void;
-  onNeedComplete: (t: TaskViewItem, mode: 'done' | 'review_done') => void;
+  onEdit: (t: TaskViewItem) => void;
+  onNeedComplete: (t: TaskViewItem, mode: 'status_done' | 'review_done') => void;
 }) {
   const { toast } = useToast();
   const { user } = useAuthStore();
+
   const [showArchive, setShowArchive] = useState(false);
   const [showSt, setShowSt] = useState(false);
-  const [busy, setBusy] = useState('');
-  const canEdit = EDIT_OK.has(t.status);
-
-  const [editField, setEditField] = useState<'title' | 'priority' | 'sp' | 'due' | 'eh' | null>(null);
-  const [eTitle, setETitle] = useState(t.title);
-  const [ePri, setEPri] = useState<TaskPriority>(t.priority);
-  const [eSp, setESp] = useState(t.story_points?.toString() ?? '');
-  const [eDd, setEDd] = useState(t.due_date ?? '');
-  const [eEh, setEEh] = useState(
-    t.estimated_hours != null && toNum(t.estimated_hours) != null ? String(toNum(t.estimated_hours)) : '',
-  );
-
   const [showAssign, setShowAssign] = useState(false);
-  const [aId, setAId] = useState(t.assignee_id ?? '');
   const [showRR, setShowRR] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [aId, setAId] = useState(t.assignee_id ?? '');
   const [rvId, setRvId] = useState('');
 
   const assignee = t.assignee_id ? umap.get(t.assignee_id) : null;
   const cm = CM[t.status];
   const SI = cm.icon;
   const users = Array.from(umap.values());
-  const isStaff =
-    user?.roles?.some((r) => ['admin', 'support_manager', 'support_agent', 'executor'].includes(r)) ??
-    false;
-  const canReview = (t.status === 'to_review' || String(t.status) === 'review') && isStaff;
-  const canRR = t.status === 'in_progress';
-  const canAssign = ASSIGN_OK.has(t.status) && users.length > 0;
-  const allowed = TRANSITIONS[t.status];
   const uOpts: DDOpt[] = users.map((u) => ({
     value: u.id,
     label: u.full_name || u.username || u.email,
     sublabel: u.email,
   }));
 
-  const ticketPath = getTicketPathFromTask(t);
-  const ticketNumber = getTicketNumberFromTask(t);
+  const isStaff =
+    user?.roles?.some((r) =>
+      ['admin', 'support_manager', 'support_agent', 'executor'].includes(r),
+    ) ?? false;
+
+  const statusAsString = String(t.status);
+  const canReview = (statusAsString === 'to_review' || statusAsString === 'review') && isStaff;
+  const canRR = t.status === 'in_progress';
+  const canAssign = ASSIGN_OK.has(t.status) && users.length > 0;
+  const canEdit = EDIT_OK.has(t.status);
+  const allowed = TRANSITIONS[t.status];
+  const ticketPath = getTaskTicketPath(t);
+  const ticketNo = getTaskTicketNumber(t);
+  const tags = getTaskTags(t);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -1803,6 +2111,7 @@ function DetailModal({
     };
     document.addEventListener('keydown', h);
     document.body.style.overflow = 'hidden';
+
     return () => {
       document.removeEventListener('keydown', h);
       document.body.style.overflow = '';
@@ -1817,58 +2126,14 @@ function DetailModal({
       await onRefresh();
       onClose();
     } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      toast({
+        title: 'Ошибка',
+        description: apiErr(e),
+        variant: 'destructive',
+      });
     } finally {
       setBusy('');
     }
-  };
-
-  const saveField = async (field: 'title' | 'priority' | 'sp' | 'due' | 'eh') => {
-    setBusy(`save-${field}`);
-    try {
-      const p: TaskUpdateInput & { estimated_hours?: number | null } = {};
-
-      if (field === 'title' && eTitle.trim() !== t.title) p.title = eTitle.trim();
-      if (field === 'priority' && ePri !== t.priority) p.priority = ePri;
-      if (field === 'sp' && eSp !== (t.story_points?.toString() ?? '')) {
-        p.story_points = eSp ? parseInt(eSp) : null;
-      }
-      if (field === 'due' && eDd !== (t.due_date ?? '')) {
-        p.due_date = eDd || null;
-      }
-      if (field === 'eh') {
-        const currentEh =
-          t.estimated_hours != null && toNum(t.estimated_hours) != null
-            ? String(toNum(t.estimated_hours))
-            : '';
-        if (eEh !== currentEh) {
-          (p as any).estimated_hours = eEh ? Number(eEh) : null;
-        }
-      }
-
-      if (Object.keys(p).length) {
-        await tasksApi.update(t.id, p as any);
-        toast({ title: 'Сохранено' });
-        await onRefresh();
-      }
-
-      setEditField(null);
-    } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
-    } finally {
-      setBusy('');
-    }
-  };
-
-  const cancelEdit = (field: 'title' | 'priority' | 'sp' | 'due' | 'eh') => {
-    if (field === 'title') setETitle(t.title);
-    if (field === 'priority') setEPri(t.priority);
-    if (field === 'sp') setESp(t.story_points?.toString() ?? '');
-    if (field === 'due') setEDd(t.due_date ?? '');
-    if (field === 'eh') {
-      setEEh(t.estimated_hours != null && toNum(t.estimated_hours) != null ? String(toNum(t.estimated_hours)) : '');
-    }
-    setEditField(null);
   };
 
   const chSt = async (s: TaskStatus) => {
@@ -1880,20 +2145,25 @@ function DetailModal({
 
     if (s === 'done') {
       setShowSt(false);
-      onNeedComplete(t, 'done');
+      onNeedComplete(t, 'status_done');
       return;
     }
 
     setShowSt(false);
     setBusy('st');
+
     try {
       await tasksApi.changeStatus(t.id, s);
-      toast({ title: `→ ${ST_LABEL[s]}` });
+      toast({ title: `Статус изменён: ${ST_LABEL[s]}` });
       await onRefresh();
       onClose();
     } catch (e: any) {
       const m = statusErr(e, t, s);
-      toast({ title: m.title, description: m.description, variant: 'destructive' });
+      toast({
+        title: m.title,
+        description: m.description,
+        variant: 'destructive',
+      });
     } finally {
       setBusy('');
     }
@@ -1902,177 +2172,103 @@ function DetailModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+
       <div
-        className="relative w-full max-w-xl max-h-[85vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
+        className="relative w-full max-w-3xl max-h-[88vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
-          <div className="flex-1 min-w-0 pr-4">
+        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className="font-mono text-xs text-[var(--text-primary)]/60 bg-[var(--hover-2)] border border-[var(--border-color)] px-1.5 py-0.5 rounded-md">
                 {t.number}
               </span>
-
-              {editField === 'priority' && canEdit ? (
-                <div className="flex items-center gap-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5 shadow-sm">
-                  {PRI_LIST.map((p) => {
-                    const m = PM[p.value];
-                    return (
-                      <button
-                        key={p.value}
-                        onClick={() => {
-                          setEPri(p.value);
-                          saveField('priority');
-                        }}
-                        className={`flex items-center gap-1 px-1.5 py-1 rounded text-xs font-medium ${
-                          ePri === p.value ? `${m.bg} ${m.c}` : 'hover:bg-[var(--hover-1)] text-[var(--text-primary)]/50'
-                        }`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
-                      </button>
-                    );
-                  })}
-                  <button
-                    onClick={() => cancelEdit('priority')}
-                    className="p-1 rounded text-[var(--text-primary)]/30 hover:bg-[var(--hover-2)]"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : (
-                <div
-                  className="relative group/pri cursor-pointer"
-                  onClick={() => canEdit && setEditField('priority')}
-                  title={canEdit ? 'Изменить приоритет' : ''}
-                >
-                  <PriBadge p={t.priority} />
-                  {canEdit && (
-                    <div className="absolute -right-2 -top-2 opacity-0 group-hover/pri:opacity-100 p-0.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded text-[var(--text-primary)]/40">
-                      <Pencil className="w-2.5 h-2.5" />
-                    </div>
-                  )}
-                </div>
+              <PriBadge p={t.priority} />
+              {t.story_points != null && <ComplexityBadge v={t.story_points} />}
+              {t.estimated_hours != null && (
+                <HoursBadge label="Трудозатраты" value={t.estimated_hours} title="Плановые трудозатраты" />
               )}
-
-              {editField === 'sp' && canEdit ? (
-                <div className="flex items-center gap-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5 shadow-sm">
-                  <input
-                    type="number"
-                    min={1}
-                    max={21}
-                    value={eSp}
-                    onChange={(e) => setESp(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') saveField('sp');
-                      if (e.key === 'Escape') cancelEdit('sp');
-                    }}
-                    className="w-14 px-1.5 py-0.5 bg-[var(--hover-1)] rounded text-xs text-[var(--text-primary)] focus:outline-none"
-                    autoFocus
-                  />
-                  <button onClick={() => saveField('sp')} className="p-1 rounded text-emerald-400 hover:bg-[var(--hover-2)]">
-                    <Check className="w-3 h-3" />
-                  </button>
-                  <button onClick={() => cancelEdit('sp')} className="p-1 rounded text-[var(--text-primary)]/30 hover:bg-[var(--hover-2)]">
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : (
-                <div
-                  className="relative group/sp cursor-pointer"
-                  onClick={() => canEdit && setEditField('sp')}
-                  title={canEdit ? 'Изменить сложность' : ''}
-                >
-                  {t.story_points != null ? (
-                    <ComplexityBadge v={t.story_points} />
-                  ) : (
-                    canEdit && (
-                      <span className="text-[10px] bg-[var(--hover-2)] text-[var(--text-primary)]/40 px-1.5 py-0.5 rounded-md border border-[var(--border-color)]">
-                        Сложность?
-                      </span>
-                    )
-                  )}
-                  {canEdit && (
-                    <div className="absolute -right-2 -top-2 opacity-0 group-hover/sp:opacity-100 p-0.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded text-[var(--text-primary)]/40">
-                      <Pencil className="w-2.5 h-2.5" />
-                    </div>
-                  )}
-                </div>
-              )}
+              {t.actual_hours != null && <HoursBadge label="Факт" value={t.actual_hours} tone="accent" />}
             </div>
 
-            {editField === 'title' && canEdit ? (
-              <div className="mt-1 space-y-2">
-                <input
-                  value={eTitle}
-                  onChange={(e) => setETitle(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') saveField('title');
-                    if (e.key === 'Escape') cancelEdit('title');
-                  }}
-                  className="w-full px-2.5 py-1.5 rounded-lg text-base font-bold bg-[var(--hover-2)] border border-[var(--accent)]/40 text-[var(--text-primary)] focus:outline-none"
-                  autoFocus
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => saveField('title')}
-                    disabled={!eTitle.trim() || busy === 'save-title'}
-                    className="flex items-center gap-1 px-3 py-1 rounded bg-[var(--accent)] text-white text-xs font-medium disabled:opacity-40"
-                  >
-                    {busy === 'save-title' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                    Сохранить
-                  </button>
-                  <button onClick={() => cancelEdit('title')} className="px-3 py-1 rounded bg-[var(--hover-2)] text-[var(--text-primary)]/60 text-xs">
-                    Отмена
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div
-                className="relative group/title cursor-pointer pr-5"
-                onClick={() => canEdit && setEditField('title')}
-                title={canEdit ? 'Изменить название' : ''}
-              >
-                <h2 className="text-base font-bold text-[var(--text-primary)] leading-snug">{t.title}</h2>
-                {canEdit && (
-                  <div className="absolute right-0 top-0 opacity-0 group-hover/title:opacity-100 p-1 bg-[var(--hover-2)] rounded text-[var(--text-primary)]/40">
-                    <Pencil className="w-3.5 h-3.5" />
-                  </div>
-                )}
-              </div>
-            )}
+            <h2 className="text-lg font-bold text-[var(--text-primary)] leading-snug">{t.title}</h2>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {canEdit && (
+              <button
+                onClick={() => onEdit(t)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/75 text-sm font-medium hover:bg-[var(--hover-3)]"
+              >
+                <Pencil className="w-4 h-4" />
+                Редактировать
+              </button>
+            )}
+
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
           {t.status === 'in_progress' && !t.assignee_id && (
             <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-500 font-medium">
-              ⚠ Статус «В работе», но нет исполнителя.
+              ⚠ У задачи нет исполнителя, но она находится в статусе «В работе».
             </div>
           )}
 
-          {t.description && (
-            <div className="rounded-xl border border-[var(--border-color)] overflow-hidden">
-              <div className="px-4 py-2.5 bg-[var(--hover-1)] border-b border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)]">
-                Описание
+          <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+            <div className="px-4 py-3 bg-[var(--hover-1)] border-b border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)]">
+              Описание
+            </div>
+            <div className="px-4 py-4">
+              {t.description ? (
+                <div className="text-sm text-[var(--text-primary)]/80 whitespace-pre-wrap leading-6">
+                  {t.description}
+                </div>
+              ) : (
+                <div className="text-sm text-[var(--text-primary)]/35">Описание не заполнено</div>
+              )}
+            </div>
+          </div>
+
+          {tags.length > 0 && (
+            <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+              <div className="px-4 py-3 bg-[var(--hover-1)] border-b border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)]">
+                Теги
               </div>
-              <div className="px-4 py-3 text-sm text-[var(--text-primary)]/80 whitespace-pre-wrap leading-relaxed">
-                {t.description}
+              <div className="px-4 py-4 flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <span
+                    key={`${tag.name}-${tag.color ?? 'x'}`}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs border"
+                    style={{
+                      borderColor: tag.color ?? 'var(--border-color)',
+                      color: tag.color ?? 'var(--text-primary)',
+                      background: `${tag.color ?? '#888'}14`,
+                    }}
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ background: tag.color ?? '#888' }}
+                    />
+                    {tag.name}
+                  </span>
+                ))}
               </div>
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
             <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
               <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">
                 Статус
               </p>
+
               <div className="relative">
                 <button
                   onClick={() => allowed.length > 0 && setShowSt((v) => !v)}
@@ -2111,125 +2307,61 @@ function DetailModal({
               </div>
             </div>
 
-            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)] relative group/due">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">
-                Срок
-              </p>
-              {editField === 'due' && canEdit ? (
-                <div className="flex items-center gap-1 mt-1">
-                  <input
-                    type="date"
-                    value={eDd}
-                    onChange={(e) => setEDd(e.target.value)}
-                    className="w-full px-1.5 py-1 rounded bg-[var(--bg-card)] border border-[var(--accent)]/40 text-xs text-[var(--text-primary)] focus:outline-none"
-                    autoFocus
-                  />
-                  <button onClick={() => saveField('due')} className="p-1 rounded text-emerald-400 hover:bg-[var(--hover-2)]">
-                    <Check className="w-3 h-3" />
-                  </button>
-                  <button onClick={() => cancelEdit('due')} className="p-1 rounded text-[var(--text-primary)]/30 hover:bg-[var(--hover-2)]">
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : (
-                <div
-                  className="cursor-pointer flex items-center h-[24px]"
-                  onClick={() => canEdit && setEditField('due')}
-                  title={canEdit ? 'Изменить срок' : ''}
-                >
-                  {t.due_date ? (
-                    <span className={`flex items-center gap-1.5 text-sm font-medium ${overdue(t) ? 'text-red-400' : 'text-[var(--text-primary)]/70'}`}>
-                      <Calendar className="w-4 h-4" />
-                      {fmtDue(t.due_date)}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-[var(--text-primary)]/30">—</span>
-                  )}
-                  {canEdit && (
-                    <div className="absolute right-2 top-2 opacity-0 group-hover/due:opacity-100 p-0.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded text-[var(--text-primary)]/40">
-                      <Pencil className="w-2.5 h-2.5" />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
             <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
               <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">
                 Исполнитель
               </p>
               <div className="h-[24px] flex items-center">
                 {assignee ? (
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 min-w-0">
                     <Ava name={assignee.full_name || assignee.username} url={assignee.avatar_url} sz="xs" />
                     <span className="text-sm text-[var(--text-primary)]/70 font-medium truncate">
                       {assignee.full_name || assignee.username}
                     </span>
                   </div>
                 ) : (
-                  <span className="text-sm text-[var(--text-primary)]/30">—</span>
+                  <span className="text-sm text-[var(--text-primary)]/30">Не назначен</span>
                 )}
               </div>
             </div>
 
-            <div
-              className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)] relative group/eh"
-              title="Плановые трудозатраты"
-            >
+            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
+              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">
+                Срок
+              </p>
+              <div className="h-[24px] flex items-center">
+                {t.due_date ? (
+                  <span
+                    className={`flex items-center gap-1.5 text-sm font-medium ${
+                      overdue(t) ? 'text-red-400' : 'text-[var(--text-primary)]/70'
+                    }`}
+                  >
+                    <Calendar className="w-4 h-4" />
+                    {fmtDue(t.due_date)}
+                  </span>
+                ) : (
+                  <span className="text-sm text-[var(--text-primary)]/30">Не задан</span>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]" title="Плановые трудозатраты">
               <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">
                 Трудозатраты (ч)
               </p>
-
-              {editField === 'eh' && canEdit ? (
-                <div className="flex items-center gap-1 mt-1">
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.5}
-                    value={eEh}
-                    onChange={(e) => setEEh(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') saveField('eh');
-                      if (e.key === 'Escape') cancelEdit('eh');
-                    }}
-                    className="w-full px-1.5 py-1 rounded bg-[var(--bg-card)] border border-[var(--accent)]/40 text-xs text-[var(--text-primary)] focus:outline-none"
-                    autoFocus
-                  />
-                  <button onClick={() => saveField('eh')} className="p-1 rounded text-emerald-400 hover:bg-[var(--hover-2)]">
-                    <Check className="w-3 h-3" />
-                  </button>
-                  <button onClick={() => cancelEdit('eh')} className="p-1 rounded text-[var(--text-primary)]/30 hover:bg-[var(--hover-2)]">
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : (
-                <div
-                  className="cursor-pointer flex items-center h-[24px]"
-                  onClick={() => canEdit && setEditField('eh')}
-                  title={canEdit ? 'Изменить трудозатраты' : 'Плановые трудозатраты'}
-                >
-                  <span className="text-sm text-[var(--text-primary)]/70 font-medium">
-                    {toNum(t.estimated_hours) != null ? `${fmtHours(t.estimated_hours)} ч` : '—'}
-                  </span>
-                  {canEdit && (
-                    <div className="absolute right-2 top-2 opacity-0 group-hover/eh:opacity-100 p-0.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded text-[var(--text-primary)]/40">
-                      <Pencil className="w-2.5 h-2.5" />
-                    </div>
-                  )}
-                </div>
-              )}
+              <span className="text-sm text-[var(--text-primary)]/70 font-medium h-[24px] flex items-center">
+                {fmtHours(t.estimated_hours)}
+              </span>
             </div>
 
-            {t.status === 'done' && (
-              <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
-                <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">
-                  Факт (ч)
-                </p>
-                <span className="text-sm text-[var(--text-primary)]/70 font-medium h-[24px] flex items-center">
-                  {toNum(t.actual_hours) != null ? `${fmtHours(t.actual_hours)} ч` : '—'}
-                </span>
-              </div>
-            )}
+            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
+              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">
+                Факт (ч)
+              </p>
+              <span className="text-sm text-[var(--text-primary)]/70 font-medium h-[24px] flex items-center">
+                {fmtHours(t.actual_hours)}
+              </span>
+            </div>
 
             <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
               <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">
@@ -2257,15 +2389,23 @@ function DetailModal({
                 </span>
                 <ChevronDown className={`w-4 h-4 transition-transform ${showAssign ? 'rotate-180' : ''}`} />
               </button>
+
               {showAssign && (
                 <div className="px-4 py-3 border-t border-[var(--border-color)] space-y-2.5 bg-[var(--bg-card)]">
-                  <SelectDD value={aId} onChange={setAId} options={uOpts} placeholder="Выберите" icon={UserCheck} searchable />
+                  <SelectDD
+                    value={aId}
+                    onChange={setAId}
+                    options={uOpts}
+                    placeholder="Выберите исполнителя"
+                    icon={UserCheck}
+                    searchable
+                  />
                   <button
-                    onClick={() => act('assign', () => tasksApi.assign(t.id, { assignee_id: aId }), 'Назначен')}
+                    onClick={() => act('assign', () => tasksApi.assign(t.id, { assignee_id: aId }), 'Исполнитель назначен')}
                     disabled={!aId || busy === 'assign'}
                     className="w-full py-2.5 rounded-xl bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-40"
                   >
-                    {busy === 'assign' ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Назначить'}
+                    {busy === 'assign' ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Сохранить исполнителя'}
                   </button>
                 </div>
               )}
@@ -2280,15 +2420,22 @@ function DetailModal({
               >
                 <span className="flex items-center gap-2">
                   <GitPullRequest className="w-4 h-4" />
-                  Ревью
+                  Отправить на ревью
                 </span>
                 <ChevronDown className={`w-4 h-4 opacity-70 transition-transform ${showRR ? 'rotate-180' : ''}`} />
               </button>
+
               {showRR && (
                 <div className="px-4 py-3 border-t border-violet-500/30 space-y-2.5 bg-violet-500/5">
-                  <SelectDD value={rvId} onChange={setRvId} options={uOpts} placeholder="Ревьюер" searchable />
+                  <SelectDD
+                    value={rvId}
+                    onChange={setRvId}
+                    options={uOpts}
+                    placeholder="Выберите ревьюера"
+                    searchable
+                  />
                   <button
-                    onClick={() => act('rr', () => tasksApi.requestReview(t.id, { reviewer_id: rvId }), 'Запрошено')}
+                    onClick={() => act('rr', () => tasksApi.requestReview(t.id, { reviewer_id: rvId }), 'Задача отправлена на ревью')}
                     disabled={!rvId || busy === 'rr'}
                     className="w-full py-2.5 rounded-xl bg-violet-500/20 border border-violet-500/40 text-violet-400 text-sm font-medium disabled:opacity-40"
                   >
@@ -2310,7 +2457,7 @@ function DetailModal({
                 Принять
               </button>
               <button
-                onClick={() => act('rv', () => tasksApi.review(t.id, { decision: 'to_fix' }), 'Возвращено')}
+                onClick={() => act('rv', () => tasksApi.review(t.id, { decision: 'to_fix' }), 'Задача возвращена на доработку')}
                 disabled={busy === 'rv'}
                 className="flex-1 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-medium disabled:opacity-50 hover:bg-red-500/20 transition-colors"
               >
@@ -2321,11 +2468,14 @@ function DetailModal({
           )}
 
           {ticketPath && (
-            <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
               <Ticket className="w-4 h-4 text-[var(--text-primary)]/30" />
-              <span className="flex-1 text-sm text-[var(--text-primary)]/50 font-medium">
-                {ticketNumber ?? 'Заявка'}
-              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm text-[var(--text-primary)]/45">Заявка</div>
+                <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">
+                  {ticketNo ?? 'Открыть заявку'}
+                </div>
+              </div>
               <Link
                 to={ticketPath}
                 onClick={onClose}
@@ -2338,9 +2488,14 @@ function DetailModal({
           )}
 
           {t.project_id && (
-            <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
               <FolderOpen className="w-4 h-4 text-[var(--text-primary)]/30" />
-              <span className="flex-1 text-sm text-[var(--text-primary)]/50 font-medium">Проект</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm text-[var(--text-primary)]/45">Проект</div>
+                <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">
+                  {t.project_name || 'Открыть проект'}
+                </div>
+              </div>
               <Link
                 to={`/projects/${t.project_id}`}
                 onClick={onClose}
@@ -2362,6 +2517,7 @@ function DetailModal({
             <Archive className="w-4 h-4" />
             В архив
           </button>
+
           <button
             onClick={onClose}
             className="px-5 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 text-sm font-medium hover:bg-[var(--hover-3)]"
@@ -2372,12 +2528,12 @@ function DetailModal({
       </div>
 
       {showArchive && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowArchive(false)} />
           <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl">
             <div className="p-6 text-center">
               <Archive className="w-10 h-10 text-[var(--text-primary)]/20 mx-auto mb-3" />
-              <p className="text-base font-bold text-[var(--text-primary)]">Архивировать?</p>
+              <p className="text-base font-bold text-[var(--text-primary)]">Архивировать задачу?</p>
               <p className="text-sm text-[var(--text-primary)]/50 mt-1">«{t.title}»</p>
             </div>
             <div className="flex border-t border-[var(--border-color)]">
@@ -2390,7 +2546,7 @@ function DetailModal({
               <button
                 onClick={() => {
                   setShowArchive(false);
-                  act('arch', () => tasksApi.archive(t.id), 'Архивировано');
+                  act('arch', () => tasksApi.archive(t.id), 'Задача архивирована');
                 }}
                 className="flex-1 py-3 text-sm font-bold text-red-500 hover:bg-red-500/10 border-l border-[var(--border-color)]"
               >
@@ -2404,9 +2560,7 @@ function DetailModal({
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   MAIN PAGE
-   ═══════════════════════════════════════════════════════════════════ */
+/* ───────────────── main page ───────────────── */
 
 export default function TasksPage() {
   const [sp] = useSearchParams();
@@ -2448,13 +2602,16 @@ export default function TasksPage() {
   const [sf, setSf] = useState(false);
 
   const [view, setView] = useState<TaskViewItem | null>(null);
+  const [editTask, setEditTask] = useState<TaskViewItem | null>(null);
   const [create, setCreate] = useState<TaskStatus | null>(null);
+
   const [assignTask, setAssignTask] = useState<TaskViewItem | null>(null);
   const [assignLd, setAssignLd] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
 
   const [completeIntent, setCompleteIntent] = useState<CompleteIntent | null>(null);
   const [completeLd, setCompleteLd] = useState(false);
+
+  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
 
   const fpR = useRef(fp);
   const foR = useRef(fo);
@@ -2475,7 +2632,7 @@ export default function TasksPage() {
     return { type: 'my' };
   }, [mode, selP, selA, selT]);
 
-  const loadU = useCallback(async () => {
+  const loadUsersMap = useCallback(async () => {
     const m = new Map<string, SimpleUser | CounterpartyCustomer>();
     try {
       (await usersApi.getAllUsers(1, 100)).items.forEach((u) => m.set(u.id, u));
@@ -2488,10 +2645,10 @@ export default function TasksPage() {
   const fetchBoard = useCallback(
     async (silent = false) => {
       if ((mode === 'project' && !selP) || (mode === 'ticket' && !selT) || (mode === 'assignee' && !selA)) {
-        setLoading(false);
-        setRefreshing(false);
         setCols([]);
         setTotal(0);
+        setLoading(false);
+        setRefreshing(false);
         return;
       }
 
@@ -2504,14 +2661,18 @@ export default function TasksPage() {
           overdue_only: foR.current || undefined,
         });
 
-        setCols(
-          COL_ORDER.map((s) => d.columns.find((c: any) => c.status === s)).filter(
-            (c): c is TaskViewColumn => !!c,
-          ),
-        );
-        setTotal(d.total_tasks);
+        const mapped: TaskViewColumn[] = COL_ORDER.map((s) =>
+          d.columns.find((c: TaskViewColumn) => c.status === s),
+        ).filter((c): c is TaskViewColumn => !!c);
+
+        setCols(mapped);
+        setTotal(d.total_tasks ?? 0);
       } catch (e: any) {
-        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+        toast({
+          title: 'Ошибка',
+          description: apiErr(e),
+          variant: 'destructive',
+        });
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -2521,8 +2682,8 @@ export default function TasksPage() {
   );
 
   useEffect(() => {
-    loadU();
-  }, [loadU]);
+    loadUsersMap();
+  }, [loadUsersMap]);
 
   useEffect(() => {
     fetchBoard();
@@ -2536,26 +2697,38 @@ export default function TasksPage() {
     async (st: TaskStatus) => {
       const c = cols.find((x) => x.status === st);
       if (!c?.tasks.has_next) return;
-      setMoreCol(st);
 
+      setMoreCol(st);
       try {
         const d: any = await tasksApi.getKanban(ctx(), {
           page: c.tasks.page + 1,
           size: c.tasks.size,
           priorities: fpR.current.length ? fpR.current : undefined,
+          overdue_only: foR.current || undefined,
         });
-        const nc = d.columns.find((x: any) => x.status === st);
+
+        const nc = d.columns.find((x: TaskViewColumn) => x.status === st);
         if (nc) {
-          setCols((p) =>
-            p.map((x) =>
+          setCols((prev) =>
+            prev.map((x) =>
               x.status === st
-                ? { ...x, tasks: { ...nc.tasks, items: [...x.tasks.items, ...nc.tasks.items] } }
+                ? {
+                    ...x,
+                    tasks: {
+                      ...nc.tasks,
+                      items: [...x.tasks.items, ...nc.tasks.items],
+                    },
+                  }
                 : x,
             ),
           );
         }
       } catch (e: any) {
-        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+        toast({
+          title: 'Ошибка',
+          description: apiErr(e),
+          variant: 'destructive',
+        });
       } finally {
         setMoreCol(null);
       }
@@ -2575,7 +2748,7 @@ export default function TasksPage() {
       }
 
       if (to === 'done') {
-        setCompleteIntent({ task, mode: 'done' });
+        setCompleteIntent({ task, mode: 'status_done' });
         return;
       }
 
@@ -2592,23 +2765,29 @@ export default function TasksPage() {
               }
               return true;
             });
+
             return {
               ...c,
-              tasks: { ...c.tasks, items, total_items: c.tasks.total_items - 1 },
+              tasks: {
+                ...c.tasks,
+                items,
+                total_items: c.tasks.total_items - 1,
+              },
             };
           }
           return c;
         });
 
         if (!moved) return prev;
-        const u = { ...moved, status: to };
+
+        const updated = { ...moved, status: to };
         return n.map((c) =>
           c.status === to
             ? {
                 ...c,
                 tasks: {
                   ...c.tasks,
-                  items: [u, ...c.tasks.items],
+                  items: [updated, ...c.tasks.items],
                   total_items: c.tasks.total_items + 1,
                 },
               }
@@ -2618,11 +2797,15 @@ export default function TasksPage() {
 
       try {
         await tasksApi.changeStatus(id, to);
-        toast({ title: `→ ${ST_LABEL[to]}` });
+        toast({ title: `Статус: ${ST_LABEL[to]}` });
       } catch (e: any) {
         setCols(snap);
         const m = statusErr(e, task, to);
-        toast({ title: m.title, description: m.description, variant: 'destructive' });
+        toast({
+          title: m.title,
+          description: m.description,
+          variant: 'destructive',
+        });
       }
     },
     [cols, toast],
@@ -2631,15 +2814,20 @@ export default function TasksPage() {
   const handleAssignProgress = useCallback(
     async (aid: string) => {
       if (!assignTask) return;
+
       setAssignLd(true);
       try {
         await tasksApi.assign(assignTask.id, { assignee_id: aid });
         await tasksApi.changeStatus(assignTask.id, 'in_progress');
-        toast({ title: 'В работе' });
+        toast({ title: 'Задача переведена в работу' });
         setAssignTask(null);
         await fetchBoard(true);
       } catch (e: any) {
-        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+        toast({
+          title: 'Ошибка',
+          description: apiErr(e),
+          variant: 'destructive',
+        });
         await fetchBoard(true);
       } finally {
         setAssignLd(false);
@@ -2651,8 +2839,8 @@ export default function TasksPage() {
   const handleComplete = useCallback(
     async (actualHours: number) => {
       if (!completeIntent) return;
-      setCompleteLd(true);
 
+      setCompleteLd(true);
       try {
         await tasksApi.update(completeIntent.task.id, { actual_hours: actualHours } as any);
 
@@ -2667,7 +2855,11 @@ export default function TasksPage() {
         setCompleteIntent(null);
         await fetchBoard(true);
       } catch (e: any) {
-        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+        toast({
+          title: 'Ошибка',
+          description: apiErr(e),
+          variant: 'destructive',
+        });
       } finally {
         setCompleteLd(false);
       }
@@ -2680,6 +2872,7 @@ export default function TasksPage() {
     setDrag(null);
     setDragO(null);
   }, []);
+
   const onDO = useCallback(
     (e: React.DragEvent, st: TaskStatus) => {
       e.preventDefault();
@@ -2689,21 +2882,25 @@ export default function TasksPage() {
     },
     [drag],
   );
+
   const onDL = useCallback(() => setDragO(null), []);
 
   const onDrop = useCallback(
     async (e: React.DragEvent, to: TaskStatus) => {
       e.preventDefault();
       setDragO(null);
+
       if (!drag || drag.from === to) {
         setDrag(null);
         return;
       }
+
       if (!TRANSITIONS[drag.from].includes(to)) {
         toast({ title: 'Переход недоступен', variant: 'destructive' });
         setDrag(null);
         return;
       }
+
       const { id, from } = drag;
       setDrag(null);
       await moveTo(id, from, to);
@@ -2711,18 +2908,24 @@ export default function TasksPage() {
     [drag, moveTo, toast],
   );
 
+  const ql = q.trim().toLowerCase();
+
   const disp = cols.map((c) =>
-    !q
+    !ql
       ? c
       : {
           ...c,
           tasks: {
             ...c.tasks,
-            items: c.tasks.items.filter(
-              (t) =>
-                t.title.toLowerCase().includes(q.toLowerCase()) ||
-                t.number.toLowerCase().includes(q.toLowerCase()),
-            ),
+            items: c.tasks.items.filter((t) => {
+              const ticketNo = getTaskTicketNumber(t) ?? '';
+              return (
+                t.title.toLowerCase().includes(ql) ||
+                t.number.toLowerCase().includes(ql) ||
+                String(t.description ?? '').toLowerCase().includes(ql) ||
+                ticketNo.toLowerCase().includes(ql)
+              );
+            }),
           },
         },
   );
@@ -2739,32 +2942,41 @@ export default function TasksPage() {
   ];
 
   const ldTicketsAsync = useCallback(
-    async (q: string, p: number) => {
-      const r = await ticketsApi.getAllWithFilters(p, 20, { project_id: selP || undefined });
-      const f = q
+    async (search: string, p: number) => {
+      const r = await ticketsApi.getAllWithFilters(p, 20, {
+        project_id: selP || undefined,
+      });
+
+      const f = search
         ? r.items.filter(
             (t: any) =>
-              String(t.title || '').toLowerCase().includes(q.toLowerCase()) ||
-              String(t.number).includes(q),
+              String(t.title || '')
+                .toLowerCase()
+                .includes(search.toLowerCase()) || String(t.number).includes(search),
           )
         : r.items;
+
       return {
-        items: f.map((t: any) => ({ value: t.id, label: `#${t.number} — ${t.title}` })),
+        items: f.map((t: any) => ({
+          value: t.id,
+          label: `${t.number} — ${t.title}`,
+        })),
         hasNext: r.items.length === 20,
       };
     },
     [selP],
   );
 
-  const ldProjAsync = useCallback(async (q: string, p: number) => {
+  const ldProjAsync = useCallback(async (search: string, p: number) => {
     const r = await projectsApi.getAll(p, 20);
-    const f = q
+    const f = search
       ? r.items.filter(
           (x) =>
-            x.name.toLowerCase().includes(q.toLowerCase()) ||
-            x.key.toLowerCase().includes(q.toLowerCase()),
+            x.name.toLowerCase().includes(search.toLowerCase()) ||
+            x.key.toLowerCase().includes(search.toLowerCase()),
         )
       : r.items;
+
     return {
       items: f.map((x) => ({
         value: x.id,
@@ -2776,20 +2988,22 @@ export default function TasksPage() {
     };
   }, []);
 
-  const ldAssAsync = useCallback(async (q: string, p: number) => {
+  const ldAssAsync = useCallback(async (search: string, p: number) => {
     let items: any[] = [];
     try {
       items = (await usersApi.getAllUsers(p, 20)).items;
     } catch {
-      //
+      items = [];
     }
-    const f = q
+
+    const f = search
       ? items.filter(
           (u) =>
-            (u.full_name || '').toLowerCase().includes(q.toLowerCase()) ||
-            u.email.toLowerCase().includes(q.toLowerCase()),
+            (u.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
+            u.email.toLowerCase().includes(search.toLowerCase()),
         )
       : items;
+
     return {
       items: f.map((u) => ({
         value: u.id,
@@ -2810,11 +3024,11 @@ export default function TasksPage() {
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-500" onDragEnd={onDE}>
       <div className="flex-shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">Задачи</h1>
           {!loading && (
             <span className="px-2 py-0.5 rounded bg-[var(--hover-2)] text-xs text-[var(--text-primary)]/50">
-              {total - done} активных · {done} завершено
+              {Math.max(total - done, 0)} активных · {done} завершено
             </span>
           )}
           {refreshing && <Loader2 className="w-4 h-4 animate-spin text-[var(--accent)]" />}
@@ -2826,8 +3040,8 @@ export default function TasksPage() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Поиск…"
-              className="w-48 pl-9 pr-8 py-2 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none focus:border-[var(--accent)]/40 focus:ring-1 focus:ring-[var(--accent-ring)] transition-all"
+              placeholder="Поиск по названию, номеру, описанию..."
+              className="w-72 pl-9 pr-8 py-2 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none focus:border-[var(--accent)]/40 focus:ring-1 focus:ring-[var(--accent-ring)] transition-all"
             />
             {q && (
               <button
@@ -2935,13 +3149,13 @@ export default function TasksPage() {
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-sm font-medium hover:bg-[var(--accent)]/90 transition-colors shadow-sm"
           >
             <Plus className="w-4 h-4" />
-            Задача
+            Новая задача
           </button>
         </div>
       </div>
 
       <div className="flex-shrink-0 flex items-center justify-between gap-3 flex-wrap mb-4">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
           <div className="flex items-center gap-1 p-1 bg-[var(--hover-1)] rounded-lg border border-[var(--border-color)]">
             {ctxTabs.map((t) => {
               const I = t.icon;
@@ -2963,20 +3177,39 @@ export default function TasksPage() {
           </div>
 
           {mode === 'project' && (
-            <div className="w-64">
-              <AsyncDD value={selP} onChange={setSelP} loadFn={ldProjAsync} placeholder="Выберите проект" icon={FolderOpen} />
+            <div className="w-72">
+              <AsyncDD
+                value={selP}
+                onChange={setSelP}
+                loadFn={ldProjAsync}
+                placeholder="Выберите проект"
+                icon={FolderOpen}
+              />
             </div>
           )}
 
           {mode === 'ticket' && (
-            <div className="w-72">
-              <AsyncDD value={selT} onChange={setSelT} loadFn={ldTicketsAsync} placeholder="Выберите заявку" icon={Ticket} wide />
+            <div className="w-80">
+              <AsyncDD
+                value={selT}
+                onChange={setSelT}
+                loadFn={ldTicketsAsync}
+                placeholder="Выберите заявку"
+                icon={Ticket}
+                wide
+              />
             </div>
           )}
 
           {mode === 'assignee' && (
-            <div className="w-64">
-              <AsyncDD value={selA} onChange={setSelA} loadFn={ldAssAsync} placeholder="Выберите исполнителя" icon={UserCheck} />
+            <div className="w-72">
+              <AsyncDD
+                value={selA}
+                onChange={setSelA}
+                loadFn={ldAssAsync}
+                placeholder="Выберите исполнителя"
+                icon={UserCheck}
+              />
             </div>
           )}
         </div>
@@ -2993,6 +3226,7 @@ export default function TasksPage() {
             <LayoutGrid className="w-3.5 h-3.5" />
             Доска
           </button>
+
           <button
             onClick={() => setViewMode('list')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
@@ -3016,7 +3250,7 @@ export default function TasksPage() {
           <ListView tasks={disp.flatMap((c) => c.tasks.items)} umap={umap} onView={setView} />
         ) : !cols.length ? (
           <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30">
-            <FolderOpen className="w-12 h-12 mb-3 opacity-50" />
+            <FileText className="w-12 h-12 mb-3 opacity-50" />
             <p className="text-base font-medium">
               {mode === 'project' && !selP
                 ? 'Выберите проект'
@@ -3065,6 +3299,10 @@ export default function TasksPage() {
             setView(null);
             setAssignTask(t);
           }}
+          onEdit={(t) => {
+            setView(null);
+            setEditTask(t);
+          }}
           onNeedComplete={(t, mode) => {
             setView(null);
             setCompleteIntent({ task: t, mode });
@@ -3073,14 +3311,27 @@ export default function TasksPage() {
       )}
 
       {create != null && (
-        <CreateModal
+        <TaskEditorModal
+          mode="create"
           initSt={create}
           context={ctx()}
-          umap={umap}
           onClose={() => setCreate(null)}
-          onOk={() => {
+          onSaved={async () => {
             setCreate(null);
-            fetchBoard(true);
+            await fetchBoard(true);
+          }}
+        />
+      )}
+
+      {editTask && (
+        <TaskEditorModal
+          mode="edit"
+          task={editTask}
+          context={ctx()}
+          onClose={() => setEditTask(null)}
+          onSaved={async () => {
+            setEditTask(null);
+            await fetchBoard(true);
           }}
         />
       )}
