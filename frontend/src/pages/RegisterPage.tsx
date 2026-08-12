@@ -345,14 +345,12 @@ export default function RegisterPage() {
                   className={`input-field transition-all ${
                     focusedField === 'fullName' ? 'ring-2 ring-[var(--primary)]/20' : ''
                   }`}
-                  placeholder="Например: Дремин Иларион Алексеевич"
+                  placeholder="Введите ФИО"
                   required
                   autoComplete="name"
                   autoFocus
                 />
-                <p className="mt-1.5 text-xs text-[var(--text-primary)]/40">
-                  Фамилия Имя Отчество — из них автоматически сформируется логин
-                </p>
+                
               </div>
 
               {/* ──── ШАГ 2: Username (авто или ручной) ──── */}
@@ -403,21 +401,7 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                {/* Подсказка */}
-                {formData.username && !usernameManual && (
-                  <div className="mt-2 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-[var(--primary)]/5 border border-[var(--primary)]/10">
-                    <Sparkles className="w-3.5 h-3.5 text-[var(--primary)] mt-0.5 shrink-0" />
-                    <div className="text-xs text-[var(--text-primary)]/60 leading-relaxed">
-                      Логин{' '}
-                      <span className="font-mono font-semibold text-[var(--primary)]">
-                        {formData.username}
-                      </span>{' '}
-                      сформирован автоматически из ФИО.
-                      <br />
-                      Можете отредактировать вручную, если нужно.
-                    </div>
-                  </div>
-                )}
+                
 
                 {usernameManual && formData.username && (
                   <div className="mt-2 flex items-center gap-2">
