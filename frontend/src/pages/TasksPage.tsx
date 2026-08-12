@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -299,12 +299,12 @@ const INP =
 const ini = (n?: string | null) =>
   n
     ? n
-        .trim()
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((w) => w[0])
-        .join('')
-        .toUpperCase()
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase()
     : '?';
 
 const overdue = (t: TaskViewItem) =>
@@ -329,28 +329,57 @@ const apiErr = (e: any) =>
   'Неизвестная ошибка';
 
 const snapCols = (c: TaskViewColumn[]) =>
-  c.map((x) => ({ ...x, tasks: { ...x.tasks, items: [...x.tasks.items] } }));
+  c.map((x) => ({
+    ...x,
+    tasks: { ...x.tasks, items: [...x.tasks.items] },
+  }));
+
+const getTaskTags = (t: TaskViewItem): TaskTag[] => t.tags ?? t.tag ?? [];
+
+const normalizeDecimalString = (value: string) => {
+  const v = value.trim().replace(',', '.');
+  const m = v.match(/^([+-]?)(\d+)(?:\.(\d+))?$/);
+  if (!m) return value;
+
+  const sign = m[1] === '-' ? '-' : '';
+  let intPart = m[2].replace(/^0+(?=\d)/, '');
+  if (!intPart) intPart = '0';
+
+  const frac = (m[3] ?? '').replace(/0+$/, '');
+  return frac ? `${sign}${intPart}.${frac}` : `${sign}${intPart}`;
+};
 
 const toNumberOrNull = (v: unknown): number | null => {
   if (v == null || v === '') return null;
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-  const raw = String(v).replace(',', '.').trim();
-  const parsed = Number(raw);
+
+  const normalized = normalizeDecimalString(String(v));
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
 };
 
 const fmtHours = (v: unknown) => {
+  if (v == null || v === '') return '—';
   const n = toNumberOrNull(v);
-  if (n == null) return '—';
-  return n.toLocaleString('ru-RU', { maximumFractionDigits: 1 });
+  if (n != null) {
+    return `${n.toLocaleString('ru-RU', {
+      maximumFractionDigits: 2,
+    })} ч`;
+  }
+
+  const s = normalizeDecimalString(String(v));
+  return s.length > 18 ? `${s.slice(0, 18)}… ч` : `${s} ч`;
 };
 
 const getTaskTicketNumber = (task: TaskViewItem) => {
   const explicit = String(task.ticket_number ?? '').trim();
   if (explicit) return explicit;
+
   if (!task.ticket_id || !task.number) return null;
+
   const parts = String(task.number).split('-');
   if (parts.length < 2) return null;
+
   return parts.slice(0, -1).join('-');
 };
 
@@ -363,19 +392,25 @@ const getTaskTicketPath = (task: TaskViewItem) => {
 function statusErr(err: any, task: TaskViewItem, to: TaskStatus) {
   const raw = apiErr(err);
   const lw = raw.toLowerCase();
+
   if (to === 'in_progress' && (!task.assignee_id || lw.includes('assignee'))) {
     return {
       title: 'Нужен исполнитель',
       description: 'Назначьте исполнителя перед переводом задачи в работу.',
     };
   }
+
   if (lw.includes('transition') || lw.includes('cannot')) {
     return {
       title: 'Переход недоступен',
       description: `Из «${ST_LABEL[task.status]}» нельзя перейти в «${ST_LABEL[to]}».`,
     };
   }
-  return { title: `Ошибка перевода в «${ST_LABEL[to]}»`, description: raw };
+
+  return {
+    title: `Ошибка перевода в «${ST_LABEL[to]}»`,
+    description: raw,
+  };
 }
 
 /* ───────────────── dropdown primitives ───────────────── */
@@ -390,10 +425,12 @@ interface DDOpt {
 
 function useDDPos(ref: React.RefObject<HTMLDivElement | null>, open: boolean, wide?: boolean) {
   const [s, setS] = useState<React.CSSProperties>({});
+
   useEffect(() => {
     if (!open || !ref.current) return;
     const r = ref.current.getBoundingClientRect();
     const up = window.innerHeight - r.bottom < 300;
+
     setS({
       position: 'fixed',
       left: Math.max(8, r.left),
@@ -402,6 +439,7 @@ function useDDPos(ref: React.RefObject<HTMLDivElement | null>, open: boolean, wi
       ...(up ? { bottom: window.innerHeight - r.top + 4 } : { top: r.bottom + 4 }),
     });
   }, [open, wide, ref]);
+
   return s;
 }
 
@@ -433,7 +471,10 @@ function SelectDD({
   useEffect(() => {
     if (!open) return;
     const h = (e: MouseEvent) => {
-      if (!tRef.current?.contains(e.target as Node) && !dRef.current?.contains(e.target as Node)) {
+      if (
+        !tRef.current?.contains(e.target as Node) &&
+        !dRef.current?.contains(e.target as Node)
+      ) {
         setOpen(false);
       }
     };
@@ -448,86 +489,87 @@ function SelectDD({
 
   const fl = q
     ? options.filter(
-        (o) =>
-          o.label.toLowerCase().includes(q.toLowerCase()) ||
-          (o.sublabel || '').toLowerCase().includes(q.toLowerCase()),
-      )
+      (o) =>
+        o.label.toLowerCase().includes(q.toLowerCase()) ||
+        (o.sublabel || '').toLowerCase().includes(q.toLowerCase()),
+    )
     : options;
 
   const dd = open
     ? createPortal(
-        <div
-          ref={dRef}
-          style={pos}
-          className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden"
-        >
-          {searchable && (
-            <div className="p-2 border-b border-[var(--border-color)]">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/30" />
-                <input
-                  ref={iRef}
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Поиск..."
-                  className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none"
-                />
-              </div>
+      <div
+        ref={dRef}
+        style={pos}
+        className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden"
+      >
+        {searchable && (
+          <div className="p-2 border-b border-[var(--border-color)]">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+              <input
+                ref={iRef}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Поиск..."
+                className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="overflow-y-auto max-h-[240px] p-1">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              onChange('');
+              setOpen(false);
+            }}
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${!value ? 'bg-[var(--accent)]/10' : 'hover:bg-[var(--hover-2)]'
+              } text-[var(--text-primary)]/60`}
+          >
+            <span>—</span>
+            <span className="flex-1">Не выбрано</span>
+            {!value && <Check className="w-4 h-4 text-[var(--accent)]" />}
+          </div>
+
+          {fl.length === 0 && q && (
+            <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">
+              Не найдено
             </div>
           )}
-          <div className="overflow-y-auto max-h-[240px] p-1">
+
+          {fl.map((o) => (
             <div
+              key={o.value}
               role="button"
               tabIndex={0}
               onClick={() => {
-                onChange('');
+                onChange(o.value);
                 setOpen(false);
               }}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${
-                !value ? 'bg-[var(--accent)]/10' : 'hover:bg-[var(--hover-2)]'
-              } text-[var(--text-primary)]/60`}
-            >
-              <span>—</span>
-              <span className="flex-1">Не выбрано</span>
-              {!value && <Check className="w-4 h-4 text-[var(--accent)]" />}
-            </div>
-            {fl.length === 0 && q && (
-              <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">
-                Не найдено
-              </div>
-            )}
-            {fl.map((o) => (
-              <div
-                key={o.value}
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  onChange(o.value);
-                  setOpen(false);
-                }}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${
-                  o.value === value
-                    ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
-                    : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${o.value === value
+                ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
+                : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'
                 }`}
-              >
-                {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
-                {o.icon && <span className="shrink-0">{o.icon}</span>}
-                <div className="flex-1 min-w-0">
-                  <span className="block truncate">{o.label}</span>
-                  {o.sublabel && (
-                    <span className="block text-xs text-[var(--text-primary)]/40 truncate">
-                      {o.sublabel}
-                    </span>
-                  )}
-                </div>
-                {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
+            >
+              {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
+              {o.icon && <span className="shrink-0">{o.icon}</span>}
+              <div className="flex-1 min-w-0">
+                <span className="block truncate">{o.label}</span>
+                {o.sublabel && (
+                  <span className="block text-xs text-[var(--text-primary)]/40 truncate">
+                    {o.sublabel}
+                  </span>
+                )}
               </div>
-            ))}
-          </div>
-        </div>,
-        document.body,
-      )
+              {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
+            </div>
+          ))}
+        </div>
+      </div>,
+      document.body,
+    )
     : null;
 
   return (
@@ -536,18 +578,17 @@ function SelectDD({
         role="button"
         tabIndex={disabled ? -1 : 0}
         onClick={() => !disabled && setOpen((v) => !v)}
-        className={`w-full flex items-center gap-2 px-3 py-2.5 bg-[var(--hover-2)] border rounded-xl text-sm text-left select-none transition-all ${
-          disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'
-        } ${open ? 'border-[var(--accent)]/50 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}
+        className={`w-full flex items-center gap-2 px-3 py-2.5 bg-[var(--hover-2)] border rounded-xl text-sm text-left select-none transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'
+          } ${open ? 'border-[var(--accent)]/50 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}
       >
         {LI && <LI className="w-4 h-4 text-[var(--text-primary)]/40 shrink-0" />}
         <span
-          className={`flex-1 truncate ${
-            sel ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-primary)]/40'
-          }`}
+          className={`flex-1 truncate ${sel ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-primary)]/40'
+            }`}
         >
           {sel ? sel.label : placeholder || '—'}
         </span>
+
         {sel && value && (
           <span
             role="button"
@@ -562,10 +603,10 @@ function SelectDD({
             <X className="w-3.5 h-3.5" />
           </span>
         )}
+
         <ChevronDown
-          className={`w-4 h-4 text-[var(--text-primary)]/30 shrink-0 transition-transform ${
-            open ? 'rotate-180' : ''
-          }`}
+          className={`w-4 h-4 text-[var(--text-primary)]/30 shrink-0 transition-transform ${open ? 'rotate-180' : ''
+            }`}
         />
       </div>
       {dd}
@@ -607,7 +648,10 @@ function AsyncDD({
   useEffect(() => {
     if (!open) return;
     const h = (e: MouseEvent) => {
-      if (!tRef.current?.contains(e.target as Node) && !dRef.current?.contains(e.target as Node)) {
+      if (
+        !tRef.current?.contains(e.target as Node) &&
+        !dRef.current?.contains(e.target as Node)
+      ) {
         setOpen(false);
       }
     };
@@ -669,104 +713,109 @@ function AsyncDD({
 
   const dd = open
     ? createPortal(
-        <div
-          ref={dRef}
-          style={pos}
-          className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden"
-        >
-          <div className="p-2 border-b border-[var(--border-color)]">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/30" />
-              <input
-                ref={iRef}
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Поиск..."
-                className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none"
-              />
-            </div>
+      <div
+        ref={dRef}
+        style={pos}
+        className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden"
+      >
+        <div className="p-2 border-b border-[var(--border-color)]">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+            <input
+              ref={iRef}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Поиск..."
+              className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none"
+            />
           </div>
-          <div className="overflow-y-auto max-h-[280px] p-1">
+        </div>
+
+        <div className="overflow-y-auto max-h-[280px] p-1">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              onChange('');
+              setOpen(false);
+            }}
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${!value
+              ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
+              : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]/60'
+              }`}
+          >
+            <span>—</span>
+            <span className="flex-1">Не выбрано</span>
+            {!value && <Check className="w-4 h-4 text-[var(--accent)]" />}
+          </div>
+
+          {ld && (
+            <div className="flex justify-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-[var(--text-primary)]/30" />
+            </div>
+          )}
+
+          {!ld && opts.length === 0 && (
+            <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">
+              {q ? 'Не найдено' : 'Нет данных'}
+            </div>
+          )}
+
+          {!ld &&
+            opts.map((o) => (
+              <div
+                key={o.value}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  onChange(o.value);
+                  setSelLbl(o.label);
+                  setOpen(false);
+                }}
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm cursor-pointer ${o.value === value
+                  ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
+                  : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'
+                  }`}
+              >
+                {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
+                {o.icon && <span className="shrink-0">{o.icon}</span>}
+                <div className="flex-1 min-w-0">
+                  <span
+                    className="block leading-snug"
+                    style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {o.label}
+                  </span>
+                  {o.sublabel && (
+                    <span className="block text-xs text-[var(--text-primary)]/40 truncate mt-0.5">
+                      {o.sublabel}
+                    </span>
+                  )}
+                </div>
+                {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
+              </div>
+            ))}
+
+          {!ld && more && (
             <div
               role="button"
               tabIndex={0}
-              onClick={() => {
-                onChange('');
-                setOpen(false);
-              }}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${
-                !value ? 'bg-[var(--accent)]/10' : 'hover:bg-[var(--hover-2)]'
-              } text-[var(--text-primary)]/60`}
+              onClick={() => !ldMore && doLoad(q, pg + 1, true)}
+              className="flex items-center justify-center gap-1.5 py-2 text-sm text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] rounded-lg cursor-pointer transition-colors"
             >
-              <span>—</span>
-              <span className="flex-1">Не выбрано</span>
-              {!value && <Check className="w-4 h-4 text-[var(--accent)]" />}
+              {ldMore ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronDown className="w-4 h-4" />}
+              Ещё
             </div>
-            {ld && (
-              <div className="flex justify-center py-4">
-                <Loader2 className="w-5 h-5 animate-spin text-[var(--text-primary)]/30" />
-              </div>
-            )}
-            {!ld && opts.length === 0 && (
-              <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">
-                {q ? 'Не найдено' : 'Нет данных'}
-              </div>
-            )}
-            {!ld &&
-              opts.map((o) => (
-                <div
-                  key={o.value}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    onChange(o.value);
-                    setSelLbl(o.label);
-                    setOpen(false);
-                  }}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm cursor-pointer ${
-                    o.value === value
-                      ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
-                      : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'
-                  }`}
-                >
-                  {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
-                  {o.icon && <span className="shrink-0">{o.icon}</span>}
-                  <div className="flex-1 min-w-0">
-                    <span
-                      className="block leading-snug"
-                      style={{
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {o.label}
-                    </span>
-                    {o.sublabel && (
-                      <span className="block text-xs text-[var(--text-primary)]/40 truncate mt-0.5">
-                        {o.sublabel}
-                      </span>
-                    )}
-                  </div>
-                  {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
-                </div>
-              ))}
-            {!ld && more && (
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => !ldMore && doLoad(q, pg + 1, true)}
-                className="flex items-center justify-center gap-1.5 py-2 text-sm text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] rounded-lg cursor-pointer transition-colors"
-              >
-                {ldMore ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronDown className="w-4 h-4" />}
-                Ещё
-              </div>
-            )}
-          </div>
-        </div>,
-        document.body,
-      )
+          )}
+        </div>
+      </div>,
+      document.body,
+    )
     : null;
 
   return (
@@ -775,18 +824,17 @@ function AsyncDD({
         role="button"
         tabIndex={disabled ? -1 : 0}
         onClick={() => !disabled && setOpen((v) => !v)}
-        className={`w-full flex items-center gap-2 px-3 py-2.5 bg-[var(--hover-2)] border rounded-xl text-sm text-left select-none transition-all ${
-          disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'
-        } ${open ? 'border-[var(--accent)]/50 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}
+        className={`w-full flex items-center gap-2 px-3 py-2.5 bg-[var(--hover-2)] border rounded-xl text-sm text-left select-none transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'
+          } ${open ? 'border-[var(--accent)]/50 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}
       >
         {LI && <LI className="w-4 h-4 text-[var(--text-primary)]/40 shrink-0" />}
         <span
-          className={`flex-1 truncate ${
-            selLbl ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-primary)]/40'
-          }`}
+          className={`flex-1 truncate ${selLbl ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-primary)]/40'
+            }`}
         >
           {selLbl || placeholder || '—'}
         </span>
+
         {value && (
           <span
             role="button"
@@ -802,10 +850,10 @@ function AsyncDD({
             <X className="w-3.5 h-3.5" />
           </span>
         )}
+
         <ChevronDown
-          className={`w-4 h-4 text-[var(--text-primary)]/30 shrink-0 transition-transform ${
-            open ? 'rotate-180' : ''
-          }`}
+          className={`w-4 h-4 text-[var(--text-primary)]/30 shrink-0 transition-transform ${open ? 'rotate-180' : ''
+            }`}
         />
       </div>
       {dd}
@@ -824,7 +872,9 @@ function Ava({
   url?: string | null;
   sz?: 'xs' | 'sm';
 }) {
+  // Для sz="xs" используем text-[10px]
   const c = sz === 'xs' ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-sm';
+
   if (url) return <img src={url} alt="" className={`${c} rounded-full object-cover shrink-0`} />;
   return (
     <div
@@ -874,6 +924,7 @@ function HoursBadge({
     tone === 'accent'
       ? 'bg-green-500/10 text-green-400 border-green-500/20'
       : 'bg-[var(--hover-2)] text-[var(--text-primary)]/55 border-[var(--border-color)]';
+
   return (
     <span
       title={title}
@@ -904,6 +955,7 @@ function ListView({
       </div>
     );
   }
+
   return (
     <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden h-full flex flex-col">
       <div className="overflow-auto flex-1 scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent">
@@ -919,12 +971,14 @@ function ListView({
               <th className="px-4 py-3 font-medium">Факт</th>
             </tr>
           </thead>
+
           <tbody className="divide-y divide-[var(--border-color)]">
             {tasks.map((t) => {
               const a = t.assignee_id ? umap.get(t.assignee_id) : null;
               const cm = CM[t.status];
               const od = overdue(t);
               const ticketNo = getTaskTicketNumber(t);
+
               return (
                 <tr
                   key={t.id}
@@ -944,9 +998,11 @@ function ListView({
                           </span>
                         )}
                       </div>
+
                       <div className="text-[var(--text-primary)] font-medium leading-snug">
                         {t.title}
                       </div>
+
                       {t.description && (
                         <div className="text-xs text-[var(--text-primary)]/45 line-clamp-2 max-w-[420px]">
                           {t.description}
@@ -954,6 +1010,7 @@ function ListView({
                       )}
                     </div>
                   </td>
+
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border ${cm.chip}`}
@@ -962,12 +1019,14 @@ function ListView({
                       {ST_LABEL[t.status]}
                     </span>
                   </td>
+
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       <PriBadge p={t.priority} />
                       {t.story_points != null && <ComplexityBadge v={t.story_points} />}
                     </div>
                   </td>
+
                   <td className="px-4 py-3">
                     {a ? (
                       <div className="flex items-center gap-2">
@@ -980,6 +1039,7 @@ function ListView({
                       <span className="text-[var(--text-primary)]/30">—</span>
                     )}
                   </td>
+
                   <td className="px-4 py-3">
                     {t.due_date ? (
                       <span
@@ -991,9 +1051,11 @@ function ListView({
                       <span className="text-[var(--text-primary)]/30">—</span>
                     )}
                   </td>
+
                   <td className="px-4 py-3 text-[var(--text-primary)]/60 whitespace-nowrap" title="Плановые трудозатраты">
                     {fmtHours(t.estimated_hours)}
                   </td>
+
                   <td className="px-4 py-3 text-[var(--text-primary)]/60 whitespace-nowrap">
                     {fmtHours(t.actual_hours)}
                   </td>
@@ -1026,7 +1088,9 @@ function TCard({
 }) {
   const od = overdue(t);
   const a = t.assignee_id ? umap.get(t.assignee_id) : null;
-  const assigneeSurname = a ? (a.full_name || a.username || '').split(' ')[0] : null;
+  const assigneeSurname = a
+    ? (a.full_name || a.username || '').split(' ')[0]
+    : null;
 
   return (
     <motion.div
@@ -1038,28 +1102,38 @@ function TCard({
       }}
       onDragEnd={onDE}
       onClick={() => onView(t)}
+      // Убрали прыжок (translate-y). Оставили только смену фона на более яркий (--hover-2) и рамку.
+      // Анимация при взятии (drag) осталась быстрой на чистом CSS (rotate-2 scale-[1.02])
       className={`group bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer transition-all duration-200 shadow-sm min-h-[140px] flex flex-col relative
         hover:bg-[var(--hover-2)] hover:border-[var(--accent)]/40
-        ${
-          dragging
-            ? 'opacity-40 rotate-2 scale-[1.02] shadow-xl z-50 ring-1 ring-[var(--accent)]'
-            : od
+        ${dragging
+          ? 'opacity-40 rotate-2 scale-[1.02] shadow-xl z-50 ring-1 ring-[var(--accent)]'
+          : od
             ? 'border-red-500/40 bg-red-500/5 hover:bg-red-500/15'
             : 'border-[var(--border-color)]'
         }
       `}
     >
+      {/* 1. Номер задачи */}
       <span className="text-xs font-mono text-[var(--text-primary)]/45 mb-1.5 leading-none">
         #{t.number}
       </span>
+
+      {/* 2. Название */}
       <h4 className="text-[15px] font-bold text-[var(--text-primary)] leading-snug tracking-tight line-clamp-2 mb-3">
         {t.title}
       </h4>
+
+      {/* 3. Бейджи (Приоритет и Сложность) */}
       <div className="flex items-center gap-2 mb-3.5 flex-wrap">
         <PriBadge p={t.priority} />
         {t.story_points != null && <ComplexityBadge v={t.story_points} />}
       </div>
+
+      {/* 4. Низ карточки */}
       <div className="flex items-center justify-between border-t border-[var(--border-color)] pt-3 mt-auto">
+
+        {/* Аватар + Фамилия (текст в кружке 10px, фамилия 13px) */}
         <div className="flex items-center gap-2 min-w-0">
           {a ? (
             <>
@@ -1072,14 +1146,19 @@ function TCard({
             <span className="text-xs text-[var(--text-primary)]/30">—</span>
           )}
         </div>
+
+        {/* Иконки привязок + Дата */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {t.ticket_id && <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />}
-          {t.project_id && <FolderOpen className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />}
+          {t.ticket_id && (
+            <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+          )}
+          {t.project_id && (
+            <FolderOpen className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+          )}
           {t.due_date && (
             <span
-              className={`text-[12px] font-semibold ml-0.5 ${
-                od ? 'text-red-400' : 'text-[var(--text-primary)]/45'
-              }`}
+              className={`text-[12px] font-semibold ml-0.5 ${od ? 'text-red-400' : 'text-[var(--text-primary)]/45'
+                }`}
             >
               {fmtDue(t.due_date)}
             </span>
@@ -1089,7 +1168,6 @@ function TCard({
     </motion.div>
   );
 }
-
 /* ───────────────── kanban column ───────────────── */
 
 function KCol({
@@ -1123,14 +1201,14 @@ function KCol({
 }) {
   const m = CM[col.status];
   const I = m.icon;
+
   return (
     <div
       onDragOver={(e) => onDO(e, col.status)}
       onDragLeave={onDL}
       onDrop={(e) => onDrop(e, col.status)}
-      className={`bg-[var(--hover-1)] rounded-xl flex flex-col w-[320px] shrink-0 border transition-colors h-full ${
-        isDO ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--border-color)]'
-      }`}
+      className={`bg-[var(--hover-1)] rounded-xl flex flex-col w-[320px] shrink-0 border transition-colors h-full ${isDO ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--border-color)]'
+        }`}
     >
       <div className="px-3 py-3 flex items-center justify-between border-b border-[var(--border-color)] shrink-0 bg-[var(--bg-card)] rounded-t-xl">
         <div className="flex items-center gap-2 min-w-0">
@@ -1140,6 +1218,7 @@ function KCol({
             {col.tasks.total_items}
           </span>
         </div>
+
         <button
           onClick={() => onAdd(col.status)}
           className="p-1.5 rounded-lg hover:bg-[var(--hover-3)] text-[var(--text-primary)]/40 hover:text-[var(--accent)] transition-colors"
@@ -1147,6 +1226,7 @@ function KCol({
           <Plus className="w-4 h-4" />
         </button>
       </div>
+
       <div className="p-2.5 flex-1 space-y-2.5 overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent">
         {col.tasks.items.length === 0 && !isDO ? (
           <div className="h-24 flex flex-col items-center justify-center text-[var(--text-primary)]/30 border border-dashed border-[var(--border-color)] rounded-xl">
@@ -1168,11 +1248,13 @@ function KCol({
             ))}
           </AnimatePresence>
         )}
+
         {isDO && col.tasks.items.length === 0 && (
           <div className="h-24 flex items-center justify-center border-2 border-dashed border-[var(--accent)]/50 rounded-xl bg-[var(--accent)]/10">
             <span className="text-sm font-medium text-[var(--accent)]">Отпустите задачу</span>
           </div>
         )}
+
         {col.tasks.has_next && (
           <button
             onClick={() => onMore(col.status)}
@@ -1198,9 +1280,12 @@ function DragPanel({
   onDrop: (e: React.DragEvent, to: TaskStatus) => void;
 }) {
   const [hov, setHov] = useState<TaskStatus | null>(null);
+
   if (!task) return null;
+
   const al = TRANSITIONS[task.from];
   if (!al.length) return null;
+
   return createPortal(
     <motion.div
       initial={{ x: '100%', opacity: 0 }}
@@ -1219,11 +1304,13 @@ function DragPanel({
           </p>
           <p className="text-sm font-bold text-[var(--text-primary)] truncate">#{task.number}</p>
         </div>
+
         <div className="p-1.5 space-y-1">
           {al.map((s) => {
             const c = CM[s];
             const I = c.icon;
             const h = hov === s;
+
             return (
               <div
                 key={s}
@@ -1237,9 +1324,8 @@ function DragPanel({
                   setHov(null);
                   onDrop(e, s);
                 }}
-                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border transition-all ${
-                  h ? `${c.brd} bg-[var(--accent)]/10 scale-[1.02] shadow-sm` : 'border-transparent hover:bg-[var(--hover-2)]'
-                }`}
+                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border transition-all ${h ? `${c.brd} bg-[var(--accent)]/10 scale-[1.02] shadow-sm` : 'border-transparent hover:bg-[var(--hover-2)]'
+                  }`}
               >
                 <div className={`w-1 h-5 rounded-full ${c.dot}`} />
                 <I className={`w-4 h-4 ${c.tc}`} />
@@ -1273,11 +1359,13 @@ function AssignModal({
   onOk: (id: string) => Promise<void>;
 }) {
   const [aid, setAid] = useState(task.assignee_id ?? '');
+
   const opts: DDOpt[] = Array.from(umap.values()).map((u) => ({
     value: u.id,
     label: u.full_name || u.username || u.email,
     sublabel: u.email,
   }));
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !loading) onClose();
@@ -1289,9 +1377,11 @@ function AssignModal({
       document.body.style.overflow = '';
     };
   }, [onClose, loading]);
+
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !loading && onClose()} />
+
       <div
         className="relative w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -1307,6 +1397,7 @@ function AssignModal({
             </div>
           </div>
         </div>
+
         <div className="p-5 space-y-4">
           <div className="rounded-xl bg-[var(--hover-2)] p-3 border border-[var(--border-color)]">
             <span className="text-xs font-mono text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
@@ -1314,6 +1405,7 @@ function AssignModal({
             </span>
             <p className="text-sm font-medium text-[var(--text-primary)] mt-1.5">{task.title}</p>
           </div>
+
           <div>
             <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">
               Исполнитель <span className="text-red-400">*</span>
@@ -1328,6 +1420,7 @@ function AssignModal({
             />
           </div>
         </div>
+
         <div className="flex justify-end gap-2.5 px-5 py-3.5 border-t border-[var(--border-color)] bg-[var(--hover-1)]">
           <button
             onClick={onClose}
@@ -1365,6 +1458,7 @@ function CompleteModal({
 }) {
   const defaultActual = toNumberOrNull(task.estimated_hours);
   const [actual, setActual] = useState(defaultActual != null ? String(defaultActual) : '');
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !loading) onClose();
@@ -1376,8 +1470,10 @@ function CompleteModal({
       document.body.style.overflow = '';
     };
   }, [onClose, loading]);
+
   const actualNum = actual === '' ? null : Number(actual);
   const valid = actualNum != null && Number.isFinite(actualNum) && actualNum >= 0;
+
   return (
     <div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !loading && onClose()} />
@@ -1396,6 +1492,7 @@ function CompleteModal({
             </div>
           </div>
         </div>
+
         <div className="p-5 space-y-4">
           <div className="rounded-xl bg-[var(--hover-2)] p-3 border border-[var(--border-color)]">
             <span className="text-xs font-mono text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
@@ -1403,6 +1500,7 @@ function CompleteModal({
             </span>
             <p className="text-sm font-medium text-[var(--text-primary)] mt-1.5">{task.title}</p>
           </div>
+
           <div className="rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-3">
             <div className="text-xs text-[var(--text-primary)]/45 mb-1" title="Плановые трудозатраты">
               Трудозатраты (ч)
@@ -1411,6 +1509,7 @@ function CompleteModal({
               {fmtHours(task.estimated_hours)}
             </div>
           </div>
+
           <div>
             <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
               Факт (ч) <span className="text-red-400">*</span>
@@ -1430,6 +1529,7 @@ function CompleteModal({
             </p>
           </div>
         </div>
+
         <div className="flex justify-end gap-2.5 px-5 py-3.5 border-t border-[var(--border-color)] bg-[var(--hover-1)]">
           <button
             onClick={onClose}
@@ -1472,6 +1572,7 @@ function TaskEditorModal({
   onSaved: () => Promise<void> | void;
 }) {
   const { toast } = useToast();
+
   const [title, setTitle] = useState(task?.title ?? '');
   const [desc, setDesc] = useState(task?.description ?? '');
   const [pri, setPri] = useState<TaskPriority>(task?.priority ?? 'medium');
@@ -1489,6 +1590,7 @@ function TaskEditorModal({
   );
   const [todo, setTodo] = useState(initSt === 'todo');
   const [saving, setSaving] = useState(false);
+
   const firstProjectChange = useRef(true);
 
   useEffect(() => {
@@ -1497,6 +1599,7 @@ function TaskEditorModal({
     };
     document.addEventListener('keydown', h);
     document.body.style.overflow = 'hidden';
+
     return () => {
       document.removeEventListener('keydown', h);
       document.body.style.overflow = '';
@@ -1515,11 +1618,12 @@ function TaskEditorModal({
     const r = await projectsApi.getAll(p, 20);
     const f = q
       ? r.items.filter(
-          (x) =>
-            x.name.toLowerCase().includes(q.toLowerCase()) ||
-            x.key.toLowerCase().includes(q.toLowerCase()),
-        )
+        (x) =>
+          x.name.toLowerCase().includes(q.toLowerCase()) ||
+          x.key.toLowerCase().includes(q.toLowerCase()),
+      )
       : r.items;
+
     return {
       items: f.map((x) => ({
         value: x.id,
@@ -1535,14 +1639,18 @@ function TaskEditorModal({
     let items: any[] = [];
     try {
       items = (await usersApi.getAllUsers(p, 20)).items;
-    } catch {}
+    } catch {
+      items = [];
+    }
+
     const f = q
       ? items.filter(
-          (u) =>
-            (u.full_name || '').toLowerCase().includes(q.toLowerCase()) ||
-            u.email.toLowerCase().includes(q.toLowerCase()),
-        )
+        (u) =>
+          (u.full_name || '').toLowerCase().includes(q.toLowerCase()) ||
+          u.email.toLowerCase().includes(q.toLowerCase()),
+      )
       : items;
+
     return {
       items: f.map((u) => ({
         value: u.id,
@@ -1559,6 +1667,7 @@ function TaskEditorModal({
         project_ids: projectId ? [projectId] : undefined,
         query: q || undefined,
       });
+
       return {
         items: r.items.map((t: any) => ({
           value: t.id,
@@ -1574,9 +1683,14 @@ function TaskEditorModal({
   const submit = async () => {
     if (!title.trim()) return;
     setSaving(true);
+
     try {
       if (mode === 'create') {
-        const payload: Record<string, any> = { title: title.trim(), priority: pri };
+        const payload: Record<string, any> = {
+          title: title.trim(),
+          priority: pri,
+        };
+
         if (desc.trim()) payload.description = desc.trim();
         if (projectId) payload.project_id = projectId;
         if (ticketId) payload.ticket_id = ticketId;
@@ -1584,46 +1698,75 @@ function TaskEditorModal({
         if (estimatedHours) payload.estimated_hours = Number(estimatedHours);
         if (assigneeId) payload.assignee_id = assigneeId;
         if (dueDate) payload.due_date = dueDate;
+
         const created = await tasksApi.create(payload as TaskCreateInput);
-        if (todo) await tasksApi.changeStatus(created.id, 'todo');
-        toast({ title: 'Задача создана', description: `${created.number} — ${created.title}` });
+
+        if (todo) {
+          await tasksApi.changeStatus(created.id, 'todo');
+        }
+
+        toast({
+          title: 'Задача создана',
+          description: `${created.number} — ${created.title}`,
+        });
       } else if (task) {
         const payload: Record<string, any> = {};
+
         if (title.trim() !== task.title) payload.title = title.trim();
         if ((desc.trim() || '') !== (task.description?.trim() || '')) {
           payload.description = desc.trim() || null;
         }
         if (pri !== task.priority) payload.priority = pri;
+
         const currentSP = task.story_points != null ? String(task.story_points) : '';
         if (sp !== currentSP) payload.story_points = sp ? Number(sp) : null;
+
         const currentEst =
           task.estimated_hours != null ? String(toNumberOrNull(task.estimated_hours) ?? '') : '';
         if (estimatedHours !== currentEst) {
           payload.estimated_hours = estimatedHours ? Number(estimatedHours) : null;
         }
+
         if (dueDate !== (task.due_date ?? '')) payload.due_date = dueDate || null;
         if (assigneeId !== (task.assignee_id ?? '')) payload.assignee_id = assigneeId || null;
         if (projectId !== (task.project_id ?? '')) payload.project_id = projectId || null;
         if (ticketId !== (task.ticket_id ?? '')) payload.ticket_id = ticketId || null;
+
         if (Object.keys(payload).length > 0) {
           await tasksApi.update(task.id, payload as TaskUpdateInput);
         }
-        toast({ title: 'Задача обновлена', description: `${task.number} — ${title.trim()}` });
+
+        toast({
+          title: 'Задача обновлена',
+          description: `${task.number} — ${title.trim()}`,
+        });
       }
+
       await onSaved();
       onClose();
     } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      toast({
+        title: 'Ошибка',
+        description: apiErr(e),
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }
   };
+
+  const titleText = mode === 'create' ? 'Создание задачи' : 'Редактирование задачи';
+  const subtitleText =
+    mode === 'create'
+      ? 'Проверьте заполнение'
+      : `Изменение задачи ${task?.number ?? ''}`;
 
   const lockTicket = context.type === 'ticket' && mode === 'create';
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !saving && onClose()} />
+
       <div
         className="relative w-full max-w-4xl max-h-[88vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -1632,88 +1775,214 @@ function TaskEditorModal({
           <div>
             <div className="flex items-center gap-2">
               <div className="w-9 h-9 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
-                {mode === 'create' ? <Plus className="w-4 h-4 text-[var(--accent)]" /> : <Pencil className="w-4 h-4 text-[var(--accent)]" />}
+                {mode === 'create' ? (
+                  <Plus className="w-4 h-4 text-[var(--accent)]" />
+                ) : (
+                  <Pencil className="w-4 h-4 text-[var(--accent)]" />
+                )}
               </div>
               <div>
-                <h2 className="text-base font-bold text-[var(--text-primary)]">{mode === 'create' ? 'Создание задачи' : 'Редактирование задачи'}</h2>
-                <p className="text-sm text-[var(--text-primary)]/50">Проверьте заполнение</p>
+                <h2 className="text-base font-bold text-[var(--text-primary)]">{titleText}</h2>
+                <p className="text-sm text-[var(--text-primary)]/50">{subtitleText}</p>
               </div>
             </div>
           </div>
-          <button onClick={() => !saving && onClose()} className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40"><X className="w-5 h-5" /></button>
+
+          <button
+            onClick={() => !saving && onClose()}
+            className="p-1.5 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
+
         <div className="flex-1 min-h-0 overflow-y-auto p-5">
           <div className="grid lg:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Название *</label>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Что нужно сделать?" autoFocus className={INP} />
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
+                  Название <span className="text-red-400">*</span>
+                </label>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Что нужно сделать?"
+                  autoFocus
+                  className={INP}
+                />
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Описание</label>
-                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Опиши задачу " rows={7} className={`${INP} resize-none`} />
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
+                  Описание
+                </label>
+                <textarea
+                  value={desc}
+                  onChange={(e) => setDesc(e.target.value)}
+                  placeholder="Опиши задачу "
+                  rows={7}
+                  className={`${INP} resize-none`}
+                />
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Приоритет</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
+                  Приоритет
+                </label>
                 <div className="grid grid-cols-2 gap-2">
                   {PRI_LIST.map((p) => {
                     const m = PM[p.value];
                     return (
-                      <button key={p.value} onClick={() => setPri(p.value)} className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${pri === p.value ? `${m.bg} ${m.c} ${m.brd}` : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'}`}>
-                        <span className={`w-2 h-2 rounded-full ${m.dot}`} />{p.label}
+                      <button
+                        key={p.value}
+                        onClick={() => setPri(p.value)}
+                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${pri === p.value
+                          ? `${m.bg} ${m.c} ${m.brd}`
+                          : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                          }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${m.dot}`} />
+                        {p.label}
                       </button>
                     );
                   })}
                 </div>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Сложность</label>
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
+                  Сложность
+                </label>
                 <div className="flex flex-wrap gap-2">
                   {SP_SERIES.map((v) => (
-                    <button key={v} onClick={() => setSp(String(v))} className={`px-3 py-2 rounded-xl text-sm border transition-all ${sp === String(v) ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'}`}>{v}</button>
+                    <button
+                      key={v}
+                      onClick={() => setSp(String(v))}
+                      className={`px-3 py-2 rounded-xl text-sm border transition-all ${sp === String(v)
+                        ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                        : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                        }`}
+                    >
+                      {v}
+                    </button>
                   ))}
-                  <button onClick={() => setSp('')} className={`px-3 py-2 rounded-xl text-sm border transition-all ${sp === '' ? 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30' : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'}`}>Без сложности</button>
+                  <button
+                    onClick={() => setSp('')}
+                    className={`px-3 py-2 rounded-xl text-sm border transition-all ${sp === ''
+                      ? 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30'
+                      : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                      }`}
+                  >
+                    Без сложности
+                  </button>
                 </div>
               </div>
             </div>
+
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Проект</label>
-                <AsyncDD value={projectId} onChange={setProjectId} loadFn={loadProjects} placeholder="Не выбран" icon={FolderOpen} />
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
+                  Проект
+                </label>
+                <AsyncDD
+                  value={projectId}
+                  onChange={setProjectId}
+                  loadFn={loadProjects}
+                  placeholder="Не выбран"
+                  icon={FolderOpen}
+                />
               </div>
+
               {!lockTicket && (
                 <div>
-                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Заявка</label>
-                  <AsyncDD value={ticketId} onChange={setTicketId} loadFn={loadTickets} placeholder={projectId ? 'Выберите заявку' : 'Выберите заявку'} icon={Ticket} wide />
+                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
+                    Заявка
+                  </label>
+                  <AsyncDD
+                    value={ticketId}
+                    onChange={setTicketId}
+                    loadFn={loadTickets}
+                    placeholder={projectId ? 'Выберите заявку' : 'Выберите заявку'}
+                    icon={Ticket}
+                    wide
+                  />
                 </div>
               )}
+
               {lockTicket && (
                 <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 flex items-center gap-3">
                   <Ticket className="w-5 h-5 text-blue-400 shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-primary)]">Создание на основании заявки</p>
-                    <p className="text-xs text-blue-400 truncate mt-0.5">{ticketLabel || 'Заявка будет привязана автоматически'}</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                      Создание на основании заявки
+                    </p>
+                    <p className="text-xs text-blue-400 truncate mt-0.5">
+                      {ticketLabel || 'Заявка будет привязана автоматически'}
+                    </p>
                   </div>
                 </div>
               )}
+
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5" title="Плановые трудозатраты">Трудозатраты (ч)</label>
-                  <input type="number" min="0" step="0.5" value={estimatedHours} onChange={(e) => setEstimatedHours(e.target.value)} placeholder="Например 4" className={INP} />
+                  <label
+                    className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5"
+                    title="Плановые трудозатраты"
+                  >
+                    Трудозатраты (ч)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={estimatedHours}
+                    onChange={(e) => setEstimatedHours(e.target.value)}
+                    placeholder="Например 4"
+                    className={INP}
+                  />
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Срок</label>
-                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={INP} />
+                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
+                    Срок
+                  </label>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className={INP}
+                  />
                 </div>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Исполнитель</label>
-                <AsyncDD value={assigneeId} onChange={setAssigneeId} loadFn={loadUsers} placeholder="Не назначен" icon={UserCheck} />
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
+                  Исполнитель
+                </label>
+                <AsyncDD
+                  value={assigneeId}
+                  onChange={setAssigneeId}
+                  loadFn={loadUsers}
+                  placeholder="Не назначен"
+                  icon={UserCheck}
+                />
               </div>
+
               {mode === 'create' && (
                 <div className="pt-1">
-                  <button onClick={() => setTodo((v) => !v)} className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border transition-all text-sm font-medium ${todo ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}>
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${todo ? 'bg-blue-500 border-blue-500' : 'border-[var(--border-color)]'}`}>{todo && <Check className="w-3 h-3 text-white" />}</div>
+                  <button
+                    onClick={() => setTodo((v) => !v)}
+                    className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border transition-all text-sm font-medium ${todo
+                      ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                      : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
+                      }`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${todo ? 'bg-blue-500 border-blue-500' : 'border-[var(--border-color)]'
+                        }`}
+                    >
+                      {todo && <Check className="w-3 h-3 text-white" />}
+                    </div>
                     Сразу к выполнению (статус «{ST_LABEL.todo}»)
                   </button>
                 </div>
@@ -1721,11 +1990,541 @@ function TaskEditorModal({
             </div>
           </div>
         </div>
+
         <div className="flex justify-end gap-2.5 px-5 py-4 border-t border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
-          <button onClick={() => !saving && onClose()} disabled={saving} className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 font-medium hover:bg-[var(--hover-3)] disabled:opacity-50 text-sm">Отмена</button>
-          <button onClick={submit} disabled={!title.trim() || saving} className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[var(--accent)] text-white font-medium disabled:opacity-40 hover:bg-[var(--accent)]/90 text-sm shadow-sm">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}{mode === 'create' ? 'Создать' : 'Сохранить изменения'}</button>
+          <button
+            onClick={() => !saving && onClose()}
+            disabled={saving}
+            className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 font-medium hover:bg-[var(--hover-3)] disabled:opacity-50 text-sm"
+          >
+            Отмена
+          </button>
+
+          <button
+            onClick={submit}
+            disabled={!title.trim() || saving}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[var(--accent)] text-white font-medium disabled:opacity-40 hover:bg-[var(--accent)]/90 text-sm shadow-sm"
+          >
+            {saving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : mode === 'create' ? (
+              <Plus className="w-4 h-4" />
+            ) : (
+              <Check className="w-4 h-4" />
+            )}
+            {mode === 'create' ? 'Создать задачу' : 'Сохранить изменения'}
+          </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ───────────────── detail modal ───────────────── */
+
+function DetailModal({
+  task: t,
+  umap,
+  onClose,
+  onRefresh,
+  onNeedAssign,
+  onEdit,
+  onNeedComplete,
+}: {
+  task: TaskViewItem;
+  umap: Map<string, SimpleUser | CounterpartyCustomer>;
+  onClose: () => void;
+  onRefresh: () => Promise<void>;
+  onNeedAssign: (t: TaskViewItem) => void;
+  onEdit: (t: TaskViewItem) => void;
+  onNeedComplete: (t: TaskViewItem, mode: 'status_done' | 'review_done') => void;
+}) {
+  const { toast } = useToast();
+  const { user } = useAuthStore();
+
+  const [showArchive, setShowArchive] = useState(false);
+  const [showSt, setShowSt] = useState(false);
+  const [showAssign, setShowAssign] = useState(false);
+  const [showRR, setShowRR] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [aId, setAId] = useState(t.assignee_id ?? '');
+  const [rvId, setRvId] = useState('');
+
+  const assignee = t.assignee_id ? umap.get(t.assignee_id) : null;
+  const cm = CM[t.status];
+  const SI = cm.icon;
+  const users = Array.from(umap.values());
+  const uOpts: DDOpt[] = users.map((u) => ({
+    value: u.id,
+    label: u.full_name || u.username || u.email,
+    sublabel: u.email,
+  }));
+
+  const isStaff =
+    user?.roles?.some((r) =>
+      ['admin', 'support_manager', 'support_agent', 'executor'].includes(r),
+    ) ?? false;
+
+  const statusAsString = String(t.status);
+  const canReview = (statusAsString === 'to_review' || statusAsString === 'review') && isStaff;
+  const canRR = t.status === 'in_progress';
+  const canAssign = ASSIGN_OK.has(t.status) && users.length > 0;
+  const canEdit = EDIT_OK.has(t.status);
+  const allowed = TRANSITIONS[t.status];
+  const ticketPath = getTaskTicketPath(t);
+  const ticketNo = getTaskTicketNumber(t);
+  const tags = getTaskTags(t);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', h);
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', h);
+      document.body.style.overflow = '';
+    };
+  }, [onClose]);
+
+  const act = async (lbl: string, fn: () => Promise<any>, msg?: string) => {
+    setBusy(lbl);
+    try {
+      await fn();
+      if (msg) toast({ title: msg });
+      await onRefresh();
+      onClose();
+    } catch (e: any) {
+      toast({
+        title: 'Ошибка',
+        description: apiErr(e),
+        variant: 'destructive',
+      });
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const chSt = async (s: TaskStatus) => {
+    if (s === 'in_progress' && !t.assignee_id) {
+      setShowSt(false);
+      onNeedAssign(t);
+      return;
+    }
+
+    if (s === 'done') {
+      setShowSt(false);
+      onNeedComplete(t, 'status_done');
+      return;
+    }
+
+    setShowSt(false);
+    setBusy('st');
+
+    try {
+      await tasksApi.changeStatus(t.id, s);
+      toast({ title: `Статус изменён: ${ST_LABEL[s]}` });
+      await onRefresh();
+      onClose();
+    } catch (e: any) {
+      const m = statusErr(e, t, s);
+      toast({
+        title: m.title,
+        description: m.description,
+        variant: 'destructive',
+      });
+    } finally {
+      setBusy('');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+
+      <div
+        className="relative w-full max-w-3xl max-h-[88vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className="font-mono text-xs text-[var(--text-primary)]/60 bg-[var(--hover-2)] border border-[var(--border-color)] px-1.5 py-0.5 rounded-md">
+                {t.number}
+              </span>
+              <PriBadge p={t.priority} />
+              {t.story_points != null && <ComplexityBadge v={t.story_points} />}
+              {t.estimated_hours != null && (
+                <HoursBadge label="Трудозатраты" value={t.estimated_hours} title="Плановые трудозатраты" />
+              )}
+              {t.actual_hours != null && <HoursBadge label="Факт" value={t.actual_hours} tone="accent" />}
+            </div>
+
+            <h2 className="text-lg font-bold text-[var(--text-primary)] leading-snug">{t.title}</h2>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {canEdit && (
+              <button
+                onClick={() => onEdit(t)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/75 text-sm font-medium hover:bg-[var(--hover-3)]"
+              >
+                <Pencil className="w-4 h-4" />
+                Редактировать
+              </button>
+            )}
+
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
+          {t.status === 'in_progress' && !t.assignee_id && (
+            <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-500 font-medium">
+              ⚠ У задачи нет исполнителя, но она находится в статусе «В работе».
+            </div>
+          )}
+
+          <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+            <div className="px-4 py-3 bg-[var(--hover-1)] border-b border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)]">
+              Описание
+            </div>
+            <div className="px-4 py-4">
+              {t.description ? (
+                <div className="text-sm text-[var(--text-primary)]/80 whitespace-pre-wrap leading-6">
+                  {t.description}
+                </div>
+              ) : (
+                <div className="text-sm text-[var(--text-primary)]/35">Описание не заполнено</div>
+              )}
+            </div>
+          </div>
+
+          {tags.length > 0 && (
+            <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+              <div className="px-4 py-3 bg-[var(--hover-1)] border-b border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)]">
+                Теги
+              </div>
+              <div className="px-4 py-4 flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <span
+                    key={`${tag.name}-${tag.color ?? 'x'}`}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs border"
+                    style={{
+                      borderColor: tag.color ?? 'var(--border-color)',
+                      color: tag.color ?? 'var(--text-primary)',
+                      background: `${tag.color ?? '#888'}14`,
+                    }}
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ background: tag.color ?? '#888' }}
+                    />
+                    {tag.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
+              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">
+                Статус
+              </p>
+
+              <div className="relative">
+                <button
+                  onClick={() => allowed.length > 0 && setShowSt((v) => !v)}
+                  disabled={busy !== '' || !allowed.length}
+                  className={`flex items-center gap-1.5 text-sm font-semibold ${cm.tc} disabled:opacity-40`}
+                >
+                  {busy === 'st' ? <Loader2 className="w-4 h-4 animate-spin" /> : <SI className="w-4 h-4" />}
+                  {ST_LABEL[t.status]}
+                  {allowed.length > 0 && <ChevronDown className="w-4 h-4 opacity-50" />}
+                </button>
+
+                {showSt && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowSt(false)} />
+                    <div className="absolute left-0 top-full mt-2 z-20 w-56 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-2xl">
+                      <div className="p-1.5">
+                        {allowed.map((s) => {
+                          const sm = CM[s];
+                          const SII = sm.icon;
+                          return (
+                            <button
+                              key={s}
+                              onClick={() => chSt(s)}
+                              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] font-medium"
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`} />
+                              <SII className={`w-4 h-4 ${sm.tc}`} />
+                              <span className="flex-1 text-left">{ST_LABEL[s]}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
+              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">
+                Исполнитель
+              </p>
+              <div className="h-[24px] flex items-center">
+                {assignee ? (
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Ava name={assignee.full_name || assignee.username} url={assignee.avatar_url} sz="xs" />
+                    <span className="text-sm text-[var(--text-primary)]/70 font-medium truncate">
+                      {assignee.full_name || assignee.username}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-sm text-[var(--text-primary)]/30">Не назначен</span>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
+              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">
+                Срок
+              </p>
+              <div className="h-[24px] flex items-center">
+                {t.due_date ? (
+                  <span
+                    className={`flex items-center gap-1.5 text-sm font-medium ${overdue(t) ? 'text-red-400' : 'text-[var(--text-primary)]/70'
+                      }`}
+                  >
+                    <Calendar className="w-4 h-4" />
+                    {fmtDue(t.due_date)}
+                  </span>
+                ) : (
+                  <span className="text-sm text-[var(--text-primary)]/30">Не задан</span>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]" title="Плановые трудозатраты">
+              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">
+                Трудозатраты (ч)
+              </p>
+              <span className="text-sm text-[var(--text-primary)]/70 font-medium h-[24px] flex items-center">
+                {fmtHours(t.estimated_hours)}
+              </span>
+            </div>
+
+            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
+              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">
+                Факт (ч)
+              </p>
+              <span className="text-sm text-[var(--text-primary)]/70 font-medium h-[24px] flex items-center">
+                {fmtHours(t.actual_hours)}
+              </span>
+            </div>
+
+            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
+              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">
+                Создана
+              </p>
+              <span className="text-sm text-[var(--text-primary)]/70 font-medium h-[24px] flex items-center">
+                {new Date(t.created_at).toLocaleDateString('ru-RU', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })}
+              </span>
+            </div>
+          </div>
+
+          {canAssign && (
+            <div className="rounded-xl border border-[var(--border-color)] overflow-hidden">
+              <button
+                onClick={() => setShowAssign((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-2.5 bg-[var(--hover-1)] text-sm text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)] font-medium transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <UserCheck className="w-4 h-4" />
+                  {t.assignee_id ? 'Сменить исполнителя' : 'Назначить исполнителя'}
+                </span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${showAssign ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showAssign && (
+                <div className="px-4 py-3 border-t border-[var(--border-color)] space-y-2.5 bg-[var(--bg-card)]">
+                  <SelectDD
+                    value={aId}
+                    onChange={setAId}
+                    options={uOpts}
+                    placeholder="Выберите исполнителя"
+                    icon={UserCheck}
+                    searchable
+                  />
+                  <button
+                    onClick={() => act('assign', () => tasksApi.assign(t.id, { assignee_id: aId }), 'Исполнитель назначен')}
+                    disabled={!aId || busy === 'assign'}
+                    className="w-full py-2.5 rounded-xl bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-40"
+                  >
+                    {busy === 'assign' ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Сохранить исполнителя'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {canRR && users.length > 0 && (
+            <div className="rounded-xl border border-violet-500/30 overflow-hidden">
+              <button
+                onClick={() => setShowRR((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-2.5 bg-violet-500/10 text-sm text-violet-400 font-medium hover:bg-violet-500/15 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <GitPullRequest className="w-4 h-4" />
+                  Отправить на ревью
+                </span>
+                <ChevronDown className={`w-4 h-4 opacity-70 transition-transform ${showRR ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showRR && (
+                <div className="px-4 py-3 border-t border-violet-500/30 space-y-2.5 bg-violet-500/5">
+                  <SelectDD
+                    value={rvId}
+                    onChange={setRvId}
+                    options={uOpts}
+                    placeholder="Выберите ревьюера"
+                    searchable
+                  />
+                  <button
+                    onClick={() => act('rr', () => tasksApi.requestReview(t.id, { reviewer_id: rvId }), 'Задача отправлена на ревью')}
+                    disabled={!rvId || busy === 'rr'}
+                    className="w-full py-2.5 rounded-xl bg-violet-500/20 border border-violet-500/40 text-violet-400 text-sm font-medium disabled:opacity-40"
+                  >
+                    Отправить
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {canReview && (
+            <div className="flex gap-3">
+              <button
+                onClick={() => onNeedComplete(t, 'review_done')}
+                disabled={busy === 'rv'}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm font-medium disabled:opacity-50 hover:bg-emerald-500/20 transition-colors"
+              >
+                <ThumbsUp className="w-4 h-4 inline mr-1.5" />
+                Принять
+              </button>
+              <button
+                onClick={() => act('rv', () => tasksApi.review(t.id, { decision: 'to_fix' }), 'Задача возвращена на доработку')}
+                disabled={busy === 'rv'}
+                className="flex-1 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-medium disabled:opacity-50 hover:bg-red-500/20 transition-colors"
+              >
+                <ThumbsDown className="w-4 h-4 inline mr-1.5" />
+                Вернуть
+              </button>
+            </div>
+          )}
+
+          {ticketPath && (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
+              <Ticket className="w-4 h-4 text-[var(--text-primary)]/30" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm text-[var(--text-primary)]/45">Заявка</div>
+                <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">
+                  {ticketNo ?? 'Открыть заявку'}
+                </div>
+              </div>
+              <Link
+                to={ticketPath}
+                onClick={onClose}
+                className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline"
+              >
+                Открыть
+                <ArrowUpRight className="w-4 h-4" />
+              </Link>
+            </div>
+          )}
+
+          {t.project_id && (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
+              <FolderOpen className="w-4 h-4 text-[var(--text-primary)]/30" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm text-[var(--text-primary)]/45">Проект</div>
+                <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">
+                  {t.project_name || 'Открыть проект'}
+                </div>
+              </div>
+              <Link
+                to={`/projects/${t.project_id}`}
+                onClick={onClose}
+                className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline"
+              >
+                Открыть
+                <ArrowUpRight className="w-4 h-4" />
+              </Link>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between px-5 py-3.5 border-t border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
+          <button
+            onClick={() => setShowArchive(true)}
+            disabled={busy === 'arch'}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-[var(--text-primary)]/40 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+          >
+            <Archive className="w-4 h-4" />
+            В архив
+          </button>
+
+          <button
+            onClick={onClose}
+            className="px-5 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 text-sm font-medium hover:bg-[var(--hover-3)]"
+          >
+            Закрыть
+          </button>
+        </div>
+      </div>
+
+      {showArchive && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowArchive(false)} />
+          <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl">
+            <div className="p-6 text-center">
+              <Archive className="w-10 h-10 text-[var(--text-primary)]/20 mx-auto mb-3" />
+              <p className="text-base font-bold text-[var(--text-primary)]">Архивировать задачу?</p>
+              <p className="text-sm text-[var(--text-primary)]/50 mt-1">«{t.title}»</p>
+            </div>
+            <div className="flex border-t border-[var(--border-color)]">
+              <button
+                onClick={() => setShowArchive(false)}
+                className="flex-1 py-3 text-sm text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)] font-medium"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={() => {
+                  setShowArchive(false);
+                  act('arch', () => tasksApi.archive(t.id), 'Задача архивирована');
+                }}
+                className="flex-1 py-3 text-sm font-bold text-red-500 hover:bg-red-500/10 border-l border-[var(--border-color)]"
+              >
+                Да
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1734,7 +2533,6 @@ function TaskEditorModal({
 
 export default function TasksPage() {
   const [sp] = useSearchParams();
-  const location = useLocation();
   const { user } = useAuthStore();
   const { toast } = useToast();
 
@@ -1742,8 +2540,15 @@ export default function TasksPage() {
   const ua = sp.get('assignee_id');
   const ut = sp.get('ticket_id');
 
+  // логика перехода с Заявок
   const shouldCreate = sp.get('create') === '1';
-  const routeTicketLabel = (location.state as { ticketLabel?: string } | null)?.ticketLabel ?? '';
+
+  useEffect(() => {
+    if (shouldCreate && ut) {
+      setCreate('backlog');
+    }
+  }, [shouldCreate, ut]);
+  // вот конец её 
 
   const staff = (user?.roles ?? []).some((r) =>
     ['admin', 'support_manager', 'support_agent', 'executor'].includes(r),
@@ -1759,7 +2564,7 @@ export default function TasksPage() {
   const [selP, setSelP] = useState(up ?? '');
   const [selA, setSelA] = useState(ua ?? '');
   const [selT, setSelT] = useState(ut ?? '');
-  const [selTLabel, setSelTLabel] = useState(routeTicketLabel);
+  const [selTLabel, setSelTLabel] = useState('');
   const ticketLabelsRef = useRef<Record<string, string>>({});
 
   const [umap, setUmap] = useState<Map<string, SimpleUser | CounterpartyCustomer>>(new Map());
@@ -1800,12 +2605,6 @@ export default function TasksPage() {
     else if (ut) setMode('ticket');
   }, [up, ua, ut]);
 
-  useEffect(() => {
-    if (shouldCreate && ut) {
-      setCreate('backlog');
-    }
-  }, [shouldCreate, ut]);
-
   const ctx = useCallback((): TaskKanbanContext => {
     if (mode === 'project' && selP) return { type: 'project', project_id: selP };
     if (mode === 'ticket' && selT) return { type: 'ticket', ticket_id: selT };
@@ -1818,7 +2617,9 @@ export default function TasksPage() {
     const m = new Map<string, SimpleUser | CounterpartyCustomer>();
     try {
       (await usersApi.getAllUsers(1, 100)).items.forEach((u) => m.set(u.id, u));
-    } catch {}
+    } catch {
+      //
+    }
     setUmap(m);
   }, []);
 
@@ -1831,17 +2632,28 @@ export default function TasksPage() {
         setRefreshing(false);
         return;
       }
+
       silent ? setRefreshing(true) : setLoading(true);
+
       try {
         const d: any = await tasksApi.getKanban(ctx(), {
           size: 20,
           priorities: fpR.current.length ? fpR.current : undefined,
           overdue_only: foR.current || undefined,
         });
-        setCols(COL_ORDER.map((s) => d.columns.find((c: any) => c.status === s)).filter((c): c is TaskViewColumn => !!c));
+
+        const mapped: TaskViewColumn[] = COL_ORDER.map((s) =>
+          d.columns.find((c: TaskViewColumn) => c.status === s),
+        ).filter((c): c is TaskViewColumn => !!c);
+
+        setCols(mapped);
         setTotal(d.total_tasks ?? 0);
       } catch (e: any) {
-        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+        toast({
+          title: 'Ошибка',
+          description: apiErr(e),
+          variant: 'destructive',
+        });
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -1850,14 +2662,23 @@ export default function TasksPage() {
     [ctx, toast, mode, selP, selT, selA],
   );
 
-  useEffect(() => { loadUsersMap(); }, [loadUsersMap]);
-  useEffect(() => { fetchBoard(); }, [fetchBoard]);
-  useEffect(() => { fetchBoard(true); }, [fp, fo, fetchBoard]);
+  useEffect(() => {
+    loadUsersMap();
+  }, [loadUsersMap]);
+
+  useEffect(() => {
+    fetchBoard();
+  }, [fetchBoard]);
+
+  useEffect(() => {
+    fetchBoard(true);
+  }, [fp, fo, fetchBoard]);
 
   const more = useCallback(
     async (st: TaskStatus) => {
       const c = cols.find((x) => x.status === st);
       if (!c?.tasks.has_next) return;
+
       setMoreCol(st);
       try {
         const d: any = await tasksApi.getKanban(ctx(), {
@@ -1866,16 +2687,29 @@ export default function TasksPage() {
           priorities: fpR.current.length ? fpR.current : undefined,
           overdue_only: foR.current || undefined,
         });
-        const nc = d.columns.find((x: any) => x.status === st);
+
+        const nc = d.columns.find((x: TaskViewColumn) => x.status === st);
         if (nc) {
           setCols((prev) =>
             prev.map((x) =>
-              x.status === st ? { ...x, tasks: { ...nc.tasks, items: [...x.tasks.items, ...nc.tasks.items] } } : x,
+              x.status === st
+                ? {
+                  ...x,
+                  tasks: {
+                    ...nc.tasks,
+                    items: [...x.tasks.items, ...nc.tasks.items],
+                  },
+                }
+                : x,
             ),
           );
         }
       } catch (e: any) {
-        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+        toast({
+          title: 'Ошибка',
+          description: apiErr(e),
+          variant: 'destructive',
+        });
       } finally {
         setMoreCol(null);
       }
@@ -1888,16 +2722,20 @@ export default function TasksPage() {
       const src = cols.find((c) => c.status === from);
       const task = src?.tasks.items.find((x) => x.id === id);
       if (!task) return;
+
       if (to === 'in_progress' && !task.assignee_id) {
         setAssignTask(task);
         return;
       }
+
       if (to === 'done') {
         setCompleteIntent({ task, mode: 'status_done' });
         return;
       }
+
       const snap = snapCols(cols);
       let moved: TaskViewItem | undefined;
+
       setCols((prev) => {
         const n = prev.map((c) => {
           if (c.status === from) {
@@ -1908,23 +2746,47 @@ export default function TasksPage() {
               }
               return true;
             });
-            return { ...c, tasks: { ...c.tasks, items, total_items: c.tasks.total_items - 1 } };
+
+            return {
+              ...c,
+              tasks: {
+                ...c.tasks,
+                items,
+                total_items: c.tasks.total_items - 1,
+              },
+            };
           }
           return c;
         });
+
         if (!moved) return prev;
+
         const updated = { ...moved, status: to };
         return n.map((c) =>
-          c.status === to ? { ...c, tasks: { ...c.tasks, items: [updated, ...c.tasks.items], total_items: c.tasks.total_items + 1 } } : c,
+          c.status === to
+            ? {
+              ...c,
+              tasks: {
+                ...c.tasks,
+                items: [updated, ...c.tasks.items],
+                total_items: c.tasks.total_items + 1,
+              },
+            }
+            : c,
         );
       });
+
       try {
         await tasksApi.changeStatus(id, to);
         toast({ title: `Статус: ${ST_LABEL[to]}` });
       } catch (e: any) {
         setCols(snap);
         const m = statusErr(e, task, to);
-        toast({ title: m.title, description: m.description, variant: 'destructive' });
+        toast({
+          title: m.title,
+          description: m.description,
+          variant: 'destructive',
+        });
       }
     },
     [cols, toast],
@@ -1933,6 +2795,7 @@ export default function TasksPage() {
   const handleAssignProgress = useCallback(
     async (aid: string) => {
       if (!assignTask) return;
+
       setAssignLd(true);
       try {
         await tasksApi.assign(assignTask.id, { assignee_id: aid });
@@ -1941,7 +2804,11 @@ export default function TasksPage() {
         setAssignTask(null);
         await fetchBoard(true);
       } catch (e: any) {
-        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+        toast({
+          title: 'Ошибка',
+          description: apiErr(e),
+          variant: 'destructive',
+        });
         await fetchBoard(true);
       } finally {
         setAssignLd(false);
@@ -1953,9 +2820,11 @@ export default function TasksPage() {
   const handleComplete = useCallback(
     async (actualHours: number) => {
       if (!completeIntent) return;
+
       setCompleteLd(true);
       try {
         await tasksApi.update(completeIntent.task.id, { actual_hours: actualHours } as any);
+
         if (completeIntent.mode === 'review_done') {
           await tasksApi.review(completeIntent.task.id, { decision: 'done' });
           toast({ title: 'Задача принята' });
@@ -1963,10 +2832,15 @@ export default function TasksPage() {
           await tasksApi.changeStatus(completeIntent.task.id, 'done');
           toast({ title: 'Задача выполнена' });
         }
+
         setCompleteIntent(null);
         await fetchBoard(true);
       } catch (e: any) {
-        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+        toast({
+          title: 'Ошибка',
+          description: apiErr(e),
+          variant: 'destructive',
+        });
       } finally {
         setCompleteLd(false);
       }
@@ -1975,7 +2849,11 @@ export default function TasksPage() {
   );
 
   const onDS = useCallback((id: string, from: TaskStatus) => setDrag({ id, from }), []);
-  const onDE = useCallback(() => { setDrag(null); setDragO(null); }, []);
+  const onDE = useCallback(() => {
+    setDrag(null);
+    setDragO(null);
+  }, []);
+
   const onDO = useCallback(
     (e: React.DragEvent, st: TaskStatus) => {
       e.preventDefault();
@@ -1985,17 +2863,25 @@ export default function TasksPage() {
     },
     [drag],
   );
+
   const onDL = useCallback(() => setDragO(null), []);
+
   const onDrop = useCallback(
     async (e: React.DragEvent, to: TaskStatus) => {
       e.preventDefault();
       setDragO(null);
-      if (!drag || drag.from === to) { setDrag(null); return; }
+
+      if (!drag || drag.from === to) {
+        setDrag(null);
+        return;
+      }
+
       if (!TRANSITIONS[drag.from].includes(to)) {
         toast({ title: 'Переход недоступен', variant: 'destructive' });
         setDrag(null);
         return;
       }
+
       const { id, from } = drag;
       setDrag(null);
       await moveTo(id, from, to);
@@ -2004,28 +2890,29 @@ export default function TasksPage() {
   );
 
   const ql = q.trim().toLowerCase();
+
   const disp = cols.map((c) =>
     !ql
       ? c
       : {
-          ...c,
-          tasks: {
-            ...c.tasks,
-            items: c.tasks.items.filter((t) => {
-              const ticketNo = getTaskTicketNumber(t) ?? '';
-              return (
-                t.title.toLowerCase().includes(ql) ||
-                t.number.toLowerCase().includes(ql) ||
-                String(t.description ?? '').toLowerCase().includes(ql) ||
-                ticketNo.toLowerCase().includes(ql)
-              );
-            }),
-          },
+        ...c,
+        tasks: {
+          ...c.tasks,
+          items: c.tasks.items.filter((t) => {
+            const ticketNo = getTaskTicketNumber(t) ?? '';
+            return (
+              t.title.toLowerCase().includes(ql) ||
+              t.number.toLowerCase().includes(ql) ||
+              String(t.description ?? '').toLowerCase().includes(ql) ||
+              ticketNo.toLowerCase().includes(ql)
+            );
+          }),
         },
+      },
   );
 
   const hf = fp.length > 0 || fo;
-  const doneCount = cols.find((c) => c.status === 'done')?.tasks.total_items ?? 0;
+  const done = cols.find((c) => c.status === 'done')?.tasks.total_items ?? 0;
 
   const ctxTabs = [
     { id: 'my' as CtxMode, label: 'Мои', icon: User },
@@ -2041,11 +2928,13 @@ export default function TasksPage() {
         project_ids: selP ? [selP] : undefined,
         query: search || undefined,
       });
+
       const items = r.items.map((t: any) => {
         const label = `${t.number} — ${t.title}`;
-        ticketLabelsRef.current[t.id] = label;
+        ticketLabelsRef.current[t.id] = label; // сохраняем label
         return { value: t.id, label };
       });
+
       return { items, hasNext: r.items.length === 20 };
     },
     [selP],
@@ -2054,14 +2943,19 @@ export default function TasksPage() {
   const ldProjAsync = useCallback(async (search: string, p: number) => {
     const r = await projectsApi.getAll(p, 20);
     const f = search
-      ? r.items.filter((x) => x.name.toLowerCase().includes(search.toLowerCase()) || x.key.toLowerCase().includes(search.toLowerCase()))
+      ? r.items.filter(
+        (x) =>
+          x.name.toLowerCase().includes(search.toLowerCase()) ||
+          x.key.toLowerCase().includes(search.toLowerCase()),
+      )
       : r.items;
+
     return {
       items: f.map((x) => ({
         value: x.id,
         label: x.name,
         sublabel: x.key,
-        icon: <FolderOpen className="w-4 h-4 text-amber-400" />,
+        icon: <FolderOpen className="w-4 h-4 text-amber-500" />,
       })),
       hasNext: r.items.length === 20,
     };
@@ -2069,21 +2963,35 @@ export default function TasksPage() {
 
   const ldAssAsync = useCallback(async (search: string, p: number) => {
     let items: any[] = [];
-    try { items = (await usersApi.getAllUsers(p, 20)).items; } catch {}
+    try {
+      items = (await usersApi.getAllUsers(p, 20)).items;
+    } catch {
+      items = [];
+    }
+
     const f = search
-      ? items.filter((u) => (u.full_name || '').toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()))
+      ? items.filter(
+        (u) =>
+          (u.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
+          u.email.toLowerCase().includes(search.toLowerCase()),
+      )
       : items;
+
     return {
-      items: f.map((u) => ({ value: u.id, label: u.full_name || u.username || u.email, sublabel: u.email })),
+      items: f.map((u) => ({
+        value: u.id,
+        label: u.full_name || u.username || u.email,
+        sublabel: u.email,
+      })),
       hasNext: items.length === 20,
     };
   }, []);
 
   const dragInfo = drag
     ? (() => {
-        const t = cols.flatMap((c) => c.tasks.items).find((x) => x.id === drag.id);
-        return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null;
-      })()
+      const t = cols.flatMap((c) => c.tasks.items).find((x) => x.id === drag.id);
+      return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null;
+    })()
     : null;
 
   return (
@@ -2093,64 +3001,171 @@ export default function TasksPage() {
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">Задачи</h1>
           {!loading && (
             <span className="px-2 py-0.5 rounded bg-[var(--hover-2)] text-xs text-[var(--text-primary)]/50">
-              {Math.max(total - doneCount, 0)} активных · {doneCount} завершено
+              {Math.max(total - done, 0)} активных · {done} завершено
             </span>
           )}
           {refreshing && <Loader2 className="w-4 h-4 animate-spin text-[var(--accent)]" />}
         </div>
+
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-primary)]/30" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск по названию, номеру..." className="w-72 pl-9 pr-8 py-2 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]/40 transition-all" />
-            {q && <button onClick={() => setQ('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/30"><X size={18} /></button>}
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Поиск по названию, номеру, описанию..."
+              className="w-72 pl-9 pr-8 py-2 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none focus:border-[var(--accent)]/40 focus:ring-1 focus:ring-[var(--accent-ring)] transition-all"
+            />
+            {q && (
+              <button
+                onClick={() => setQ('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/30 hover:text-[var(--text-primary)]"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
+
           <div className="relative">
-            <button onClick={() => setSf((v) => !v)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${hf ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--accent)]' : 'bg-[var(--hover-2)] border-[var(--border-color)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-3)]'}`}><Filter className="w-4 h-4" />Фильтры{hf && <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />}</button>
+            <button
+              onClick={() => setSf((v) => !v)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${hf
+                ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--accent)]'
+                : 'bg-[var(--hover-2)] border-[var(--border-color)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-3)]'
+                }`}
+            >
+              <Filter className="w-4 h-4" />
+              Фильтры
+              {hf && <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />}
+            </button>
+
             {sf && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setSf(false)} />
                 <div className="absolute right-0 top-full mt-2 z-20 w-56 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl p-3 space-y-3">
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest text-[var(--text-primary)]/30 mb-2 font-medium">Приоритет</p>
+                    <p className="text-[10px] uppercase tracking-widest text-[var(--text-primary)]/30 mb-2 font-medium">
+                      Приоритет
+                    </p>
                     <div className="flex flex-wrap gap-1.5">
                       {PRI_LIST.map((p) => {
                         const m = PM[p.value];
-                        return <button key={p.value} onClick={() => setFp((v) => v.includes(p.value) ? v.filter((x) => x !== p.value) : [...v, p.value])} className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-all ${fp.includes(p.value) ? `${m.bg} ${m.c} ${m.brd}` : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'}`}><span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />{p.label}</button>;
+                        return (
+                          <button
+                            key={p.value}
+                            onClick={() =>
+                              setFp((v) =>
+                                v.includes(p.value) ? v.filter((x) => x !== p.value) : [...v, p.value],
+                              )
+                            }
+                            className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-all ${fp.includes(p.value)
+                              ? `${m.bg} ${m.c} ${m.brd}`
+                              : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                              }`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
+                            {p.label}
+                          </button>
+                        );
                       })}
                     </div>
                   </div>
+
                   <div className="border-t border-[var(--border-color)] pt-2">
-                    <button onClick={() => setFo((v) => !v)} className={`w-full flex items-center gap-2 py-1.5 px-2 rounded font-medium text-sm transition-colors ${fo ? 'text-[var(--accent)] bg-[var(--accent)]/5' : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'}`}><div className={`w-4 h-4 rounded border flex items-center justify-center ${fo ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'}`}>{fo && <Check className="w-3 h-3 text-white" />}</div>Просроченные</button>
+                    <button
+                      onClick={() => setFo((v) => !v)}
+                      className={`w-full flex items-center gap-2 py-1.5 px-2 rounded font-medium text-sm transition-colors ${fo ? 'text-[var(--accent)] bg-[var(--accent)]/5' : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'
+                        }`}
+                    >
+                      <div
+                        className={`w-4 h-4 rounded border flex items-center justify-center ${fo ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'
+                          }`}
+                      >
+                        {fo && <Check className="w-3 h-3 text-white" />}
+                      </div>
+                      Просроченные
+                    </button>
                   </div>
-                  {hf && <div className="border-t border-[var(--border-color)] pt-2"><button onClick={() => { setFp([]); setFo(false); }} className="w-full text-center text-sm font-medium text-[var(--accent)] hover:underline">Сбросить</button></div>}
+
+                  {hf && (
+                    <div className="border-t border-[var(--border-color)] pt-2">
+                      <button
+                        onClick={() => {
+                          setFp([]);
+                          setFo(false);
+                        }}
+                        className="w-full text-center text-sm font-medium text-[var(--accent)] hover:underline"
+                      >
+                        Сбросить
+                      </button>
+                    </div>
+                  )}
                 </div>
               </>
             )}
           </div>
-          <button onClick={() => fetchBoard(true)} disabled={refreshing || loading} className="p-2 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"><RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /></button>
-          <button onClick={() => setCreate('backlog')} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-sm font-medium hover:bg-[var(--accent)]/90 shadow-sm"><Plus className="w-4 h-4" />Новая задача</button>
+
+          <button
+            onClick={() => fetchBoard(true)}
+            disabled={refreshing || loading}
+            className="p-2 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)] hover:bg-[var(--hover-3)] disabled:opacity-40 transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+
+          <button
+            onClick={() => setCreate('backlog')}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-sm font-medium hover:bg-[var(--accent)]/90 transition-colors shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Новая задача
+          </button>
         </div>
       </div>
 
       <div className="flex-shrink-0 flex items-center justify-between gap-3 flex-wrap mb-4">
         <div className="flex items-center gap-2.5 flex-wrap">
           <div className="flex items-center gap-1 p-1 bg-[var(--hover-1)] rounded-lg border border-[var(--border-color)]">
-            {ctxTabs.map((t) => (
-              <button key={t.id} onClick={() => setMode(t.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${mode === t.id ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'}`}><t.icon className="w-3.5 h-3.5" />{t.label}</button>
-            ))}
+            {ctxTabs.map((t) => {
+              const I = t.icon;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setMode(t.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${mode === t.id
+                    ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                    : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'
+                    }`}
+                >
+                  <I className="w-3.5 h-3.5" />
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
+
           {mode === 'project' && (
             <div className="w-72">
-              <AsyncDD value={selP} onChange={setSelP} loadFn={ldProjAsync} placeholder="Выберите проект" icon={FolderOpen} />
+              <AsyncDD
+                value={selP}
+                onChange={(v) => {
+                  setSelT(v);
+                  setSelTLabel(v ? (ticketLabelsRef.current[v] ?? '') : '');
+                }}
+                loadFn={ldProjAsync}
+                placeholder="Выберите проект"
+                icon={FolderOpen}
+              />
             </div>
           )}
+
           {mode === 'ticket' && (
             <div className="w-80">
               <AsyncDD
                 value={selT}
                 onChange={(v) => {
                   setSelT(v);
-                  setSelTLabel(v ? (ticketLabelsRef.current[v] ?? '') : '');
+                  if (!v) setSelTLabel('');
                 }}
                 loadFn={ldTicketsAsync}
                 placeholder="Выберите заявку"
@@ -2159,33 +3174,85 @@ export default function TasksPage() {
               />
             </div>
           )}
+
           {mode === 'assignee' && (
             <div className="w-72">
-              <AsyncDD value={selA} onChange={setSelA} loadFn={ldAssAsync} placeholder="Выберите исполнителя" icon={UserCheck} />
+              <AsyncDD
+                value={selA}
+                onChange={setSelA}
+                loadFn={ldAssAsync}
+                placeholder="Выберите исполнителя"
+                icon={UserCheck}
+              />
             </div>
           )}
         </div>
+
         <div className="flex items-center gap-1 p-1 bg-[var(--hover-1)] rounded-lg border border-[var(--border-color)]">
-          <button onClick={() => setViewMode('kanban')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'kanban' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'}`}><LayoutGrid className="w-3.5 h-3.5" />Доска</button>
-          <button onClick={() => setViewMode('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'list' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'}`}><List className="w-3.5 h-3.5" />Список</button>
+          <button
+            onClick={() => setViewMode('kanban')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'kanban'
+              ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+              : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'
+              }`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            Доска
+          </button>
+
+          <button
+            onClick={() => setViewMode('list')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'list'
+              ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+              : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'
+              }`}
+          >
+            <List className="w-3.5 h-3.5" />
+            Список
+          </button>
         </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" /></div>
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" />
+          </div>
         ) : viewMode === 'list' ? (
           <ListView tasks={disp.flatMap((c) => c.tasks.items)} umap={umap} onView={setView} />
         ) : !cols.length ? (
           <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30">
             <FileText className="w-12 h-12 mb-3 opacity-50" />
-            <p className="text-base font-medium">{mode === 'project' && !selP ? 'Выберите проект' : mode === 'assignee' && !selA ? 'Выберите исполнителя' : mode === 'ticket' && !selT ? 'Выберите заявку' : 'Нет задач'}</p>
+            <p className="text-base font-medium">
+              {mode === 'project' && !selP
+                ? 'Выберите проект'
+                : mode === 'assignee' && !selA
+                  ? 'Выберите исполнителя'
+                  : mode === 'ticket' && !selT
+                    ? 'Выберите заявку'
+                    : 'Нет задач'}
+            </p>
           </div>
         ) : (
           <div className="h-full overflow-x-auto overflow-y-hidden pb-2 scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent">
             <div className="flex gap-3 h-full">
               {disp.map((c) => (
-                <KCol key={c.status} col={c} umap={umap} isDO={dragO === c.status} dragId={drag?.id ?? null} ldMore={moreCol === c.status} onDS={onDS} onDE={onDE} onDO={onDO} onDL={onDL} onDrop={onDrop} onAdd={setCreate} onView={setView} onMore={more} />
+                <KCol
+                  key={c.status}
+                  col={c}
+                  umap={umap}
+                  isDO={dragO === c.status}
+                  dragId={drag?.id ?? null}
+                  ldMore={moreCol === c.status}
+                  onDS={onDS}
+                  onDE={onDE}
+                  onDO={onDO}
+                  onDL={onDL}
+                  onDrop={onDrop}
+                  onAdd={setCreate}
+                  onView={setView}
+                  onMore={more}
+                />
               ))}
             </div>
           </div>
@@ -2200,9 +3267,18 @@ export default function TasksPage() {
           umap={umap}
           onClose={() => setView(null)}
           onRefresh={() => fetchBoard(true)}
-          onNeedAssign={(t) => { setView(null); setAssignTask(t); }}
-          onEdit={(t) => { setView(null); setEditTask(t); }}
-          onNeedComplete={(t, m) => { setView(null); setCompleteIntent({ task: t, mode: m }); }}
+          onNeedAssign={(t) => {
+            setView(null);
+            setAssignTask(t);
+          }}
+          onEdit={(t) => {
+            setView(null);
+            setEditTask(t);
+          }}
+          onNeedComplete={(t, mode) => {
+            setView(null);
+            setCompleteIntent({ task: t, mode });
+          }}
         />
       )}
 
@@ -2213,7 +3289,10 @@ export default function TasksPage() {
           context={ctx()}
           ticketLabel={mode === 'ticket' && selT ? selTLabel : undefined}
           onClose={() => setCreate(null)}
-          onSaved={() => { setCreate(null); fetchBoard(true); }}
+          onSaved={async () => {
+            setCreate(null);
+            await fetchBoard(true);
+          }}
         />
       )}
 
@@ -2223,16 +3302,34 @@ export default function TasksPage() {
           task={editTask}
           context={ctx()}
           onClose={() => setEditTask(null)}
-          onSaved={() => { setEditTask(null); fetchBoard(true); }}
+          onSaved={async () => {
+            setEditTask(null);
+            await fetchBoard(true);
+          }}
         />
       )}
 
       {assignTask && (
-        <AssignModal task={assignTask} umap={umap} loading={assignLd} onClose={() => !assignLd && setAssignTask(null)} onOk={handleAssignProgress} />
+        <AssignModal
+          task={assignTask}
+          umap={umap}
+          loading={assignLd}
+          onClose={() => {
+            if (!assignLd) setAssignTask(null);
+          }}
+          onOk={handleAssignProgress}
+        />
       )}
 
       {completeIntent && (
-        <CompleteModal task={completeIntent.task} loading={completeLd} onClose={() => !completeLd && setCompleteIntent(null)} onOk={handleComplete} />
+        <CompleteModal
+          task={completeIntent.task}
+          loading={completeLd}
+          onClose={() => {
+            if (!completeLd) setCompleteIntent(null);
+          }}
+          onOk={handleComplete}
+        />
       )}
     </div>
   );
