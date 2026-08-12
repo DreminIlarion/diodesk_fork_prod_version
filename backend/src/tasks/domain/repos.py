@@ -26,6 +26,8 @@ class TaskView:
 
     status: TaskStatus
     priority: Priority
+    description: str | None = None  
+
 
     assignee_id: UUID | None = None
     due_date: datetime | None = None
