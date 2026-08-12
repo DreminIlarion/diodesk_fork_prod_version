@@ -188,7 +188,12 @@ class TaskService:
             estimated_hours=data.estimated_hours,
             due_date=data.due_date,
         )
+
+        if data.actual_hours is not None:
+            task.actual_hours = Decimal(str(data.actual_hours))
+
         await self.task_repo.update(task)
+
 
         await finalize(
             self.uow, task,

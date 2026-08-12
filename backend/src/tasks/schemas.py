@@ -103,6 +103,7 @@ class TaskUpdate(BaseModel):
     estimated_hours: NonNegativeFloat | None = Field(
         None, description="Предварительное время выполнения"
     )
+    actual_hours: NonNegativeFloat | None = Field(None, description="Фактические трудозатраты (часы)")
     due_date: date | None = Field(None, description="Срок выполнения (deadline)")
 
 
