@@ -299,12 +299,12 @@ const INP =
 const ini = (n?: string | null) =>
   n
     ? n
-        .trim()
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((w) => w[0])
-        .join('')
-        .toUpperCase()
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase()
     : '?';
 
 const overdue = (t: TaskViewItem) =>
@@ -489,89 +489,87 @@ function SelectDD({
 
   const fl = q
     ? options.filter(
-        (o) =>
-          o.label.toLowerCase().includes(q.toLowerCase()) ||
-          (o.sublabel || '').toLowerCase().includes(q.toLowerCase()),
-      )
+      (o) =>
+        o.label.toLowerCase().includes(q.toLowerCase()) ||
+        (o.sublabel || '').toLowerCase().includes(q.toLowerCase()),
+    )
     : options;
 
   const dd = open
     ? createPortal(
-        <div
-          ref={dRef}
-          style={pos}
-          className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden"
-        >
-          {searchable && (
-            <div className="p-2 border-b border-[var(--border-color)]">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/30" />
-                <input
-                  ref={iRef}
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Поиск..."
-                  className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none"
-                />
-              </div>
+      <div
+        ref={dRef}
+        style={pos}
+        className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden"
+      >
+        {searchable && (
+          <div className="p-2 border-b border-[var(--border-color)]">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+              <input
+                ref={iRef}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Поиск..."
+                className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="overflow-y-auto max-h-[240px] p-1">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              onChange('');
+              setOpen(false);
+            }}
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${!value ? 'bg-[var(--accent)]/10' : 'hover:bg-[var(--hover-2)]'
+              } text-[var(--text-primary)]/60`}
+          >
+            <span>—</span>
+            <span className="flex-1">Не выбрано</span>
+            {!value && <Check className="w-4 h-4 text-[var(--accent)]" />}
+          </div>
+
+          {fl.length === 0 && q && (
+            <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">
+              Не найдено
             </div>
           )}
 
-          <div className="overflow-y-auto max-h-[240px] p-1">
+          {fl.map((o) => (
             <div
+              key={o.value}
               role="button"
               tabIndex={0}
               onClick={() => {
-                onChange('');
+                onChange(o.value);
                 setOpen(false);
               }}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${
-                !value ? 'bg-[var(--accent)]/10' : 'hover:bg-[var(--hover-2)]'
-              } text-[var(--text-primary)]/60`}
-            >
-              <span>—</span>
-              <span className="flex-1">Не выбрано</span>
-              {!value && <Check className="w-4 h-4 text-[var(--accent)]" />}
-            </div>
-
-            {fl.length === 0 && q && (
-              <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">
-                Не найдено
-              </div>
-            )}
-
-            {fl.map((o) => (
-              <div
-                key={o.value}
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  onChange(o.value);
-                  setOpen(false);
-                }}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${
-                  o.value === value
-                    ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
-                    : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${o.value === value
+                  ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
+                  : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'
                 }`}
-              >
-                {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
-                {o.icon && <span className="shrink-0">{o.icon}</span>}
-                <div className="flex-1 min-w-0">
-                  <span className="block truncate">{o.label}</span>
-                  {o.sublabel && (
-                    <span className="block text-xs text-[var(--text-primary)]/40 truncate">
-                      {o.sublabel}
-                    </span>
-                  )}
-                </div>
-                {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
+            >
+              {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
+              {o.icon && <span className="shrink-0">{o.icon}</span>}
+              <div className="flex-1 min-w-0">
+                <span className="block truncate">{o.label}</span>
+                {o.sublabel && (
+                  <span className="block text-xs text-[var(--text-primary)]/40 truncate">
+                    {o.sublabel}
+                  </span>
+                )}
               </div>
-            ))}
-          </div>
-        </div>,
-        document.body,
-      )
+              {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
+            </div>
+          ))}
+        </div>
+      </div>,
+      document.body,
+    )
     : null;
 
   return (
@@ -580,15 +578,13 @@ function SelectDD({
         role="button"
         tabIndex={disabled ? -1 : 0}
         onClick={() => !disabled && setOpen((v) => !v)}
-        className={`w-full flex items-center gap-2 px-3 py-2.5 bg-[var(--hover-2)] border rounded-xl text-sm text-left select-none transition-all ${
-          disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'
-        } ${open ? 'border-[var(--accent)]/50 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}
+        className={`w-full flex items-center gap-2 px-3 py-2.5 bg-[var(--hover-2)] border rounded-xl text-sm text-left select-none transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'
+          } ${open ? 'border-[var(--accent)]/50 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}
       >
         {LI && <LI className="w-4 h-4 text-[var(--text-primary)]/40 shrink-0" />}
         <span
-          className={`flex-1 truncate ${
-            sel ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-primary)]/40'
-          }`}
+          className={`flex-1 truncate ${sel ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-primary)]/40'
+            }`}
         >
           {sel ? sel.label : placeholder || '—'}
         </span>
@@ -609,9 +605,8 @@ function SelectDD({
         )}
 
         <ChevronDown
-          className={`w-4 h-4 text-[var(--text-primary)]/30 shrink-0 transition-transform ${
-            open ? 'rotate-180' : ''
-          }`}
+          className={`w-4 h-4 text-[var(--text-primary)]/30 shrink-0 transition-transform ${open ? 'rotate-180' : ''
+            }`}
         />
       </div>
       {dd}
@@ -718,111 +713,109 @@ function AsyncDD({
 
   const dd = open
     ? createPortal(
-        <div
-          ref={dRef}
-          style={pos}
-          className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden"
-        >
-          <div className="p-2 border-b border-[var(--border-color)]">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/30" />
-              <input
-                ref={iRef}
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Поиск..."
-                className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none"
-              />
-            </div>
+      <div
+        ref={dRef}
+        style={pos}
+        className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden"
+      >
+        <div className="p-2 border-b border-[var(--border-color)]">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+            <input
+              ref={iRef}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Поиск..."
+              className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="overflow-y-auto max-h-[280px] p-1">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              onChange('');
+              setOpen(false);
+            }}
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${!value
+                ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
+                : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]/60'
+              }`}
+          >
+            <span>—</span>
+            <span className="flex-1">Не выбрано</span>
+            {!value && <Check className="w-4 h-4 text-[var(--accent)]" />}
           </div>
 
-          <div className="overflow-y-auto max-h-[280px] p-1">
+          {ld && (
+            <div className="flex justify-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-[var(--text-primary)]/30" />
+            </div>
+          )}
+
+          {!ld && opts.length === 0 && (
+            <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">
+              {q ? 'Не найдено' : 'Нет данных'}
+            </div>
+          )}
+
+          {!ld &&
+            opts.map((o) => (
+              <div
+                key={o.value}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  onChange(o.value);
+                  setSelLbl(o.label);
+                  setOpen(false);
+                }}
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm cursor-pointer ${o.value === value
+                    ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
+                    : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'
+                  }`}
+              >
+                {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
+                {o.icon && <span className="shrink-0">{o.icon}</span>}
+                <div className="flex-1 min-w-0">
+                  <span
+                    className="block leading-snug"
+                    style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {o.label}
+                  </span>
+                  {o.sublabel && (
+                    <span className="block text-xs text-[var(--text-primary)]/40 truncate mt-0.5">
+                      {o.sublabel}
+                    </span>
+                  )}
+                </div>
+                {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
+              </div>
+            ))}
+
+          {!ld && more && (
             <div
               role="button"
               tabIndex={0}
-              onClick={() => {
-                onChange('');
-                setOpen(false);
-              }}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${
-                !value
-                  ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
-                  : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]/60'
-              }`}
+              onClick={() => !ldMore && doLoad(q, pg + 1, true)}
+              className="flex items-center justify-center gap-1.5 py-2 text-sm text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] rounded-lg cursor-pointer transition-colors"
             >
-              <span>—</span>
-              <span className="flex-1">Не выбрано</span>
-              {!value && <Check className="w-4 h-4 text-[var(--accent)]" />}
+              {ldMore ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronDown className="w-4 h-4" />}
+              Ещё
             </div>
-
-            {ld && (
-              <div className="flex justify-center py-4">
-                <Loader2 className="w-5 h-5 animate-spin text-[var(--text-primary)]/30" />
-              </div>
-            )}
-
-            {!ld && opts.length === 0 && (
-              <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">
-                {q ? 'Не найдено' : 'Нет данных'}
-              </div>
-            )}
-
-            {!ld &&
-              opts.map((o) => (
-                <div
-                  key={o.value}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    onChange(o.value);
-                    setSelLbl(o.label);
-                    setOpen(false);
-                  }}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm cursor-pointer ${
-                    o.value === value
-                      ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
-                      : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'
-                  }`}
-                >
-                  {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
-                  {o.icon && <span className="shrink-0">{o.icon}</span>}
-                  <div className="flex-1 min-w-0">
-                    <span
-                      className="block leading-snug"
-                      style={{
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {o.label}
-                    </span>
-                    {o.sublabel && (
-                      <span className="block text-xs text-[var(--text-primary)]/40 truncate mt-0.5">
-                        {o.sublabel}
-                      </span>
-                    )}
-                  </div>
-                  {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
-                </div>
-              ))}
-
-            {!ld && more && (
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => !ldMore && doLoad(q, pg + 1, true)}
-                className="flex items-center justify-center gap-1.5 py-2 text-sm text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] rounded-lg cursor-pointer transition-colors"
-              >
-                {ldMore ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronDown className="w-4 h-4" />}
-                Ещё
-              </div>
-            )}
-          </div>
-        </div>,
-        document.body,
-      )
+          )}
+        </div>
+      </div>,
+      document.body,
+    )
     : null;
 
   return (
@@ -831,15 +824,13 @@ function AsyncDD({
         role="button"
         tabIndex={disabled ? -1 : 0}
         onClick={() => !disabled && setOpen((v) => !v)}
-        className={`w-full flex items-center gap-2 px-3 py-2.5 bg-[var(--hover-2)] border rounded-xl text-sm text-left select-none transition-all ${
-          disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'
-        } ${open ? 'border-[var(--accent)]/50 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}
+        className={`w-full flex items-center gap-2 px-3 py-2.5 bg-[var(--hover-2)] border rounded-xl text-sm text-left select-none transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'
+          } ${open ? 'border-[var(--accent)]/50 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}
       >
         {LI && <LI className="w-4 h-4 text-[var(--text-primary)]/40 shrink-0" />}
         <span
-          className={`flex-1 truncate ${
-            selLbl ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-primary)]/40'
-          }`}
+          className={`flex-1 truncate ${selLbl ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-primary)]/40'
+            }`}
         >
           {selLbl || placeholder || '—'}
         </span>
@@ -861,9 +852,8 @@ function AsyncDD({
         )}
 
         <ChevronDown
-          className={`w-4 h-4 text-[var(--text-primary)]/30 shrink-0 transition-transform ${
-            open ? 'rotate-180' : ''
-          }`}
+          className={`w-4 h-4 text-[var(--text-primary)]/30 shrink-0 transition-transform ${open ? 'rotate-180' : ''
+            }`}
         />
       </div>
       {dd}
@@ -1102,7 +1092,7 @@ function TCard({
     : null;
 
   return (
-    <div
+    <motion.div
       draggable
       onDragStart={(e) => {
         (e as any).dataTransfer.effectAllowed = 'move';
@@ -1110,43 +1100,49 @@ function TCard({
       }}
       onDragEnd={onDE}
       onClick={() => onView(t)}
-      className={`bg-[var(--bg-card)] border rounded-xl p-3.5 cursor-pointer transition-all hover:bg-[var(--hover-1)] hover:border-[var(--accent)]/30 shadow-sm min-h-[120px] flex flex-col ${
-        dragging ? 'opacity-40 scale-[1.02]' : ''
-      } ${od ? 'border-red-500/40 bg-red-500/5' : 'border-[var(--border-color)]'}`}
+      animate={{
+        rotate: dragging ? -2.5 : 0,
+        scale: dragging ? 1.03 : 1,
+        opacity: dragging ? 0.45 : 1,
+      }}
+      transition={{ duration: 0.16 }}
+      className={`bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer transition-colors hover:bg-[var(--hover-1)] hover:border-[var(--accent)]/30 shadow-sm min-h-[136px] flex flex-col ${
+        od ? 'border-red-500/40 bg-red-500/5' : 'border-[var(--border-color)]'
+      }`}
     >
-      {/* Row 1: номер */}
-      <span className="px-1.5 py-0.5 rounded-md text-xs font-mono bg-[var(--hover-2)] text-[var(--text-primary)]/50 self-start mb-1.5">
+      {/* 1. Номер */}
+      <span className="text-[11px] font-mono text-[var(--text-primary)]/38 mb-2 leading-none">
         #{t.number}
       </span>
 
-      {/* Row 2: название */}
-      <h4 className="text-sm font-semibold text-[var(--text-primary)] leading-snug line-clamp-2 mb-2 flex-1">
+      {/* 2. Название — главный акцент */}
+      <h4 className="text-[15px] font-bold text-[var(--text-primary)] leading-5 tracking-[-0.01em] line-clamp-2 mb-3">
         {t.title}
       </h4>
 
-      {/* Row 3: приоритет + сложность */}
-      <div className="flex items-center gap-2 mb-2.5 flex-wrap">
+      {/* 3. Приоритет + сложность */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
         <PriBadge p={t.priority} />
         {t.story_points != null && <ComplexityBadge v={t.story_points} />}
       </div>
 
-      {/* Row 4: черта, фамилия слева, иконки+дата справа */}
-      <div className="flex items-center justify-between border-t border-[var(--border-color)] pt-2 mt-auto">
-        <span className="text-xs text-[var(--text-primary)]/60 truncate max-w-[120px]">
+      {/* 4. Низ карточки */}
+      <div className="flex items-center justify-between border-t border-[var(--border-color)] pt-2.5 mt-auto min-h-[28px]">
+        <span className="text-xs text-[var(--text-primary)]/62 truncate max-w-[120px] font-medium">
           {assigneeSurname ?? '—'}
         </span>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {t.project_id && (
-            <FolderOpen className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
-          )}
           {t.ticket_id && (
             <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+          )}
+          {t.project_id && (
+            <FolderOpen className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
           )}
           {t.due_date && (
             <span
               className={`text-xs font-medium ml-0.5 ${
-                od ? 'text-red-400' : 'text-[var(--text-primary)]/40'
+                od ? 'text-red-400' : 'text-[var(--text-primary)]/42'
               }`}
             >
               {fmtDue(t.due_date)}
@@ -1154,7 +1150,7 @@ function TCard({
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -1197,8 +1193,7 @@ function KCol({
       onDragOver={(e) => onDO(e, col.status)}
       onDragLeave={onDL}
       onDrop={(e) => onDrop(e, col.status)}
-      className={`bg-[var(--hover-1)] rounded-xl flex flex-col w-[320px] shrink-0 border transition-all h-full ${
-        isDO ? 'border-[var(--accent)] bg-[var(--accent)]/5 scale-[1.01]' : 'border-[var(--border-color)]'
+      className={`bg-[var(--hover-1)] rounded-xl flex flex-col w-[320px] shrink-0 border transition-colors h-full ${isDO ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--border-color)]'
       }`}
     >
       <div className="px-3 py-3 flex items-center justify-between border-b border-[var(--border-color)] shrink-0 bg-[var(--bg-card)] rounded-t-xl">
@@ -1315,9 +1310,8 @@ function DragPanel({
                   setHov(null);
                   onDrop(e, s);
                 }}
-                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border transition-all ${
-                  h ? `${c.brd} bg-[var(--accent)]/10 scale-[1.02] shadow-sm` : 'border-transparent hover:bg-[var(--hover-2)]'
-                }`}
+                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border transition-all ${h ? `${c.brd} bg-[var(--accent)]/10 scale-[1.02] shadow-sm` : 'border-transparent hover:bg-[var(--hover-2)]'
+                  }`}
               >
                 <div className={`w-1 h-5 rounded-full ${c.dot}`} />
                 <I className={`w-4 h-4 ${c.tc}`} />
@@ -1608,10 +1602,10 @@ function TaskEditorModal({
     const r = await projectsApi.getAll(p, 20);
     const f = q
       ? r.items.filter(
-          (x) =>
-            x.name.toLowerCase().includes(q.toLowerCase()) ||
-            x.key.toLowerCase().includes(q.toLowerCase()),
-        )
+        (x) =>
+          x.name.toLowerCase().includes(q.toLowerCase()) ||
+          x.key.toLowerCase().includes(q.toLowerCase()),
+      )
       : r.items;
 
     return {
@@ -1635,10 +1629,10 @@ function TaskEditorModal({
 
     const f = q
       ? items.filter(
-          (u) =>
-            (u.full_name || '').toLowerCase().includes(q.toLowerCase()) ||
-            u.email.toLowerCase().includes(q.toLowerCase()),
-        )
+        (u) =>
+          (u.full_name || '').toLowerCase().includes(q.toLowerCase()) ||
+          u.email.toLowerCase().includes(q.toLowerCase()),
+      )
       : items;
 
     return {
@@ -1651,24 +1645,24 @@ function TaskEditorModal({
     };
   }, []);
 
-const loadTickets = useCallback(
-  async (q: string, p: number) => {
-    const r = await ticketsApi.getAll(p, 20, {
-      project_ids: projectId ? [projectId] : undefined,
-      query: q || undefined,
-    });
+  const loadTickets = useCallback(
+    async (q: string, p: number) => {
+      const r = await ticketsApi.getAll(p, 20, {
+        project_ids: projectId ? [projectId] : undefined,
+        query: q || undefined,
+      });
 
-    return {
-      items: r.items.map((t: any) => ({
-        value: t.id,
-        label: `${t.number} — ${t.title}`,
-        icon: <Ticket className="w-4 h-4 text-[var(--text-primary)]/40" />,
-      })),
-      hasNext: r.items.length === 20,
-    };
-  },
-  [projectId],
-);
+      return {
+        items: r.items.map((t: any) => ({
+          value: t.id,
+          label: `${t.number} — ${t.title}`,
+          icon: <Ticket className="w-4 h-4 text-[var(--text-primary)]/40" />,
+        })),
+        hasNext: r.items.length === 20,
+      };
+    },
+    [projectId],
+  );
 
   const submit = async () => {
     if (!title.trim()) return;
@@ -1748,7 +1742,7 @@ const loadTickets = useCallback(
   const titleText = mode === 'create' ? 'Создание задачи' : 'Редактирование задачи';
   const subtitleText =
     mode === 'create'
-      ? 'Все основные поля вынесены прямо в форму.'
+      ? 'Проверьте заполнение'
       : `Изменение задачи ${task?.number ?? ''}`;
 
   const lockTicket = context.type === 'ticket' && mode === 'create';
@@ -1809,7 +1803,7 @@ const loadTickets = useCallback(
                 <textarea
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
-                  placeholder="Опиши задачу обычным человеческим текстом"
+                  placeholder="Опиши задачу "
                   rows={7}
                   className={`${INP} resize-none`}
                 />
@@ -1826,11 +1820,10 @@ const loadTickets = useCallback(
                       <button
                         key={p.value}
                         onClick={() => setPri(p.value)}
-                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${
-                          pri === p.value
+                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${pri === p.value
                             ? `${m.bg} ${m.c} ${m.brd}`
                             : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                        }`}
+                          }`}
                       >
                         <span className={`w-2 h-2 rounded-full ${m.dot}`} />
                         {p.label}
@@ -1849,22 +1842,20 @@ const loadTickets = useCallback(
                     <button
                       key={v}
                       onClick={() => setSp(String(v))}
-                      className={`px-3 py-2 rounded-xl text-sm border transition-all ${
-                        sp === String(v)
+                      className={`px-3 py-2 rounded-xl text-sm border transition-all ${sp === String(v)
                           ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
                           : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                      }`}
+                        }`}
                     >
                       {v}
                     </button>
                   ))}
                   <button
                     onClick={() => setSp('')}
-                    className={`px-3 py-2 rounded-xl text-sm border transition-all ${
-                      sp === ''
+                    className={`px-3 py-2 rounded-xl text-sm border transition-all ${sp === ''
                         ? 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30'
                         : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                    }`}
+                      }`}
                   >
                     Без сложности
                   </button>
@@ -1895,7 +1886,7 @@ const loadTickets = useCallback(
                     value={ticketId}
                     onChange={setTicketId}
                     loadFn={loadTickets}
-                    placeholder={projectId ? 'Выберите заявку' : 'Сначала можно выбрать проект'}
+                    placeholder={projectId ? 'Выберите заявку' : 'Выберите заявку'}
                     icon={Ticket}
                     wide
                   />
@@ -1957,16 +1948,14 @@ const loadTickets = useCallback(
                 <div className="pt-1">
                   <button
                     onClick={() => setTodo((v) => !v)}
-                    className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border transition-all text-sm font-medium ${
-                      todo
+                    className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border transition-all text-sm font-medium ${todo
                         ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
                         : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
-                    }`}
+                      }`}
                   >
                     <div
-                      className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                        todo ? 'bg-blue-500 border-blue-500' : 'border-[var(--border-color)]'
-                      }`}
+                      className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${todo ? 'bg-blue-500 border-blue-500' : 'border-[var(--border-color)]'
+                        }`}
                     >
                       {todo && <Check className="w-3 h-3 text-white" />}
                     </div>
@@ -2289,9 +2278,8 @@ function DetailModal({
               <div className="h-[24px] flex items-center">
                 {t.due_date ? (
                   <span
-                    className={`flex items-center gap-1.5 text-sm font-medium ${
-                      overdue(t) ? 'text-red-400' : 'text-[var(--text-primary)]/70'
-                    }`}
+                    className={`flex items-center gap-1.5 text-sm font-medium ${overdue(t) ? 'text-red-400' : 'text-[var(--text-primary)]/70'
+                      }`}
                   >
                     <Calendar className="w-4 h-4" />
                     {fmtDue(t.due_date)}
@@ -2670,12 +2658,12 @@ export default function TasksPage() {
             prev.map((x) =>
               x.status === st
                 ? {
-                    ...x,
-                    tasks: {
-                      ...nc.tasks,
-                      items: [...x.tasks.items, ...nc.tasks.items],
-                    },
-                  }
+                  ...x,
+                  tasks: {
+                    ...nc.tasks,
+                    items: [...x.tasks.items, ...nc.tasks.items],
+                  },
+                }
                 : x,
             ),
           );
@@ -2741,13 +2729,13 @@ export default function TasksPage() {
         return n.map((c) =>
           c.status === to
             ? {
-                ...c,
-                tasks: {
-                  ...c.tasks,
-                  items: [updated, ...c.tasks.items],
-                  total_items: c.tasks.total_items + 1,
-                },
-              }
+              ...c,
+              tasks: {
+                ...c.tasks,
+                items: [updated, ...c.tasks.items],
+                total_items: c.tasks.total_items + 1,
+              },
+            }
             : c,
         );
       });
@@ -2871,20 +2859,20 @@ export default function TasksPage() {
     !ql
       ? c
       : {
-          ...c,
-          tasks: {
-            ...c.tasks,
-            items: c.tasks.items.filter((t) => {
-              const ticketNo = getTaskTicketNumber(t) ?? '';
-              return (
-                t.title.toLowerCase().includes(ql) ||
-                t.number.toLowerCase().includes(ql) ||
-                String(t.description ?? '').toLowerCase().includes(ql) ||
-                ticketNo.toLowerCase().includes(ql)
-              );
-            }),
-          },
+        ...c,
+        tasks: {
+          ...c.tasks,
+          items: c.tasks.items.filter((t) => {
+            const ticketNo = getTaskTicketNumber(t) ?? '';
+            return (
+              t.title.toLowerCase().includes(ql) ||
+              t.number.toLowerCase().includes(ql) ||
+              String(t.description ?? '').toLowerCase().includes(ql) ||
+              ticketNo.toLowerCase().includes(ql)
+            );
+          }),
         },
+      },
   );
 
   const hf = fp.length > 0 || fo;
@@ -2898,32 +2886,32 @@ export default function TasksPage() {
     ...(staff ? [{ id: 'ticket' as CtxMode, label: 'Заявка', icon: Ticket }] : []),
   ];
 
-const ldTicketsAsync = useCallback(
-  async (search: string, p: number) => {
-    const r = await ticketsApi.getAll(p, 20, {
-      project_ids: selP ? [selP] : undefined,
-      query: search || undefined,
-    });
+  const ldTicketsAsync = useCallback(
+    async (search: string, p: number) => {
+      const r = await ticketsApi.getAll(p, 20, {
+        project_ids: selP ? [selP] : undefined,
+        query: search || undefined,
+      });
 
-    return {
-      items: r.items.map((t: any) => ({
-        value: t.id,
-        label: `${t.number} — ${t.title}`,
-      })),
-      hasNext: r.items.length === 20,
-    };
-  },
-  [selP],
-);
+      return {
+        items: r.items.map((t: any) => ({
+          value: t.id,
+          label: `${t.number} — ${t.title}`,
+        })),
+        hasNext: r.items.length === 20,
+      };
+    },
+    [selP],
+  );
 
   const ldProjAsync = useCallback(async (search: string, p: number) => {
     const r = await projectsApi.getAll(p, 20);
     const f = search
       ? r.items.filter(
-          (x) =>
-            x.name.toLowerCase().includes(search.toLowerCase()) ||
-            x.key.toLowerCase().includes(search.toLowerCase()),
-        )
+        (x) =>
+          x.name.toLowerCase().includes(search.toLowerCase()) ||
+          x.key.toLowerCase().includes(search.toLowerCase()),
+      )
       : r.items;
 
     return {
@@ -2947,10 +2935,10 @@ const ldTicketsAsync = useCallback(
 
     const f = search
       ? items.filter(
-          (u) =>
-            (u.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
-            u.email.toLowerCase().includes(search.toLowerCase()),
-        )
+        (u) =>
+          (u.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
+          u.email.toLowerCase().includes(search.toLowerCase()),
+      )
       : items;
 
     return {
@@ -2965,9 +2953,9 @@ const ldTicketsAsync = useCallback(
 
   const dragInfo = drag
     ? (() => {
-        const t = cols.flatMap((c) => c.tasks.items).find((x) => x.id === drag.id);
-        return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null;
-      })()
+      const t = cols.flatMap((c) => c.tasks.items).find((x) => x.id === drag.id);
+      return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null;
+    })()
     : null;
 
   return (
@@ -3005,11 +2993,10 @@ const ldTicketsAsync = useCallback(
           <div className="relative">
             <button
               onClick={() => setSf((v) => !v)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${
-                hf
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${hf
                   ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--accent)]'
                   : 'bg-[var(--hover-2)] border-[var(--border-color)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-3)]'
-              }`}
+                }`}
             >
               <Filter className="w-4 h-4" />
               Фильтры
@@ -3035,11 +3022,10 @@ const ldTicketsAsync = useCallback(
                                 v.includes(p.value) ? v.filter((x) => x !== p.value) : [...v, p.value],
                               )
                             }
-                            className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-all ${
-                              fp.includes(p.value)
+                            className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-all ${fp.includes(p.value)
                                 ? `${m.bg} ${m.c} ${m.brd}`
                                 : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                            }`}
+                              }`}
                           >
                             <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
                             {p.label}
@@ -3052,14 +3038,12 @@ const ldTicketsAsync = useCallback(
                   <div className="border-t border-[var(--border-color)] pt-2">
                     <button
                       onClick={() => setFo((v) => !v)}
-                      className={`w-full flex items-center gap-2 py-1.5 px-2 rounded font-medium text-sm transition-colors ${
-                        fo ? 'text-[var(--accent)] bg-[var(--accent)]/5' : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'
-                      }`}
+                      className={`w-full flex items-center gap-2 py-1.5 px-2 rounded font-medium text-sm transition-colors ${fo ? 'text-[var(--accent)] bg-[var(--accent)]/5' : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'
+                        }`}
                     >
                       <div
-                        className={`w-4 h-4 rounded border flex items-center justify-center ${
-                          fo ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'
-                        }`}
+                        className={`w-4 h-4 rounded border flex items-center justify-center ${fo ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'
+                          }`}
                       >
                         {fo && <Check className="w-3 h-3 text-white" />}
                       </div>
@@ -3112,11 +3096,10 @@ const ldTicketsAsync = useCallback(
                 <button
                   key={t.id}
                   onClick={() => setMode(t.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
-                    mode === t.id
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${mode === t.id
                       ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
                       : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'
-                  }`}
+                    }`}
                 >
                   <I className="w-3.5 h-3.5" />
                   {t.label}
@@ -3166,11 +3149,10 @@ const ldTicketsAsync = useCallback(
         <div className="flex items-center gap-1 p-1 bg-[var(--hover-1)] rounded-lg border border-[var(--border-color)]">
           <button
             onClick={() => setViewMode('kanban')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'kanban'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'kanban'
                 ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
                 : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'
-            }`}
+              }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
             Доска
@@ -3178,11 +3160,10 @@ const ldTicketsAsync = useCallback(
 
           <button
             onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'list'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'list'
                 ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
                 : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'
-            }`}
+              }`}
           >
             <List className="w-3.5 h-3.5" />
             Список
