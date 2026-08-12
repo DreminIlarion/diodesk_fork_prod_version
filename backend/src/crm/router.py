@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Body, Depends, Path, Query, status
 from pydantic import EmailStr
 
+from src.shared.domain.exceptions import NotFoundError
 from src.iam.dependencies import get_current_user, require_role
 from src.iam.domain.vo import UserRole
 from src.iam.mappers import map_user_to_response
@@ -111,7 +112,11 @@ async def get_counterparties(
     description="Soft-delete метод, делает контрагента не активным не удаляя фактически"
 )
 async def delete_counterparty(counterparty_id: UUID, repository: CounterpartyRepoDep) -> None:
-    await repository.update(counterparty_id, is_active=False)
+    counterparty = await repository.read(counterparty_id)
+    if counterparty is None:
+        raise NotFoundError(f"Counterparty with ID {counterparty_id} not found")
+    counterparty.is_active = False
+    await repository.update(counterparty)
 
 
 @router.post(
@@ -137,7 +142,7 @@ async def add_contact_person(
 async def delete_contact_person(
         counterparty_id: UUID,
         phone: Annotated[str, Query(..., description="Номер телефона")],
-        email: Annotated[EmailStr, Query(..., description="Email адрес")],
+        email: Annotated[EmailStr | None, Query(None, description="Email адрес")],
         service: CounterpartyServiceDep,
 ) -> CounterpartyResponse:
     return await service.delete_contact_person(counterparty_id, phone, email)
