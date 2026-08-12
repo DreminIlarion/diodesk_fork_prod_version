@@ -922,7 +922,7 @@ function HoursBadge({
 }) {
   const cls =
     tone === 'accent'
-      ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+      ? 'bg-green-500/10 text-green-400 border-green-500/20'
       : 'bg-[var(--hover-2)] text-[var(--text-primary)]/55 border-[var(--border-color)]';
 
   return (
@@ -2531,6 +2531,16 @@ export default function TasksPage() {
   const up = sp.get('project_id');
   const ua = sp.get('assignee_id');
   const ut = sp.get('ticket_id');
+
+  // логика перехода с Заявок
+  const shouldCreate = sp.get('create') === '1';
+
+  useEffect(() => {
+    if (shouldCreate && ut) {
+      setCreate('backlog');
+    }
+  }, [shouldCreate, ut]);
+  // вот конец её 
 
   const staff = (user?.roles ?? []).some((r) =>
     ['admin', 'support_manager', 'support_agent', 'executor'].includes(r),

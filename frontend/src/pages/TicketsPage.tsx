@@ -7,15 +7,13 @@ import {
   Clock, AlertTriangle, CheckCircle2, Calendar, XCircle,
   Building2, User, X, SlidersHorizontal, ChevronDown, Check,
   Sparkles, Flame, MessageSquare, HelpCircle, Edit3, FolderOpen,
-  UserCheck, Ticket,
+  UserCheck, Ticket, MoreVertical,
 } from 'lucide-react';
 import { ticketsApi, counterpartiesApi, projectsApi, usersApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import type { TicketListItem, Counterparty, Project, SimpleUser } from '../types';
 
-/* ═══════════════════════════════════════════════════════════════════
-   СТАТУСЫ
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══ СТАТУСЫ ═══ */
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   'new': { label: 'Новый', color: 'status-new' },
@@ -34,9 +32,7 @@ const STATUS_OPTIONS = Object.entries(STATUS_MAP).map(([value, { label, color }]
   value, label, color,
 }));
 
-/* ═══════════════════════════════════════════════════════════════════
-   ПРИОРИТЕТЫ
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══ ПРИОРИТЕТЫ ═══ */
 
 const PRIORITY_MAP: Record<string, { label: string; color: string }> = {
   'low': { label: 'Низкий', color: 'priority-low' },
@@ -49,9 +45,7 @@ const PRIORITY_OPTIONS = Object.entries(PRIORITY_MAP).map(([value, { label, colo
   value, label, color,
 }));
 
-/* ═══════════════════════════════════════════════════════════════════
-   ТИПЫ ЗАЯВОК
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══ ТИПЫ ЗАЯВОК ═══ */
 
 const TICKET_TYPES: { value: string; label: string; icon: ReactNode; color: string }[] = [
   { value: 'Инцидент', label: 'Инцидент', icon: <AlertTriangle size={14} />, color: 'type-incident' },
@@ -65,9 +59,7 @@ const TICKET_TYPES: { value: string; label: string; icon: ReactNode; color: stri
   { value: 'Прочее', label: 'Прочее', icon: <MessageSquare size={14} />, color: 'type-other' },
 ];
 
-/* ═══════════════════════════════════════════════════════════════════
-   УТИЛИТЫ
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══ УТИЛИТЫ ═══ */
 
 function toShortName(fullName: string | null | undefined): string {
   if (!fullName) return '—';
@@ -93,16 +85,13 @@ function formatDate(d: string): string {
   return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-/** Безопасно достаём items из любого ответа API */
 function toItems<T>(res: any): T[] {
   if (Array.isArray(res)) return res as T[];
   if (Array.isArray(res?.items)) return res.items as T[];
   return [];
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   ИНТЕРФЕЙСЫ
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══ ИНТЕРФЕЙСЫ ═══ */
 
 interface DropdownOption {
   value: string;
@@ -123,10 +112,7 @@ interface FilterDropdownProps {
   multiple?: boolean;
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   FILTER DROPDOWN — ИСПРАВЛЕННЫЙ
-   Ключевое: убран w-max, добавлен max-w и right-0 fallback
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══ FILTER DROPDOWN ═══ */
 
 function FilterDropdown({
   label, icon, options, value, onChange,
@@ -249,7 +235,6 @@ function FilterDropdown({
         )}
       </button>
 
-      {/* ▼ DROPDOWN MENU — фиксированная ширина, не вылезает ▼ */}
       {open && (
         <div
           className="absolute z-[100] top-full mt-2 left-0 w-[280px]
@@ -352,9 +337,7 @@ function FilterDropdown({
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   STAT CARD
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══ STAT CARD ═══ */
 
 function StatCard({ label, value, icon: Icon, color, bg }: {
   label: string; value: number; icon: ElementType; color: string; bg: string;
@@ -373,9 +356,7 @@ function StatCard({ label, value, icon: Icon, color, bg }: {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   FILTER TAG
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══ FILTER TAG ═══ */
 
 function FilterTag({ label, icon, colorClass, onRemove }: {
   label: string; icon?: ReactNode; colorClass?: string; onRemove: () => void;
@@ -393,9 +374,77 @@ function FilterTag({ label, icon, colorClass, onRemove }: {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   TICKET ROW
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══ TICKET ACTIONS (троеточие) ═══ */
+
+function TicketActions({ ticket }: { ticket: TicketListItem }) {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        className="p-1.5 rounded-lg text-[var(--text-primary)]/25 hover:text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] transition-colors"
+      >
+        <MoreVertical size={16} />
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1 z-[60] w-[220px] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setOpen(false);
+              navigate(`/tasks?ticket_id=${ticket.id}`);
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/80 hover:bg-[var(--hover-1)] transition-colors text-left"
+          >
+            <FileText size={16} className="text-[var(--text-primary)]/40 shrink-0" />
+            <span>Задачи по заявке</span>
+          </button>
+
+          <div className="h-px bg-[var(--border-color)] mx-3" />
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setOpen(false);
+              navigate(`/tasks?ticket_id=${ticket.id}&create=1`);
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/80 hover:bg-[var(--hover-1)] transition-colors text-left"
+          >
+            <Plus size={16} className="text-[var(--accent)] shrink-0" />
+            <span>Создать задачу</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══ TICKET ROW ═══ */
 
 function TicketRow({ ticket, showAssignee, showReporter }: {
   ticket: TicketListItem;
@@ -413,7 +462,7 @@ function TicketRow({ ticket, showAssignee, showReporter }: {
       className="grid items-start px-4 py-3.5 rounded-xl
                  hover:bg-[var(--hover-1)] active:bg-[var(--hover-2)]
                  transition-colors duration-100 group"
-      style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) 160px 120px 110px 20px' }}
+      style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) 160px 120px 110px 50px' }}
     >
       <div className="min-w-0 pr-3">
         <span className="text-[17px] font-semibold text-[var(--text-primary)] block leading-snug
@@ -490,7 +539,8 @@ function TicketRow({ ticket, showAssignee, showReporter }: {
         </span>
       </div>
 
-      <div className="self-center flex justify-end">
+      <div className="self-center flex items-center justify-end gap-1">
+        <TicketActions ticket={ticket} />
         <ChevronRight size={18}
           className="text-[var(--text-primary)]/20 group-hover:text-[var(--accent-light)]
                      group-hover:translate-x-0.5 transition-all shrink-0" />
@@ -499,9 +549,7 @@ function TicketRow({ ticket, showAssignee, showReporter }: {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   TABLE HEADER
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══ TABLE HEADER ═══ */
 
 function TableHeader({ showAssigneeCol }: { showAssigneeCol: boolean }) {
   const cols: { label: ReactNode; align?: string }[] = [
@@ -517,7 +565,7 @@ function TableHeader({ showAssigneeCol }: { showAssigneeCol: boolean }) {
     <div
       className="hidden lg:grid px-4 py-2 text-[13px] uppercase tracking-widest
                  font-semibold text-[var(--text-primary)]/25 border-b border-[var(--border-color)]"
-      style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) 160px 120px 110px 20px' }}
+      style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) 160px 120px 110px 50px' }}
     >
       {cols.map((c, i) => (
         <div key={i} className={c.align || ''}>{c.label}</div>
@@ -526,9 +574,7 @@ function TableHeader({ showAssigneeCol }: { showAssigneeCol: boolean }) {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   EMPTY STATE
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══ EMPTY STATE ═══ */
 
 function EmptyState({ hasFilters, hasSearch, onCreateClick }: {
   hasFilters: boolean; hasSearch: boolean; onCreateClick: () => void;
@@ -555,9 +601,7 @@ function EmptyState({ hasFilters, hasSearch, onCreateClick }: {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   ОСНОВНОЙ КОМПОНЕНТ
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══ ОСНОВНОЙ КОМПОНЕНТ ═══ */
 
 export default function TicketsPage() {
   const navigate = useNavigate();
@@ -570,20 +614,9 @@ export default function TicketsPage() {
   const isCustomerAdmin = roles.includes('customer_admin');
   const isClientUser = isCustomer || isCustomerAdmin;
 
-  /*
-    Видимость фильтров:
-    ┌──────────────────┬──────────┬────────────────┬──────────────┐
-    │ Фильтр           │ customer │ customer_admin │ остальные    │
-    ├──────────────────┼──────────┼────────────────┼──────────────┤
-    │ Контрагент       │ ❌       │ ❌             │ ✅           │
-    │ Исполнитель      │ ❌       │ ❌             │ ✅           │
-    │ Автор            │ ❌       │ ✅             │ ✅           │
-    │ Проект           │ ✅ (свои)│ ✅ (свои)      │ ✅ (все)     │
-    └──────────────────┴──────────┴────────────────┴──────────────┘
-  */
   const showCounterpartyFilter = !isClientUser;
   const showAssigneeFilter = !isClientUser;
-  const showReporterFilter = !isCustomer;  // customer_admin + остальные
+  const showReporterFilter = !isCustomer;
   const showAssigneeCol = !isClientUser;
   const showReporterCol = !isCustomer;
 
@@ -625,7 +658,7 @@ export default function TicketsPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  /* ── Загрузка проектов для клиентов (getMyProjects) ── */
+  /* ── Загрузка проектов для клиентов ── */
   useEffect(() => {
     if (!isClientUser) return;
     setLoadingProjects(true);
@@ -646,7 +679,6 @@ export default function TicketsPage() {
         .finally(() => setLoadingCounterparties(false));
     }
 
-    // Проекты для не-клиентов (у клиентов уже загружены выше)
     if (!isClientUser && projects.length === 0) {
       setLoadingProjects(true);
       projectsApi.getAll(1, 100)
@@ -662,11 +694,7 @@ export default function TicketsPage() {
     }
   }, [showFilters]);
 
-  /* ── Сборка параметров фильтрации ──
-     Для клиентов НЕ передаём project_ids принудительно.
-     Бэкенд сам фильтрует по контрагенту текущего пользователя.
-     Фронт передаёт project_ids ТОЛЬКО если пользователь явно выбрал проект в фильтре.
-  */
+  /* ── Сборка параметров фильтрации ── */
   const buildFilters = useCallback(() => ({
     query: debouncedSearch || undefined,
     status: statusFilter.length > 0 ? statusFilter : undefined,
@@ -785,10 +813,7 @@ export default function TicketsPage() {
     label: u.full_name || u.username || u.email || 'Без имени',
     sublabel: u.email,
   }));
-
-  /* ══════════════════════════════════════════════════════════════════
-     RENDER
-     ══════════════════════════════════════════════════════════════════ */
+  /* ═══ RENDER ═══ */
 
   if (initialLoad) {
     return (
@@ -902,10 +927,7 @@ export default function TicketsPage() {
             )}
           </div>
 
-          {/* Сетка фильтров — overflow-visible чтобы dropdown не обрезался,
-              но контейнер не расширяется за пределы страницы */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 items-start">
-
             <FilterDropdown
               label="Статус"
               options={STATUS_OPTIONS}
@@ -978,7 +1000,6 @@ export default function TicketsPage() {
               />
             )}
 
-            {/* Дата — занимает 2 колонки на sm+ */}
             <div className="sm:col-span-2 xl:col-span-2">
               <label className="text-sm text-[var(--text-primary)]/50 mb-1.5 block font-medium">
                 Дата создания
@@ -1138,9 +1159,12 @@ export default function TicketsPage() {
                         </span>
                       )}
                     </div>
-                    <ChevronRight size={18}
-                      className="text-[var(--text-muted)] group-hover:text-[var(--accent-light)]
-                                 group-hover:translate-x-0.5 transition-all shrink-0" />
+                    <div className="flex items-center gap-1">
+                      <TicketActions ticket={ticket} />
+                      <ChevronRight size={18}
+                        className="text-[var(--text-muted)] group-hover:text-[var(--accent-light)]
+                                   group-hover:translate-x-0.5 transition-all shrink-0" />
+                    </div>
                   </div>
 
                   <h3 className="text-[18px] font-semibold text-[var(--text-primary)] mb-3
