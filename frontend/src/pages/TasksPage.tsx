@@ -1101,36 +1101,46 @@ function TCard({
       onDragEnd={onDE}
       onClick={() => onView(t)}
       animate={{
-        rotate: dragging ? -2.5 : 0,
-        scale: dragging ? 1.03 : 1,
-        opacity: dragging ? 0.45 : 1,
+        rotate: dragging ? 3 : 0, // Наклон в другую сторону (вправо)
+        scale: dragging ? 1.04 : 1,
+        opacity: dragging ? 0.4 : 1,
+        zIndex: dragging ? 50 : 1,
       }}
-      transition={{ duration: 0.16 }}
-      className={`bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer transition-colors hover:bg-[var(--hover-1)] hover:border-[var(--accent)]/30 shadow-sm min-h-[136px] flex flex-col ${
+      transition={{ type: 'spring', damping: 25, stiffness: 400 }}
+      className={`group bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer transition-colors hover:bg-[var(--hover-1)] hover:border-[var(--accent)]/30 shadow-sm min-h-[140px] flex flex-col ${
         od ? 'border-red-500/40 bg-red-500/5' : 'border-[var(--border-color)]'
       }`}
     >
-      {/* 1. Номер */}
-      <span className="text-[11px] font-mono text-[var(--text-primary)]/38 mb-2 leading-none">
+      {/* 1. Номер задачи — теперь чётко виден */}
+      <span className="text-xs font-mono text-[var(--text-primary)]/45 mb-1.5 leading-none">
         #{t.number}
       </span>
 
-      {/* 2. Название — главный акцент */}
-      <h4 className="text-[15px] font-bold text-[var(--text-primary)] leading-5 tracking-[-0.01em] line-clamp-2 mb-3">
+      {/* 2. Название — самый жирный акцент */}
+      <h4 className="text-[15px] font-bold text-[var(--text-primary)] leading-snug tracking-tight line-clamp-2 mb-3">
         {t.title}
       </h4>
 
-      {/* 3. Приоритет + сложность */}
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
+      {/* 3. Бейджи */}
+      <div className="flex items-center gap-2 mb-3.5 flex-wrap">
         <PriBadge p={t.priority} />
         {t.story_points != null && <ComplexityBadge v={t.story_points} />}
       </div>
 
-      {/* 4. Низ карточки */}
-      <div className="flex items-center justify-between border-t border-[var(--border-color)] pt-2.5 mt-auto min-h-[28px]">
-        <span className="text-xs text-[var(--text-primary)]/62 truncate max-w-[120px] font-medium">
-          {assigneeSurname ?? '—'}
-        </span>
+      {/* 4. Низ карточки: Аватар + Фамилия (13px) | Иконки + Срок */}
+      <div className="flex items-center justify-between border-t border-[var(--border-color)] pt-3 mt-auto">
+        <div className="flex items-center gap-2 min-w-0">
+          {a ? (
+            <>
+              <Ava name={a.full_name || a.username} url={a.avatar_url} sz="xs" />
+              <span className="text-[10px] text-[var(--text-primary)]/70 font-medium truncate max-w-[100px]">
+                {assigneeSurname}
+              </span>
+            </>
+          ) : (
+            <span className="text-xs text-[var(--text-primary)]/30">—</span>
+          )}
+        </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
           {t.ticket_id && (
@@ -1141,8 +1151,8 @@ function TCard({
           )}
           {t.due_date && (
             <span
-              className={`text-xs font-medium ml-0.5 ${
-                od ? 'text-red-400' : 'text-[var(--text-primary)]/42'
+              className={`text-[12px] font-semibold ml-0.5 ${
+                od ? 'text-red-400' : 'text-[var(--text-primary)]/45'
               }`}
             >
               {fmtDue(t.due_date)}
