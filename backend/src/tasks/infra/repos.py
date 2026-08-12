@@ -113,19 +113,30 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
     async def get_next_sequence(
             self, ticket_id: UUID | None = None, project_id: UUID | None = None
     ) -> int:
-        # Атомарная операция для получения последовательности
+        # Считаем реальное количество задач
+        count_stmt = select(func.count()).select_from(TaskOrm)
+        if ticket_id is not None:
+            count_stmt = count_stmt.where(TaskOrm.ticket_id == ticket_id)
+        elif project_id is not None:
+            count_stmt = count_stmt.where(TaskOrm.project_id == project_id)
+        else:
+            count_stmt = count_stmt.where(TaskOrm.ticket_id.is_(None), TaskOrm.project_id.is_(None))
+        
+        real_count = await self.session.scalar(count_stmt)
+        next_num = (real_count or 0) + 1
+        
+        # Атомарная вставка/обновление
         stmt = (
             pg_insert(TaskSequence)
-            .values(project_id=project_id, ticket_id=ticket_id, last_number=1)
+            .values(project_id=project_id, ticket_id=ticket_id, last_number=next_num)
             .on_conflict_do_update(
                 constraint="uq_task_sequences",
                 set_={"last_number": TaskSequence.last_number + 1},
             )
             .returning(TaskSequence.last_number)
         )
-
+        
         result = await self.session.execute(stmt)
-
         return result.scalar_one()
 
     async def get_grouped_by_status(
