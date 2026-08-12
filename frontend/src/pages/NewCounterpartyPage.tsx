@@ -564,7 +564,7 @@ export default function NewCounterpartyPage() {
     const allEmails = collectAllEmails(
       formData.email, contactPersons, includeContacts, branches, includeBranches,
     );
-    const invalidEmail = allEmails.find(e => !isEmailValid(e.email));
+    const invalidEmail = allEmails.find(e => e.email.trim() && !isEmailValid(e.email));
     if (invalidEmail) {
       setGeneralError(`Некорректный email "${invalidEmail.email}" в: ${invalidEmail.source}`);
       return;
@@ -717,7 +717,7 @@ export default function NewCounterpartyPage() {
     isOkpoValid
   );
 
-  const isStep2Valid = companyPhone.isComplete && isEmailFilled && isEmailCorrect;
+  const isStep2Valid = companyPhone.isComplete
 
   const totalSteps = formData.counterparty_type === 'Юридическое лицо' ? 5 : 4;
   const productsStep = formData.counterparty_type === 'Юридическое лицо' ? 5 : 4;
@@ -753,10 +753,10 @@ export default function NewCounterpartyPage() {
               onClick={() => { if (s < step) setStep(s); }}
               disabled={s > step}
               className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-semibold transition-all ${step === s
-                  ? 'bg-[var(--accent)] text-white shadow-[var(--shadow-md)]'
-                  : step > s
-                    ? 'bg-emerald-600 text-white cursor-pointer hover:bg-emerald-500'
-                    : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40'
+                ? 'bg-[var(--accent)] text-white shadow-[var(--shadow-md)]'
+                : step > s
+                  ? 'bg-emerald-600 text-white cursor-pointer hover:bg-emerald-500'
+                  : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40'
                 }`}
             >
               {step > s ? <Check className="w-4 h-4" /> : s}
@@ -799,8 +799,8 @@ export default function NewCounterpartyPage() {
               {COUNTERPARTY_TYPES.map(type => (
                 <button key={type.value} type="button" onClick={() => handleTypeChange(type.value)}
                   className={`p-5 rounded-xl border-2 text-left transition-all ${formData.counterparty_type === type.value
-                      ? 'border-[var(--accent)]/60 bg-[var(--accent)]/[0.06]'
-                      : 'border-[var(--border-color)] bg-[var(--hover-1)] hover:border-[var(--accent)]/20'
+                    ? 'border-[var(--accent)]/60 bg-[var(--accent)]/[0.06]'
+                    : 'border-[var(--border-color)] bg-[var(--hover-1)] hover:border-[var(--accent)]/20'
                     }`}>
                   <div className={`mb-2 ${formData.counterparty_type === type.value ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'}`}>
                     {type.icon}
@@ -991,13 +991,13 @@ export default function NewCounterpartyPage() {
             <div>
               <label className={labelCls}>
                 <Mail className="w-4 h-4 inline mr-1.5 text-[var(--text-primary)]/40" />
-                Email <span className="text-[var(--accent)]">*</span>
+                Email <span className="text-[var(--accent)]">(необяз.)</span>
               </label>
               <EmailInput
                 value={formData.email}
                 onChange={v => { clearErrors(); setFormData({ ...formData, email: v }); }}
                 placeholder="info@company.ru"
-                required
+
                 hasBackendError={hasFieldError(fieldErrors, 'email')}
               />
               <FieldErrorMsg fieldErrors={fieldErrors} fieldName="email" />
@@ -1103,7 +1103,7 @@ export default function NewCounterpartyPage() {
                   />
                 </div>
                 <div>
-                  <label className={labelCls}>Email</label>
+                  <label className={labelCls}>Email <span className="text-[var(--text-primary)]/40 text-sm font-normal">(необяз.)</span></label>
                   <EmailInput
                     value={cp.email ?? ''}
                     onChange={v => updateContactPerson(i, { ...cp, email: v })}
@@ -1350,7 +1350,7 @@ export default function NewCounterpartyPage() {
         </div>
       )}
 
-            {/* ═══ Шаг «Продукты» ═══ */}
+      {/* ═══ Шаг «Продукты» ═══ */}
       {step === productsStep && (
         <div className="bg-[var(--hover-2)] border border-[var(--border-color)] rounded-2xl p-6 space-y-6">
           <div className="flex items-center justify-between p-4 bg-[var(--hover-1)] rounded-xl border border-[var(--border-color)]">
@@ -1437,11 +1437,10 @@ export default function NewCounterpartyPage() {
                       <button
                         key={env.value}
                         onClick={() => setProductEnv(env.value)}
-                        className={`px-3 py-2.5 rounded-xl text-base font-medium transition-all ${
-                          productEnv === env.value
+                        className={`px-3 py-2.5 rounded-xl text-base font-medium transition-all ${productEnv === env.value
                             ? envBadgeClass(env.value)
                             : 'border border-[var(--border-color)] bg-[var(--hover-1)] text-[var(--text-primary)]/40 hover:bg-[var(--hover-2)]'
-                        }`}
+                          }`}
                       >
                         {env.label}
                       </button>
@@ -1499,8 +1498,8 @@ export default function NewCounterpartyPage() {
               )}
             </div>
           )}
-          
-                   {/* Предупреждение о дубликатах email */}
+
+          {/* Предупреждение о дубликатах email */}
           <DuplicateEmailWarning
             duplicates={findDuplicateEmails(
               formData.email, contactPersons, includeContacts, branches, includeBranches,
