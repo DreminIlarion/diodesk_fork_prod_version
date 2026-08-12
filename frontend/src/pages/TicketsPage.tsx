@@ -420,7 +420,7 @@ function TicketActions({ ticket }: { ticket: TicketListItem }) {
             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/80 hover:bg-[var(--hover-1)] transition-colors text-left"
           >
             <FileText size={16} className="text-[var(--text-primary)]/40 shrink-0" />
-            <span>Задачи по заявке</span>
+            <span>Посмотреть задачи по заявке</span>
           </button>
 
           <div className="h-px bg-[var(--border-color)] mx-3" />
@@ -436,7 +436,7 @@ function TicketActions({ ticket }: { ticket: TicketListItem }) {
             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/80 hover:bg-[var(--hover-1)] transition-colors text-left"
           >
             <Plus size={16} className="text-[var(--accent)] shrink-0" />
-            <span>Создать задачу</span>
+            <span>Создать задачу на основании</span>
           </button>
         </div>
       )}

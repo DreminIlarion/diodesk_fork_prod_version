@@ -660,38 +660,55 @@ export default function NewTicketPage() {
         )}
       </div>
 
-      {/* Compact Progress */}
-      <div className="flex items-center gap-2 mb-8">
-        {[
-          { num: 1, label: 'Описание', icon: <FileText className="w-4 h-4" /> },
-          { num: 2, label: 'Классификация', icon: <Tag className="w-4 h-4" /> },
-          { num: 3, label: 'Отправка', icon: <CheckCircle2 className="w-4 h-4" /> },
-        ].map((s, i) => (
-          <div key={s.num} className="flex items-center flex-1">
-            <button
-              onClick={() => {
-                if (s.num < step) setStep(s.num);
-                else if (s.num === step + 1 && step === 1 && validateStep1()) setStep(s.num);
-              }}
-              disabled={s.num > step + 1}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium w-full transition-all
-                ${step === s.num
-                  ? 'bg-red-700 text-white shadow-md'
-                  : step > s.num
-                    ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 cursor-pointer hover:bg-emerald-600/30'
-                    : 'bg-[var(--hover-1)] text-[var(--text-primary)]/40 border border-[var(--border-color)]'
-                }`}>
-              {step > s.num ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : s.icon}
-              <span className="hidden sm:inline">{s.label}</span>
-              <span className="sm:hidden">{s.num}</span>
-            </button>
-            {i < 2 && (
-              <div className={`w-6 h-0.5 mx-1 rounded-full flex-shrink-0
-                ${step > s.num ? 'bg-emerald-500' : 'bg-[var(--border-color)]'}`} />
-            )}
+      {/* Progress stepper */}
+<div className="flex items-center gap-0 mb-8">
+  {[
+    { num: 1, label: 'Описание', icon: <FileText className="w-4 h-4" /> },
+    { num: 2, label: 'Классификация', icon: <Tag className="w-4 h-4" /> },
+    { num: 3, label: 'Отправка', icon: <CheckCircle2 className="w-4 h-4" /> },
+  ].map((s, i) => {
+    const isActive = step === s.num;
+    const isDone = step > s.num;
+    const isNext = s.num === step + 1;
+
+    return (
+      <div key={s.num} className="flex items-center flex-1">
+        <button
+          onClick={() => {
+            if (isDone) setStep(s.num);
+            else if (isNext && step === 1 && validateStep1()) setStep(s.num);
+          }}
+          disabled={s.num > step + 1}
+          className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium w-full transition-all duration-200 border
+            ${isActive
+              ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-lg shadow-[var(--accent)]/20'
+              : isDone
+                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 cursor-pointer hover:bg-emerald-500/25'
+                : 'bg-[var(--hover-1)] text-[var(--text-primary)]/35 border-[var(--border-color)] cursor-default'
+            }`}
+        >
+          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold
+            ${isActive
+              ? 'bg-white/20'
+              : isDone
+                ? 'bg-emerald-500/20'
+                : 'bg-[var(--hover-2)]'
+            }`}
+          >
+            {isDone ? <CheckCircle2 className="w-4 h-4" /> : s.num}
           </div>
-        ))}
+          <span className="hidden sm:inline truncate">{s.label}</span>
+        </button>
+
+        {i < 2 && (
+          <div className={`w-8 h-[2px] mx-1 rounded-full shrink-0 transition-colors duration-300
+            ${step > s.num ? 'bg-emerald-500/60' : 'bg-[var(--border-color)]'}`}
+          />
+        )}
       </div>
+    );
+  })}
+</div>
 
       {/* Draft restored notice */}
       {hasDraft && step === 1 && title && (
@@ -1160,13 +1177,13 @@ export default function NewTicketPage() {
         {/* ═══ Step 3 ═══ */}
         {step === 3 && (
           <div className="space-y-6">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-3">
-                <CheckCircle2 className="w-10 h-10 text-green-400" />
-              </div>
-              <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-1">Проверьте заявку</h2>
-              <p className="text-sm text-[var(--text-primary)]/60">Убедитесь, что всё верно перед отправкой</p>
-            </div>
+            <div className="text-center mb-8">
+  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
+    <CheckCircle2 className="w-7 h-7 text-emerald-400" />
+  </div>
+  <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-1">Проверьте заявку</h2>
+  <p className="text-sm text-[var(--text-primary)]/50">Убедитесь, что всё верно перед отправкой</p>
+</div>
 
             <div className="space-y-4">
               {/* Привязка */}
@@ -1244,20 +1261,21 @@ export default function NewTicketPage() {
               </div>
 
               {/* Тип + Приоритет */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-4 rounded-xl bg-[var(--hover-1)]">
-                  <p className="text-[var(--text-primary)]/50 text-xs mb-2">Тип</p>
-                  <div className={`inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-xl ${TICKET_TYPES.find(t => t.value === type)?.color || ''}`}>
-                    {TICKET_TYPES.find(t => t.value === type)?.icon} {type}
-                  </div>
-                </div>
-                <div className="p-4 rounded-xl bg-[var(--hover-1)]">
-                  <p className="text-[var(--text-primary)]/50 text-xs mb-2">Приоритет</p>
-                  <div className={`inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-xl ${PRIORITIES.find(p => p.value === priority)?.color || ''}`}>
-                    {PRIORITIES.find(p => p.value === priority)?.icon} {PRIORITIES.find(p => p.value === priority)?.label || priority}
-                  </div>
-                </div>
-              </div>
+              {/* Тип + Приоритет */}
+<div className="grid grid-cols-2 gap-3">
+  <div className="p-4 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
+    <p className="text-[var(--text-primary)]/40 text-xs mb-2 font-medium uppercase tracking-wider">Тип</p>
+    <div className={`inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg font-medium border ${TICKET_TYPES.find(t => t.value === type)?.color || ''}`}>
+      {TICKET_TYPES.find(t => t.value === type)?.icon} {type}
+    </div>
+  </div>
+  <div className="p-4 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
+    <p className="text-[var(--text-primary)]/40 text-xs mb-2 font-medium uppercase tracking-wider">Приоритет</p>
+    <div className={`inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg font-medium border ${PRIORITIES.find(p => p.value === priority)?.color || ''}`}>
+      {PRIORITIES.find(p => p.value === priority)?.icon} {PRIORITIES.find(p => p.value === priority)?.label || priority}
+    </div>
+  </div>
+</div>
 
               {/* Теги */}
               {tags.length > 0 && (
@@ -1296,34 +1314,34 @@ export default function NewTicketPage() {
           </div>
         )}
 
-        {/* Navigation */}
-        <div className="flex justify-between items-center mt-8 pt-6 border-t border-[var(--border-color)]">
-          {step > 1 ? (
-            <button onClick={() => setStep(step - 1)}
-              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[var(--hover-1)] hover:bg-[var(--hover-2)]
-                         text-sm font-medium text-[var(--text-primary)] transition-colors">
-              <ArrowLeft className="w-4 h-4" /> Назад
-            </button>
-          ) : <div />}
+{/* Navigation */}
+<div className="flex justify-between items-center mt-8 pt-6 border-t border-[var(--border-color)]">
+  {step > 1 ? (
+    <button onClick={() => setStep(step - 1)}
+      className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[var(--hover-1)] hover:bg-[var(--hover-2)]
+                 border border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)] transition-colors">
+      <ArrowLeft className="w-4 h-4" /> Назад
+    </button>
+  ) : <div />}
 
-          {step < 3 ? (
-            <button onClick={handleNextStep}
-              disabled={step === 1 && (!title.trim() || !hasDescription)}
-              className="px-8 py-3 rounded-xl bg-red-700 hover:bg-red-600 text-white text-sm font-semibold ml-auto
-                         shadow-lg shadow-red-900/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed
-                         disabled:hover:bg-red-700 flex items-center gap-2">
-              Далее <ArrowRight className="w-4 h-4" />
-            </button>
-          ) : (
-            <button onClick={handleSubmit} disabled={submitting}
-              className="px-8 py-3 rounded-xl bg-red-700 hover:bg-red-600 text-white text-sm font-semibold
-                         flex items-center gap-2 ml-auto disabled:opacity-50 shadow-lg shadow-red-900/30 transition-colors">
-              {submitting
-                ? <Loader2 className="w-5 h-5 animate-spin" />
-                : <><FileText className="w-4 h-4" /> Создать заявку</>}
-            </button>
-          )}
-        </div>
+  {step < 3 ? (
+    <button onClick={handleNextStep}
+      disabled={step === 1 && (!title.trim() || !hasDescription)}
+      className="px-8 py-3 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent)]/90 text-white text-sm font-semibold ml-auto
+                 shadow-lg shadow-[var(--accent)]/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed
+                 flex items-center gap-2">
+      Далее <ArrowRight className="w-4 h-4" />
+    </button>
+  ) : (
+    <button onClick={handleSubmit} disabled={submitting}
+      className="px-8 py-3 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent)]/90 text-white text-sm font-semibold
+                 flex items-center gap-2 ml-auto disabled:opacity-50 shadow-lg shadow-[var(--accent)]/20 transition-all">
+      {submitting
+        ? <Loader2 className="w-5 h-5 animate-spin" />
+        : <><FileText className="w-4 h-4" /> Создать заявку</>}
+    </button>
+  )}
+</div>
       </div>
     </div>
   );
