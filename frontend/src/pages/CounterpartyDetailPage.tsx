@@ -1180,7 +1180,7 @@ const priorityClr = (p: string) => ({
                     <p className="text-[var(--text-primary)] text-base font-mono">{counterparty.kpp}</p>
                   </div>
                 )}
-                {counterparty.okpo && (
+                {counterparty.okpo && counterparty.okpo !== 'None' && (
                   <div className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] p-5">
                     <p className="text-xs uppercase tracking-widest text-[var(--text-primary)]/40 mb-4 flex items-center gap-2"><Briefcase className="w-3.5 h-3.5" /> ОКПО</p>
                     <p className="text-[var(--text-primary)] text-base font-mono">{counterparty.okpo}</p>
