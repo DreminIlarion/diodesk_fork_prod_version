@@ -12,7 +12,7 @@ class ContactPersonIn(BaseModel):
     first_name: str = Field(..., description="Имя")
     last_name: str = Field(..., description="Фамилия")
     middle_name: str | None = Field(None, description="Отчество")
-    phone: str = Field(..., description="Номер телефона", examples=["88005553535", "+78005553535"])
+    phone: str | None = Field(None, description="Номер телефона", examples=["88005553535", "+78005553535"])
     email: EmailStr | None = Field(None, description="Адрес электронной почты")
     messengers: dict[str, str] = Field(
         default_factory=dict,
@@ -25,7 +25,7 @@ class ContactPersonOut(BaseModel):
     """Созданное контактное лицо"""
 
     full_name: str = Field(..., description="ФИО лица", examples=["Иванов Иван Иванович"])
-    phone: str = Field(..., description="Номер телефона", examples=["88005553535", "+78005553535"])
+    phone: str | None = Field(None, description="Номер телефона", examples=["88005553535", "+78005553535"])
     email: EmailStr | None = Field(None, description="Адрес электронной почты")
     messengers: dict[str, str] = Field(
         default_factory=dict,

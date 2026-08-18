@@ -721,7 +721,7 @@ export default function NewCounterpartyPage() {
   const isStep2Valid = companyPhone.isComplete
 
   const isStep3Valid = !includeContacts || contactPersons.every(cp => 
-    cp.last_name && cp.first_name && cp.middle_name && cp.phone
+    cp.last_name && cp.first_name && cp.middle_name 
   );
 
   const totalSteps = formData.counterparty_type === 'Юридическое лицо' ? 5 : 4;
@@ -1101,7 +1101,7 @@ export default function NewCounterpartyPage() {
               {/* Телефон + Email контакта */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={labelCls}>Телефон <span className="text-[var(--accent)]">*</span></label>
+                  <label className={labelCls}>Телефон <span className="text-[var(--text-primary)]/40 text-sm font-normal">(необяз.)</span></label>
                   <ContactPhoneInput
                     value={cp.phone}
                     onChange={(raw) => updateContactPerson(i, { ...cp, phone: raw })}
@@ -1174,7 +1174,7 @@ export default function NewCounterpartyPage() {
               Назад
             </button>
             <button onClick={() => setStep(4)}
-              disabled={includeContacts && contactPersons.some(cp => !cp.last_name || !cp.first_name || !cp.middle_name || !cp.phone)}
+              disabled={includeContacts && contactPersons.some(cp => !cp.last_name || !cp.first_name || !cp.middle_name )}
               className="px-6 py-3 text-base font-semibold text-white bg-[var(--accent)]
                         hover:bg-[var(--accent-light)] rounded-xl transition-all shadow-[var(--shadow-md)]
                         disabled:opacity-40 disabled:cursor-not-allowed">
