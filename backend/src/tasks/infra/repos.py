@@ -96,6 +96,7 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
             actual_hours=None if model.actual_hours is None else Decimal(model.actual_hours),
             project_id=model.project_id,
             ticket_id=model.ticket_id,
+            attachments=[AttachmentMapper.to_entity(a) for a in model.attachments],
             tags={Tag(name=tag["name"], color=tag["color"]) for tag in model.tags},
         )
 

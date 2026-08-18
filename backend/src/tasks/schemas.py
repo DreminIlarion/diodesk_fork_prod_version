@@ -135,6 +135,7 @@ class TaskViewResponse(BaseModel):
     due_date: date | None = Field(None, description="Срок выполнения (deadline)")
 
     ticket_id: UUID | None = Field(None, description="Тикет на основе которого создана задача")
+    attachments: list[AttachmentResponse] = Field(default_factory=list, description="Вложения")
     project_id: UUID | None = Field(None, description="Проект в рамках которого создана задача")
     tag: list[Tag] = Field(default_factory=list, description="Теги для маркировки и поиска")
 

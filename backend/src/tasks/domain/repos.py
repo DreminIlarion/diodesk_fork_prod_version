@@ -37,6 +37,7 @@ class TaskView:
 
     project_id: UUID | None = None
     ticket_id: UUID | None = None
+    attachments: list = field(default_factory=list)  # ← ДОБАВИ
 
     tags: set[Tag] = field(default_factory=set)
 

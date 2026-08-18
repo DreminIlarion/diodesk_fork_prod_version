@@ -41,6 +41,7 @@ def map_task_to_response(task: Task) -> TaskResponse:
 
 def map_task_view_to_response(task: TaskView) -> TaskViewResponse:
     tags = [Tag(name=tag.name, color=tag.color) for tag in task.tags]
+    attachments = [map_attachment_to_response(a) for a in task.attachments]
 
     return TaskViewResponse(
         id=task.id,
@@ -58,5 +59,6 @@ def map_task_view_to_response(task: TaskView) -> TaskViewResponse:
         actual_hours=float(task.actual_hours) if task.actual_hours else None,
         project_id=task.project_id,
         ticket_id=task.ticket_id,
+        attachments=attachments,
         tags=tags,
     )
