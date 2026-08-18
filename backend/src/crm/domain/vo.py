@@ -198,8 +198,8 @@ class ContactPerson(ValueObject):
     })
 
     full_name: FullName
-    phone: Phone
-    email: EmailStr
+    phone: Phone | None
+    email: EmailStr | None
     messengers: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -229,15 +229,15 @@ class ContactPerson(ValueObject):
             first_name: str,
             last_name: str,
             middle_name: str | None,
-            phone: str,
-            email: str,
+            phone: str | None,
+            email: str | None,
             messengers: dict[str, str],
     ) -> "ContactPerson":
         return cls(
             full_name=FullName(
                 f"{last_name} {first_name} {middle_name if middle_name is not None else ''}"
             ),
-            phone=Phone(phone),
+            phone=Phone(phone) if phone else None,
             email=email,
             messengers=messengers,
         )
