@@ -264,8 +264,8 @@ const getAttachmentMime = (a: TaskAttachment) => a.mime_type || a.content_type |
 const getAttachmentSize = (a: TaskAttachment) => {
   const size =
     typeof a.size_bytes === 'number' ? a.size_bytes :
-    typeof a.size === 'number' ? a.size :
-    typeof a.file_size === 'number' ? a.file_size : null;
+      typeof a.size === 'number' ? a.size :
+        typeof a.file_size === 'number' ? a.file_size : null;
   return size != null && Number.isFinite(size) ? size : null;
 };
 
@@ -518,54 +518,53 @@ function SelectDD({ value, onChange, options, placeholder, icon: LI, searchable,
 
   const fl = q
     ? options.filter((o) =>
-        o.label.toLowerCase().includes(q.toLowerCase()) ||
-        (o.sublabel || '').toLowerCase().includes(q.toLowerCase()),
-      )
+      o.label.toLowerCase().includes(q.toLowerCase()) ||
+      (o.sublabel || '').toLowerCase().includes(q.toLowerCase()),
+    )
     : options;
 
   const dd = open
     ? createPortal(
-        <div ref={dRef} style={pos} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden">
-          {searchable && (
-            <div className="p-2 border-b border-[var(--border-color)]">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/30" />
-                <input ref={iRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск..."
-                  className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none" />
-              </div>
+      <div ref={dRef} style={pos} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden">
+        {searchable && (
+          <div className="p-2 border-b border-[var(--border-color)]">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+              <input ref={iRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск..."
+                className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none" />
             </div>
-          )}
-          <div className="overflow-y-auto max-h-[240px] p-1">
-            <div role="button" tabIndex={0} onClick={() => { onChange(''); setOpen(false); }}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${!value ? 'bg-[var(--accent)]/10' : 'hover:bg-[var(--hover-2)]'} text-[var(--text-primary)]/60`}>
-              <span>—</span><span className="flex-1">Не выбрано</span>
-              {!value && <Check className="w-4 h-4 text-[var(--accent)]" />}
-            </div>
-            {fl.length === 0 && q && <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">Не найдено</div>}
-            {fl.map((o) => (
-              <div key={o.value} role="button" tabIndex={0} onClick={() => { onChange(o.value); setOpen(false); }}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${o.value === value ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium' : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'}`}>
-                {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
-                {o.icon && <span className="shrink-0">{o.icon}</span>}
-                <div className="flex-1 min-w-0">
-                  <span className="block truncate">{o.label}</span>
-                  {o.sublabel && <span className="block text-xs text-[var(--text-primary)]/40 truncate">{o.sublabel}</span>}
-                </div>
-                {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
-              </div>
-            ))}
           </div>
-        </div>,
-        document.body,
-      )
+        )}
+        <div className="overflow-y-auto max-h-[240px] p-1">
+          <div role="button" tabIndex={0} onClick={() => { onChange(''); setOpen(false); }}
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${!value ? 'bg-[var(--accent)]/10' : 'hover:bg-[var(--hover-2)]'} text-[var(--text-primary)]/60`}>
+            <span>—</span><span className="flex-1">Не выбрано</span>
+            {!value && <Check className="w-4 h-4 text-[var(--accent)]" />}
+          </div>
+          {fl.length === 0 && q && <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">Не найдено</div>}
+          {fl.map((o) => (
+            <div key={o.value} role="button" tabIndex={0} onClick={() => { onChange(o.value); setOpen(false); }}
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${o.value === value ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium' : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'}`}>
+              {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
+              {o.icon && <span className="shrink-0">{o.icon}</span>}
+              <div className="flex-1 min-w-0">
+                <span className="block truncate">{o.label}</span>
+                {o.sublabel && <span className="block text-xs text-[var(--text-primary)]/40 truncate">{o.sublabel}</span>}
+              </div>
+              {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
+            </div>
+          ))}
+        </div>
+      </div>,
+      document.body,
+    )
     : null;
 
   return (
     <div ref={tRef} className="relative w-full">
       <div role="button" tabIndex={disabled ? -1 : 0} onClick={() => !disabled && setOpen((v) => !v)}
-        className={`w-full flex items-center gap-2 px-3 py-2.5 bg-[var(--hover-2)] border rounded-xl text-sm text-left select-none transition-all ${
-          disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'
-        } ${open ? 'border-[var(--accent)]/50 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}>
+        className={`w-full flex items-center gap-2 px-3 py-2.5 bg-[var(--hover-2)] border rounded-xl text-sm text-left select-none transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'
+          } ${open ? 'border-[var(--accent)]/50 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}>
         {LI && <LI className="w-4 h-4 text-[var(--text-primary)]/40 shrink-0" />}
         <span className={`flex-1 truncate ${sel ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-primary)]/40'}`}>
           {sel ? sel.label : placeholder || '—'}
@@ -650,58 +649,55 @@ function AsyncDD({ value, onChange, loadFn, placeholder, icon: LI, disabled, wid
 
   const dd = open
     ? createPortal(
-        <div ref={dRef} style={pos} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden">
-          <div className="p-2 border-b border-[var(--border-color)]">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/30" />
-              <input ref={iRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск..."
-                className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none" />
-            </div>
+      <div ref={dRef} style={pos} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden">
+        <div className="p-2 border-b border-[var(--border-color)]">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+            <input ref={iRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск..."
+              className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none" />
           </div>
-          <div className="overflow-y-auto max-h-[280px] p-1">
-            <div role="button" tabIndex={0} onClick={() => { onChange(''); setOpen(false); }}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${
-                !value ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium' : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]/60'
+        </div>
+        <div className="overflow-y-auto max-h-[280px] p-1">
+          <div role="button" tabIndex={0} onClick={() => { onChange(''); setOpen(false); }}
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${!value ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium' : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]/60'
               }`}>
-              <span>—</span><span className="flex-1">Не выбрано</span>
-              {!value && <Check className="w-4 h-4 text-[var(--accent)]" />}
-            </div>
-            {ld && <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-[var(--text-primary)]/30" /></div>}
-            {!ld && opts.length === 0 && <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">{q ? 'Не найдено' : 'Нет данных'}</div>}
-            {!ld && opts.map((o) => (
-              <div key={o.value} role="button" tabIndex={0} onClick={() => { onChange(o.value); setSelLbl(o.label); setOpen(false); }}
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm cursor-pointer ${
-                  o.value === value ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium' : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'
-                }`}>
-                {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
-                {o.icon && <span className="shrink-0">{o.icon}</span>}
-                <div className="flex-1 min-w-0">
-                  <span className="block leading-snug" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {o.label}
-                  </span>
-                  {o.sublabel && <span className="block text-xs text-[var(--text-primary)]/40 truncate mt-0.5">{o.sublabel}</span>}
-                </div>
-                {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
-              </div>
-            ))}
-            {!ld && more && (
-              <div role="button" tabIndex={0} onClick={() => !ldMore && doLoad(q, pg + 1, true)}
-                className="flex items-center justify-center gap-1.5 py-2 text-sm text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] rounded-lg cursor-pointer transition-colors">
-                {ldMore ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronDown className="w-4 h-4" />} Ещё
-              </div>
-            )}
+            <span>—</span><span className="flex-1">Не выбрано</span>
+            {!value && <Check className="w-4 h-4 text-[var(--accent)]" />}
           </div>
-        </div>,
-        document.body,
-      )
+          {ld && <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-[var(--text-primary)]/30" /></div>}
+          {!ld && opts.length === 0 && <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">{q ? 'Не найдено' : 'Нет данных'}</div>}
+          {!ld && opts.map((o) => (
+            <div key={o.value} role="button" tabIndex={0} onClick={() => { onChange(o.value); setSelLbl(o.label); setOpen(false); }}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm cursor-pointer ${o.value === value ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium' : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'
+                }`}>
+              {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
+              {o.icon && <span className="shrink-0">{o.icon}</span>}
+              <div className="flex-1 min-w-0">
+                <span className="block leading-snug" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                  {o.label}
+                </span>
+                {o.sublabel && <span className="block text-xs text-[var(--text-primary)]/40 truncate mt-0.5">{o.sublabel}</span>}
+              </div>
+              {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
+            </div>
+          ))}
+          {!ld && more && (
+            <div role="button" tabIndex={0} onClick={() => !ldMore && doLoad(q, pg + 1, true)}
+              className="flex items-center justify-center gap-1.5 py-2 text-sm text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] rounded-lg cursor-pointer transition-colors">
+              {ldMore ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronDown className="w-4 h-4" />} Ещё
+            </div>
+          )}
+        </div>
+      </div>,
+      document.body,
+    )
     : null;
 
   return (
     <div ref={tRef} className="relative w-full">
       <div role="button" tabIndex={disabled ? -1 : 0} onClick={() => !disabled && setOpen((v) => !v)}
-        className={`w-full flex items-center gap-2 px-3 py-2.5 bg-[var(--hover-2)] border rounded-xl text-sm text-left select-none transition-all ${
-          disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'
-        } ${open ? 'border-[var(--accent)]/50 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}>
+        className={`w-full flex items-center gap-2 px-3 py-2.5 bg-[var(--hover-2)] border rounded-xl text-sm text-left select-none transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'
+          } ${open ? 'border-[var(--accent)]/50 ring-1 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}>
         {LI && <LI className="w-4 h-4 text-[var(--text-primary)]/40 shrink-0" />}
         <span className={`flex-1 truncate ${selLbl ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-primary)]/40'}`}>
           {selLbl || placeholder || '—'}
@@ -1444,16 +1440,15 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                     const m = PM[p.value];
                     return (
                       <button key={p.value} onClick={() => setPri(p.value)}
-                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${
-                          pri === p.value ? `${m.bg} ${m.c} ${m.brd}` : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                        }`}>
+                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${pri === p.value ? `${m.bg} ${m.c} ${m.brd}` : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                          }`}>
                         <span className={`w-2 h-2 rounded-full ${m.dot}`} />{p.label}
                       </button>
                     );
                   })}
                 </div>
               </div>
-                                <div>
+              <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
                   Сложность
                 </label>
@@ -1462,22 +1457,20 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                     <button
                       key={v}
                       onClick={() => setSp(String(v))}
-                      className={`px-3 py-2 rounded-xl text-sm border transition-all ${
-                        sp === String(v)
+                      className={`px-3 py-2 rounded-xl text-sm border transition-all ${sp === String(v)
                           ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
                           : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                      }`}
+                        }`}
                     >
                       {v}
                     </button>
                   ))}
                   <button
                     onClick={() => setSp('')}
-                    className={`px-3 py-2 rounded-xl text-sm border transition-all ${
-                      sp === ''
+                    className={`px-3 py-2 rounded-xl text-sm border transition-all ${sp === ''
                         ? 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30'
                         : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                    }`}
+                      }`}
                   >
                     Без сложности
                   </button>
@@ -1529,9 +1522,8 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
               {mode === 'create' && !!assigneeId && (
                 <div className="pt-1">
                   <button onClick={() => setTodo((v) => !v)}
-                    className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border transition-all text-sm font-medium ${
-                      todo ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
-                    }`}>
+                    className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border transition-all text-sm font-medium ${todo ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
+                      }`}>
                     <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${todo ? 'bg-blue-500 border-blue-500' : 'border-[var(--border-color)]'}`}>
                       {todo && <Check className="w-3 h-3 text-white" />}
                     </div>
@@ -1932,6 +1924,15 @@ export default function TasksPage() {
   const [boardScrollWidth, setBoardScrollWidth] = useState(0);
   const [boardViewportWidth, setBoardViewportWidth] = useState(0);
 
+  const [fixedBoardScrollbarStyle, setFixedBoardScrollbarStyle] = useState<React.CSSProperties>({
+  position: 'fixed',
+  left: 0,
+  width: 0,
+  bottom: 12,
+  zIndex: 55,
+  display: 'none',
+});
+
   const staff = (user?.roles ?? []).some((r) => ['admin', 'support_manager', 'support_agent', 'executor'].includes(r));
 
   const [mode, setMode] = useState<CtxMode>(() => {
@@ -2000,15 +2001,33 @@ export default function TasksPage() {
 const syncBoardScrollbarMetrics = useCallback(() => {
   const board = boardScrollRef.current;
   const inner = boardInnerRef.current;
-  if (!board || !inner) return;
-  
-  // Учитываем только ширину контента, а не скроллбара
+
+  if (!board || !inner) {
+    setFixedBoardScrollbarStyle((prev) => ({
+      ...prev,
+      display: 'none',
+    }));
+    return;
+  }
+
   const contentWidth = inner.scrollWidth;
   const viewportWidth = board.clientWidth;
-  
+  const rect = board.getBoundingClientRect();
+  const hasHorizontalOverflow = contentWidth > viewportWidth + 2;
+
   setBoardScrollWidth(contentWidth);
   setBoardViewportWidth(viewportWidth);
-  
+
+  setFixedBoardScrollbarStyle({
+    position: 'fixed',
+    left: rect.left,
+    width: rect.width,
+    bottom: 12,
+    zIndex: 55,
+    display: hasHorizontalOverflow ? 'block' : 'none',
+    pointerEvents: 'auto',
+  });
+
   if (bottomBoardScrollRef.current) {
     bottomBoardScrollRef.current.scrollLeft = board.scrollLeft;
   }
@@ -2032,23 +2051,41 @@ const syncBoardScrollbarMetrics = useCallback(() => {
     requestAnimationFrame(() => boardScrollSyncRef.current = false);
   }, []);
 
-  useEffect(() => {
-    if (viewMode !== 'kanban') return;
-    syncBoardScrollbarMetrics();
-    const board = boardScrollRef.current;
-    const inner = boardInnerRef.current;
-    let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined' && board && inner) {
-      ro = new ResizeObserver(() => syncBoardScrollbarMetrics());
-      ro.observe(board);
-      ro.observe(inner);
-    }
-    window.addEventListener('resize', syncBoardScrollbarMetrics);
-    return () => {
-      ro?.disconnect();
-      window.removeEventListener('resize', syncBoardScrollbarMetrics);
-    };
-  }, [viewMode, cols, syncBoardScrollbarMetrics]);
+useEffect(() => {
+  if (viewMode !== 'kanban' || loading || !cols.length) {
+    setFixedBoardScrollbarStyle((prev) => ({
+      ...prev,
+      display: 'none',
+    }));
+    return;
+  }
+
+  const run = () => {
+    requestAnimationFrame(syncBoardScrollbarMetrics);
+  };
+
+  run();
+
+  const board = boardScrollRef.current;
+  const inner = boardInnerRef.current;
+
+  let ro: ResizeObserver | null = null;
+
+  if (typeof ResizeObserver !== 'undefined' && board && inner) {
+    ro = new ResizeObserver(run);
+    ro.observe(board);
+    ro.observe(inner);
+  }
+
+  window.addEventListener('resize', run);
+  window.addEventListener('scroll', run, true);
+
+  return () => {
+    ro?.disconnect();
+    window.removeEventListener('resize', run);
+    window.removeEventListener('scroll', run, true);
+  };
+}, [viewMode, loading, cols.length, syncBoardScrollbarMetrics]);
 
   const loadUsersMap = useCallback(async () => {
     const m = new Map<string, SimpleUser | CounterpartyCustomer>();
@@ -2341,43 +2378,65 @@ const syncBoardScrollbarMetrics = useCallback(() => {
         ) : !cols.length ? (
           <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30"><FileText className="w-12 h-12 mb-3 opacity-50" /><p className="text-base font-medium">{mode === 'project' && !selP ? 'Выберите проект' : mode === 'assignee' && !selA ? 'Выберите исполнителя' : mode === 'ticket' && !selT ? 'Выберите заявку' : 'Нет задач'}</p></div>
         ) : (
-          <div className="flex-1 flex flex-col min-h-0">
-            {/* Основная область с колонками - скрываем нативный скроллбар */}
-            <div
-              ref={boardScrollRef}
-              onScroll={handleBoardScroll}
-              className="flex-1 overflow-x-auto overflow-y-hidden pb-2"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
-              <style>{`
-                div[data-board-scroll]::-webkit-scrollbar {
-                  display: none;
-                }
-              `}</style>
-              <div 
-                ref={boardInnerRef} 
-                data-board-scroll
-                className="flex gap-3 h-full w-max min-w-full"
-              >
-                {disp.map((c) => (
-                  <KCol key={c.status} col={c} umap={umap} isDO={dragO === c.status} dragId={drag?.id ?? null} ldMore={moreCol === c.status} onDS={onDS} onDE={onDE} onDO={onDO} onDL={onDL} onDrop={onDrop} onAdd={setCreate} onView={setView} onMore={more} />
-                ))}
-              </div>
-            </div>
-
-            {/* Нижний скроллбар - всегда видимый, не дублируется */}
-            <div className="h-4 mt-2 shrink-0 relative">
-              <div
-                ref={bottomBoardScrollRef}
-                onScroll={handleBottomBoardScroll}
-                className="absolute inset-0 overflow-x-auto overflow-y-hidden rounded-full bg-[var(--hover-1)] border border-[var(--border-color)] scrollbar-thin scrollbar-thumb-[var(--accent)]/50 scrollbar-track-transparent"
-              >
-                <div style={{ width: boardScrollWidth || '100%', height: '1px' }} />
-              </div>
-            </div>
-          </div>
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+  <div
+    ref={boardScrollRef}
+    onScroll={handleBoardScroll}
+    className="flex-1 overflow-x-auto overflow-y-hidden pb-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+  >
+    <div
+      ref={boardInnerRef}
+      className="flex gap-3 h-full w-max min-w-full"
+    >
+      {disp.map((c) => (
+        <KCol
+          key={c.status}
+          col={c}
+          umap={umap}
+          isDO={dragO === c.status}
+          dragId={drag?.id ?? null}
+          ldMore={moreCol === c.status}
+          onDS={onDS}
+          onDE={onDE}
+          onDO={onDO}
+          onDL={onDL}
+          onDrop={onDrop}
+          onAdd={setCreate}
+          onView={setView}
+          onMore={more}
+        />
+      ))}
+    </div>
+  </div>
+</div>
         )}
       </div>
+
+        {viewMode === 'kanban' &&
+  !loading &&
+  cols.length > 0 &&
+  createPortal(
+    <div
+      style={fixedBoardScrollbarStyle}
+      className="px-1"
+    >
+      <div className="h-5 rounded-xl bg-[var(--bg-card)]/95 border border-[var(--border-color)] shadow-2xl backdrop-blur-md overflow-hidden">
+        <div
+          ref={bottomBoardScrollRef}
+          onScroll={handleBottomBoardScroll}
+          className="h-full w-full overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/60 scrollbar-track-transparent"
+        >
+          <div
+            style={{
+              width: Math.max(boardScrollWidth, boardViewportWidth),
+              height: 1,
+            }}
+          />
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )}
 
       <AnimatePresence>{dragInfo && <DragPanel task={dragInfo} onDrop={onDrop} />}</AnimatePresence>
 
