@@ -13,7 +13,7 @@ import { ticketsApi, counterpartiesApi, projectsApi, usersApi } from '../api/cli
 import { attachmentsApi } from '../api/attachments';
 import type { Counterparty, TicketTag, TicketPriority, TicketType, Project } from '../types';
 import { SpellCheckField } from '../components/helpers/SpellCheckField';
-import { TicketDescriptionContent } from '../components/helpers/TicketDescriptionContent';
+import { TicketDescriptionContent, renderInlineFormatting } from '../components/helpers/TicketDescriptionContent';
 import {
   TicketEditor, serializeBlocks, type DescriptionBlock,
 } from '../components/helpers/TicketEditor';
@@ -1240,9 +1240,11 @@ export default function NewTicketPage() {
                   {descriptionBlocks.map(block => {
                     if (block.type === 'text') {
                       if (!block.value.trim()) return null;
+                      // Оборачиваем текст в <strong> для markdown-форматирования
                       return (
-                        <TicketDescriptionContent key={block.id} text={block.value}
-                          className="text-[var(--text-primary)] text-sm leading-relaxed" />
+                        <div key={block.id} className="text-[var(--text-primary)] text-sm leading-relaxed whitespace-pre-wrap break-words">
+                          {renderInlineFormatting(block.value)}
+                        </div>
                       );
                     }
                     if (block.type === 'image' && block.localPreview) {

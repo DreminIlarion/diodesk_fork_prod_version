@@ -4,10 +4,10 @@ import { attachmentsApi } from '../../api/attachments';
 
 // ─── Inline formatting 
 
-function renderInlineFormatting(text: string): React.ReactNode[] {
+export function renderInlineFormatting(text: string): React.ReactNode[] {
   const result: React.ReactNode[] = [];
   // Порядок важен: сначала *** потом ** потом *
-  const regex = /(\*\*\*(?!\s)([^*]+?)(?<!\s)\*\*\*|\*\*(?!\s)([^*]+?)(?<!\s)\*\*|\*(?!\s)([^*]+?)(?<!\s)\*)/g;
+  const regex = /(\*\*\*([^*]+?)\*\*\*|\*\*([^*]+?)\*\*|\*([^*]+?)\*)/g;
 
   let lastIndex = 0;
   let match: RegExpExecArray | null;
