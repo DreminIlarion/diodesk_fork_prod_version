@@ -227,7 +227,7 @@ class ContactPerson(ValueObject):
     def create(
             cls,
             first_name: str,
-            last_name: str,
+            last_name: str | None,
             middle_name: str | None,
             phone: str | None,
             email: str | None,

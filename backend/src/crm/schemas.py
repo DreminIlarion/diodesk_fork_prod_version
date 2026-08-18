@@ -10,7 +10,8 @@ class ContactPersonIn(BaseModel):
     """Добавление контактного лица контрагента"""
 
     first_name: str = Field(..., description="Имя")
-    last_name: str = Field(..., description="Фамилия")
+    last_name: str | None = Field(None, description="Фамилия")
+    
     middle_name: str | None = Field(None, description="Отчество")
     phone: str | None = Field(None, description="Номер телефона", examples=["88005553535", "+78005553535"])
     email: EmailStr | None = Field(None, description="Адрес электронной почты")
