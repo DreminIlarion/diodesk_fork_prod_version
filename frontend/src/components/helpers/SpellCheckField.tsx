@@ -163,7 +163,12 @@ export function SpellCheckField({
     <div className="space-y-2">
       {/* Label + кнопка */}
       <div className="flex items-center justify-between">
-        {label && <span className="block text-2xl font-semibold text-[var(--text-primary)] mb-4">{label}</span>}
+        {label && (
+          <span className="block text-lg font-semibold text-[var(--text-primary)] mb-4">
+            {label.split('*')[0]}
+            {label.includes('*') && <span className="text-red-400">*</span>}
+          </span>
+        )}
         <button
           type="button"
           onClick={handleCheck}
