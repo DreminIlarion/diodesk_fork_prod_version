@@ -101,8 +101,12 @@ class TicketAuthZService:
             IsTicketReporterRule(subject, ticket),
             IsTicketCreatorRule(subject, ticket),
             HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT]),
+            AllOf(
+                HasAnyUserRoleRule(subject, required_roles=[UserRole.CUSTOMER_ADMIN, UserRole.CUSTOMER]),
+                SameCounterpartyRule(subject, ticket.counterparty_id)
+            ),
         ]
-        return AnyOf(*rules).check()
+        return AnyOf(*rules).check()    
 
     async def can_track_ticket(self, subject: Subject, ticket: Ticket) -> PermissionResult:
         """

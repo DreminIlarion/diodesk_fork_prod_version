@@ -10,6 +10,7 @@ from ..domain.entities import Invitation, User
 from ..domain.repos import UserFilters
 from ..domain.vo import Email, FullName, PasswordHash, Username, UserRole
 from .models import InvitationOrm, UserOrm
+from uuid import UUID
 
 
 class UserMapper(ModelMapper[User, UserOrm]):
@@ -82,6 +83,17 @@ class SqlUserRepository(SqlAlchemyRepository[User, UserOrm]):
         result = await self.session.execute(stmt)
         model = result.scalar_one_or_none()
         return None if model is None else self.model_mapper.to_entity(model)
+    
+    async def get_customer_admins(self, counterparty_id: UUID) -> list[User]:
+        stmt = select(self.model).where(
+            self.model.counterparty_id == counterparty_id,
+            type_coerce(self.model.roles, JSONB).op('?|')(
+                cast(literal([UserRole.CUSTOMER_ADMIN.value]), ARRAY(VARCHAR))
+            ),
+        )
+        result = await self.session.execute(stmt)
+        models = result.scalars().all()
+        return [self.model_mapper.to_entity(model) for model in models]
 
 
 class InvitationMapper(ModelMapper[Invitation, InvitationOrm]):

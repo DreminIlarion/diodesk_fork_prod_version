@@ -128,6 +128,7 @@ class TicketService:
             title=data.title,
             description=data.description,
             priority=data.priority,
+            type=data.type,  # добавил
             project_id=context.project_id,
             created_by_role=current_subject.roles[0] if current_subject.roles else None,
             counterparty_id=context.counterparty_id,
