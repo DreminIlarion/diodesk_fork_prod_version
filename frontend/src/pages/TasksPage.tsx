@@ -2412,7 +2412,7 @@ useEffect(() => {
         )}
       </div>
 
-        {viewMode === 'kanban' &&
+{viewMode === 'kanban' &&
   !loading &&
   cols.length > 0 &&
   createPortal(
@@ -2420,19 +2420,17 @@ useEffect(() => {
       style={fixedBoardScrollbarStyle}
       className="px-1"
     >
-      <div className="h-5 rounded-xl bg-[var(--bg-card)]/95 border border-[var(--border-color)] shadow-2xl backdrop-blur-md overflow-hidden">
+      <div
+        ref={bottomBoardScrollRef}
+        onScroll={handleBottomBoardScroll}
+        className="h-5 rounded-xl bg-[var(--bg-card)]/95 border border-[var(--border-color)] shadow-2xl backdrop-blur-md overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/60 scrollbar-track-transparent"
+      >
         <div
-          ref={bottomBoardScrollRef}
-          onScroll={handleBottomBoardScroll}
-          className="h-full w-full overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/60 scrollbar-track-transparent"
-        >
-          <div
-            style={{
-              width: Math.max(boardScrollWidth, boardViewportWidth),
-              height: 1,
-            }}
-          />
-        </div>
+          style={{
+            width: Math.max(boardScrollWidth, boardViewportWidth),
+            height: '100%',
+          }}
+        />
       </div>
     </div>,
     document.body,
