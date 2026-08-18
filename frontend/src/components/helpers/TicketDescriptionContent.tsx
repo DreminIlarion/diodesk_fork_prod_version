@@ -6,7 +6,7 @@ import { attachmentsApi } from '../../api/attachments';
 
 export function renderInlineFormatting(text: string): React.ReactNode[] {
   const result: React.ReactNode[] = [];
-  // Порядок важен: сначала *** потом ** потом *
+  // Убираем \s-ограничения — пусть маркеры работают везде
   const regex = /(\*\*\*([^*]+?)\*\*\*|\*\*([^*]+?)\*\*|\*([^*]+?)\*)/g;
 
   let lastIndex = 0;
