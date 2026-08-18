@@ -68,7 +68,7 @@ class CounterpartyMapper(ModelMapper[Counterparty, CounterpartyOrm]):
             contact_persons=[
                 {
                     "full_name": contact_person.full_name.value,
-                    "phone": contact_person.phone.value,
+                    "phone": contact_person.phone.value if contact_person.phone else None,
                     "email": contact_person.email,
                     "messengers": contact_person.messengers,
                 }
