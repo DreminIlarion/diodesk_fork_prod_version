@@ -1379,196 +1379,145 @@ const handleStatusChange = useCallback(async (s: string) => {
               </div>
             )}
 
-            {/* Manage */}
-                        {/* Manage → Статус и действия */}
+                        {/* Действия */}
             {activeTab === 'manage' && canShowManage && (
               <div className="p-6 space-y-6">
-
-                {/* ── Текущий статус ── */}
-                <div className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-[var(--hover-1)] border border-[var(--border-color)]">
-                  <div className="w-10 h-10 rounded-xl bg-[var(--hover-2)] flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="w-5 h-5 text-[var(--text-primary)]/50" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-[var(--text-primary)]/40 uppercase tracking-wider mb-1">
-                      Текущий статус
-                    </p>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className={`px-4 py-1.5 rounded-xl text-sm font-semibold border ${getStatusColor(ticket.status || '')}`}>
-                        {STATUS_LABELS[ticket.status || ''] || ticket.status}
-                      </span>
-                      <span className="text-sm text-[var(--text-primary)]/35">
-                        {STATUS_DESCRIPTIONS[ticket.status || ''] || ''}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── Изменить статус на ── */}
+                
+                {/* ── Статус ── */}
                 <div>
-                  <h3 className="text-base font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2.5">
-                    <RefreshCw className="w-4 h-4 text-[var(--text-primary)]/40" />
-                    Изменить статус на
-                  </h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]/50 uppercase tracking-wider">
+                      Статус
+                    </h3>
+                    <span className={`px-3 py-1 rounded-lg text-sm font-medium border ${getStatusColor(ticket.status || '')}`}>
+                      {STATUS_LABELS[ticket.status || ''] || ticket.status}
+                    </span>
+                  </div>
+                  
+                  <p className="text-sm text-[var(--text-primary)]/40 mb-4">
+                    {STATUS_DESCRIPTIONS[ticket.status || ''] || ''}
+                  </p>
 
+                  {/* Кнопки перехода */}
                   {!canChangeStatus ? (
-                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/8 border border-amber-500/20">
-                      <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
-                      <p className="text-sm text-amber-400/80">У вас нет прав для смены статуса этой заявки</p>
+                    <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-500/8 border border-amber-500/20">
+                      <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <p className="text-sm text-amber-400/80">Нет прав для изменения статуса</p>
                     </div>
                   ) : availableStatuses.length === 0 ? (
-                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-500/60 shrink-0" />
+                    <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500/60 shrink-0" />
                       <p className="text-sm text-[var(--text-primary)]/50">
-                        Нет доступных переходов из статуса «{STATUS_LABELS[ticket.status || ''] || ticket.status}»
+                        Нет доступных переходов из текущего статуса
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      {availableStatuses.map(status => {
-                        const currentLabel = STATUS_LABELS[ticket.status || ''] || ticket.status;
-                        const targetLabel = STATUS_LABELS[status] || status;
-                        const targetDesc = STATUS_DESCRIPTIONS[status] || '';
-
-                        return (
-                          <button
-                            key={status}
-                            onClick={() => handleStatusChange(status)}
-                            disabled={updatingStatus}
-                            className={`
-                              w-full flex items-center gap-4 px-5 py-3.5 rounded-xl
-                              border border-[var(--border-color)]
-                              bg-[var(--bg-card)] hover:bg-[var(--hover-2)]
-                              transition-all group text-left
-                              disabled:opacity-40 disabled:cursor-not-allowed
-                            `}
-                          >
-                            {/* Иконка перехода */}
-                            <div className={`
-                              w-9 h-9 rounded-lg flex items-center justify-center shrink-0
-                              transition-colors
-                              ${updatingStatus
-                                ? 'bg-[var(--hover-2)]'
-                                : 'bg-[var(--hover-1)] group-hover:bg-[var(--accent)]/15'
-                              }
-                            `}>
-                              {updatingStatus ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-[var(--text-primary)]/40" />
-                              ) : (
-                                <RefreshCw className="w-4 h-4 text-[var(--text-primary)]/40 group-hover:text-[var(--accent)]" />
-                              )}
-                            </div>
-
-                            {/* Текст */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`inline-flex px-2.5 py-0.5 rounded-lg text-xs font-semibold border ${getStatusColor(status)}`}>
-                                  {targetLabel}
-                                </span>
-                              </div>
-                              {targetDesc && (
-                                <p className="text-xs text-[var(--text-primary)]/30 mt-1 truncate">
-                                  {targetDesc}
-                                </p>
-                              )}
-                            </div>
-
-                            {/* Стрелка */}
-                            <ChevronDown className="w-4 h-4 -rotate-90 text-[var(--text-primary)]/20 group-hover:text-[var(--accent)] shrink-0" />
-                          </button>
-                        );
-                      })}
+                    <div className="flex flex-wrap gap-2">
+                      {availableStatuses.map(status => (
+                        <button
+                          key={status}
+                          onClick={() => handleStatusChange(status)}
+                          disabled={updatingStatus}
+                          className={`
+                            group flex items-center gap-2 px-4 py-2.5 rounded-xl
+                            border border-[var(--border-color)]
+                            bg-[var(--bg-card)] hover:bg-[var(--hover-2)]
+                            transition-all text-sm font-medium
+                            disabled:opacity-40 disabled:cursor-not-allowed
+                          `}
+                        >
+                          {updatingStatus ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-[var(--text-primary)]/40" />
+                          ) : (
+                            <ArrowUpRight className="w-4 h-4 text-[var(--text-primary)]/30 group-hover:text-[var(--accent)] transition-colors" />
+                          )}
+                          <span className="text-[var(--text-primary)]/70 group-hover:text-[var(--text-primary)] transition-colors">
+                            {STATUS_LABELS[status] || status}
+                          </span>
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
 
-                {/* ── Исполнитель (компактно, без дублирования) ── */}
+                {/* ── Разделитель ── */}
+                <div className="border-t border-[var(--border-color)]" />
+
+                {/* ── Исполнитель ── */}
                 {canAssign && (
                   <div>
-                    <h3 className="text-base font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2.5">
-                      <UserCheck className="w-4 h-4 text-[var(--text-primary)]/40" />
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]/50 uppercase tracking-wider mb-3">
                       Исполнитель
                     </h3>
-
+                    
                     <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
-                      {ticket.assignee_id ? (
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-700 to-red-800 flex items-center justify-center shrink-0">
-                            <User className="w-4 h-4 text-white" />
-                          </div>
-                          <span className="text-sm font-medium text-[var(--text-primary)] truncate">
-                            {getAssigneeName() || 'Исполнитель'}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[var(--hover-2)] border border-dashed border-[var(--border-color)] flex items-center justify-center shrink-0">
-                            <User className="w-4 h-4 text-[var(--text-primary)]/30" />
-                          </div>
-                          <span className="text-sm text-[var(--text-primary)]/40">Не назначен</span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-3 min-w-0">
+                        {ticket.assignee_id ? (
+                          <>
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-red-700 to-red-800 flex items-center justify-center shrink-0">
+                              <User className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="text-sm font-medium text-[var(--text-primary)] truncate">
+                              {getAssigneeName() || 'Исполнитель'}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-9 h-9 rounded-full bg-[var(--hover-2)] border border-dashed border-[var(--border-color)] flex items-center justify-center shrink-0">
+                              <User className="w-4 h-4 text-[var(--text-primary)]/30" />
+                            </div>
+                            <span className="text-sm text-[var(--text-primary)]/40">Не назначен</span>
+                          </>
+                        )}
+                      </div>
 
                       <button
                         onClick={() => { loadSupportUsers(); setShowAssigneeModal(true); }}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
                                    bg-[var(--hover-2)] hover:bg-[var(--hover-3)]
                                    text-[var(--text-primary)]/60 hover:text-[var(--text-primary)]
                                    border border-[var(--border-color)] transition-all shrink-0"
                       >
-                        {ticket.assignee_id ? (
-                          <>
-                            <RefreshCw className="w-3.5 h-3.5" />
-                            Изменить
-                          </>
-                        ) : (
-                          <>
-                            <UserPlus className="w-3.5 h-3.5" />
-                            Назначить
-                          </>
-                        )}
+                        {ticket.assignee_id ? 'Изменить' : 'Назначить'}
                       </button>
                     </div>
                   </div>
                 )}
 
-                {/* ── Архивирование ── */}
-                <div className="pt-2 border-t border-[var(--border-color)]">
+                {/* ── Разделитель ── */}
+                <div className="border-t border-[var(--border-color)]" />
+
+                {/* ── Архив ── */}
+                <div>
                   {ticket.is_archived ? (
                     <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/8 border border-amber-500/20">
-                      <Archive className="w-5 h-5 text-amber-400 shrink-0" />
+                      <Archive className="w-4 h-4 text-amber-400 shrink-0" />
                       <div>
-                        <p className="text-sm font-medium text-[var(--text-primary)]">Заявка в архиве</p>
-                        <p className="text-xs text-[var(--text-primary)]/35">Доступна только для чтения</p>
+                        <p className="text-sm font-medium text-[var(--text-primary)]">В архиве</p>
+                        <p className="text-xs text-[var(--text-primary)]/35">Только для чтения</p>
                       </div>
                     </div>
                   ) : canArchive() ? (
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <Archive className="w-5 h-5 text-[var(--text-primary)]/30 shrink-0" />
-                        <div>
-                          <p className="text-sm font-medium text-[var(--text-primary)]/70">Архивировать</p>
-                          <p className="text-xs text-[var(--text-primary)]/30">Скроется из основного списка</p>
-                        </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-[var(--text-primary)]/70">Архивировать заявку</p>
+                        <p className="text-xs text-[var(--text-primary)]/35">Скроется из основного списка</p>
                       </div>
                       <button
                         onClick={() => setShowArchiveConfirm(true)}
                         disabled={archiving}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium
-                                   bg-amber-600/15 hover:bg-amber-600/25
-                                   border border-amber-600/25
+                                   bg-amber-600/10 hover:bg-amber-600/20
+                                   border border-amber-600/20
                                    text-amber-400
                                    disabled:opacity-50 shrink-0 transition-colors"
                       >
-                        {archiving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+                        {archiving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Archive className="w-3.5 h-3.5" />}
                         Архивировать
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-3 text-[var(--text-primary)]/25 text-sm">
-                      <Archive className="w-4 h-4 shrink-0" />
-                      <span>Нет прав для архивирования</span>
-                    </div>
+                    <p className="text-sm text-[var(--text-primary)]/25">Нет прав для архивирования</p>
                   )}
                 </div>
 
