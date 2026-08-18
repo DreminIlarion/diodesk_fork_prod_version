@@ -1164,6 +1164,8 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
   const [localFileUrls, setLocalFileUrls] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [isDragOver, setIsDragOver] = useState(false);
+
   const [previewItem, setPreviewItem] = useState<AttachmentPreviewItem | null>(null);
   const existingAttachments = Array.isArray(task?.attachments) ? task.attachments : [];
 
@@ -1201,6 +1203,23 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
     setFiles((prev) => [...prev, ...selected].slice(0, 10));
     e.target.value = '';
   };
+
+  const handleDragOver = (e: React.DragEvent) => {
+  e.preventDefault();
+  setIsDragOver(true);
+};
+
+const handleDragLeave = (e: React.DragEvent) => {
+  e.preventDefault();
+  setIsDragOver(false);
+};
+
+const handleDrop = (e: React.DragEvent) => {
+  e.preventDefault();
+  setIsDragOver(false);
+  const droppedFiles = Array.from(e.dataTransfer.files || []);
+  setFiles((prev) => [...prev, ...droppedFiles].slice(0, 10));
+};
 
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
@@ -1376,23 +1395,46 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                         У задачи пока нет вложений
                       </div>
                     )}
-                    <p className="mt-2 text-xs text-[var(--text-primary)]/35">
-                      Существующие вложения не пропадут. Новые файлы будут просто добавлены к ним.
-                    </p>
+                    
                   </div>
                 )}
 
                 <div>
-                  <div className="text-xs font-medium text-[var(--text-primary)]/45 mb-2">
-                    {mode === 'edit' ? 'Добавить новые файлы' : 'Файлы'}
-                  </div>
-                  <div className="border-2 border-dashed border-[var(--border-color)] rounded-xl p-4 text-center bg-[var(--hover-1)] hover:bg-[var(--hover-2)] transition-colors">
-                    <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} className="hidden" />
-                    <button type="button" onClick={() => fileInputRef.current?.click()} className="text-sm text-[var(--accent)] hover:text-[var(--accent-light)] font-medium">
-                      + Выбрать файлы
-                    </button>
-                  </div>
-                </div>
+  <div className="text-xs font-medium text-[var(--text-primary)]/45 mb-2">
+    {mode === 'edit' ? 'Добавить новые файлы' : 'Файлы'}
+  </div>
+  <button 
+  type="button" 
+  onClick={() => fileInputRef.current?.click()}
+  onDragOver={handleDragOver}
+  onDragLeave={handleDragLeave}
+  onDrop={handleDrop}
+  className={`w-full border-2 border-dashed rounded-xl p-4 text-center transition-colors group ${
+    isDragOver 
+      ? 'border-[var(--accent)] bg-[var(--accent)]/5' 
+      : 'border-[var(--border-color)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)] hover:border-[var(--accent)]/30'
+  }`}
+>
+  <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} className="hidden" />
+  <div className="flex flex-col items-center gap-2">
+    <div className={`w-12 h-12 rounded-xl border flex items-center justify-center transition-colors ${
+      isDragOver 
+        ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30' 
+        : 'bg-[var(--hover-3)] border-[var(--border-color)] group-hover:bg-[var(--accent)]/10 group-hover:border-[var(--accent)]/30'
+    }`}>
+      <Plus className={`w-6 h-6 transition-colors ${
+        isDragOver ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40 group-hover:text-[var(--accent)]'
+      }`} />
+    </div>
+    <div>
+      <p className="text-sm text-[var(--accent)] font-medium">
+        {isDragOver ? 'Отпустите файлы' : 'Выбрать файлы'}
+      </p>
+      <p className="text-xs text-[var(--text-primary)]/40 mt-0.5">или перетащите их сюда</p>
+    </div>
+  </div>
+</button>
+</div>
 
                 {files.length > 0 && (
                   <div className="space-y-2">
@@ -2423,7 +2465,7 @@ useEffect(() => {
       <div
         ref={bottomBoardScrollRef}
         onScroll={handleBottomBoardScroll}
-        className="h-5 rounded-xl bg-[var(--bg-card)]/95 border border-[var(--border-color)] shadow-2xl backdrop-blur-md overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/60 scrollbar-track-transparent"
+        className="h-2 rounded-xl bg-[var(--bg-card)]/95 border border-[var(--border-color)] shadow-2xl backdrop-blur-md overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/60 scrollbar-track-transparent"
       >
         <div
           style={{
