@@ -1997,16 +1997,22 @@ export default function TasksPage() {
     return { type: 'my' };
   }, [mode, selP, selA, selT]);
 
-  const syncBoardScrollbarMetrics = useCallback(() => {
-    const board = boardScrollRef.current;
-    const inner = boardInnerRef.current;
-    if (!board || !inner) return;
-    setBoardScrollWidth(Math.max(board.scrollWidth, inner.scrollWidth));
-    setBoardViewportWidth(board.clientWidth);
-    if (bottomBoardScrollRef.current) {
-      bottomBoardScrollRef.current.scrollLeft = board.scrollLeft;
-    }
-  }, []);
+const syncBoardScrollbarMetrics = useCallback(() => {
+  const board = boardScrollRef.current;
+  const inner = boardInnerRef.current;
+  if (!board || !inner) return;
+  
+  // Учитываем только ширину контента, а не скроллбара
+  const contentWidth = inner.scrollWidth;
+  const viewportWidth = board.clientWidth;
+  
+  setBoardScrollWidth(contentWidth);
+  setBoardViewportWidth(viewportWidth);
+  
+  if (bottomBoardScrollRef.current) {
+    bottomBoardScrollRef.current.scrollLeft = board.scrollLeft;
+  }
+}, []);
 
   const handleBoardScroll = useCallback(() => {
     if (boardScrollSyncRef.current) return;
@@ -2335,24 +2341,36 @@ export default function TasksPage() {
         ) : !cols.length ? (
           <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30"><FileText className="w-12 h-12 mb-3 opacity-50" /><p className="text-base font-medium">{mode === 'project' && !selP ? 'Выберите проект' : mode === 'assignee' && !selA ? 'Выберите исполнителя' : mode === 'ticket' && !selT ? 'Выберите заявку' : 'Нет задач'}</p></div>
         ) : (
-                    <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 flex flex-col min-h-0">
+            {/* Основная область с колонками - скрываем нативный скроллбар */}
             <div
               ref={boardScrollRef}
               onScroll={handleBoardScroll}
-              className="flex-1 overflow-x-auto overflow-y-hidden pb-2 scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent"
+              className="flex-1 overflow-x-auto overflow-y-hidden pb-2"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-              <div ref={boardInnerRef} className="flex gap-3 h-full w-max min-w-full">
+              <style>{`
+                div[data-board-scroll]::-webkit-scrollbar {
+                  display: none;
+                }
+              `}</style>
+              <div 
+                ref={boardInnerRef} 
+                data-board-scroll
+                className="flex gap-3 h-full w-max min-w-full"
+              >
                 {disp.map((c) => (
                   <KCol key={c.status} col={c} umap={umap} isDO={dragO === c.status} dragId={drag?.id ?? null} ldMore={moreCol === c.status} onDS={onDS} onDE={onDE} onDO={onDO} onDL={onDL} onDrop={onDrop} onAdd={setCreate} onView={setView} onMore={more} />
                 ))}
               </div>
             </div>
 
-            <div className="h-4 mt-2 shrink-0 bg-[var(--hover-1)] rounded-full border border-[var(--border-color)] relative overflow-hidden">
+            {/* Нижний скроллбар - всегда видимый, не дублируется */}
+            <div className="h-4 mt-2 shrink-0 relative">
               <div
                 ref={bottomBoardScrollRef}
                 onScroll={handleBottomBoardScroll}
-                className="absolute inset-0 overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/50 scrollbar-track-transparent"
+                className="absolute inset-0 overflow-x-auto overflow-y-hidden rounded-full bg-[var(--hover-1)] border border-[var(--border-color)] scrollbar-thin scrollbar-thumb-[var(--accent)]/50 scrollbar-track-transparent"
               >
                 <div style={{ width: boardScrollWidth || '100%', height: '1px' }} />
               </div>
