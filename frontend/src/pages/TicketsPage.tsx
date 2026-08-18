@@ -8,10 +8,12 @@ import {
   Building2, User, X, SlidersHorizontal, ChevronDown, Check,
   Sparkles, Flame, MessageSquare, HelpCircle, Edit3, FolderOpen,
   UserCheck, Ticket, MoreVertical,
+  Settings, RefreshCw, Archive,
 } from 'lucide-react';
 import { ticketsApi, counterpartiesApi, projectsApi, usersApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import type { TicketListItem, Counterparty, Project, SimpleUser } from '../types';
+import { useToast } from '../components/ui/use-toast';
 
 /* ═══ СТАТУСЫ ═══ */
 
@@ -379,16 +381,43 @@ function FilterTag({ label, icon, colorClass, onRemove }: {
 function TicketActions({ ticket }: { ticket: TicketListItem }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [showManage, setShowManage] = useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const { toast } = useToast(); // Добавьте импорт useToast
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setShowManage(false);
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
+
+  const handleArchive = async () => {
+    setArchiving(true);
+    try {
+      await ticketsApi.archiveTicket(ticket.id);
+      toast({ title: 'Заявка архивирована' });
+      setShowArchiveConfirm(false);
+      setOpen(false);
+      // Обновите список заявок
+      window.location.reload(); // Или вызовите функцию обновления списка
+    } catch (e: any) {
+      toast({ 
+        title: 'Ошибка', 
+        description: e?.response?.status === 403 ? 'Нет прав' : 'Не удалось архивировать',
+        variant: 'destructive' 
+      });
+    } finally {
+      setArchiving(false);
+    }
+  };
 
   return (
     <div ref={ref} className="relative">
@@ -398,17 +427,19 @@ function TicketActions({ ticket }: { ticket: TicketListItem }) {
           e.preventDefault();
           e.stopPropagation();
           setOpen((v) => !v);
+          setShowManage(false);
         }}
-        className="p-1.5 rounded-lg text-[var(--text-primary)]/25 hover:text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] transition-colors"
+        className="p-2 rounded-lg text-[var(--text-primary)]/30 hover:text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] transition-colors"
       >
-        <MoreVertical size={16} />
+        <MoreVertical size={18} />
       </button>
 
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 z-[60] w-[220px] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-xl"
+          className="absolute right-0 top-full mt-1 z-[60] w-[240px] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-xl"
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Задачи */}
           <button
             type="button"
             onClick={(e) => {
@@ -419,11 +450,9 @@ function TicketActions({ ticket }: { ticket: TicketListItem }) {
             }}
             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/80 hover:bg-[var(--hover-1)] transition-colors text-left"
           >
-            <FileText size={16} className="text-[var(--text-primary)]/40 shrink-0" />
-            <span>Посмотреть задачи по заявке</span>
+            <FolderOpen size={16} className="text-[var(--text-primary)]/40 shrink-0" />
+            <span>Задачи по заявке</span>
           </button>
-
-          <div className="h-px bg-[var(--border-color)] mx-3" />
 
           <button
             type="button"
@@ -436,8 +465,123 @@ function TicketActions({ ticket }: { ticket: TicketListItem }) {
             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/80 hover:bg-[var(--hover-1)] transition-colors text-left"
           >
             <Plus size={16} className="text-[var(--accent)] shrink-0" />
-            <span>Создать задачу на основании</span>
+            <span>Создать задачу</span>
           </button>
+
+          <div className="h-px bg-[var(--border-color)] mx-3" />
+
+          {/* Управление */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowManage(!showManage);
+            }}
+            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/80 hover:bg-[var(--hover-1)] transition-colors text-left"
+          >
+            <span className="flex items-center gap-3">
+              <Settings size={16} className="text-[var(--text-primary)]/40 shrink-0" />
+              <span>Управление</span>
+            </span>
+            <ChevronDown 
+              size={16} 
+              className={`text-[var(--text-primary)]/40 transition-transform ${showManage ? 'rotate-180' : ''}`} 
+            />
+          </button>
+
+          {/* Подменю управления */}
+          {showManage && (
+            <div className="bg-[var(--hover-1)]/50 py-1">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setOpen(false);
+                  navigate(`/tickets/${ticket.number}?tab=manage`);
+                }}
+                className="w-full flex items-center gap-3 pl-11 pr-4 py-2.5 text-sm text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] transition-colors text-left"
+              >
+                <RefreshCw size={14} className="text-[var(--text-primary)]/40 shrink-0" />
+                <span>Изменить статус</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setOpen(false);
+                  navigate(`/tickets/${ticket.number}?tab=manage#assignee`);
+                }}
+                className="w-full flex items-center gap-3 pl-11 pr-4 py-2.5 text-sm text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] transition-colors text-left"
+              >
+                <UserCheck size={14} className="text-[var(--text-primary)]/40 shrink-0" />
+                <span>Назначить исполнителя</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowArchiveConfirm(true);
+                }}
+                className="w-full flex items-center gap-3 pl-11 pr-4 py-2.5 text-sm text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] transition-colors text-left"
+              >
+                <Archive size={14} className="text-[var(--text-primary)]/40 shrink-0" />
+                <span>В архив</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Модалка подтверждения архивации */}
+      {showArchiveConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+            onClick={() => setShowArchiveConfirm(false)} 
+          />
+          <div 
+            className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 text-center">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
+                <Archive className="w-6 h-6 text-amber-500" />
+              </div>
+              <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">
+                Переместить в архив?
+              </h3>
+              <p className="text-sm text-[var(--text-primary)]/50">
+                Заявка <span className="font-mono text-[var(--accent)]">{ticket.number}</span> будет скрыта из основного списка
+              </p>
+            </div>
+            <div className="flex border-t border-[var(--border-color)]">
+              <button
+                onClick={() => setShowArchiveConfirm(false)}
+                disabled={archiving}
+                className="flex-1 py-3.5 text-sm font-medium text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)] transition-colors disabled:opacity-50"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleArchive}
+                disabled={archiving}
+                className="flex-1 py-3.5 text-sm font-semibold text-amber-500 hover:bg-amber-500/10 border-l border-[var(--border-color)] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {archiving ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Archive size={16} />
+                )}
+                В архив
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

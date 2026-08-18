@@ -1,6 +1,6 @@
 // pages/TicketDetailPage.tsx
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link,useSearchParams  } from 'react-router-dom';
 import {
   ArrowLeft, Clock, User, Ticket as Tic, FileText, History,
   Loader2, Download, Image, File, ChevronDown, ChevronUp,
@@ -27,6 +27,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 /* ═══════════════════════════════════════════════════════════════════
    РУСИФИКАЦИЯ РОЛЕЙ
    ═══════════════════════════════════════════════════════════════════ */
+
+
 
 const PRIORITY_LABELS: Record<string, string> = {
   'low': 'Низкий',
@@ -223,6 +225,9 @@ function InlineStarRating({
    ═══════════════════════════════════════════════════════════════════ */
 
 export default function TicketDetailPage() {
+
+
+
   const [imagePreviews, setImagePreviews] = useState<Record<string, string>>({});
   const [previewsLoaded, setPreviewsLoaded] = useState(false);
   const [previewFile, setPreviewFile] = useState<any>(null);
@@ -277,6 +282,15 @@ export default function TicketDetailPage() {
   const canChangeStatus = hasRole(userRoles, 'admin') ||
     (ticket?.status && STATUS_PERMISSIONS[ticket.status]?.some(role => hasRole(userRoles, role))) || false;
   const canShowManage = isStaff;
+
+    const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'manage' && canShowManage) {
+      setActiveTab('manage');
+    }
+  }, [searchParams, canShowManage]);
 
   const canArchive = useCallback(() => {
     if (!ticket || !user) return false;
@@ -1498,52 +1512,41 @@ export default function TicketDetailPage() {
                 )}
 
                 {/* Архивация */}
-                <div className="border border-[var(--accent)]/30 rounded-xl overflow-hidden">
-                  <div className="px-6 py-4 bg-red-950/20 border-b border-[var(--accent)]/30">
-                    <h3 className="text-base font-semibold text-[var(--accent)]/80 uppercase tracking-wider">
-                      Опасная зона
-                    </h3>
-                  </div>
-                  <div className="p-6">
-                    {ticket.is_archived ? (
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <Archive className="w-5 h-5 text-amber-400" />
-                            <span className="text-base font-semibold text-[var(--text-primary)]">В архиве</span>
-                          </div>
-                          <p className="text-sm text-[var(--text-primary)]/40">Заявка доступна только для чтения</p>
-                        </div>
-                        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                          <Archive className="w-4 h-4" /> Архив
-                        </span>
-                      </div>
-                    ) : canArchive() ? (
-                      <div className="flex items-center justify-between gap-6">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <Archive className="w-5 h-5 text-[var(--text-primary)]/60" />
-                            <span className="text-base font-semibold text-[var(--text-primary)]">Архивировать заявку</span>
-                          </div>
-                          <p className="text-sm text-[var(--text-primary)]/40">Заявка скроется из основного списка</p>
-                        </div>
-                        <button
-                          onClick={() => setShowArchiveConfirm(true)}
-                          disabled={archiving}
-                          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-600/30 text-amber-400 text-sm font-medium disabled:opacity-50 flex-shrink-0"
-                        >
-                          {archiving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
-                          Архивировать
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-4 text-[var(--text-primary)]/40">
-                        <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                        <p className="text-sm">У вас нет прав для архивирования</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+<div className="border border-[var(--border-color)] rounded-xl overflow-hidden">
+  <div className="p-6">
+    {ticket.is_archived ? (
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Archive className="w-5 h-5 text-amber-400" />
+          <span className="text-base font-medium text-[var(--text-primary)]">В архиве</span>
+        </div>
+        <span className="px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
+          Только чтение
+        </span>
+      </div>
+    ) : canArchive() ? (
+      <div className="flex items-center justify-between gap-6">
+        <div className="flex items-center gap-3">
+          <Archive className="w-5 h-5 text-[var(--text-primary)]/40" />
+          <span className="text-base text-[var(--text-primary)]/60">Переместить в архив</span>
+        </div>
+        <button 
+          onClick={() => setShowArchiveConfirm(true)} 
+          disabled={archiving}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--hover-2)] hover:bg-[var(--hover-3)] border border-[var(--border-color)] text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] text-sm font-medium disabled:opacity-50 flex-shrink-0 transition-colors"
+        >
+          {archiving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+          В архив
+        </button>
+      </div>
+    ) : (
+      <div className="flex items-center gap-3 text-[var(--text-primary)]/40">
+        <Archive className="w-5 h-5" />
+        <span className="text-sm">Недостаточно прав</span>
+      </div>
+    )}
+  </div>
+</div>
               </div>
             )}
           </div>
