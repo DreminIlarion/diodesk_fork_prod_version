@@ -4,7 +4,7 @@ PRESIGNED_URL_EXPIRES_IN = 1800
 # Максимальная длина для имени файла
 MAX_FILENAME_LENGTH = 255
 # Разрешённые типы владельцев файлов (те к кому можно прикрепить вложение)
-ALLOWED_OWNER_TYPES = {"user", "counterparty", "ticket", "message", "comment"}
+ALLOWED_OWNER_TYPES = {"user", "counterparty", "ticket", "message", "comment", "task"}
 # Mime типы для документов (не включать application/octet-stream - не безопасно)
 DOCUMENT_MIME_TYPES = {
     # PDF
