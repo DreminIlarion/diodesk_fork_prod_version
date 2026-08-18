@@ -415,6 +415,7 @@ const getTaskTicketPath = (task: TaskViewItem) => {
 const formatFileSize = (b: number) =>
     b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(1)} MB`;
 
+
 const isImageFile = (file?: Pick<File, 'type' | 'name'> | null) => {
     if (!file) return false;
     const mime = String(file.type ?? '').toLowerCase();
@@ -435,7 +436,88 @@ const isImageAttachment = (a: TaskAttachment) => {
     const mime = String(a.mime_type || a.content_type || '').toLowerCase();
     const url = getAttachmentUrl(a).toLowerCase();
     return mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(url);
+    
 };
+
+function TaskAttachmentItem({ attachment }: { attachment: TaskAttachment }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    (async () => {
+      try {
+        const { download_url } = await attachmentsApi.getPresignedDownloadUrl(attachment.id!);
+        const fixedUrl = download_url.replace(/http:\/\/(minio|maildev):9000/g, 'http://localhost:9900');
+        const res = await fetch(fixedUrl);
+        if (!res.ok) throw new Error();
+        const blob = await res.blob();
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) {
+          setUrl(objectUrl);
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setError(true);
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [attachment.id]);
+
+  const name = getAttachmentName(attachment);
+  const size = getAttachmentSize(attachment);
+  const isImage = isImageAttachment(attachment);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)]">
+        <Loader2 className="w-4 h-4 animate-spin text-[var(--text-primary)]/40" />
+        <span className="text-sm text-[var(--text-primary)]/40">Загрузка...</span>
+      </div>
+    );
+  }
+
+  if (error || !url) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-red-500/20 bg-red-500/5">
+        <FileIcon className="w-5 h-5 text-red-400" />
+        <span className="text-sm text-red-400">Ошибка загрузки</span>
+      </div>
+    );
+  }
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)] transition-colors group"
+    >
+      {isImage ? (
+        <img src={url} alt="" className="w-12 h-12 rounded-lg object-cover border border-[var(--border-color)] shrink-0" />
+      ) : (
+        <div className="w-12 h-12 rounded-lg bg-[var(--hover-3)] flex items-center justify-center shrink-0">
+          <FileIcon className="w-5 h-5 text-[var(--text-primary)]/40" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">{name}</p>
+        <p className="text-xs text-[var(--text-primary)]/35">{size ? formatFileSize(size) : 'Файл'}</p>
+      </div>
+      <ArrowUpRight className="w-4 h-4 text-[var(--text-primary)]/20" />
+    </a>
+  );
+}
 
 function statusErr(err: any, task: TaskViewItem, to: TaskStatus) {
   const raw = apiErr(err);
@@ -2329,44 +2411,18 @@ function DetailModal({
             </div>
           </div>
 
-          {/* Вложения в просмотре */}
           {attachments.length > 0 && (
-            <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
-                <div className="px-4 py-3 bg-[var(--hover-1)] border-b border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)]">
-                    Вложения
-                </div>
-                <div className="px-4 py-4 grid sm:grid-cols-2 gap-3">
-                    {attachments.map((att, i) => {
-                        const name = getAttachmentName(att);
-                        const url = getAttachmentUrl(att);
-                        const size = getAttachmentSize(att);
-                        const previewable = isImageAttachment(att);
-                        return (
-                            <a
-                                key={i}
-                                href={url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)] transition-colors group"
-                            >
-                                {previewable && url ? (
-                                    <img src={url} alt="" className="w-12 h-12 rounded-lg object-cover border border-[var(--border-color)] shrink-0" />
-                                ) : (
-                                    <div className="w-12 h-12 rounded-lg bg-[var(--hover-3)] flex items-center justify-center shrink-0">
-                                        <FileIcon className="w-5 h-5 text-[var(--text-primary)]/40" />
-                                    </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">{name}</p>
-                                    <p className="text-xs text-[var(--text-primary)]/35">{size ? formatFileSize(size) : 'Файл'}</p>
-                                </div>
-                                <ArrowUpRight className="w-4 h-4 text-[var(--text-primary)]/20" />
-                            </a>
-                        );
-                    })}
-                </div>
-            </div>
-          )}
+  <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+    <div className="px-4 py-3 bg-[var(--hover-1)] border-b border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)]">
+      Вложения
+    </div>
+    <div className="px-4 py-4 grid sm:grid-cols-2 gap-3">
+      {attachments.map((att, i) => (
+        <TaskAttachmentItem key={i} attachment={att} />
+      ))}
+    </div>
+  </div>
+)}
 
           {tags.length > 0 && (
             <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
