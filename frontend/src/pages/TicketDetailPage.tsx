@@ -6,7 +6,7 @@ import {
   Loader2, Download, Image, File, ChevronDown, ChevronUp,
   Calendar, UserPlus, UserCheck, CheckCircle2, X, Plus,
   Search, Settings, AlertCircle, RefreshCw, Tag, Edit,
-  Paperclip as PaperclipIcon, MessageCircle, Building2, Phone, Mail,
+  Paperclip as PaperclipIcon, MessageCircle, Building2, Phone, Mail, ChevronRight,
   Archive, Star, Check,
 } from 'lucide-react';
 import { ticketsApi, usersApi, counterpartiesApi, feedbacksApi } from '../api/client';
@@ -98,7 +98,7 @@ const STATUS_PERMISSIONS: Record<string, string[]> = {
   'closed': ['admin', 'support_agent', 'support_manager'],
   'reopened': ['admin', 'support_agent', 'support_manager'],
   'rejected': ['admin', 'support_agent', 'support_manager'],
-  'canceled': ['admin', 'support_agent', 'support_manager'], 
+  'canceled': ['admin', 'support_agent', 'support_manager'],
 };
 
 const STATUS_DESCRIPTIONS: Record<string, string> = {
@@ -182,11 +182,10 @@ function InlineStarRating({
               <Star
                 width={size}
                 height={size}
-                className={`transition-colors duration-150 ${
-                  isActive
+                className={`transition-colors duration-150 ${isActive
                     ? 'text-emerald-500 fill-emerald-500'
                     : 'text-[var(--text-primary)]/10'
-                }`}
+                  }`}
                 style={{ display: 'block' }}
               />
             </span>
@@ -206,11 +205,10 @@ function InlineStarRating({
             <Star
               width={size}
               height={size}
-              className={`transition-colors duration-150 ${
-                isActive
+              className={`transition-colors duration-150 ${isActive
                   ? 'text-emerald-500 fill-emerald-500'
                   : 'text-[var(--text-primary)]/15'
-              }`}
+                }`}
               style={{ display: 'block' }}
             />
           </button>
@@ -720,20 +718,20 @@ export default function TicketDetailPage() {
     finally { setDownloadingId(null); }
   }, [toast]);
 
-const handleStatusChange = useCallback(async (s: string) => {
-  if (!canChangeStatus || !ticket) return;
-  setUpdatingStatus(true);
-  try {
-    const updated = await ticketsApi.updateTicketStatus(ticket.id, s as any);
-    setTicket(updated);
-    // Сразу обновляем availableStatuses для нового статуса
-    toast({ title: 'Успешно', description: `Статус: ${STATUS_LABELS[s] || s}` });
-  } catch (e: any) {
-    toast({ title: 'Ошибка', description: e.response?.status === 403 ? 'Нет прав' : 'Ошибка', variant: 'destructive' });
-  } finally {
-    setUpdatingStatus(false);
-  }
-}, [canChangeStatus, ticket, toast]);
+  const handleStatusChange = useCallback(async (s: string) => {
+    if (!canChangeStatus || !ticket) return;
+    setUpdatingStatus(true);
+    try {
+      const updated = await ticketsApi.updateTicketStatus(ticket.id, s as any);
+      setTicket(updated);
+      // Сразу обновляем availableStatuses для нового статуса
+      toast({ title: 'Успешно', description: `Статус: ${STATUS_LABELS[s] || s}` });
+    } catch (e: any) {
+      toast({ title: 'Ошибка', description: e.response?.status === 403 ? 'Нет прав' : 'Ошибка', variant: 'destructive' });
+    } finally {
+      setUpdatingStatus(false);
+    }
+  }, [canChangeStatus, ticket, toast]);
 
   const handleAssign = useCallback(async (aid: string | null) => {
     if (!ticket) return;
@@ -942,7 +940,7 @@ const handleStatusChange = useCallback(async (s: string) => {
     if (diffDays < 7) return `${diffDays} дн. назад`;
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
   }, []);
-  
+
   const canEdit = ['new', 'pending_approval', 'open', 'reopened'].includes(ticket?.status || '');
 
   /* ═══════════════════════════════════════════════════════════════════
@@ -1169,11 +1167,10 @@ const handleStatusChange = useCallback(async (s: string) => {
           <div className="flex gap-2 border-b border-[var(--border-color)] overflow-x-auto">
             {tabs.map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-6 py-3 rounded-t-xl transition-all whitespace-nowrap ${
-                  activeTab === tab.id
+                className={`flex items-center gap-2 px-6 py-3 rounded-t-xl transition-all whitespace-nowrap ${activeTab === tab.id
                     ? 'bg-[var(--accent)]/50 text-white border-b-2 border-[var(--accent)]'
                     : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-1)]'
-                }`}>
+                  }`}>
                 <tab.icon className="w-5 h-5" />
                 <span className="text-base font-medium">{tab.label}</span>
                 {tab.count !== undefined && tab.count > 0 && (
@@ -1199,11 +1196,10 @@ const handleStatusChange = useCallback(async (s: string) => {
                       <div className="flex gap-1 bg-[var(--hover-1)] rounded-lg p-0.5">
                         {(['newest', 'oldest'] as const).map(order => (
                           <button key={order} onClick={() => setCommentSortOrder(order)}
-                            className={`px-3 py-1.5 text-base rounded-md transition-colors ${
-                              commentSortOrder === order
+                            className={`px-3 py-1.5 text-base rounded-md transition-colors ${commentSortOrder === order
                                 ? 'bg-[var(--accent)]/50 text-white'
                                 : 'text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60'
-                            }`}>
+                              }`}>
                             {order === 'newest' ? 'Сначала новые' : 'Сначала старые'}
                           </button>
                         ))}
@@ -1380,176 +1376,176 @@ const handleStatusChange = useCallback(async (s: string) => {
             )}
 
             {/* Manage */}
-{/* Manage */}
-{activeTab === 'manage' && canShowManage && (
-  <div className="p-6 space-y-8">
-    {/* Текущий статус */}
-    <div className="bg-[var(--hover-1)] rounded-xl p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-semibold text-[var(--text-primary)] flex items-center gap-3">
-          <CheckCircle2 className="w-6 h-6 text-[var(--success)]" /> Текущий статус
-        </h3>
-        <span className={`px-4 py-1.5 rounded-xl text-base font-medium border ${getStatusColor(ticket.status || '')}`}>
-          {STATUS_LABELS[ticket.status || ''] || ticket.status}
-        </span>
-      </div>
-      <p className="text-[var(--text-primary)]/60 text-base">{STATUS_DESCRIPTIONS[ticket.status || ''] || ''}</p>
-    </div>
-
-    {/* Изменить статус */}
-    <div>
-      <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2 flex items-center gap-3">
-        <RefreshCw className="w-5 h-5 text-[var(--info)]" /> Изменить статус на
-      </h3>
-      <p className="text-sm text-[var(--text-primary)]/40 mb-5">
-        Выберите новый статус для заявки
-      </p>
-      
-      {!canChangeStatus ? (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-5 flex items-center gap-4">
-          <AlertCircle className="w-6 h-6 text-[var(--warning)] flex-shrink-0" />
-          <p className="text-[var(--warning)]/80 text-base">У вас нет прав для изменения статуса</p>
-        </div>
-      ) : availableStatuses.length === 0 ? (
-        <div className="bg-[var(--hover-1)] rounded-xl p-8 text-center border border-dashed border-[var(--border-color)]">
-          <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-[var(--text-primary)]/20" />
-          <p className="text-[var(--text-primary)]/50 text-lg">Нет доступных переходов</p>
-          <p className="text-sm text-[var(--text-primary)]/30 mt-1">Текущий статус является конечным</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {availableStatuses.map(status => {
-            const statusBtnMap: Record<string, { bg: string; text: string; border: string; hover: string }> = {
-              'new': { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', hover: 'hover:bg-blue-500/20' },
-              'pending_approval': { bg: 'bg-yellow-500/10', text: 'text-yellow-400', border: 'border-yellow-500/30', hover: 'hover:bg-yellow-500/20' },
-              'open': { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/30', hover: 'hover:bg-cyan-500/20' },
-              'in_progress': { bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/30', hover: 'hover:bg-indigo-500/20' },
-              'waiting': { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30', hover: 'hover:bg-orange-500/20' },
-              'resolved': { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', hover: 'hover:bg-emerald-500/20' },
-              'closed': { bg: 'bg-gray-500/10', text: 'text-gray-400', border: 'border-gray-500/30', hover: 'hover:bg-gray-500/20' },
-              'reopened': { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30', hover: 'hover:bg-purple-500/20' },
-              'rejected': { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30', hover: 'hover:bg-red-500/20' },
-              'canceled': { bg: 'bg-zinc-500/10', text: 'text-zinc-400', border: 'border-zinc-500/30', hover: 'hover:bg-zinc-500/20' },
-            };
-            const style = statusBtnMap[status] || { bg: 'bg-[var(--hover-1)]', text: 'text-[var(--text-primary)]', border: 'border-[var(--border-color)]', hover: 'hover:bg-[var(--hover-2)]' };
-            
-            return (
-              <button 
-                key={status} 
-                onClick={() => handleStatusChange(status)} 
-                disabled={updatingStatus}
-                className={`w-full flex items-center justify-between px-5 py-4 rounded-xl font-medium transition-all border ${style.bg} ${style.text} ${style.border} ${style.hover} disabled:opacity-50 disabled:cursor-not-allowed text-base`}
-              >
-                <span className="flex items-center gap-3">
-                  {updatingStatus ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <ChevronRight className="w-5 h-5 opacity-50" />
-                  )}
-                  <span className="font-semibold">{STATUS_LABELS[status] || status}</span>
-                </span>
-                <span className="text-sm opacity-70">{STATUS_DESCRIPTIONS[status] || ''}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-
-    {/* Исполнитель */}
-    {canAssign && (
-      <div>
-        <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2 flex items-center gap-3">
-          <UserCheck className="w-5 h-5 text-[var(--info)]" /> Исполнитель
-        </h3>
-        <p className="text-sm text-[var(--text-primary)]/40 mb-5">
-          {ticket.assignee_id ? 'Измените текущего исполнителя' : 'Назначьте исполнителя для заявки'}
-        </p>
-        
-        <div className="bg-[var(--hover-1)] rounded-xl p-6">
-          {ticket.assignee_id ? (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-700 to-red-800 flex items-center justify-center">
-                  <User className="w-6 h-6 text-white" />
+            {/* Manage */}
+            {activeTab === 'manage' && canShowManage && (
+              <div className="p-6 space-y-8">
+                {/* Текущий статус */}
+                <div className="bg-[var(--hover-1)] rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-semibold text-[var(--text-primary)] flex items-center gap-3">
+                      <CheckCircle2 className="w-6 h-6 text-[var(--success)]" /> Текущий статус
+                    </h3>
+                    <span className={`px-4 py-1.5 rounded-xl text-base font-medium border ${getStatusColor(ticket.status || '')}`}>
+                      {STATUS_LABELS[ticket.status || ''] || ticket.status}
+                    </span>
+                  </div>
+                  <p className="text-[var(--text-primary)]/60 text-base">{STATUS_DESCRIPTIONS[ticket.status || ''] || ''}</p>
                 </div>
+
+                {/* Изменить статус */}
                 <div>
-                  <p className="text-[var(--text-primary)] font-semibold text-base">{getAssigneeName() || 'Исполнитель'}</p>
-                  <p className="text-[var(--text-primary)]/40 text-sm">Текущий исполнитель</p>
+                  <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2 flex items-center gap-3">
+                    <RefreshCw className="w-5 h-5 text-[var(--info)]" /> Изменить статус на
+                  </h3>
+                  <p className="text-sm text-[var(--text-primary)]/40 mb-5">
+                    Выберите новый статус для заявки
+                  </p>
+
+                  {!canChangeStatus ? (
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-5 flex items-center gap-4">
+                      <AlertCircle className="w-6 h-6 text-[var(--warning)] flex-shrink-0" />
+                      <p className="text-[var(--warning)]/80 text-base">У вас нет прав для изменения статуса</p>
+                    </div>
+                  ) : availableStatuses.length === 0 ? (
+                    <div className="bg-[var(--hover-1)] rounded-xl p-8 text-center border border-dashed border-[var(--border-color)]">
+                      <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-[var(--text-primary)]/20" />
+                      <p className="text-[var(--text-primary)]/50 text-lg">Нет доступных переходов</p>
+                      <p className="text-sm text-[var(--text-primary)]/30 mt-1">Текущий статус является конечным</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {availableStatuses.map(status => {
+                        const statusBtnMap: Record<string, { bg: string; text: string; border: string; hover: string }> = {
+                          'new': { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', hover: 'hover:bg-blue-500/20' },
+                          'pending_approval': { bg: 'bg-yellow-500/10', text: 'text-yellow-400', border: 'border-yellow-500/30', hover: 'hover:bg-yellow-500/20' },
+                          'open': { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/30', hover: 'hover:bg-cyan-500/20' },
+                          'in_progress': { bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/30', hover: 'hover:bg-indigo-500/20' },
+                          'waiting': { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30', hover: 'hover:bg-orange-500/20' },
+                          'resolved': { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', hover: 'hover:bg-emerald-500/20' },
+                          'closed': { bg: 'bg-gray-500/10', text: 'text-gray-400', border: 'border-gray-500/30', hover: 'hover:bg-gray-500/20' },
+                          'reopened': { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30', hover: 'hover:bg-purple-500/20' },
+                          'rejected': { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30', hover: 'hover:bg-red-500/20' },
+                          'canceled': { bg: 'bg-zinc-500/10', text: 'text-zinc-400', border: 'border-zinc-500/30', hover: 'hover:bg-zinc-500/20' },
+                        };
+                        const style = statusBtnMap[status] || { bg: 'bg-[var(--hover-1)]', text: 'text-[var(--text-primary)]', border: 'border-[var(--border-color)]', hover: 'hover:bg-[var(--hover-2)]' };
+
+                        return (
+                          <button
+                            key={status}
+                            onClick={() => handleStatusChange(status)}
+                            disabled={updatingStatus}
+                            className={`w-full flex items-center justify-between px-5 py-4 rounded-xl font-medium transition-all border ${style.bg} ${style.text} ${style.border} ${style.hover} disabled:opacity-50 disabled:cursor-not-allowed text-base`}
+                          >
+                            <span className="flex items-center gap-3">
+                              {updatingStatus ? (
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                              ) : (
+                                <ChevronRight className="w-5 h-5 opacity-50" />
+                              )}
+                              <span className="font-semibold">{STATUS_LABELS[status] || status}</span>
+                            </span>
+                            <span className="text-sm opacity-70">{STATUS_DESCRIPTIONS[status] || ''}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Исполнитель */}
+                {canAssign && (
+                  <div>
+                    <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2 flex items-center gap-3">
+                      <UserCheck className="w-5 h-5 text-[var(--info)]" /> Исполнитель
+                    </h3>
+                    <p className="text-sm text-[var(--text-primary)]/40 mb-5">
+                      {ticket.assignee_id ? 'Измените текущего исполнителя' : 'Назначьте исполнителя для заявки'}
+                    </p>
+
+                    <div className="bg-[var(--hover-1)] rounded-xl p-6">
+                      {ticket.assignee_id ? (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-700 to-red-800 flex items-center justify-center">
+                              <User className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                              <p className="text-[var(--text-primary)] font-semibold text-base">{getAssigneeName() || 'Исполнитель'}</p>
+                              <p className="text-[var(--text-primary)]/40 text-sm">Текущий исполнитель</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => { loadSupportUsers(); setShowAssigneeModal(true); }}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] border border-[var(--border-color)] transition-all"
+                          >
+                            <UserPlus className="w-4 h-4" /> Изменить
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-center py-5">
+                          <UserPlus className="w-12 h-12 mx-auto mb-3 text-[var(--text-primary)]/20" />
+                          <p className="text-[var(--text-primary)]/50 text-base mb-4">Исполнитель не назначен</p>
+                          <button
+                            onClick={() => { loadSupportUsers(); setShowAssigneeModal(true); }}
+                            className="px-5 py-2.5 rounded-lg text-sm font-medium bg-[var(--accent)]/40 hover:bg-[var(--accent)]/60 text-[var(--text-primary)]/80 hover:text-[var(--text-primary)] border border-[var(--accent)]/20 transition-all"
+                          >
+                            <UserPlus className="w-4 h-4 inline mr-2" />Назначить исполнителя
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Архивация */}
+                <div className="border border-[var(--accent)]/30 rounded-xl overflow-hidden">
+                  <div className="px-6 py-4 bg-red-950/20 border-b border-[var(--accent)]/30">
+                    <h3 className="text-base font-semibold text-[var(--accent)]/80 uppercase tracking-wider">
+                      Опасная зона
+                    </h3>
+                  </div>
+                  <div className="p-6">
+                    {ticket.is_archived ? (
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Archive className="w-5 h-5 text-amber-400" />
+                            <span className="text-base font-semibold text-[var(--text-primary)]">В архиве</span>
+                          </div>
+                          <p className="text-sm text-[var(--text-primary)]/40">Заявка доступна только для чтения</p>
+                        </div>
+                        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                          <Archive className="w-4 h-4" /> Архив
+                        </span>
+                      </div>
+                    ) : canArchive() ? (
+                      <div className="flex items-center justify-between gap-6">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Archive className="w-5 h-5 text-[var(--text-primary)]/60" />
+                            <span className="text-base font-semibold text-[var(--text-primary)]">Архивировать заявку</span>
+                          </div>
+                          <p className="text-sm text-[var(--text-primary)]/40">Заявка скроется из основного списка</p>
+                        </div>
+                        <button
+                          onClick={() => setShowArchiveConfirm(true)}
+                          disabled={archiving}
+                          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-600/30 text-amber-400 text-sm font-medium disabled:opacity-50 flex-shrink-0"
+                        >
+                          {archiving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+                          Архивировать
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-4 text-[var(--text-primary)]/40">
+                        <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                        <p className="text-sm">У вас нет прав для архивирования</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-              <button 
-                onClick={() => { loadSupportUsers(); setShowAssigneeModal(true); }}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] border border-[var(--border-color)] transition-all"
-              >
-                <UserPlus className="w-4 h-4" /> Изменить
-              </button>
-            </div>
-          ) : (
-            <div className="text-center py-5">
-              <UserPlus className="w-12 h-12 mx-auto mb-3 text-[var(--text-primary)]/20" />
-              <p className="text-[var(--text-primary)]/50 text-base mb-4">Исполнитель не назначен</p>
-              <button 
-                onClick={() => { loadSupportUsers(); setShowAssigneeModal(true); }}
-                className="px-5 py-2.5 rounded-lg text-sm font-medium bg-[var(--accent)]/40 hover:bg-[var(--accent)]/60 text-[var(--text-primary)]/80 hover:text-[var(--text-primary)] border border-[var(--accent)]/20 transition-all"
-              >
-                <UserPlus className="w-4 h-4 inline mr-2" />Назначить исполнителя
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    )}
-
-    {/* Архивация */}
-    <div className="border border-[var(--accent)]/30 rounded-xl overflow-hidden">
-      <div className="px-6 py-4 bg-red-950/20 border-b border-[var(--accent)]/30">
-        <h3 className="text-base font-semibold text-[var(--accent)]/80 uppercase tracking-wider">
-          Опасная зона
-        </h3>
-      </div>
-      <div className="p-6">
-        {ticket.is_archived ? (
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Archive className="w-5 h-5 text-amber-400" />
-                <span className="text-base font-semibold text-[var(--text-primary)]">В архиве</span>
-              </div>
-              <p className="text-sm text-[var(--text-primary)]/40">Заявка доступна только для чтения</p>
-            </div>
-            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
-              <Archive className="w-4 h-4" /> Архив
-            </span>
-          </div>
-        ) : canArchive() ? (
-          <div className="flex items-center justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Archive className="w-5 h-5 text-[var(--text-primary)]/60" />
-                <span className="text-base font-semibold text-[var(--text-primary)]">Архивировать заявку</span>
-              </div>
-              <p className="text-sm text-[var(--text-primary)]/40">Заявка скроется из основного списка</p>
-            </div>
-            <button 
-              onClick={() => setShowArchiveConfirm(true)} 
-              disabled={archiving}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-600/30 text-amber-400 text-sm font-medium disabled:opacity-50 flex-shrink-0"
-            >
-              {archiving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
-              Архивировать
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-4 text-[var(--text-primary)]/40">
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-            <p className="text-sm">У вас нет прав для архивирования</p>
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-)}
+            )}
           </div>
         </div>
 
@@ -1862,11 +1858,10 @@ const handleStatusChange = useCallback(async (s: string) => {
                     { value: 'critical', label: 'Критический', cls: 'priority-critical' },
                   ].map(p => (
                     <button key={p.value} type="button" onClick={() => setEditPriority(p.value)}
-                      className={`px-3 py-2.5 rounded-xl text-base font-medium border transition-all ${
-                        editPriority === p.value
+                      className={`px-3 py-2.5 rounded-xl text-base font-medium border transition-all ${editPriority === p.value
                           ? p.cls
                           : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--hover-2)]'
-                      }`}>
+                        }`}>
                       {p.label}
                     </button>
                   ))}
