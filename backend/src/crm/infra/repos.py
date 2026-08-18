@@ -39,7 +39,7 @@ class CounterpartyMapper(ModelMapper[Counterparty, CounterpartyOrm]):
             contact_persons=[
                 ContactPerson(
                     full_name=FullName(contact_person["full_name"]),
-                    phone=Phone(contact_person["phone"]),
+                    phone=Phone(contact_person["phone"]) if contact_person["phone"] else None,
                     email=contact_person["email"],
                     messengers=contact_person["messengers"],
                 )
