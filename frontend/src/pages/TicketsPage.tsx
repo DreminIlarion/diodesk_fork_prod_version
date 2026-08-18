@@ -520,14 +520,14 @@ function TicketRow({ ticket, showAssignee, showReporter }: {
       </div>
 
       <div className="self-center">
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[16px] font-semibold
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[14px] font-semibold
                          border whitespace-nowrap ${statusColor}`}>
           {statusLabel}
         </span>
       </div>
 
       <div className="self-center">
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[16px] font-semibold
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[14px] font-semibold
                          border whitespace-nowrap ${priorityColor}`}>
           {priorityLabel}
         </span>

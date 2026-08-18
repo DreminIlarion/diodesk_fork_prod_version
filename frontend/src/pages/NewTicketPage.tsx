@@ -1,4 +1,5 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react';
+﻿
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader2, FileText,
@@ -20,7 +21,6 @@ import {
 
 // ─── Константы ────
 
-const DRAFT_KEY = 'new_ticket_draft';
 const AI_TIMEOUT_MS = 5000;
 
 const PRIORITIES = [
@@ -62,7 +62,7 @@ interface SimpleUser {
 const CAN_SELECT_COUNTERPARTY_ROLES = ['admin', 'support_agent', 'support_manager', 'executor'];
 type SelectionType = 'project' | 'counterparty' | null;
 
-// ─── Draft helpers ────
+// ─── Draft types ────
 
 interface DraftData {
   step: number;
@@ -82,29 +82,35 @@ interface DraftData {
   projectSearch: string;
   reporterSearch: string;
   savedAt: number;
+  userId: string; // привязка черновика к пользователю
 }
 
-function saveDraft(data: DraftData) {
+// ─── Draft helpers (принимают ключ) ────
+
+function getDraftKey(userId: string | undefined): string {
+  return userId ? `new_ticket_draft:${userId}` : 'new_ticket_draft:anonymous';
+}
+
+function saveDraft(data: DraftData, key: string) {
   try {
-    // Фильтруем блоки — не сохраняем localFile и localPreview (не сериализуемы)
     const cleanBlocks = data.descriptionBlocks.map(b => {
       if (b.type === 'image') {
         return { id: b.id, type: b.type as 'image', value: b.value };
       }
       return { ...b };
     });
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...data, descriptionBlocks: cleanBlocks }));
+    localStorage.setItem(key, JSON.stringify({ ...data, descriptionBlocks: cleanBlocks }));
   } catch { }
 }
 
-function loadDraft(): DraftData | null {
+function loadDraft(key: string): DraftData | null {
   try {
-    const raw = localStorage.getItem(DRAFT_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const data = JSON.parse(raw) as DraftData;
-    // Проверяем что черновику не больше 24 часов
+    // Черновик не старше 24 часов
     if (Date.now() - data.savedAt > 24 * 60 * 60 * 1000) {
-      localStorage.removeItem(DRAFT_KEY);
+      localStorage.removeItem(key);
       return null;
     }
     return data;
@@ -113,8 +119,8 @@ function loadDraft(): DraftData | null {
   }
 }
 
-function clearDraft() {
-  localStorage.removeItem(DRAFT_KEY);
+function clearDraft(key: string) {
+  localStorage.removeItem(key);
 }
 
 // ─── Компонент ────
@@ -127,8 +133,11 @@ export default function NewTicketPage() {
   const { user } = useAuthStore();
   const pageRef = useRef<HTMLDivElement>(null);
 
-  // Загружаем черновик
-  const draft = useRef(loadDraft());
+  // Ключ черновика привязан к конкретному пользователю
+  const draftKey = getDraftKey(user?.id ?? user?.user_id);
+
+  // Загружаем черновик только для текущего пользователя
+  const draft = useRef(loadDraft(draftKey));
 
   const [step, setStep] = useState(draft.current?.step || 1);
   const [title, setTitle] = useState(draft.current?.title || '');
@@ -194,14 +203,49 @@ export default function NewTicketPage() {
     b => (b.type === 'text' && b.value.trim().length > 0) || (b.type === 'image' && b.localFile)
   );
 
+  // ─── Сброс черновика при смене пользователя ───
+  // Если в localStorage лежит черновик другого пользователя — он просто не загрузится,
+  // потому что ключ уже содержит user.id. Но на случай если user изменился во время
+  // работы — сбрасываем стейт.
+  const prevUserIdRef = useRef<string | undefined>(user?.id ?? user?.user_id);
+
+  useEffect(() => {
+    const currentUserId = user?.id ?? user?.user_id;
+    if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== currentUserId) {
+      // Пользователь сменился — сбрасываем всё
+      clearDraft(getDraftKey(prevUserIdRef.current));
+      draft.current = null;
+      setHasDraft(false);
+      setStep(1);
+      setTitle('');
+      setDescriptionBlocks([{ id: 'init', type: 'text', value: '' }]);
+      setPriority('medium');
+      setType('Инцидент');
+      setTags([]);
+      setGeneralFiles([]);
+      setSelectionType(null);
+      setSelectedCounterparty(null);
+      setSelectedProject(null);
+      setSelectedReporter(null);
+      setCounterpartySearch('');
+      setProjectSearch('');
+      setReporterSearch('');
+      setAiSuggestion(null);
+      setAiSuggestedTags([]);
+      aiDoneRef.current = false;
+    }
+    prevUserIdRef.current = currentUserId;
+  }, [user?.id, user?.user_id]);
+
   // ─── Draft auto-save ───
 
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // Debounced save
     if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
     draftSaveTimerRef.current = setTimeout(() => {
+      const currentUserId = user?.id ?? user?.user_id;
+      if (!currentUserId) return; // не сохраняем без пользователя
       saveDraft({
         step,
         title,
@@ -220,7 +264,8 @@ export default function NewTicketPage() {
         projectSearch,
         reporterSearch,
         savedAt: Date.now(),
-      });
+        userId: currentUserId,
+      }, draftKey);
       setHasDraft(true);
     }, 500);
 
@@ -229,7 +274,7 @@ export default function NewTicketPage() {
     };
   }, [step, title, descriptionBlocks, priority, type, tags, selectionType,
     selectedCounterparty, selectedProject, selectedReporter,
-    counterpartySearch, projectSearch, reporterSearch]);
+    counterpartySearch, projectSearch, reporterSearch, draftKey]);
 
   // ─── Restore draft counterparty/project ───
 
@@ -267,12 +312,11 @@ export default function NewTicketPage() {
         .catch(() => { });
     }
 
-    // Clear the ref so it doesn't re-run
     draft.current = null;
   }, [canSelectCounterparty]);
 
   const handleClearDraft = () => {
-    clearDraft();
+    clearDraft(draftKey);
     setHasDraft(false);
     setStep(1);
     setTitle('');
@@ -349,9 +393,7 @@ export default function NewTicketPage() {
     autoSelectProject();
   }, [preselectedProjectId, canSelectCounterparty]);
 
-  /* ══════════════════════════════════════════════════════════════════════
-     AI с таймаутом 5 секунд
-     ══════════════════════════════════════════════════════════════════════ */
+  // ─── AI с таймаутом ───
 
   useEffect(() => {
     if (step !== 2) {
@@ -369,9 +411,7 @@ export default function NewTicketPage() {
     const currentTitle = titleRef.current.trim();
     const currentDesc = descriptionRef.current.trim();
 
-    if (!currentTitle || !currentDesc) {
-      return;
-    }
+    if (!currentTitle || !currentDesc) return;
 
     aiAbortRef.current?.abort();
     const controller = new AbortController();
@@ -382,12 +422,10 @@ export default function NewTicketPage() {
     setAiSuggestion(null);
     setAiTimedOut(false);
 
-    // Таймаут 5 секунд
     const timeoutId = setTimeout(() => {
       if (controller.signal.aborted) return;
       setAiTimedOut(true);
       setAiLoading(false);
-      // Не отменяем запрос — если ответ всё-таки придёт, обновим
     }, AI_TIMEOUT_MS);
 
     ticketsApi.predict(currentTitle, currentDesc)
@@ -406,7 +444,7 @@ export default function NewTicketPage() {
         if (controller.signal.aborted) return;
         console.error('AI prediction failed:', err);
         setAiLoading(false);
-        setAiTimedOut(true); // При ошибке тоже даём выбирать вручную
+        setAiTimedOut(true);
       });
 
     return () => {
@@ -479,7 +517,7 @@ export default function NewTicketPage() {
     finally { setLoadingUsers(false); }
   };
 
-  // ─── Handlers ──
+  // ─── Handlers ───
 
   const handleSelectionTypeChange = (t: SelectionType) => {
     setSelectionType(t); setSelectedCounterparty(null); setSelectedProject(null);
@@ -617,7 +655,7 @@ export default function NewTicketPage() {
       }
 
       // Очищаем черновик при успешном создании
-      clearDraft();
+      clearDraft(draftKey);
       setHasDraft(false);
 
       navigate('/tickets');
@@ -661,54 +699,49 @@ export default function NewTicketPage() {
       </div>
 
       {/* Progress stepper */}
-<div className="flex items-center gap-0 mb-8">
-  {[
-    { num: 1, label: 'Описание', icon: <FileText className="w-4 h-4" /> },
-    { num: 2, label: 'Классификация', icon: <Tag className="w-4 h-4" /> },
-    { num: 3, label: 'Отправка', icon: <CheckCircle2 className="w-4 h-4" /> },
-  ].map((s, i) => {
-    const isActive = step === s.num;
-    const isDone = step > s.num;
-    const isNext = s.num === step + 1;
+      <div className="flex items-center gap-0 mb-8">
+        {[
+          { num: 1, label: 'Описание', icon: <FileText className="w-4 h-4" /> },
+          { num: 2, label: 'Классификация', icon: <Tag className="w-4 h-4" /> },
+          { num: 3, label: 'Отправка', icon: <CheckCircle2 className="w-4 h-4" /> },
+        ].map((s, i) => {
+          const isActive = step === s.num;
+          const isDone = step > s.num;
+          const isNext = s.num === step + 1;
 
-    return (
-      <div key={s.num} className="flex items-center flex-1">
-        <button
-          onClick={() => {
-            if (isDone) setStep(s.num);
-            else if (isNext && step === 1 && validateStep1()) setStep(s.num);
-          }}
-          disabled={s.num > step + 1}
-          className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium w-full transition-all duration-200 border
-            ${isActive
-              ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-lg shadow-[var(--accent)]/20'
-              : isDone
-                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 cursor-pointer hover:bg-emerald-500/25'
-                : 'bg-[var(--hover-1)] text-[var(--text-primary)]/35 border-[var(--border-color)] cursor-default'
-            }`}
-        >
-          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold
-            ${isActive
-              ? 'bg-white/20'
-              : isDone
-                ? 'bg-emerald-500/20'
-                : 'bg-[var(--hover-2)]'
-            }`}
-          >
-            {isDone ? <CheckCircle2 className="w-4 h-4" /> : s.num}
-          </div>
-          <span className="hidden sm:inline truncate">{s.label}</span>
-        </button>
+          return (
+            <div key={s.num} className="flex items-center flex-1">
+              <button
+                onClick={() => {
+                  if (isDone) setStep(s.num);
+                  else if (isNext && step === 1 && validateStep1()) setStep(s.num);
+                }}
+                disabled={s.num > step + 1}
+                className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium w-full transition-all duration-200 border
+                  ${isActive
+                    ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-lg shadow-[var(--accent)]/20'
+                    : isDone
+                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 cursor-pointer hover:bg-emerald-500/25'
+                      : 'bg-[var(--hover-1)] text-[var(--text-primary)]/35 border-[var(--border-color)] cursor-default'
+                  }`}
+              >
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold
+                  ${isActive ? 'bg-white/20' : isDone ? 'bg-emerald-500/20' : 'bg-[var(--hover-2)]'}`}
+                >
+                  {isDone ? <CheckCircle2 className="w-4 h-4" /> : s.num}
+                </div>
+                <span className="hidden sm:inline truncate">{s.label}</span>
+              </button>
 
-        {i < 2 && (
-          <div className={`w-8 h-[2px] mx-1 rounded-full shrink-0 transition-colors duration-300
-            ${step > s.num ? 'bg-emerald-500/60' : 'bg-[var(--border-color)]'}`}
-          />
-        )}
+              {i < 2 && (
+                <div className={`w-8 h-[2px] mx-1 rounded-full shrink-0 transition-colors duration-300
+                  ${step > s.num ? 'bg-emerald-500/60' : 'bg-[var(--border-color)]'}`}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
-    );
-  })}
-</div>
 
       {/* Draft restored notice */}
       {hasDraft && step === 1 && title && (
@@ -979,8 +1012,6 @@ export default function NewTicketPage() {
         {/* ═══ Step 2 ═══ */}
         {step === 2 && (
           <div className="space-y-8">
-
-            {/* AI Loading — но с возможностью редактирования после таймаута */}
             {aiLoading && !aiTimedOut && (
               <div className="p-5 rounded-xl bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 flex items-center gap-4">
                 <div className="relative flex-shrink-0">
@@ -996,7 +1027,6 @@ export default function NewTicketPage() {
               </div>
             )}
 
-            {/* AI Timed Out */}
             {aiTimedOut && !aiSuggestion && (
               <div className="p-5 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center gap-4">
                 <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center flex-shrink-0">
@@ -1012,10 +1042,8 @@ export default function NewTicketPage() {
               </div>
             )}
 
-            {/* AI Success */}
             {aiSuggestion && !aiLoading && (
-              <div className="p-4 rounded-xl bg-gradient-to-r from-yellow-500/15 to-orange-500/10
-                              border border-yellow-500/20 flex items-center gap-3">
+              <div className="p-4 rounded-xl bg-gradient-to-r from-yellow-500/15 to-orange-500/10 border border-yellow-500/20 flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
                   <Zap className="w-4 h-4 text-yellow-400" />
                 </div>
@@ -1026,7 +1054,6 @@ export default function NewTicketPage() {
               </div>
             )}
 
-            {/* Всегда показываем выбор, даже когда AI загружается (после таймаута) */}
             <div className={aiLoading && !aiTimedOut ? 'opacity-40 pointer-events-none transition-opacity' : 'transition-opacity'}>
 
               {/* Тип */}
@@ -1178,15 +1205,14 @@ export default function NewTicketPage() {
         {step === 3 && (
           <div className="space-y-6">
             <div className="text-center mb-8">
-  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-    <CheckCircle2 className="w-7 h-7 text-emerald-400" />
-  </div>
-  <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-1">Проверьте заявку</h2>
-  <p className="text-sm text-[var(--text-primary)]/50">Убедитесь, что всё верно перед отправкой</p>
-</div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-7 h-7 text-emerald-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-1">Проверьте заявку</h2>
+              <p className="text-sm text-[var(--text-primary)]/50">Убедитесь, что всё верно перед отправкой</p>
+            </div>
 
             <div className="space-y-4">
-              {/* Привязка */}
               {selectedProject && (
                 <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-3">
                   <FolderOpen className="w-6 h-6 text-amber-400 flex-shrink-0" />
@@ -1214,7 +1240,6 @@ export default function NewTicketPage() {
                 </div>
               )}
 
-              {/* Инициатор */}
               <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/30 flex items-center gap-3">
                 <User className="w-6 h-6 text-green-400 flex-shrink-0" />
                 <div>
@@ -1227,20 +1252,17 @@ export default function NewTicketPage() {
                 </div>
               </div>
 
-              {/* Тема */}
               <div className="p-4 rounded-xl bg-[var(--hover-1)]">
                 <p className="text-[var(--text-primary)]/50 text-xs mb-1">Тема</p>
                 <p className="text-[var(--text-primary)] font-medium break-words">{title || '—'}</p>
               </div>
 
-              {/* Описание */}
               <div className="p-4 rounded-xl bg-[var(--hover-1)]">
                 <p className="text-[var(--text-primary)]/50 text-xs mb-3">Описание</p>
                 <div className="space-y-3">
                   {descriptionBlocks.map(block => {
                     if (block.type === 'text') {
                       if (!block.value.trim()) return null;
-                      // Оборачиваем текст в <strong> для markdown-форматирования
                       return (
                         <div key={block.id} className="text-[var(--text-primary)] text-sm leading-relaxed whitespace-pre-wrap break-words">
                           {renderInlineFormatting(block.value)}
@@ -1262,24 +1284,21 @@ export default function NewTicketPage() {
                 </div>
               </div>
 
-              {/* Тип + Приоритет */}
-              {/* Тип + Приоритет */}
-<div className="grid grid-cols-2 gap-3">
-  <div className="p-4 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
-    <p className="text-[var(--text-primary)]/40 text-xs mb-2 font-medium uppercase tracking-wider">Тип</p>
-    <div className={`inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg font-medium border ${TICKET_TYPES.find(t => t.value === type)?.color || ''}`}>
-      {TICKET_TYPES.find(t => t.value === type)?.icon} {type}
-    </div>
-  </div>
-  <div className="p-4 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
-    <p className="text-[var(--text-primary)]/40 text-xs mb-2 font-medium uppercase tracking-wider">Приоритет</p>
-    <div className={`inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg font-medium border ${PRIORITIES.find(p => p.value === priority)?.color || ''}`}>
-      {PRIORITIES.find(p => p.value === priority)?.icon} {PRIORITIES.find(p => p.value === priority)?.label || priority}
-    </div>
-  </div>
-</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-4 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
+                  <p className="text-[var(--text-primary)]/40 text-xs mb-2 font-medium uppercase tracking-wider">Тип</p>
+                  <div className={`inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg font-medium border ${TICKET_TYPES.find(t => t.value === type)?.color || ''}`}>
+                    {TICKET_TYPES.find(t => t.value === type)?.icon} {type}
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
+                  <p className="text-[var(--text-primary)]/40 text-xs mb-2 font-medium uppercase tracking-wider">Приоритет</p>
+                  <div className={`inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg font-medium border ${PRIORITIES.find(p => p.value === priority)?.color || ''}`}>
+                    {PRIORITIES.find(p => p.value === priority)?.icon} {PRIORITIES.find(p => p.value === priority)?.label || priority}
+                  </div>
+                </div>
+              </div>
 
-              {/* Теги */}
               {tags.length > 0 && (
                 <div className="p-4 rounded-xl bg-[var(--hover-1)]">
                   <p className="text-[var(--text-primary)]/50 text-xs mb-2">Теги</p>
@@ -1297,7 +1316,6 @@ export default function NewTicketPage() {
                 </div>
               )}
 
-              {/* Вложения */}
               {generalFiles.length > 0 && (
                 <div className="p-4 rounded-xl bg-[var(--hover-1)]">
                   <p className="text-[var(--text-primary)]/50 text-xs mb-2">Вложения ({generalFiles.length})</p>
@@ -1316,34 +1334,34 @@ export default function NewTicketPage() {
           </div>
         )}
 
-{/* Navigation */}
-<div className="flex justify-between items-center mt-8 pt-6 border-t border-[var(--border-color)]">
-  {step > 1 ? (
-    <button onClick={() => setStep(step - 1)}
-      className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[var(--hover-1)] hover:bg-[var(--hover-2)]
-                 border border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)] transition-colors">
-      <ArrowLeft className="w-4 h-4" /> Назад
-    </button>
-  ) : <div />}
+        {/* Navigation */}
+        <div className="flex justify-between items-center mt-8 pt-6 border-t border-[var(--border-color)]">
+          {step > 1 ? (
+            <button onClick={() => setStep(step - 1)}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[var(--hover-1)] hover:bg-[var(--hover-2)]
+                         border border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)] transition-colors">
+              <ArrowLeft className="w-4 h-4" /> Назад
+            </button>
+          ) : <div />}
 
-  {step < 3 ? (
-    <button onClick={handleNextStep}
-      disabled={step === 1 && (!title.trim() || !hasDescription)}
-      className="px-8 py-3 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent)]/90 text-white text-sm font-semibold ml-auto
-                 shadow-lg shadow-[var(--accent)]/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed
-                 flex items-center gap-2">
-      Далее <ArrowRight className="w-4 h-4" />
-    </button>
-  ) : (
-    <button onClick={handleSubmit} disabled={submitting}
-      className="px-8 py-3 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent)]/90 text-white text-sm font-semibold
-                 flex items-center gap-2 ml-auto disabled:opacity-50 shadow-lg shadow-[var(--accent)]/20 transition-all">
-      {submitting
-        ? <Loader2 className="w-5 h-5 animate-spin" />
-        : <><FileText className="w-4 h-4" /> Создать заявку</>}
-    </button>
-  )}
-</div>
+          {step < 3 ? (
+            <button onClick={handleNextStep}
+              disabled={step === 1 && (!title.trim() || !hasDescription)}
+              className="px-8 py-3 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent)]/90 text-white text-sm font-semibold ml-auto
+                         shadow-lg shadow-[var(--accent)]/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed
+                         flex items-center gap-2">
+              Далее <ArrowRight className="w-4 h-4" />
+            </button>
+          ) : (
+            <button onClick={handleSubmit} disabled={submitting}
+              className="px-8 py-3 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent)]/90 text-white text-sm font-semibold
+                         flex items-center gap-2 ml-auto disabled:opacity-50 shadow-lg shadow-[var(--accent)]/20 transition-all">
+              {submitting
+                ? <Loader2 className="w-5 h-5 animate-spin" />
+                : <><FileText className="w-4 h-4" /> Создать заявку</>}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
