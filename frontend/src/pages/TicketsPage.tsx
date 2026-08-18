@@ -522,7 +522,7 @@ function TicketActions({ ticket, onTicketUpdated }: {
             setShowStatusMenu(false);
             setShowAssigneeMenu(false);
           }}
-          className="p-2 rounded-lg text-[var(--text-primary)]/5 hover:text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] transition-colors"
+          className="p-2 rounded-lg text-[var(--text-primary)]/90 hover:text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] transition-colors"
         >
           <MoreVertical size={20} />
         </button>
@@ -544,7 +544,7 @@ function TicketActions({ ticket, onTicketUpdated }: {
               className="w-full flex items-center gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/80 hover:bg-[var(--hover-1)] transition-colors text-left"
             >
               <FolderOpen size={16} className="text-[var(--text-primary)]/40 shrink-0" />
-              <span>Задачи по заявке</span>
+              <span>Посмотреть задачи по заявке</span>
             </button>
 
             <button
@@ -558,7 +558,7 @@ function TicketActions({ ticket, onTicketUpdated }: {
               className="w-full flex items-center gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/80 hover:bg-[var(--hover-1)] transition-colors text-left"
             >
               <Plus size={16} className="text-[var(--accent)] shrink-0" />
-              <span>Создать задачу</span>
+              <span>Создать задачу на основании</span>
             </button>
 
             <div className="h-px bg-[var(--border-color)] mx-3" />
@@ -621,7 +621,7 @@ function TicketActions({ ticket, onTicketUpdated }: {
             </button>
 
             {showAssigneeMenu && (
-              <div className="bg-[var(--hover-1)]/50 py-1 max-h-[200px] overflow-y-auto">
+              <div className="bg-[var(--hover-1)]/50 py-1 max-h-[130px] overflow-y-auto">
                 {loadingUsers ? (
                   <div className="flex justify-center py-3">
                     <Loader2 size={16} className="animate-spin text-[var(--text-primary)]/40" />
