@@ -26,7 +26,7 @@ class PresignedUploadRequest(BaseModel):
     )
     owner_type: str = Field(
         ...,
-        pattern="^(ticket|comment|user|counterparty|message)$",
+        pattern="^(ticket|comment|user|counterparty|message|task)$",
         description="Сущность, которой принадлежит файл"
     )
     owner_id: UUID = Field(..., description="ID сущности, которой принадлежит файл")
@@ -56,7 +56,7 @@ class ConfirmUploadRequest(BaseModel):
     )
     owner_type: str = Field(
         ...,
-        pattern="^(ticket|comment|user|counterparty|message)$",
+        pattern="^(ticket|comment|user|counterparty|message|task)$",
         description="Сущность, которой принадлежит файл",
     )
     owner_id: UUID = Field(..., description="ID сущности, которой принадлежит файл")
