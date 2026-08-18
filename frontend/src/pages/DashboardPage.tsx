@@ -925,7 +925,7 @@ export default function DashboardPage() {
                   </h2>
 
                   <p className="mt-1 text-sm text-[var(--text-primary)]/40">
-                    Последние организации
+                    Последние контрагенты
                   </p>
                 </div>
 
@@ -1003,7 +1003,7 @@ export default function DashboardPage() {
                   </span>
 
                   <span className="text-right text-sm font-medium text-[var(--text-primary)]/75">
-                    {counterparty.counterparty_type || 'Организация'}
+                    {counterparty.counterparty_type || 'Контрагент'}
                   </span>
                 </div>
 

@@ -217,7 +217,7 @@ function RatingBar({ star, count, total }: { star: number; count: number; total:
 interface TicketOption { id: string; number: string; title: string; }
 
 function TicketSelect({
-  value, label, onChange, disabled = false, placeholder = 'Тикет',
+  value, label, onChange, disabled = false, placeholder = 'Заявка',
 }: {
   value: string;
   label?: string;
@@ -293,7 +293,7 @@ function TicketSelect({
             ref={inputRef}
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Поиск по закрытым тикетам..."
+            placeholder="Поиск по закрытым заявкам..."
             className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30"
           />
         </div>
@@ -305,7 +305,7 @@ function TicketSelect({
           className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm transition-colors
             ${!value ? 'bg-emerald-500/8 text-[var(--text-primary)]' : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}
         >
-          <span className="flex-1 text-left">Все тикеты</span>
+          <span className="flex-1 text-left">Все заявки</span>
           {!value && <Check className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />}
         </button>
 
@@ -319,7 +319,7 @@ function TicketSelect({
           <div className="px-3 py-6 text-center">
             <Ticket className="w-5 h-5 text-[var(--text-primary)]/15 mx-auto mb-2" />
             <p className="text-sm text-[var(--text-primary)]/35">
-              {search ? 'Ничего не найдено' : 'Нет закрытых тикетов'}
+              {search ? 'Ничего не найдено' : 'Нет закрытых заявок'}
             </p>
           </div>
         )}
@@ -582,7 +582,7 @@ function CreateFeedbackModal({
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-[var(--text-primary)]">Новый отзыв</h2>
-              <p className="text-xs text-[var(--text-primary)]/35 mt-0.5">Только по закрытому тикету</p>
+              <p className="text-xs text-[var(--text-primary)]/35 mt-0.5">Только по закрытой заявке</p>
             </div>
             <button
               onClick={() => !saving && onClose()}
@@ -598,14 +598,14 @@ function CreateFeedbackModal({
           {/* Ticket */}
           <div>
             <label className="block text-xs font-medium text-[var(--text-primary)]/50 uppercase tracking-wider mb-2">
-              Тикет <span className="text-[var(--accent)]">*</span>
+              Заявка <span className="text-[var(--accent)]">*</span>
             </label>
             <TicketSelect
               value={ticketId}
               label={ticketLabel}
               onChange={(id, l) => { setTicketId(id); setTicketLabel(l); }}
               disabled={!!presetTicketId}
-              placeholder="Выберите закрытый тикет"
+              placeholder="Выберите закрытую заявку"
             />
           </div>
 
@@ -928,7 +928,7 @@ function FeedbackCard({
             <ArrowUpRight className="w-3 h-3 flex-shrink-0 opacity-0 group-hover/link:opacity-100 transition-opacity" />
           </Link>
         ) : (
-          <span className="text-xs text-[var(--text-primary)]/20">Тикет не найден</span>
+          <span className="text-xs text-[var(--text-primary)]/20">Заявка не найдена</span>
         )}
       </div>
     </motion.div>
@@ -1115,7 +1115,7 @@ export default function FeedbacksPage() {
               value={filterTicketId}
               label={filterTicketLabel}
               onChange={(id, l) => { setFilterTicketId(id); setFilterTicketLabel(l); setPage(1); }}
-              placeholder="Тикет"
+              placeholder="Заявка"
             />
           </div>
 
@@ -1280,7 +1280,7 @@ export default function FeedbacksPage() {
             <p className="text-sm text-[var(--text-primary)]/30 mb-5">
               {hasActiveFilters
                 ? 'Попробуйте изменить фильтры'
-                : 'Оставьте первый отзыв по закрытому тикету'
+                : 'Оставьте первый отзыв по закрытой заявке'
               }
             </p>
             <div className="flex items-center justify-center gap-2">

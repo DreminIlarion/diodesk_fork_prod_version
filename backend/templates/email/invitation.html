@@ -31,7 +31,7 @@
         <li>Создавать и отслеживать заявки</li>
         <li>Общаться с поддержкой</li>
         {% if 'customer_admin' in granted_roles %}
-          <li>Управлять пользователями своей организации</li>
+          <li>Управлять пользователями своим контрагентом</li>
         {% endif %}
       {% endif %}
       {% if 'agent' in granted_roles or 'admin' in granted_roles %}

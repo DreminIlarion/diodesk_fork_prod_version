@@ -343,7 +343,7 @@ function LogTimeModal({
               <div className="relative mb-2">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-primary)]/40" />
                 <input value={taskSearch} onChange={e => setTaskSearch(e.target.value)}
-                  placeholder="Поиск по названию или номеру тикета..."
+                  placeholder="Поиск по названию или номеру заявки..."
                   className="w-full pl-9 pr-3 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl
                              text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--accent)]/30" />
               </div>
