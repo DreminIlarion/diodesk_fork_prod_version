@@ -1453,7 +1453,39 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                   })}
                 </div>
               </div>
+                                <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
+                  Сложность
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {SP_SERIES.map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => setSp(String(v))}
+                      className={`px-3 py-2 rounded-xl text-sm border transition-all ${
+                        sp === String(v)
+                          ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                          : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                      }`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setSp('')}
+                    className={`px-3 py-2 rounded-xl text-sm border transition-all ${
+                      sp === ''
+                        ? 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30'
+                        : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                    }`}
+                  >
+                    Без сложности
+                  </button>
+                </div>
+              </div>
+
             </div>
+
 
             <div className="space-y-4">
               <div>
@@ -2303,43 +2335,26 @@ export default function TasksPage() {
         ) : !cols.length ? (
           <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30"><FileText className="w-12 h-12 mb-3 opacity-50" /><p className="text-base font-medium">{mode === 'project' && !selP ? 'Выберите проект' : mode === 'assignee' && !selA ? 'Выберите исполнителя' : mode === 'ticket' && !selT ? 'Выберите заявку' : 'Нет задач'}</p></div>
         ) : (
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="shrink-0 pb-2">
-              <div className="h-4 bg-[var(--hover-1)] rounded-full border border-[var(--border-color)] relative overflow-hidden">
-                <div
-                  ref={bottomBoardScrollRef}
-                  onScroll={handleBottomBoardScroll}
-                  className="absolute inset-0 overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/50 scrollbar-track-transparent"
-                >
-                  <div style={{ width: Math.max(boardScrollWidth, boardViewportWidth), height: 1 }} />
-                </div>
-              </div>
-            </div>
-
+                    <div className="flex-1 flex flex-col min-h-0">
             <div
               ref={boardScrollRef}
               onScroll={handleBoardScroll}
-              className="flex-1 overflow-x-auto overflow-y-hidden pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="flex-1 overflow-x-auto overflow-y-hidden pb-2 scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent"
             >
               <div ref={boardInnerRef} className="flex gap-3 h-full w-max min-w-full">
                 {disp.map((c) => (
-                  <KCol
-                    key={c.status}
-                    col={c}
-                    umap={umap}
-                    isDO={dragO === c.status}
-                    dragId={drag?.id ?? null}
-                    ldMore={moreCol === c.status}
-                    onDS={onDS}
-                    onDE={onDE}
-                    onDO={onDO}
-                    onDL={onDL}
-                    onDrop={onDrop}
-                    onAdd={setCreate}
-                    onView={setView}
-                    onMore={more}
-                  />
+                  <KCol key={c.status} col={c} umap={umap} isDO={dragO === c.status} dragId={drag?.id ?? null} ldMore={moreCol === c.status} onDS={onDS} onDE={onDE} onDO={onDO} onDL={onDL} onDrop={onDrop} onAdd={setCreate} onView={setView} onMore={more} />
                 ))}
+              </div>
+            </div>
+
+            <div className="h-4 mt-2 shrink-0 bg-[var(--hover-1)] rounded-full border border-[var(--border-color)] relative overflow-hidden">
+              <div
+                ref={bottomBoardScrollRef}
+                onScroll={handleBottomBoardScroll}
+                className="absolute inset-0 overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/50 scrollbar-track-transparent"
+              >
+                <div style={{ width: boardScrollWidth || '100%', height: '1px' }} />
               </div>
             </div>
           </div>
