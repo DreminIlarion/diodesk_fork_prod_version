@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
@@ -37,8 +38,10 @@ import {
   LayoutGrid,
   Clock3,
   FileText,
+  File as FileIcon,
 } from 'lucide-react';
 import { tasksApi, projectsApi, ticketsApi, usersApi } from '../api/client';
+import { attachmentsApi } from '../api/attachments';
 import { useAuthStore } from '../stores/authStore';
 import { useToast } from '../components/ui/use-toast';
 import type {
@@ -60,6 +63,20 @@ type TaskTag = {
   color?: string | null;
 };
 
+type TaskAttachment = {
+  id?: string;
+  file_name?: string | null;
+  original_name?: string | null;
+  filename?: string | null;
+  name?: string | null;
+  file_url?: string | null;
+  url?: string | null;
+  mime_type?: string | null;
+  content_type?: string | null;
+  size?: number | null;
+  file_size?: number | null;
+};
+
 type TaskViewItem = TaskKanbanItem & {
   description?: string | null;
   estimated_hours?: number | string | null;
@@ -70,6 +87,7 @@ type TaskViewItem = TaskKanbanItem & {
   project_name?: string | null;
   tags?: TaskTag[] | null;
   tag?: TaskTag[] | null;
+  attachments?: TaskAttachment[] | null;
 };
 
 type TaskViewColumn = Omit<TaskKanbanColumn, 'tasks'> & {
@@ -392,6 +410,31 @@ const getTaskTicketPath = (task: TaskViewItem) => {
   const number = getTaskTicketNumber(task);
   if (number) return `/tickets/${number}`;
   return task.ticket_id ? `/tickets/${task.ticket_id}` : null;
+};
+
+const formatFileSize = (b: number) =>
+    b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(1)} MB`;
+
+const isImageFile = (file?: Pick<File, 'type' | 'name'> | null) => {
+    if (!file) return false;
+    const mime = String(file.type ?? '').toLowerCase();
+    return mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(String(file.name ?? ''));
+};
+
+const getAttachmentName = (a: TaskAttachment) =>
+    a.original_name || a.file_name || a.filename || a.name || 'Файл';
+
+const getAttachmentUrl = (a: TaskAttachment) => a.file_url || a.url || '';
+
+const getAttachmentSize = (a: TaskAttachment) => {
+    const size = typeof a.size === 'number' ? a.size : typeof a.file_size === 'number' ? a.file_size : null;
+    return size != null && Number.isFinite(size) ? size : null;
+};
+
+const isImageAttachment = (a: TaskAttachment) => {
+    const mime = String(a.mime_type || a.content_type || '').toLowerCase();
+    const url = getAttachmentUrl(a).toLowerCase();
+    return mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(url);
 };
 
 function statusErr(err: any, task: TaskViewItem, to: TaskStatus) {
@@ -884,7 +927,6 @@ function Ava({
   url?: string | null;
   sz?: 'xs' | 'sm';
 }) {
-  // Для sz="xs" используем text-[10px]
   const c = sz === 'xs' ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-sm';
 
   if (url) return <img src={url} alt="" className={`${c} rounded-full object-cover shrink-0`} />;
@@ -1004,7 +1046,7 @@ function ListView({
                           #{t.number}
                         </span>
                         {ticketNo && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-[var(--hover-2)] text-[var(--text-primary)]/45 border border-[var(--border-color)]">
+                          <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] bg-[var(--hover-2)] text-[var(--text-primary)]/45 border border-[var(--border-color)]">
                             <Ticket className="w-3 h-3" />
                             {ticketNo}
                           </span>
@@ -1114,8 +1156,6 @@ function TCard({
       }}
       onDragEnd={onDE}
       onClick={() => onView(t)}
-      // Убрали прыжок (translate-y). Оставили только смену фона на более яркий (--hover-2) и рамку.
-      // Анимация при взятии (drag) осталась быстрой на чистом CSS (rotate-2 scale-[1.02])
       className={`group bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer transition-all duration-200 shadow-sm min-h-[140px] flex flex-col relative
         hover:bg-[var(--hover-2)] hover:border-[var(--accent)]/40
         ${dragging
@@ -1126,26 +1166,20 @@ function TCard({
         }
       `}
     >
-      {/* 1. Номер задачи */}
       <span className="text-xs font-mono text-[var(--text-primary)]/45 mb-1.5 leading-none">
         #{t.number}
       </span>
 
-      {/* 2. Название */}
       <h4 className="text-[15px] font-bold text-[var(--text-primary)] leading-snug tracking-tight line-clamp-2 mb-3">
         {t.title}
       </h4>
 
-      {/* 3. Бейджи (Приоритет и Сложность) */}
       <div className="flex items-center gap-2 mb-3.5 flex-wrap">
         <PriBadge p={t.priority} />
         {t.story_points != null && <ComplexityBadge v={t.story_points} />}
       </div>
 
-      {/* 4. Низ карточки */}
       <div className="flex items-center justify-between border-t border-[var(--border-color)] pt-3 mt-auto">
-
-        {/* Аватар + Фамилия (текст в кружке 10px, фамилия 13px) */}
         <div className="flex items-center gap-2 min-w-0">
           {a ? (
             <>
@@ -1159,7 +1193,6 @@ function TCard({
           )}
         </div>
 
-        {/* Иконки привязок + Дата */}
         <div className="flex items-center gap-1.5 shrink-0">
           {t.ticket_id && (
             <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
@@ -1180,6 +1213,7 @@ function TCard({
     </motion.div>
   );
 }
+
 /* ───────────────── kanban column ───────────────── */
 
 function KCol({
@@ -1604,9 +1638,15 @@ function TaskEditorModal({
   );
   const [todo, setTodo] = useState(initSt === 'todo' && !!assigneeId);
 
-useEffect(() => {
-  if (!assigneeId && todo) setTodo(false);
-}, [assigneeId, todo]);
+  // Вложения state
+  const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<Record<string, string>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!assigneeId && todo) setTodo(false);
+  }, [assigneeId, todo]);
+
   const [saving, setSaving] = useState(false);
 
   const firstProjectChange = useRef(true);
@@ -1631,6 +1671,30 @@ useEffect(() => {
     }
     setTicketId('');
   }, [projectId]);
+
+  // Preview logic
+  useEffect(() => {
+    const newPreviews: Record<string, string> = {};
+    files.forEach((file, i) => {
+        if (isImageFile(file)) {
+            newPreviews[`${file.name}-${i}`] = URL.createObjectURL(file);
+        }
+    });
+    setPreviews(newPreviews);
+    return () => {
+        Object.values(newPreviews).forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [files]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files || []);
+    setFiles(prev => [...prev, ...selected].slice(0, 10));
+    e.target.value = '';
+  };
+
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
 
   const loadProjects = useCallback(async (q: string, p: number) => {
     const r = await projectsApi.getAll(p, 20);
@@ -1703,6 +1767,8 @@ useEffect(() => {
     setSaving(true);
 
     try {
+      let taskId = task?.id;
+
       if (mode === 'create') {
         const payload: Record<string, any> = {
           title: title.trim(),
@@ -1718,6 +1784,7 @@ useEffect(() => {
         if (dueDate) payload.due_date = dueDate;
 
         const created = await tasksApi.create(payload as TaskCreateInput);
+        taskId = created.id;
 
         if (todo) {
           await tasksApi.changeStatus(created.id, 'todo');
@@ -1758,6 +1825,17 @@ useEffect(() => {
           title: 'Задача обновлена',
           description: `${task.number} — ${title.trim()}`,
         });
+      }
+
+      // Загрузка вложений
+      if (taskId && files.length > 0) {
+          for (const file of files) {
+              try {
+                  await attachmentsApi.uploadAttachment(file, 'task', taskId);
+              } catch (err) {
+                  console.error('File upload failed:', file.name, err);
+              }
+          }
       }
 
       await onSaved();
@@ -1843,6 +1921,54 @@ useEffect(() => {
                 />
               </div>
 
+              {/* Блок вложений */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
+                    Вложения <span className="text-[var(--text-primary)]/40 text-xs">(до 10 файлов, есть предпросмотр фото)</span>
+                </label>
+                
+                <div className="border-2 border-dashed border-[var(--border-color)] rounded-xl p-4 text-center bg-[var(--hover-1)] hover:bg-[var(--hover-2)] transition-colors">
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        onChange={handleFileSelect}
+                        className="hidden"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-sm text-[var(--accent)] hover:text-[var(--accent-light)] font-medium"
+                    >
+                        + Выбрать файлы
+                    </button>
+                </div>
+                
+                {files.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                        {files.map((f, i) => {
+                            const preview = previews[`${f.name}-${i}`];
+                            return (
+                                <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)]">
+                                    {preview ? (
+                                        <img src={preview} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                                    ) : (
+                                        <FileIcon className="w-5 h-5 text-[var(--text-primary)]/40 shrink-0" />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm text-[var(--text-primary)] truncate">{f.name}</p>
+                                        <p className="text-[10px] text-[var(--text-primary)]/30">{formatFileSize(f.size)}</p>
+                                    </div>
+                                    <button onClick={() => removeFile(i)} className="text-[var(--text-primary)]/40 hover:text-red-400 p-1">
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
                   Приоритет
@@ -1864,35 +1990,6 @@ useEffect(() => {
                       </button>
                     );
                   })}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
-                  Сложность
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {SP_SERIES.map((v) => (
-                    <button
-                      key={v}
-                      onClick={() => setSp(String(v))}
-                      className={`px-3 py-2 rounded-xl text-sm border transition-all ${sp === String(v)
-                        ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
-                        : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                        }`}
-                    >
-                      {v}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => setSp('')}
-                    className={`px-3 py-2 rounded-xl text-sm border transition-all ${sp === ''
-                      ? 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30'
-                      : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                      }`}
-                  >
-                    Без сложности
-                  </button>
                 </div>
               </div>
             </div>
@@ -1987,25 +2084,25 @@ useEffect(() => {
               </div>
 
               {mode === 'create' && !!assigneeId && (
-  <div className="pt-1">
-    <button
-      onClick={() => setTodo((v) => !v)}
-      className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border transition-all text-sm font-medium ${todo
-        ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
-        : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
-        }`}
-    >
-      <div
-        className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-          todo ? 'bg-blue-500 border-blue-500' : 'border-[var(--border-color)]'
-        }`}
-      >
-        {todo && <Check className="w-3 h-3 text-white" />}
-      </div>
-      Сразу к выполнению (статус «{ST_LABEL.todo}»)
-    </button>
-  </div>
-)}
+                <div className="pt-1">
+                    <button
+                    onClick={() => setTodo((v) => !v)}
+                    className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border transition-all text-sm font-medium ${todo
+                        ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                        : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
+                        }`}
+                    >
+                    <div
+                        className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                        todo ? 'bg-blue-500 border-blue-500' : 'border-[var(--border-color)]'
+                        }`}
+                    >
+                        {todo && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                    Сразу к выполнению (статус «{ST_LABEL.todo}»)
+                    </button>
+                </div>
+                )}
             </div>
           </div>
         </div>
@@ -2093,6 +2190,7 @@ function DetailModal({
   const ticketPath = getTaskTicketPath(t);
   const ticketNo = getTaskTicketNumber(t);
   const tags = getTaskTags(t);
+  const attachments = Array.isArray(t.attachments) ? t.attachments : [];
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -2230,6 +2328,45 @@ function DetailModal({
               )}
             </div>
           </div>
+
+          {/* Вложения в просмотре */}
+          {attachments.length > 0 && (
+            <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+                <div className="px-4 py-3 bg-[var(--hover-1)] border-b border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)]">
+                    Вложения
+                </div>
+                <div className="px-4 py-4 grid sm:grid-cols-2 gap-3">
+                    {attachments.map((att, i) => {
+                        const name = getAttachmentName(att);
+                        const url = getAttachmentUrl(att);
+                        const size = getAttachmentSize(att);
+                        const previewable = isImageAttachment(att);
+                        return (
+                            <a
+                                key={i}
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)] transition-colors group"
+                            >
+                                {previewable && url ? (
+                                    <img src={url} alt="" className="w-12 h-12 rounded-lg object-cover border border-[var(--border-color)] shrink-0" />
+                                ) : (
+                                    <div className="w-12 h-12 rounded-lg bg-[var(--hover-3)] flex items-center justify-center shrink-0">
+                                        <FileIcon className="w-5 h-5 text-[var(--text-primary)]/40" />
+                                    </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">{name}</p>
+                                    <p className="text-xs text-[var(--text-primary)]/35">{size ? formatFileSize(size) : 'Файл'}</p>
+                                </div>
+                                <ArrowUpRight className="w-4 h-4 text-[var(--text-primary)]/20" />
+                            </a>
+                        );
+                    })}
+                </div>
+            </div>
+          )}
 
           {tags.length > 0 && (
             <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
@@ -2564,16 +2701,15 @@ export default function TasksPage() {
   const up = sp.get('project_id');
   const ua = sp.get('assignee_id');
   const ut = sp.get('ticket_id');
-
-  // логика перехода с Заявок
   const shouldCreate = sp.get('create') === '1';
 
-  useEffect(() => {
-    if (shouldCreate && ut) {
-      setCreate('backlog');
-    }
-  }, [shouldCreate, ut]);
-  // вот конец её 
+  // Kanban Scroll Refs
+  const boardScrollRef = useRef<HTMLDivElement>(null);
+  const boardInnerRef = useRef<HTMLDivElement>(null);
+  const bottomBoardScrollRef = useRef<HTMLDivElement>(null);
+  const boardScrollSyncRef = useRef(false);
+  const [boardScrollWidth, setBoardScrollWidth] = useState(0);
+  const [boardViewportWidth, setBoardViewportWidth] = useState(0);
 
   const staff = (user?.roles ?? []).some((r) =>
     ['admin', 'support_manager', 'support_agent', 'executor'].includes(r),
@@ -2625,6 +2761,10 @@ export default function TasksPage() {
   foR.current = fo;
 
   useEffect(() => {
+    if (shouldCreate && ut) setCreate('backlog');
+  }, [shouldCreate, ut]);
+
+  useEffect(() => {
     if (up) setMode('project');
     else if (ua) setMode('assignee');
     else if (ut) setMode('ticket');
@@ -2638,13 +2778,50 @@ export default function TasksPage() {
     return { type: 'my' };
   }, [mode, selP, selA, selT]);
 
+  // Scroll Sync Logic
+  const syncBoardScrollbarMetrics = useCallback(() => {
+    const board = boardScrollRef.current;
+    const inner = boardInnerRef.current;
+    if (!board || !inner) return;
+
+    setBoardScrollWidth(Math.max(board.scrollWidth, inner.scrollWidth));
+    setBoardViewportWidth(board.clientWidth);
+
+    if (bottomBoardScrollRef.current) {
+        bottomBoardScrollRef.current.scrollLeft = board.scrollLeft;
+    }
+  }, []);
+
+  const handleBoardScroll = useCallback(() => {
+    if (boardScrollSyncRef.current) return;
+    boardScrollSyncRef.current = true;
+    if (bottomBoardScrollRef.current && boardScrollRef.current) {
+        bottomBoardScrollRef.current.scrollLeft = boardScrollRef.current.scrollLeft;
+    }
+    requestAnimationFrame(() => boardScrollSyncRef.current = false);
+  }, []);
+
+  const handleBottomBoardScroll = useCallback(() => {
+    if (boardScrollSyncRef.current) return;
+    boardScrollSyncRef.current = true;
+    if (boardScrollRef.current && bottomBoardScrollRef.current) {
+        boardScrollRef.current.scrollLeft = bottomBoardScrollRef.current.scrollLeft;
+    }
+    requestAnimationFrame(() => boardScrollSyncRef.current = false);
+  }, []);
+
+  useEffect(() => {
+    if (viewMode !== 'kanban') return;
+    syncBoardScrollbarMetrics();
+    window.addEventListener('resize', syncBoardScrollbarMetrics);
+    return () => window.removeEventListener('resize', syncBoardScrollbarMetrics);
+  }, [viewMode, cols, syncBoardScrollbarMetrics]);
+
   const loadUsersMap = useCallback(async () => {
     const m = new Map<string, SimpleUser | CounterpartyCustomer>();
     try {
       (await usersApi.getAllUsers(1, 100)).items.forEach((u) => m.set(u.id, u));
-    } catch {
-      //
-    }
+    } catch { /* ignore */ }
     setUmap(m);
   }, []);
 
@@ -2674,11 +2851,7 @@ export default function TasksPage() {
         setCols(mapped);
         setTotal(d.total_tasks ?? 0);
       } catch (e: any) {
-        toast({
-          title: 'Ошибка',
-          description: apiErr(e),
-          variant: 'destructive',
-        });
+        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -2687,17 +2860,9 @@ export default function TasksPage() {
     [ctx, toast, mode, selP, selT, selA],
   );
 
-  useEffect(() => {
-    loadUsersMap();
-  }, [loadUsersMap]);
-
-  useEffect(() => {
-    fetchBoard();
-  }, [fetchBoard]);
-
-  useEffect(() => {
-    fetchBoard(true);
-  }, [fp, fo, fetchBoard]);
+  useEffect(() => { loadUsersMap(); }, [loadUsersMap]);
+  useEffect(() => { fetchBoard(); }, [fetchBoard]);
+  useEffect(() => { fetchBoard(true); }, [fp, fo, fetchBoard]);
 
   const more = useCallback(
     async (st: TaskStatus) => {
@@ -2718,23 +2883,13 @@ export default function TasksPage() {
           setCols((prev) =>
             prev.map((x) =>
               x.status === st
-                ? {
-                  ...x,
-                  tasks: {
-                    ...nc.tasks,
-                    items: [...x.tasks.items, ...nc.tasks.items],
-                  },
-                }
+                ? { ...x, tasks: { ...nc.tasks, items: [...x.tasks.items, ...nc.tasks.items] } }
                 : x,
             ),
           );
         }
       } catch (e: any) {
-        toast({
-          title: 'Ошибка',
-          description: apiErr(e),
-          variant: 'destructive',
-        });
+        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
       } finally {
         setMoreCol(null);
       }
@@ -2752,12 +2907,10 @@ export default function TasksPage() {
         setAssignIntent({ task, targetStatus: 'todo' });
         return;
       }
-
       if (to === 'in_progress' && !task.assignee_id) {
         setAssignIntent({ task, targetStatus: 'in_progress' });
         return;
       }
-
       if (to === 'done') {
         setCompleteIntent({ task, mode: 'status_done' });
         return;
@@ -2770,38 +2923,19 @@ export default function TasksPage() {
         const n = prev.map((c) => {
           if (c.status === from) {
             const items = c.tasks.items.filter((x) => {
-              if (x.id === id) {
-                moved = x;
-                return false;
-              }
+              if (x.id === id) { moved = x; return false; }
               return true;
             });
-
-            return {
-              ...c,
-              tasks: {
-                ...c.tasks,
-                items,
-                total_items: c.tasks.total_items - 1,
-              },
-            };
+            return { ...c, tasks: { ...c.tasks, items, total_items: c.tasks.total_items - 1 } };
           }
           return c;
         });
 
         if (!moved) return prev;
-
         const updated = { ...moved, status: to };
         return n.map((c) =>
           c.status === to
-            ? {
-              ...c,
-              tasks: {
-                ...c.tasks,
-                items: [updated, ...c.tasks.items],
-                total_items: c.tasks.total_items + 1,
-              },
-            }
+            ? { ...c, tasks: { ...c.tasks, items: [updated, ...c.tasks.items], total_items: c.tasks.total_items + 1 } }
             : c,
         );
       });
@@ -2812,53 +2946,37 @@ export default function TasksPage() {
       } catch (e: any) {
         setCols(snap);
         const m = statusErr(e, task, to);
-        toast({
-          title: m.title,
-          description: m.description,
-          variant: 'destructive',
-        });
+        toast({ title: m.title, description: m.description, variant: 'destructive' });
       }
     },
     [cols, toast],
   );
 
-const handleAssignAndMove = useCallback(
-  async (aid: string) => {
-    if (!assignIntent) return;
-
-    setAssignLd(true);
-    try {
-      await tasksApi.assign(assignIntent.task.id, { assignee_id: aid });
-      await tasksApi.changeStatus(assignIntent.task.id, assignIntent.targetStatus );
-
-      toast({
-        title: `Задача переведена в «${ST_LABEL[assignIntent.targetStatus]}»`,
-      });
-
-      setAssignIntent(null);
-      await fetchBoard(true);
-    } catch (e: any) {
-      toast({
-        title: 'Ошибка',
-        description: apiErr(e),
-        variant: 'destructive',
-      });
-      await fetchBoard(true);
-    } finally {
-      setAssignLd(false);
-    }
-  },
-  [assignIntent, fetchBoard, toast],
-);
+  const handleAssignAndMove = useCallback(
+    async (aid: string) => {
+      if (!assignIntent) return;
+      setAssignLd(true);
+      try {
+        await tasksApi.assign(assignIntent.task.id, { assignee_id: aid });
+        await tasksApi.changeStatus(assignIntent.task.id, assignIntent.targetStatus );
+        toast({ title: `Задача переведена в «${ST_LABEL[assignIntent.targetStatus]}»` });
+        setAssignIntent(null);
+        await fetchBoard(true);
+      } catch (e: any) {
+        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      } finally {
+        setAssignLd(false);
+      }
+    },
+    [assignIntent, fetchBoard, toast],
+  );
 
   const handleComplete = useCallback(
     async (actualHours: number) => {
       if (!completeIntent) return;
-
       setCompleteLd(true);
       try {
         await tasksApi.update(completeIntent.task.id, { actual_hours: actualHours } as any);
-
         if (completeIntent.mode === 'review_done') {
           await tasksApi.review(completeIntent.task.id, { decision: 'done' });
           toast({ title: 'Задача принята' });
@@ -2866,15 +2984,10 @@ const handleAssignAndMove = useCallback(
           await tasksApi.changeStatus(completeIntent.task.id, 'done');
           toast({ title: 'Задача выполнена' });
         }
-
         setCompleteIntent(null);
         await fetchBoard(true);
       } catch (e: any) {
-        toast({
-          title: 'Ошибка',
-          description: apiErr(e),
-          variant: 'destructive',
-        });
+        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
       } finally {
         setCompleteLd(false);
       }
@@ -2883,67 +2996,40 @@ const handleAssignAndMove = useCallback(
   );
 
   const onDS = useCallback((id: string, from: TaskStatus) => setDrag({ id, from }), []);
-  const onDE = useCallback(() => {
-    setDrag(null);
-    setDragO(null);
-  }, []);
-
-  const onDO = useCallback(
-    (e: React.DragEvent, st: TaskStatus) => {
-      e.preventDefault();
-      if (drag && !TRANSITIONS[drag.from].includes(st)) return;
-      e.dataTransfer.dropEffect = 'move';
-      setDragO(st);
-    },
-    [drag],
-  );
-
+  const onDE = useCallback(() => { setDrag(null); setDragO(null); }, []);
+  const onDO = useCallback((e: React.DragEvent, st: TaskStatus) => {
+    e.preventDefault();
+    if (drag && !TRANSITIONS[drag.from].includes(st)) return;
+    e.dataTransfer.dropEffect = 'move';
+    setDragO(st);
+  }, [drag]);
   const onDL = useCallback(() => setDragO(null), []);
-
-  const onDrop = useCallback(
-    async (e: React.DragEvent, to: TaskStatus) => {
-      e.preventDefault();
-      setDragO(null);
-
-      if (!drag || drag.from === to) {
-        setDrag(null);
-        return;
-      }
-
-      if (!TRANSITIONS[drag.from].includes(to)) {
-        toast({ title: 'Переход недоступен', variant: 'destructive' });
-        setDrag(null);
-        return;
-      }
-
-      const { id, from } = drag;
+  const onDrop = useCallback(async (e: React.DragEvent, to: TaskStatus) => {
+    e.preventDefault();
+    setDragO(null);
+    if (!drag || drag.from === to) { setDrag(null); return; }
+    if (!TRANSITIONS[drag.from].includes(to)) {
+      toast({ title: 'Переход недоступен', variant: 'destructive' });
       setDrag(null);
-      await moveTo(id, from, to);
-    },
-    [drag, moveTo, toast],
-  );
+      return;
+    }
+    const { id, from } = drag;
+    setDrag(null);
+    await moveTo(id, from, to);
+  }, [drag, moveTo, toast]);
 
   const ql = q.trim().toLowerCase();
-
-  const disp = cols.map((c) =>
-    !ql
-      ? c
-      : {
-        ...c,
-        tasks: {
-          ...c.tasks,
-          items: c.tasks.items.filter((t) => {
-            const ticketNo = getTaskTicketNumber(t) ?? '';
-            return (
-              t.title.toLowerCase().includes(ql) ||
-              t.number.toLowerCase().includes(ql) ||
-              String(t.description ?? '').toLowerCase().includes(ql) ||
-              ticketNo.toLowerCase().includes(ql)
-            );
-          }),
-        },
-      },
-  );
+  const disp = cols.map((c) => !ql ? c : {
+    ...c,
+    tasks: {
+      ...c.tasks,
+      items: c.tasks.items.filter((t) => {
+        const ticketNo = getTaskTicketNumber(t) ?? '';
+        return t.title.toLowerCase().includes(ql) || t.number.toLowerCase().includes(ql) ||
+               String(t.description ?? '').toLowerCase().includes(ql) || ticketNo.toLowerCase().includes(ql);
+      }),
+    },
+  });
 
   const hf = fp.length > 0 || fo;
   const done = cols.find((c) => c.status === 'done')?.tasks.total_items ?? 0;
@@ -2956,204 +3042,75 @@ const handleAssignAndMove = useCallback(
     ...(staff ? [{ id: 'ticket' as CtxMode, label: 'Заявка', icon: Ticket }] : []),
   ];
 
-  const ldTicketsAsync = useCallback(
-    async (search: string, p: number) => {
-      const r = await ticketsApi.getAll(p, 20, {
-        project_ids: selP ? [selP] : undefined,
-        query: search || undefined,
-      });
-
-      const items = r.items.map((t: any) => {
-        const label = `${t.number} — ${t.title}`;
-        ticketLabelsRef.current[t.id] = label; // сохраняем label
-        return { value: t.id, label };
-      });
-
-      return { items, hasNext: r.items.length === 20 };
-    },
-    [selP],
-  );
+  const ldTicketsAsync = useCallback(async (search: string, p: number) => {
+    const r = await ticketsApi.getAll(p, 20, { project_ids: selP ? [selP] : undefined, query: search || undefined });
+    const items = r.items.map((t: any) => {
+      const label = `${t.number} — ${t.title}`;
+      ticketLabelsRef.current[t.id] = label;
+      return { value: t.id, label };
+    });
+    return { items, hasNext: r.items.length === 20 };
+  }, [selP]);
 
   const ldProjAsync = useCallback(async (search: string, p: number) => {
     const r = await projectsApi.getAll(p, 20);
-    const f = search
-      ? r.items.filter(
-        (x) =>
-          x.name.toLowerCase().includes(search.toLowerCase()) ||
-          x.key.toLowerCase().includes(search.toLowerCase()),
-      )
-      : r.items;
-
-    return {
-      items: f.map((x) => ({
-        value: x.id,
-        label: x.name,
-        sublabel: x.key,
-        icon: <FolderOpen className="w-4 h-4 text-amber-500" />,
-      })),
-      hasNext: r.items.length === 20,
-    };
+    const f = search ? r.items.filter(x => x.name.toLowerCase().includes(search.toLowerCase()) || x.key.toLowerCase().includes(search.toLowerCase())) : r.items;
+    return { items: f.map(x => ({ value: x.id, label: x.name, sublabel: x.key, icon: <FolderOpen className="w-4 h-4 text-amber-500" /> })), hasNext: r.items.length === 20 };
   }, []);
 
   const ldAssAsync = useCallback(async (search: string, p: number) => {
-    let items: any[] = [];
-    try {
-      items = (await usersApi.getAllUsers(p, 20)).items;
-    } catch {
-      items = [];
-    }
-
-    const f = search
-      ? items.filter(
-        (u) =>
-          (u.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
-          u.email.toLowerCase().includes(search.toLowerCase()),
-      )
-      : items;
-
-    return {
-      items: f.map((u) => ({
-        value: u.id,
-        label: u.full_name || u.username || u.email,
-        sublabel: u.email,
-      })),
-      hasNext: items.length === 20,
-    };
+    let items = []; try { items = (await usersApi.getAllUsers(p, 20)).items; } catch { items = []; }
+    const f = search ? items.filter(u => (u.full_name || '').toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())) : items;
+    return { items: f.map(u => ({ value: u.id, label: u.full_name || u.username || u.email, sublabel: u.email })), hasNext: items.length === 20 };
   }, []);
 
-  const dragInfo = drag
-    ? (() => {
-      const t = cols.flatMap((c) => c.tasks.items).find((x) => x.id === drag.id);
-      return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null;
-    })()
-    : null;
+  const dragInfo = drag ? (() => {
+    const t = cols.flatMap(c => c.tasks.items).find(x => x.id === drag.id);
+    return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null;
+  })() : null;
 
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-500" onDragEnd={onDE}>
       <div className="flex-shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">Задачи</h1>
-          {!loading && (
-            <span className="px-2 py-0.5 rounded bg-[var(--hover-2)] text-xs text-[var(--text-primary)]/50">
-              {Math.max(total - done, 0)} активных · {done} завершено
-            </span>
-          )}
+          {!loading && <span className="px-2 py-0.5 rounded bg-[var(--hover-2)] text-xs text-[var(--text-primary)]/50">{Math.max(total - done, 0)} активных · {done} завершено</span>}
           {refreshing && <Loader2 className="w-4 h-4 animate-spin text-[var(--accent)]" />}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-primary)]/30" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Поиск по названию, номеру, описанию..."
-              className="w-72 pl-9 pr-8 py-2 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none focus:border-[var(--accent)]/40 focus:ring-1 focus:ring-[var(--accent-ring)] transition-all"
-            />
-            {q && (
-              <button
-                onClick={() => setQ('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/30 hover:text-[var(--text-primary)]"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск..." className="w-72 pl-9 pr-8 py-2 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:border-[var(--accent)]/40 focus:ring-1 focus:ring-[var(--accent-ring)]" />
+            {q && <button onClick={() => setQ('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/30 hover:text-[var(--text-primary)]"><X className="w-3.5 h-3.5" /></button>}
           </div>
 
           <div className="relative">
-            <button
-              onClick={() => setSf((v) => !v)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${hf
-                ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--accent)]'
-                : 'bg-[var(--hover-2)] border-[var(--border-color)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-3)]'
-                }`}
-            >
-              <Filter className="w-4 h-4" />
-              Фильтры
-              {hf && <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />}
-            </button>
-
+            <button onClick={() => setSf((v) => !v)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${hf ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--accent)]' : 'bg-[var(--hover-2)] border-[var(--border-color)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-3)]'}`}><Filter className="w-4 h-4" />Фильтры{hf && <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />}</button>
             {sf && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setSf(false)} />
                 <div className="absolute right-0 top-full mt-2 z-20 w-56 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl p-3 space-y-3">
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest text-[var(--text-primary)]/30 mb-2 font-medium">
-                      Приоритет
-                    </p>
+                    <p className="text-[10px] uppercase tracking-widest text-[var(--text-primary)]/30 mb-2 font-medium">Приоритет</p>
                     <div className="flex flex-wrap gap-1.5">
                       {PRI_LIST.map((p) => {
                         const m = PM[p.value];
-                        return (
-                          <button
-                            key={p.value}
-                            onClick={() =>
-                              setFp((v) =>
-                                v.includes(p.value) ? v.filter((x) => x !== p.value) : [...v, p.value],
-                              )
-                            }
-                            className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-all ${fp.includes(p.value)
-                              ? `${m.bg} ${m.c} ${m.brd}`
-                              : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                              }`}
-                          >
-                            <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
-                            {p.label}
-                          </button>
-                        );
+                        return <button key={p.value} onClick={() => setFp((v) => v.includes(p.value) ? v.filter((x) => x !== p.value) : [...v, p.value])} className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-all ${fp.includes(p.value) ? `${m.bg} ${m.c} ${m.brd}` : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'}`}><span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />{p.label}</button>;
                       })}
                     </div>
                   </div>
-
                   <div className="border-t border-[var(--border-color)] pt-2">
-                    <button
-                      onClick={() => setFo((v) => !v)}
-                      className={`w-full flex items-center gap-2 py-1.5 px-2 rounded font-medium text-sm transition-colors ${fo ? 'text-[var(--accent)] bg-[var(--accent)]/5' : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'
-                        }`}
-                    >
-                      <div
-                        className={`w-4 h-4 rounded border flex items-center justify-center ${fo ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'
-                          }`}
-                      >
-                        {fo && <Check className="w-3 h-3 text-white" />}
-                      </div>
-                      Просроченные
-                    </button>
+                    <button onClick={() => setFo((v) => !v)} className={`w-full flex items-center gap-2 py-1.5 px-2 rounded font-medium text-sm transition-colors ${fo ? 'text-[var(--accent)] bg-[var(--accent)]/5' : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'}`}><div className={`w-4 h-4 rounded border flex items-center justify-center ${fo ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'}`}>{fo && <Check className="w-3 h-3 text-white" />}</div>Просроченные</button>
                   </div>
-
-                  {hf && (
-                    <div className="border-t border-[var(--border-color)] pt-2">
-                      <button
-                        onClick={() => {
-                          setFp([]);
-                          setFo(false);
-                        }}
-                        className="w-full text-center text-sm font-medium text-[var(--accent)] hover:underline"
-                      >
-                        Сбросить
-                      </button>
-                    </div>
-                  )}
+                  {hf && <div className="border-t border-[var(--border-color)] pt-2"><button onClick={() => { setFp([]); setFo(false); }} className="w-full text-center text-sm font-medium text-[var(--accent)] hover:underline">Сбросить</button></div>}
                 </div>
               </>
             )}
           </div>
 
-          <button
-            onClick={() => fetchBoard(true)}
-            disabled={refreshing || loading}
-            className="p-2 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)] hover:bg-[var(--hover-3)] disabled:opacity-40 transition-colors"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
-
-          <button
-            onClick={() => setCreate('backlog')}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-sm font-medium hover:bg-[var(--accent)]/90 transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Новая задача
-          </button>
+          <button onClick={() => fetchBoard(true)} disabled={refreshing || loading} className="p-2 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)] hover:bg-[var(--hover-3)] disabled:opacity-40"><RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /></button>
+          <button onClick={() => setCreate('backlog')} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-sm font-medium hover:bg-[var(--accent)]/90 transition-colors shadow-sm"><Plus className="w-4 h-4" />Новая задача</button>
         </div>
       </div>
 
@@ -3162,129 +3119,67 @@ const handleAssignAndMove = useCallback(
           <div className="flex items-center gap-1 p-1 bg-[var(--hover-1)] rounded-lg border border-[var(--border-color)]">
             {ctxTabs.map((t) => {
               const I = t.icon;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setMode(t.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${mode === t.id
-                    ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-                    : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'
-                    }`}
-                >
-                  <I className="w-3.5 h-3.5" />
-                  {t.label}
-                </button>
-              );
+              return <button key={t.id} onClick={() => setMode(t.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${mode === t.id ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'}`}><I className="w-3.5 h-3.5" />{t.label}</button>;
             })}
           </div>
 
-          {mode === 'project' && (
-          <div className="w-72">
-            <AsyncDD
-              value={selP}
-              onChange={setSelP}
-              loadFn={ldProjAsync}
-              placeholder="Выберите проект"
-              icon={FolderOpen}
-            />
-          </div>
-        )}
-
-          {mode === 'ticket' && (
-            <div className="w-80">
-              <AsyncDD
-                value={selT}
-                onChange={(v) => {
-                  setSelT(v);
-                  if (!v) setSelTLabel('');
-                }}
-                loadFn={ldTicketsAsync}
-                placeholder="Выберите заявку"
-                icon={Ticket}
-                wide
-              />
-            </div>
-          )}
-
-          {mode === 'assignee' && (
-            <div className="w-72">
-              <AsyncDD
-                value={selA}
-                onChange={setSelA}
-                loadFn={ldAssAsync}
-                placeholder="Выберите исполнителя"
-                icon={UserCheck}
-              />
-            </div>
-          )}
+          {mode === 'project' && <div className="w-72"><AsyncDD value={selP} onChange={setSelP} loadFn={ldProjAsync} placeholder="Выберите проект" icon={FolderOpen} /></div>}
+          {mode === 'ticket' && <div className="w-80"><AsyncDD value={selT} onChange={(v) => { setSelT(v); setSelTLabel(v ? ticketLabelsRef.current[v] ?? '' : ''); }} loadFn={ldTicketsAsync} placeholder="Выберите заявку" icon={Ticket} wide /></div>}
+          {mode === 'assignee' && <div className="w-72"><AsyncDD value={selA} onChange={setSelA} loadFn={ldAssAsync} placeholder="Выберите исполнителя" icon={UserCheck} /></div>}
         </div>
 
         <div className="flex items-center gap-1 p-1 bg-[var(--hover-1)] rounded-lg border border-[var(--border-color)]">
-          <button
-            onClick={() => setViewMode('kanban')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'kanban'
-              ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-              : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'
-              }`}
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            Доска
-          </button>
-
-          <button
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'list'
-              ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-              : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'
-              }`}
-          >
-            <List className="w-3.5 h-3.5" />
-            Список
-          </button>
+          <button onClick={() => setViewMode('kanban')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'kanban' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}><LayoutGrid className="w-3.5 h-3.5" />Доска</button>
+          <button onClick={() => setViewMode('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'list' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}><List className="w-3.5 h-3.5" />Список</button>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" />
-          </div>
+          <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" /></div>
         ) : viewMode === 'list' ? (
           <ListView tasks={disp.flatMap((c) => c.tasks.items)} umap={umap} onView={setView} />
         ) : !cols.length ? (
-          <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30">
-            <FileText className="w-12 h-12 mb-3 opacity-50" />
-            <p className="text-base font-medium">
-              {mode === 'project' && !selP
-                ? 'Выберите проект'
-                : mode === 'assignee' && !selA
-                  ? 'Выберите исполнителя'
-                  : mode === 'ticket' && !selT
-                    ? 'Выберите заявку'
-                    : 'Нет задач'}
-            </p>
-          </div>
+          <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30"><FileText className="w-12 h-12 mb-3 opacity-50" /><p className="text-base font-medium">{mode === 'project' && !selP ? 'Выберите проект' : mode === 'assignee' && !selA ? 'Выберите исполнителя' : mode === 'ticket' && !selT ? 'Выберите заявку' : 'Нет задач'}</p></div>
         ) : (
-          <div className="h-full overflow-x-auto overflow-y-hidden pb-2 scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent">
-            <div className="flex gap-3 h-full">
-              {disp.map((c) => (
-                <KCol
-                  key={c.status}
-                  col={c}
-                  umap={umap}
-                  isDO={dragO === c.status}
-                  dragId={drag?.id ?? null}
-                  ldMore={moreCol === c.status}
-                  onDS={onDS}
-                  onDE={onDE}
-                  onDO={onDO}
-                  onDL={onDL}
-                  onDrop={onDrop}
-                  onAdd={setCreate}
-                  onView={setView}
-                  onMore={more}
-                />
-              ))}
+          <div className="flex-1 flex flex-col min-h-0">
+            {/* Board Area */}
+            <div 
+                ref={boardScrollRef}
+                onScroll={handleBoardScroll}
+                className="flex-1 overflow-x-auto overflow-y-hidden pb-2 scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent"
+            >
+              <div ref={boardInnerRef} className="flex gap-3 h-full w-max min-w-full">
+                {disp.map((c) => (
+                  <KCol
+                    key={c.status}
+                    col={c}
+                    umap={umap}
+                    isDO={dragO === c.status}
+                    dragId={drag?.id ?? null}
+                    ldMore={moreCol === c.status}
+                    onDS={onDS}
+                    onDE={onDE}
+                    onDO={onDO}
+                    onDL={onDL}
+                    onDrop={onDrop}
+                    onAdd={setCreate}
+                    onView={setView}
+                    onMore={more}
+                  />
+                ))}
+              </div>
+            </div>
+            
+            {/* Always Visible Custom Scrollbar */}
+            <div className="h-4 mt-2 shrink-0 bg-[var(--hover-1)] rounded-full border border-[var(--border-color)] relative overflow-hidden">
+                <div 
+                    ref={bottomBoardScrollRef}
+                    onScroll={handleBottomBoardScroll}
+                    className="absolute inset-0 overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/50 scrollbar-track-transparent"
+                >
+                    <div style={{ width: boardScrollWidth || '100%', height: '1px' }} />
+                </div>
             </div>
           </div>
         )}
@@ -3298,18 +3193,9 @@ const handleAssignAndMove = useCallback(
           umap={umap}
           onClose={() => setView(null)}
           onRefresh={() => fetchBoard(true)}
-          onNeedAssign={(t, targetStatus) => {
-            setView(null);
-            setAssignIntent({ task: t, targetStatus });
-          }}
-          onEdit={(t) => {
-            setView(null);
-            setEditTask(t);
-          }}
-          onNeedComplete={(t, mode) => {
-            setView(null);
-            setCompleteIntent({ task: t, mode });
-          }}
+          onNeedAssign={(t, targetStatus) => { setView(null); setAssignIntent({ task: t, targetStatus }); }}
+          onEdit={(t) => { setView(null); setEditTask(t); }}
+          onNeedComplete={(t, mode) => { setView(null); setCompleteIntent({ task: t, mode }); }}
         />
       )}
 
@@ -3320,10 +3206,7 @@ const handleAssignAndMove = useCallback(
           context={ctx()}
           ticketLabel={mode === 'ticket' && selT ? selTLabel : undefined}
           onClose={() => setCreate(null)}
-          onSaved={async () => {
-            setCreate(null);
-            await fetchBoard(true);
-          }}
+          onSaved={async () => { setCreate(null); await fetchBoard(true); }}
         />
       )}
 
@@ -3333,10 +3216,7 @@ const handleAssignAndMove = useCallback(
           task={editTask}
           context={ctx()}
           onClose={() => setEditTask(null)}
-          onSaved={async () => {
-            setEditTask(null);
-            await fetchBoard(true);
-          }}
+          onSaved={async () => { setEditTask(null); await fetchBoard(true); }}
         />
       )}
 
@@ -3346,9 +3226,7 @@ const handleAssignAndMove = useCallback(
           targetStatus={assignIntent.targetStatus}
           umap={umap}
           loading={assignLd}
-          onClose={() => {
-            if (!assignLd) setAssignIntent(null);
-          }}
+          onClose={() => { if (!assignLd) setAssignIntent(null); }}
           onOk={handleAssignAndMove}
         />
       )}
@@ -3357,9 +3235,7 @@ const handleAssignAndMove = useCallback(
         <CompleteModal
           task={completeIntent.task}
           loading={completeLd}
-          onClose={() => {
-            if (!completeLd) setCompleteIntent(null);
-          }}
+          onClose={() => { if (!completeLd) setCompleteIntent(null); }}
           onOk={handleComplete}
         />
       )}

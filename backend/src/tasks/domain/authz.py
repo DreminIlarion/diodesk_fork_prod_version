@@ -66,6 +66,8 @@ class TaskAuthZService:
                         IsMemberExistsRule(project_member),
                         IsProjectStaffRule(project_member),
                     ),
+                    TaskAssigneeStatusRule(subject, task, new_status),  # ← ДОБАВИl
+                    TaskReviewerStatusRule(subject, task, new_status),   # ← ДОБАВИl    
                 )
             )
 
