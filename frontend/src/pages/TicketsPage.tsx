@@ -1,5 +1,6 @@
 // pages/TicketsPage.tsx
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import type { ElementType, ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -14,7 +15,6 @@ import { ticketsApi, counterpartiesApi, projectsApi, usersApi } from '../api/cli
 import { useAuthStore } from '../stores/authStore';
 import type { TicketListItem, Counterparty, Project, SimpleUser } from '../types';
 import { useToast } from '../components/ui/use-toast';
-import { createPortal } from 'react-dom';
 
 /* ═══ СТАТУСЫ ═══ */
 
@@ -379,388 +379,913 @@ function FilterTag({ label, icon, colorClass, onRemove }: {
 
 /* ═══ TICKET ACTIONS (троеточие) ═══ */
 
-function TicketActions({ ticket, onTicketUpdated }: { 
-  ticket: TicketListItem; 
+/* ═══ TICKET ACTIONS ═══ */
+
+function TicketActions({
+  ticket,
+  onTicketUpdated,
+}: {
+  ticket: TicketListItem;
   onTicketUpdated?: () => void;
 }) {
   const navigate = useNavigate();
+  const { toast } = useToast();
+
   const [open, setOpen] = useState(false);
-  const [showManage, setShowManage] = useState(false);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [archiving, setArchiving] = useState(false);
-  const [showStatusMenu, setShowStatusMenu] = useState(false);
+
   const [showAssigneeMenu, setShowAssigneeMenu] = useState(false);
   const [supportUsers, setSupportUsers] = useState<SimpleUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [updatingAssignee, setUpdatingAssignee] = useState(false);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
 
-  // Закрытие при клике вне
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const [menuPosition, setMenuPosition] = useState({
+    top: 0,
+    left: 0,
+    maxHeight: 500,
+  });
+
+  const MENU_WIDTH = 280;
+  const MENU_ESTIMATED_HEIGHT = 540;
+  const VIEWPORT_GAP = 12;
+
+  /* ── Расчёт позиции меню ── */
+
+  const updateMenuPosition = useCallback(() => {
+    const button = buttonRef.current;
+
+    if (!button) return;
+
+    const rect = button.getBoundingClientRect();
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    /*
+     * По горизонтали меню выравнивается по правому краю кнопки.
+     * Если места мало — не даём ему выйти за viewport.
+     */
+    let left = rect.right - MENU_WIDTH;
+
+    left = Math.max(
+      VIEWPORT_GAP,
+      Math.min(
+        left,
+        viewportWidth - MENU_WIDTH - VIEWPORT_GAP,
+      ),
+    );
+
+    const spaceBelow =
+      viewportHeight - rect.bottom - VIEWPORT_GAP;
+
+    const spaceAbove =
+      rect.top - VIEWPORT_GAP;
+
+    /*
+     * Если снизу достаточно места — открываем вниз.
+     * Если нет, но сверху места больше — открываем вверх.
+     */
+    const shouldOpenUp =
+      spaceBelow < MENU_ESTIMATED_HEIGHT &&
+      spaceAbove > spaceBelow;
+
+    let top: number;
+    let maxHeight: number;
+
+    if (shouldOpenUp) {
+      maxHeight = Math.max(
+        180,
+        Math.min(
+          MENU_ESTIMATED_HEIGHT,
+          spaceAbove,
+        ),
+      );
+
+      top = Math.max(
+        VIEWPORT_GAP,
+        rect.top - maxHeight - 6,
+      );
+    } else {
+      top = rect.bottom + 6;
+
+      maxHeight = Math.max(
+        180,
+        Math.min(
+          MENU_ESTIMATED_HEIGHT,
+          spaceBelow,
+        ),
+      );
+    }
+
+    setMenuPosition({
+      top,
+      left,
+      maxHeight,
+    });
+  }, []);
+
+  /* ── При открытии вычисляем позицию ── */
+
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        setShowManage(false);
-        setShowStatusMenu(false);
-        setShowAssigneeMenu(false);
-        setMenuPosition(null);
-      }
+
+    updateMenuPosition();
+
+    const handlePositionChange = () => {
+      updateMenuPosition();
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+
+    /*
+     * capture=true важен для scroll:
+     * событие scroll у вложенных контейнеров не bubble.
+     */
+    window.addEventListener(
+      'scroll',
+      handlePositionChange,
+      true,
+    );
+
+    window.addEventListener(
+      'resize',
+      handlePositionChange,
+    );
+
+    return () => {
+      window.removeEventListener(
+        'scroll',
+        handlePositionChange,
+        true,
+      );
+
+      window.removeEventListener(
+        'resize',
+        handlePositionChange,
+      );
+    };
+  }, [open, updateMenuPosition]);
+
+  /* ── Закрытие кликом снаружи ── */
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handler = (event: MouseEvent) => {
+      const target = event.target as Node;
+
+      if (
+        buttonRef.current?.contains(target) ||
+        menuRef.current?.contains(target)
+      ) {
+        return;
+      }
+
+      setOpen(false);
+      setShowAssigneeMenu(false);
+    };
+
+    document.addEventListener(
+      'mousedown',
+      handler,
+    );
+
+    return () => {
+      document.removeEventListener(
+        'mousedown',
+        handler,
+      );
+    };
   }, [open]);
 
-  // Загрузка пользователей при открытии меню назначения
+  /* ── Escape ── */
+
   useEffect(() => {
-    if (!showAssigneeMenu || supportUsers.length > 0) return;
+    if (!open) return;
+
+    const handler = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+
+      setOpen(false);
+      setShowAssigneeMenu(false);
+    };
+
+    document.addEventListener(
+      'keydown',
+      handler,
+    );
+
+    return () => {
+      document.removeEventListener(
+        'keydown',
+        handler,
+      );
+    };
+  }, [open]);
+
+  /* ── Исполнители ── */
+
+  useEffect(() => {
+    if (
+      !showAssigneeMenu ||
+      supportUsers.length > 0
+    ) {
+      return;
+    }
+
     setLoadingUsers(true);
-    usersApi.getAllUsers(1, 100)
-      .then(res => {
-        const staff = res.items.filter(u => 
-          u.roles?.some(r => ['admin', 'support_agent', 'support_manager', 'executor'].includes(r))
+
+    usersApi
+      .getAllUsers(1, 100)
+      .then((res) => {
+        const staff = res.items.filter((u) =>
+          u.roles?.some((role) =>
+            [
+              'admin',
+              'support_agent',
+              'support_manager',
+              'executor',
+            ].includes(role),
+          ),
         );
+
         setSupportUsers(staff);
       })
-      .catch(() => toast({ title: 'Ошибка', description: 'Не удалось загрузить пользователей', variant: 'destructive' }))
-      .finally(() => setLoadingUsers(false));
-  }, [showAssigneeMenu]);
+      .catch(() =>
+        toast({
+          title: 'Ошибка',
+          description:
+            'Не удалось загрузить пользователей',
+          variant: 'destructive',
+        }),
+      )
+      .finally(() => {
+        setLoadingUsers(false);
+      });
+  }, [
+    showAssigneeMenu,
+    supportUsers.length,
+    toast,
+  ]);
 
-  // Обработка архивации
+  /* ── Archive ── */
+
   const handleArchive = async () => {
     setArchiving(true);
+
     try {
-      await ticketsApi.archiveTicket(ticket.id);
-      toast({ title: 'Заявка архивирована' });
+      await ticketsApi.archiveTicket(
+        ticket.id,
+      );
+
+      toast({
+        title: 'Заявка архивирована',
+      });
+
       setShowArchiveConfirm(false);
       setOpen(false);
-      setShowManage(false);
-      setMenuPosition(null);
+      setShowAssigneeMenu(false);
+
       onTicketUpdated?.();
     } catch (e: any) {
-      toast({ 
-        title: 'Ошибка', 
-        description: e?.response?.status === 403 ? 'Нет прав' : 'Не удалось архивировать',
-        variant: 'destructive' 
+      toast({
+        title: 'Ошибка',
+        description:
+          e?.response?.status === 403
+            ? 'Нет прав'
+            : 'Не удалось архивировать',
+        variant: 'destructive',
       });
     } finally {
       setArchiving(false);
     }
   };
 
-  // Обработка изменения статуса
-  const handleStatusChange = async (status: string) => {
+  /* ── Status ── */
+
+  const handleStatusChange = async (
+    status: string,
+  ) => {
     setUpdatingStatus(true);
+
     try {
-      await ticketsApi.updateTicketStatus(ticket.id, status as any);
-      toast({ title: 'Статус обновлён', description: STATUS_MAP[status]?.label || status });
+      await ticketsApi.updateTicketStatus(
+        ticket.id,
+        status as any,
+      );
+
+      toast({
+        title: 'Статус обновлён',
+        description:
+          STATUS_MAP[status]?.label ||
+          status,
+      });
+
       setOpen(false);
-      setShowManage(false);
-      setShowStatusMenu(false);
-      setMenuPosition(null);
+      setShowAssigneeMenu(false);
+
       onTicketUpdated?.();
     } catch (e: any) {
-      toast({ 
-        title: 'Ошибка', 
-        description: e?.response?.status === 403 ? 'Нет прав' : 'Не удалось обновить статус',
-        variant: 'destructive' 
+      toast({
+        title: 'Ошибка',
+        description:
+          e?.response?.status === 403
+            ? 'Нет прав'
+            : 'Не удалось обновить статус',
+        variant: 'destructive',
       });
     } finally {
       setUpdatingStatus(false);
     }
   };
 
-  // Обработка назначения исполнителя
-  const handleAssigneeChange = async (userId: string | null) => {
+  /* ── Assignee ── */
+
+  const handleAssigneeChange = async (
+    userId: string | null,
+  ) => {
     setUpdatingAssignee(true);
+
     try {
-      await ticketsApi.assignTicket(ticket.id, userId || '');
-      toast({ 
-        title: userId ? 'Исполнитель назначен' : 'Исполнитель снят' 
+      await ticketsApi.assignTicket(
+        ticket.id,
+        userId || '',
+      );
+
+      toast({
+        title: userId
+          ? 'Исполнитель назначен'
+          : 'Исполнитель снят',
       });
+
       setOpen(false);
-      setShowManage(false);
       setShowAssigneeMenu(false);
-      setMenuPosition(null);
+
       onTicketUpdated?.();
     } catch (e: any) {
-      toast({ 
-        title: 'Ошибка', 
-        description: e?.response?.status === 403 ? 'Нет прав' : 'Не удалось назначить исполнителя',
-        variant: 'destructive' 
+      toast({
+        title: 'Ошибка',
+        description:
+          e?.response?.status === 403
+            ? 'Нет прав'
+            : 'Не удалось назначить исполнителя',
+        variant: 'destructive',
       });
     } finally {
       setUpdatingAssignee(false);
     }
   };
 
-  // Доступные статусы
-  const getAvailableStatuses = (currentStatus: string): string[] => {
-    const transitions: Record<string, string[]> = {
-      'new': ['pending_approval', 'canceled'],
-      'pending_approval': ['open', 'rejected'],
-      'open': ['in_progress'],
-      'in_progress': ['waiting', 'resolved'],
-      'waiting': ['in_progress'],
-      'resolved': ['closed'],
-      'closed': ['reopened'],
-      'reopened': ['open'],
-      'rejected': ['closed'],
+  const getAvailableStatuses = (
+    currentStatus: string,
+  ): string[] => {
+    const transitions: Record<
+      string,
+      string[]
+    > = {
+      new: [
+        'pending_approval',
+        'canceled',
+      ],
+      pending_approval: [
+        'open',
+        'rejected',
+      ],
+      open: ['in_progress'],
+      in_progress: [
+        'waiting',
+        'resolved',
+      ],
+      waiting: ['in_progress'],
+      resolved: ['closed'],
+      closed: ['reopened'],
+      reopened: ['open'],
+      rejected: ['closed'],
     };
-    return transitions[currentStatus] || [];
+
+    return (
+      transitions[currentStatus] || []
+    );
   };
 
-  const availableStatuses = getAvailableStatuses(ticket.status);
+  const availableStatuses =
+    getAvailableStatuses(ticket.status);
 
-  const handleToggle = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setMenuPosition({
-      top: rect.bottom + 4,
-      left: Math.min(rect.right - 260, window.innerWidth - 270),
-    });
-    setOpen((v) => !v);
-    setShowManage(false);
-    setShowStatusMenu(false);
-    setShowAssigneeMenu(false);
-  };
+  /* ── Portal menu ── */
 
-  return (
-    <>
-      <div ref={ref} className="relative">
-        <button
-          type="button"
-          onClick={handleToggle}
-          className="p-2 rounded-lg text-[var(--text-primary)]/90 hover:text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] transition-colors"
-        >
-          <MoreVertical size={20} />
-        </button>
-      </div>
+  const menu =
+    open &&
+    createPortal(
+      <div
+        ref={menuRef}
+        className="
+          fixed z-[9999]
+          w-[280px]
+          overflow-y-auto overscroll-contain
+          rounded-xl
+          border border-[var(--border-color)]
+          bg-[var(--bg-card)]
+          shadow-2xl
+        "
+        style={{
+          top: menuPosition.top,
+          left: menuPosition.left,
+          maxHeight:
+            menuPosition.maxHeight,
+        }}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+      >
+        {/* Tasks */}
 
-      {/* Выпадающее меню через portal */}
-      {open && menuPosition && createPortal(
-        <div
-          className="fixed z-[9999] w-[260px] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-2xl"
-          style={{ top: menuPosition.top, left: menuPosition.left }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Задачи */}
+        <div className="py-1.5">
           <button
             type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+
               setOpen(false);
-              setMenuPosition(null);
-              navigate(`/tasks?ticket_id=${ticket.id}`);
+
+              navigate(
+                `/tasks?ticket_id=${ticket.id}`,
+              );
             }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/80 hover:bg-[var(--hover-1)] transition-colors text-left"
+            className="
+              flex w-full items-center gap-3
+              px-4 py-3
+              text-left text-sm
+              text-[var(--text-primary)]/80
+              transition-colors
+              hover:bg-[var(--hover-1)]
+            "
           >
-            <FolderOpen size={16} className="text-[var(--text-primary)]/40 shrink-0" />
-            <span>Посмотреть задачи по заявке</span>
+            <FolderOpen
+              size={17}
+              className="shrink-0 text-[var(--text-primary)]/45"
+            />
+
+            <span>
+              Посмотреть задачи по заявке
+            </span>
           </button>
 
           <button
             type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+
               setOpen(false);
-              setMenuPosition(null);
-              navigate(`/tasks?ticket_id=${ticket.id}&create=1`);
+
+              navigate(
+                `/tasks?ticket_id=${ticket.id}&create=1`,
+              );
             }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/80 hover:bg-[var(--hover-1)] transition-colors text-left"
+            className="
+              flex w-full items-center gap-3
+              px-4 py-3
+              text-left text-sm
+              text-[var(--text-primary)]/80
+              transition-colors
+              hover:bg-[var(--hover-1)]
+            "
           >
-            <Plus size={16} className="text-[var(--accent)] shrink-0" />
-            <span>Создать задачу на основании</span>
+            <Plus
+              size={17}
+              className="shrink-0 text-[var(--accent)]"
+            />
+
+            <span>
+              Создать задачу
+            </span>
           </button>
+        </div>
 
-          <div className="h-px bg-[var(--border-color)] mx-3" />
+        <div className="mx-3 h-px bg-[var(--border-color)]" />
 
-          {/* Статус */}
-          <div className="px-4 py-2 text-xs font-semibold text-[var(--text-primary)]/40 uppercase tracking-wider">
-            Изменить статус
-          </div>
-          <div className="px-2 pb-2">
-            {availableStatuses.length === 0 ? (
-              <p className="px-2 py-2 text-sm text-[var(--text-primary)]/30">
-                Нет доступных переходов
-              </p>
-            ) : (
-              availableStatuses.map(status => (
+        {/* Status */}
+
+        <div className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)]/40">
+          Изменить статус
+        </div>
+
+        <div className="px-2 pb-2">
+          {availableStatuses.length ===
+          0 ? (
+            <p className="px-2 py-2 text-sm text-[var(--text-primary)]/35">
+              Нет доступных переходов
+            </p>
+          ) : (
+            availableStatuses.map(
+              (status) => (
                 <button
                   key={status}
                   type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleStatusChange(status);
+                  disabled={
+                    updatingStatus
+                  }
+                  onClick={(
+                    event,
+                  ) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    handleStatusChange(
+                      status,
+                    );
                   }}
-                  disabled={updatingStatus}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left disabled:opacity-50 ${
-                    STATUS_MAP[status]?.color || 'status-closed'
-                  }`}
+                  className={`
+                    flex w-full items-center gap-3
+                    rounded-lg px-3 py-2.5
+                    text-left text-sm
+                    transition-colors
+                    disabled:opacity-50
+                    ${
+                      STATUS_MAP[status]
+                        ?.color ||
+                      'status-closed'
+                    }
+                  `}
                 >
                   {updatingStatus ? (
-                    <Loader2 size={14} className="animate-spin shrink-0" />
+                    <Loader2
+                      size={14}
+                      className="shrink-0 animate-spin"
+                    />
                   ) : (
-                    <ChevronRight size={14} className="shrink-0 opacity-50" />
+                    <ChevronRight
+                      size={14}
+                      className="shrink-0 opacity-50"
+                    />
                   )}
-                  <span className="font-medium">{STATUS_MAP[status]?.label || status}</span>
+
+                  <span className="font-medium">
+                    {STATUS_MAP[status]
+                      ?.label || status}
+                  </span>
                 </button>
-              ))
-            )}
-          </div>
+              ),
+            )
+          )}
+        </div>
 
-          <div className="h-px bg-[var(--border-color)] mx-3" />
+        <div className="mx-3 h-px bg-[var(--border-color)]" />
 
-          {/* Исполнитель */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowAssigneeMenu(!showAssigneeMenu);
-            }}
-            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/80 hover:bg-[var(--hover-1)] transition-colors text-left"
-          >
-            <span className="flex items-center gap-3">
-              <UserCheck size={16} className="text-[var(--text-primary)]/40 shrink-0" />
-              <span>Исполнитель</span>
-            </span>
-            <ChevronDown 
-              size={16} 
-              className={`text-[var(--text-primary)]/40 transition-transform ${showAssigneeMenu ? 'rotate-180' : ''}`} 
+        {/* Assignee */}
+
+        <button
+          type="button"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            setShowAssigneeMenu(
+              (value) => !value,
+            );
+          }}
+          className="
+            flex w-full items-center
+            justify-between gap-3
+            px-4 py-3
+            text-left text-sm
+            text-[var(--text-primary)]/80
+            transition-colors
+            hover:bg-[var(--hover-1)]
+          "
+        >
+          <span className="flex min-w-0 items-center gap-3">
+            <UserCheck
+              size={17}
+              className="shrink-0 text-[var(--text-primary)]/45"
             />
-          </button>
 
-          {showAssigneeMenu && (
-            <div className="bg-[var(--hover-1)]/50 py-1 max-h-[130px] overflow-y-auto">
-              {loadingUsers ? (
-                <div className="flex justify-center py-3">
-                  <Loader2 size={16} className="animate-spin text-[var(--text-primary)]/40" />
-                </div>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleAssigneeChange(null);
-                    }}
-                    disabled={updatingAssignee}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] transition-colors text-left disabled:opacity-50"
-                  >
-                    <X size={14} className="text-[var(--text-primary)]/40 shrink-0" />
-                    <span>Снять исполнителя</span>
-                  </button>
-                  {supportUsers.map(user => (
+            <span>
+              Исполнитель
+            </span>
+          </span>
+
+          <ChevronDown
+            size={16}
+            className={`
+              shrink-0
+              text-[var(--text-primary)]/40
+              transition-transform
+              ${
+                showAssigneeMenu
+                  ? 'rotate-180'
+                  : ''
+              }
+            `}
+          />
+        </button>
+
+        {showAssigneeMenu && (
+          <div
+            className="
+              max-h-[220px]
+              overflow-y-auto
+              border-t border-[var(--border-color)]
+              bg-[var(--hover-1)]/40
+              py-1
+            "
+          >
+            {loadingUsers ? (
+              <div className="flex justify-center py-4">
+                <Loader2
+                  size={18}
+                  className="animate-spin text-[var(--text-primary)]/40"
+                />
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  disabled={
+                    updatingAssignee
+                  }
+                  onClick={(
+                    event,
+                  ) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    handleAssigneeChange(
+                      null,
+                    );
+                  }}
+                  className="
+                    flex w-full items-center gap-3
+                    px-4 py-2.5
+                    text-left text-sm
+                    text-[var(--text-primary)]/70
+                    transition-colors
+                    hover:bg-[var(--hover-2)]
+                    disabled:opacity-50
+                  "
+                >
+                  <X
+                    size={15}
+                    className="shrink-0 text-[var(--text-primary)]/40"
+                  />
+
+                  <span>
+                    Снять исполнителя
+                  </span>
+                </button>
+
+                {supportUsers.map(
+                  (user) => (
                     <button
                       key={user.id}
                       type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleAssigneeChange(user.id);
+                      disabled={
+                        updatingAssignee
+                      }
+                      onClick={(
+                        event,
+                      ) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        handleAssigneeChange(
+                          user.id,
+                        );
                       }}
-                      disabled={updatingAssignee}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] transition-colors text-left disabled:opacity-50"
+                      className="
+                        flex w-full items-center gap-3
+                        px-4 py-2.5
+                        text-left text-sm
+                        text-[var(--text-primary)]/70
+                        transition-colors
+                        hover:bg-[var(--hover-2)]
+                        disabled:opacity-50
+                      "
                     >
-                      <User size={14} className="text-[var(--text-primary)]/40 shrink-0" />
-                      <span className="truncate">{user.full_name || user.username || user.email}</span>
-                      {ticket.assignee?.id === user.id && (
-                        <Check size={14} className="text-[var(--success)] shrink-0 ml-auto" />
+                      <User
+                        size={15}
+                        className="shrink-0 text-[var(--text-primary)]/40"
+                      />
+
+                      <span className="min-w-0 flex-1 truncate">
+                        {user.full_name ||
+                          user.username ||
+                          user.email}
+                      </span>
+
+                      {ticket.assignee
+                        ?.id === user.id && (
+                        <Check
+                          size={15}
+                          className="ml-auto shrink-0 text-[var(--success)]"
+                        />
                       )}
                     </button>
-                  ))}
-                </>
-              )}
-            </div>
-          )}
-
-          <div className="h-px bg-[var(--border-color)] mx-3" />
-
-          {/* Архив */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowArchiveConfirm(true);
-            }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/80 hover:bg-[var(--hover-1)] transition-colors text-left"
-          >
-            <Archive size={16} className="text-[var(--text-primary)]/40 shrink-0" />
-            <span>В архив</span>
-          </button>
-        </div>,
-        document.body
-      )}
-
-      {/* Модалка подтверждения архивации */}
-      {showArchiveConfirm && createPortal(
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
-          <div 
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowArchiveConfirm(false);
-            }} 
-          />
-          <div 
-            className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-6 text-center">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
-                <Archive className="w-6 h-6 text-amber-500" />
-              </div>
-              <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">
-                Переместить в архив?
-              </h3>
-              <p className="text-sm text-[var(--text-primary)]/50">
-                Заявка <span className="font-mono text-[var(--accent)]">{ticket.number}</span> будет скрыта из основного списка
-              </p>
-            </div>
-            <div className="flex border-t border-[var(--border-color)]">
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setShowArchiveConfirm(false);
-                }}
-                disabled={archiving}
-                className="flex-1 py-3.5 text-sm font-medium text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)] transition-colors disabled:opacity-50"
-              >
-                Отмена
-              </button>
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleArchive();
-                }}
-                disabled={archiving}
-                className="flex-1 py-3.5 text-sm font-semibold text-amber-500 hover:bg-amber-500/10 border-l border-[var(--border-color)] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {archiving ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <Archive size={16} />
+                  ),
                 )}
-                В архив
-              </button>
-            </div>
+              </>
+            )}
           </div>
-        </div>,
-        document.body
-      )}
+        )}
+
+        <div className="mx-3 h-px bg-[var(--border-color)]" />
+
+        {/* Archive */}
+
+        <button
+          type="button"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            setOpen(false);
+            setShowAssigneeMenu(false);
+            setShowArchiveConfirm(true);
+          }}
+          className="
+            flex w-full items-center gap-3
+            px-4 py-3
+            text-left text-sm
+            text-[var(--text-primary)]/80
+            transition-colors
+            hover:bg-amber-500/10
+            hover:text-amber-400
+          "
+        >
+          <Archive
+            size={17}
+            className="shrink-0"
+          />
+
+          <span>В архив</span>
+        </button>
+      </div>,
+      document.body,
+    );
+
+  /* ── Archive modal ── */
+
+  const archiveModal =
+    showArchiveConfirm &&
+    createPortal(
+      <div
+        className="
+          fixed inset-0 z-[10000]
+          flex items-center justify-center
+          p-4
+        "
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          if (!archiving) {
+            setShowArchiveConfirm(
+              false,
+            );
+          }
+        }}
+      >
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+        <div
+          className="
+            relative w-full max-w-sm
+            overflow-hidden rounded-2xl
+            border border-[var(--border-color)]
+            bg-[var(--bg-card)]
+            shadow-2xl
+          "
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        >
+          <div className="p-6 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10">
+              <Archive className="h-6 w-6 text-amber-500" />
+            </div>
+
+            <h3 className="mb-2 text-lg font-bold text-[var(--text-primary)]">
+              Переместить в архив?
+            </h3>
+
+            <p className="text-sm text-[var(--text-primary)]/50">
+              Заявка{' '}
+              <span className="font-mono text-[var(--accent)]">
+                {ticket.number}
+              </span>{' '}
+              будет скрыта из основного
+              списка
+            </p>
+          </div>
+
+          <div className="flex border-t border-[var(--border-color)]">
+            <button
+              type="button"
+              disabled={archiving}
+              onClick={(
+                event,
+              ) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                setShowArchiveConfirm(
+                  false,
+                );
+              }}
+              className="
+                flex-1 py-3.5
+                text-sm font-medium
+                text-[var(--text-primary)]/60
+                transition-colors
+                hover:bg-[var(--hover-1)]
+                disabled:opacity-50
+              "
+            >
+              Отмена
+            </button>
+
+            <button
+              type="button"
+              disabled={archiving}
+              onClick={(
+                event,
+              ) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                handleArchive();
+              }}
+              className="
+                flex flex-1 items-center
+                justify-center gap-2
+                border-l border-[var(--border-color)]
+                py-3.5
+                text-sm font-semibold text-amber-500
+                transition-colors
+                hover:bg-amber-500/10
+                disabled:opacity-50
+              "
+            >
+              {archiving ? (
+                <Loader2
+                  size={16}
+                  className="animate-spin"
+                />
+              ) : (
+                <Archive size={16} />
+              )}
+
+              В архив
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body,
+    );
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label="Действия с заявкой"
+        aria-expanded={open}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          if (!open) {
+            /*
+             * Сначала вычисляем позицию,
+             * чтобы при первом render не было
+             * скачка из 0,0.
+             */
+            updateMenuPosition();
+          }
+
+          setOpen((value) => !value);
+          setShowAssigneeMenu(false);
+        }}
+        className="
+          rounded-lg p-2
+          text-[var(--text-primary)]/60
+          transition-colors
+          hover:bg-[var(--hover-2)]
+          hover:text-[var(--text-primary)]
+        "
+      >
+        <MoreVertical size={20} />
+      </button>
+
+      {menu}
+      {archiveModal}
     </>
   );
 }
