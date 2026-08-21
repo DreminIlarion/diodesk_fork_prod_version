@@ -29,9 +29,10 @@ class CounterpartyService:
         exists_counterparty = await self.repository.get_by_inn(Inn(data.inn))
         if exists_counterparty is not None:
             raise AlreadyExistsError(f"Counterparty with INN {data.inn} already exists")
-        exists_counterparty = await self.repository.get_by_email(data.email)
-        if exists_counterparty is not None:
-            raise AlreadyExistsError(f"This {data.email} email address already used")
+        if data.email:
+            exists_counterparty = await self.repository.get_by_email(data.email)
+            if exists_counterparty:
+                raise AlreadyExistsError(f"This {data.email} email address already used")
 
         # 2. Создание доменных примитивов и объектов значений
         inn = Inn(data.inn)

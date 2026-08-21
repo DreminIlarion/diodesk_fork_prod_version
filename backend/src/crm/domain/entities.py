@@ -73,15 +73,18 @@ class Counterparty(Entity):
                 "to attach a branch. Missing parent_id value."
             )
 
-        # 5. Телефон и электронная почат контактного лица должны быть уникальны
+        # 5. Телефон и электронная почта контактного лица должны быть уникальны
         seen_contact_data = set()
         for contact_person in self.contact_persons:
+            # Пропускаем проверку, если оба поля пустые
+            if not contact_person.phone and not contact_person.email:
+                continue
+            
             contact_data = (contact_person.phone, contact_person.email)
             if contact_data in seen_contact_data:
                 raise InvariantViolationError(
                     "Combination of phone number and email must be unique for contact persons"
                 )
-
             seen_contact_data.add(contact_data)
 
     @property
@@ -181,11 +184,22 @@ class Counterparty(Entity):
     ) -> Self:
         """Добавления контактного лица"""
 
-        # Проверка, нет ли такого же телефона и email у добавленных контактных лиц
+        # Проверка дубликатов
         for contact_person in self.contact_persons:
-            if contact_person.phone == Phone(phone) and contact_person.email == email:
+            # Пропускаем проверку, если оба поля пустые
+            if not phone and not email:
+                continue
+            
+            # Проверяем совпадение по телефону
+            if phone and contact_person.phone == Phone(phone):
                 raise ValueError(
-                    f"Contact person with phone - '{phone}' and email - '{email}' already exists"
+                    f"Contact person with phone - '{phone}' already exists"
+                )
+            
+            # Проверяем совпадение по email
+            if email and contact_person.email == email:
+                raise ValueError(
+                    f"Contact person with email - '{email}' already exists"
                 )
 
         self.contact_persons.append(
