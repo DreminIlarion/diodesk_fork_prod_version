@@ -146,6 +146,7 @@ class TicketAuthZService:
                     SameCounterpartyRule(subject, ticket.counterparty_id)
                 ),
                 IsProjectStaffRule(member),
+                HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.ADMIN, UserRole.SUPPORT_AGENT]),
             ]
 
             return AnyOf(*project_rules).check()
