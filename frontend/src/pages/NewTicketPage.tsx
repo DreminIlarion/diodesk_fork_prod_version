@@ -76,7 +76,7 @@ const PRIORITIES = [
   {
     value: 'medium',
     label: 'Средний',
-    desc: 'Обычный приоритет',
+    desc: 'Стандартный приоритет',
     icon: SignalMedium,
     iconColor: 'text-yellow-400',
     selected: 'border-yellow-500/50 bg-yellow-500/10',
