@@ -1,6 +1,5 @@
 // pages/TicketsPage.tsx
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import type { ElementType, ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -379,8 +378,6 @@ function FilterTag({ label, icon, colorClass, onRemove }: {
 
 /* ═══ TICKET ACTIONS (троеточие) ═══ */
 
-/* ═══ TICKET ACTIONS ═══ */
-
 function TicketActions({
   ticket,
   onTicketUpdated,
@@ -392,6 +389,8 @@ function TicketActions({
   const { toast } = useToast();
 
   const [open, setOpen] = useState(false);
+  const [openUp, setOpenUp] = useState(false);
+
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [archiving, setArchiving] = useState(false);
 
@@ -402,135 +401,13 @@ function TicketActions({
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [updatingAssignee, setUpdatingAssignee] = useState(false);
 
+  const ref = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const [menuPosition, setMenuPosition] = useState({
-    top: 0,
-    left: 0,
-    maxHeight: 500,
-  });
-
-  const MENU_WIDTH = 280;
-  const MENU_ESTIMATED_HEIGHT = 540;
-  const VIEWPORT_GAP = 12;
-
-  /* ── Расчёт позиции меню ── */
-
-  const updateMenuPosition = useCallback(() => {
-    const button = buttonRef.current;
-
-    if (!button) return;
-
-    const rect = button.getBoundingClientRect();
-
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    /*
-     * По горизонтали меню выравнивается по правому краю кнопки.
-     * Если места мало — не даём ему выйти за viewport.
-     */
-    let left = rect.right - MENU_WIDTH;
-
-    left = Math.max(
-      VIEWPORT_GAP,
-      Math.min(
-        left,
-        viewportWidth - MENU_WIDTH - VIEWPORT_GAP,
-      ),
-    );
-
-    const spaceBelow =
-      viewportHeight - rect.bottom - VIEWPORT_GAP;
-
-    const spaceAbove =
-      rect.top - VIEWPORT_GAP;
-
-    /*
-     * Если снизу достаточно места — открываем вниз.
-     * Если нет, но сверху места больше — открываем вверх.
-     */
-    const shouldOpenUp =
-      spaceBelow < MENU_ESTIMATED_HEIGHT &&
-      spaceAbove > spaceBelow;
-
-    let top: number;
-    let maxHeight: number;
-
-    if (shouldOpenUp) {
-      maxHeight = Math.max(
-        180,
-        Math.min(
-          MENU_ESTIMATED_HEIGHT,
-          spaceAbove,
-        ),
-      );
-
-      top = Math.max(
-        VIEWPORT_GAP,
-        rect.top - maxHeight - 6,
-      );
-    } else {
-      top = rect.bottom + 6;
-
-      maxHeight = Math.max(
-        180,
-        Math.min(
-          MENU_ESTIMATED_HEIGHT,
-          spaceBelow,
-        ),
-      );
-    }
-
-    setMenuPosition({
-      top,
-      left,
-      maxHeight,
-    });
-  }, []);
-
-  /* ── При открытии вычисляем позицию ── */
-
-  useEffect(() => {
-    if (!open) return;
-
-    updateMenuPosition();
-
-    const handlePositionChange = () => {
-      updateMenuPosition();
-    };
-
-    /*
-     * capture=true важен для scroll:
-     * событие scroll у вложенных контейнеров не bubble.
-     */
-    window.addEventListener(
-      'scroll',
-      handlePositionChange,
-      true,
-    );
-
-    window.addEventListener(
-      'resize',
-      handlePositionChange,
-    );
-
-    return () => {
-      window.removeEventListener(
-        'scroll',
-        handlePositionChange,
-        true,
-      );
-
-      window.removeEventListener(
-        'resize',
-        handlePositionChange,
-      );
-    };
-  }, [open, updateMenuPosition]);
-
-  /* ── Закрытие кликом снаружи ── */
+  /* ────────────────────────────────────────────────────────────────────── */
+  /* Закрытие кликом снаружи                                               */
+  /* ────────────────────────────────────────────────────────────────────── */
 
   useEffect(() => {
     if (!open) return;
@@ -538,10 +415,7 @@ function TicketActions({
     const handler = (event: MouseEvent) => {
       const target = event.target as Node;
 
-      if (
-        buttonRef.current?.contains(target) ||
-        menuRef.current?.contains(target)
-      ) {
+      if (ref.current?.contains(target)) {
         return;
       }
 
@@ -549,20 +423,16 @@ function TicketActions({
       setShowAssigneeMenu(false);
     };
 
-    document.addEventListener(
-      'mousedown',
-      handler,
-    );
+    document.addEventListener('mousedown', handler);
 
     return () => {
-      document.removeEventListener(
-        'mousedown',
-        handler,
-      );
+      document.removeEventListener('mousedown', handler);
     };
   }, [open]);
 
-  /* ── Escape ── */
+  /* ────────────────────────────────────────────────────────────────────── */
+  /* Закрытие по Escape                                                    */
+  /* ────────────────────────────────────────────────────────────────────── */
 
   useEffect(() => {
     if (!open) return;
@@ -574,26 +444,79 @@ function TicketActions({
       setShowAssigneeMenu(false);
     };
 
-    document.addEventListener(
-      'keydown',
-      handler,
-    );
+    document.addEventListener('keydown', handler);
 
     return () => {
-      document.removeEventListener(
-        'keydown',
-        handler,
-      );
+      document.removeEventListener('keydown', handler);
     };
   }, [open]);
 
-  /* ── Исполнители ── */
+  /* ────────────────────────────────────────────────────────────────────── */
+  /* После открытия проверяем реальную высоту меню                         */
+  /* ────────────────────────────────────────────────────────────────────── */
 
   useEffect(() => {
-    if (
-      !showAssigneeMenu ||
-      supportUsers.length > 0
-    ) {
+    if (!open) return;
+
+    const button = buttonRef.current;
+    const menu = menuRef.current;
+
+    if (!button || !menu) return;
+
+    const buttonRect = button.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+
+    const gap = 8;
+
+    const spaceBelow =
+      window.innerHeight -
+      buttonRect.bottom -
+      gap;
+
+    const spaceAbove =
+      buttonRect.top -
+      gap;
+
+    /*
+     * Используем реальную высоту меню.
+     *
+     * Если вниз оно не помещается,
+     * а сверху места больше — открываем вверх.
+     */
+    const shouldOpenUp =
+      menuRect.height > spaceBelow &&
+      spaceAbove > spaceBelow;
+
+    if (shouldOpenUp !== openUp) {
+      setOpenUp(shouldOpenUp);
+    }
+  }, [open, showAssigneeMenu, openUp]);
+
+  /* ────────────────────────────────────────────────────────────────────── */
+  /* При scroll закрываем меню                                             */
+  /* ────────────────────────────────────────────────────────────────────── */
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleScroll = () => {
+      setOpen(false);
+      setShowAssigneeMenu(false);
+    };
+
+    window.addEventListener('scroll', handleScroll, true);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [open]);
+
+  /* ────────────────────────────────────────────────────────────────────── */
+  /* Исполнители                                                           */
+  /* ────────────────────────────────────────────────────────────────────── */
+
+  useEffect(() => {
+    if (!showAssigneeMenu || supportUsers.length > 0) {
       return;
     }
 
@@ -602,8 +525,8 @@ function TicketActions({
     usersApi
       .getAllUsers(1, 100)
       .then((res) => {
-        const staff = res.items.filter((u) =>
-          u.roles?.some((role) =>
+        const staff = res.items.filter((user) =>
+          user.roles?.some((role) =>
             [
               'admin',
               'support_agent',
@@ -618,29 +541,24 @@ function TicketActions({
       .catch(() =>
         toast({
           title: 'Ошибка',
-          description:
-            'Не удалось загрузить пользователей',
+          description: 'Не удалось загрузить пользователей',
           variant: 'destructive',
         }),
       )
       .finally(() => {
         setLoadingUsers(false);
       });
-  }, [
-    showAssigneeMenu,
-    supportUsers.length,
-    toast,
-  ]);
+  }, [showAssigneeMenu, supportUsers.length, toast]);
 
-  /* ── Archive ── */
+  /* ────────────────────────────────────────────────────────────────────── */
+  /* Архив                                                                 */
+  /* ────────────────────────────────────────────────────────────────────── */
 
   const handleArchive = async () => {
     setArchiving(true);
 
     try {
-      await ticketsApi.archiveTicket(
-        ticket.id,
-      );
+      await ticketsApi.archiveTicket(ticket.id);
 
       toast({
         title: 'Заявка архивирована',
@@ -651,11 +569,11 @@ function TicketActions({
       setShowAssigneeMenu(false);
 
       onTicketUpdated?.();
-    } catch (e: any) {
+    } catch (error: any) {
       toast({
         title: 'Ошибка',
         description:
-          e?.response?.status === 403
+          error?.response?.status === 403
             ? 'Нет прав'
             : 'Не удалось архивировать',
         variant: 'destructive',
@@ -665,11 +583,11 @@ function TicketActions({
     }
   };
 
-  /* ── Status ── */
+  /* ────────────────────────────────────────────────────────────────────── */
+  /* Статус                                                                */
+  /* ────────────────────────────────────────────────────────────────────── */
 
-  const handleStatusChange = async (
-    status: string,
-  ) => {
+  const handleStatusChange = async (status: string) => {
     setUpdatingStatus(true);
 
     try {
@@ -681,19 +599,18 @@ function TicketActions({
       toast({
         title: 'Статус обновлён',
         description:
-          STATUS_MAP[status]?.label ||
-          status,
+          STATUS_MAP[status]?.label || status,
       });
 
       setOpen(false);
       setShowAssigneeMenu(false);
 
       onTicketUpdated?.();
-    } catch (e: any) {
+    } catch (error: any) {
       toast({
         title: 'Ошибка',
         description:
-          e?.response?.status === 403
+          error?.response?.status === 403
             ? 'Нет прав'
             : 'Не удалось обновить статус',
         variant: 'destructive',
@@ -703,7 +620,9 @@ function TicketActions({
     }
   };
 
-  /* ── Assignee ── */
+  /* ────────────────────────────────────────────────────────────────────── */
+  /* Исполнитель                                                           */
+  /* ────────────────────────────────────────────────────────────────────── */
 
   const handleAssigneeChange = async (
     userId: string | null,
@@ -726,11 +645,11 @@ function TicketActions({
       setShowAssigneeMenu(false);
 
       onTicketUpdated?.();
-    } catch (e: any) {
+    } catch (error: any) {
       toast({
         title: 'Ошибка',
         description:
-          e?.response?.status === 403
+          error?.response?.status === 403
             ? 'Нет прав'
             : 'Не удалось назначить исполнителя',
         variant: 'destructive',
@@ -740,323 +659,370 @@ function TicketActions({
     }
   };
 
+  /* ────────────────────────────────────────────────────────────────────── */
+  /* Доступные переходы                                                    */
+  /* ────────────────────────────────────────────────────────────────────── */
+
   const getAvailableStatuses = (
     currentStatus: string,
   ): string[] => {
-    const transitions: Record<
-      string,
-      string[]
-    > = {
+    const transitions: Record<string, string[]> = {
       new: [
         'pending_approval',
         'canceled',
       ],
+
       pending_approval: [
         'open',
         'rejected',
       ],
-      open: ['in_progress'],
+
+      open: [
+        'in_progress',
+      ],
+
       in_progress: [
         'waiting',
         'resolved',
       ],
-      waiting: ['in_progress'],
-      resolved: ['closed'],
-      closed: ['reopened'],
-      reopened: ['open'],
-      rejected: ['closed'],
+
+      waiting: [
+        'in_progress',
+      ],
+
+      resolved: [
+        'closed',
+      ],
+
+      closed: [
+        'reopened',
+      ],
+
+      reopened: [
+        'open',
+      ],
+
+      rejected: [
+        'closed',
+      ],
     };
 
-    return (
-      transitions[currentStatus] || []
-    );
+    return transitions[currentStatus] || [];
   };
 
   const availableStatuses =
     getAvailableStatuses(ticket.status);
 
-  /* ── Portal menu ── */
+  /* ────────────────────────────────────────────────────────────────────── */
+  /* Open                                                                  */
+  /* ────────────────────────────────────────────────────────────────────── */
 
-  const menu =
-    open &&
-    createPortal(
+  const handleToggleMenu = (
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (open) {
+      setOpen(false);
+      setShowAssigneeMenu(false);
+      return;
+    }
+
+    /*
+     * Первичное определение направления.
+     *
+     * После render useEffect выше проверит
+     * уже настоящую высоту меню.
+     */
+    const rect =
+      buttonRef.current?.getBoundingClientRect();
+
+    if (rect) {
+      const spaceBelow =
+        window.innerHeight - rect.bottom;
+
+      const spaceAbove =
+        rect.top;
+
+      /*
+       * Для строки в нижней половине viewport
+       * сразу предпочтём открытие наверх,
+       * если снизу мало места.
+       */
+      setOpenUp(
+        spaceBelow < 420 &&
+        spaceAbove > spaceBelow,
+      );
+    } else {
+      setOpenUp(false);
+    }
+
+    setShowAssigneeMenu(false);
+    setOpen(true);
+  };
+
+  return (
+    <>
       <div
-        ref={menuRef}
-        className="
-          fixed z-[9999]
-          w-[280px]
-          overflow-y-auto overscroll-contain
-          rounded-xl
-          border border-[var(--border-color)]
-          bg-[var(--bg-card)]
-          shadow-2xl
-        "
-        style={{
-          top: menuPosition.top,
-          left: menuPosition.left,
-          maxHeight:
-            menuPosition.maxHeight,
-        }}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-        }}
+        ref={ref}
+        className="relative"
       >
-        {/* Tasks */}
-
-        <div className="py-1.5">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-
-              setOpen(false);
-
-              navigate(
-                `/tasks?ticket_id=${ticket.id}`,
-              );
-            }}
-            className="
-              flex w-full items-center gap-3
-              px-4 py-3
-              text-left text-sm
-              text-[var(--text-primary)]/80
-              transition-colors
-              hover:bg-[var(--hover-1)]
-            "
-          >
-            <FolderOpen
-              size={17}
-              className="shrink-0 text-[var(--text-primary)]/45"
-            />
-
-            <span>
-              Посмотреть задачи по заявке
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-
-              setOpen(false);
-
-              navigate(
-                `/tasks?ticket_id=${ticket.id}&create=1`,
-              );
-            }}
-            className="
-              flex w-full items-center gap-3
-              px-4 py-3
-              text-left text-sm
-              text-[var(--text-primary)]/80
-              transition-colors
-              hover:bg-[var(--hover-1)]
-            "
-          >
-            <Plus
-              size={17}
-              className="shrink-0 text-[var(--accent)]"
-            />
-
-            <span>
-              Создать задачу
-            </span>
-          </button>
-        </div>
-
-        <div className="mx-3 h-px bg-[var(--border-color)]" />
-
-        {/* Status */}
-
-        <div className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)]/40">
-          Изменить статус
-        </div>
-
-        <div className="px-2 pb-2">
-          {availableStatuses.length ===
-          0 ? (
-            <p className="px-2 py-2 text-sm text-[var(--text-primary)]/35">
-              Нет доступных переходов
-            </p>
-          ) : (
-            availableStatuses.map(
-              (status) => (
-                <button
-                  key={status}
-                  type="button"
-                  disabled={
-                    updatingStatus
-                  }
-                  onClick={(
-                    event,
-                  ) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-
-                    handleStatusChange(
-                      status,
-                    );
-                  }}
-                  className={`
-                    flex w-full items-center gap-3
-                    rounded-lg px-3 py-2.5
-                    text-left text-sm
-                    transition-colors
-                    disabled:opacity-50
-                    ${
-                      STATUS_MAP[status]
-                        ?.color ||
-                      'status-closed'
-                    }
-                  `}
-                >
-                  {updatingStatus ? (
-                    <Loader2
-                      size={14}
-                      className="shrink-0 animate-spin"
-                    />
-                  ) : (
-                    <ChevronRight
-                      size={14}
-                      className="shrink-0 opacity-50"
-                    />
-                  )}
-
-                  <span className="font-medium">
-                    {STATUS_MAP[status]
-                      ?.label || status}
-                  </span>
-                </button>
-              ),
-            )
-          )}
-        </div>
-
-        <div className="mx-3 h-px bg-[var(--border-color)]" />
-
-        {/* Assignee */}
+        {/* ================================================================ */}
+        {/* Троеточие */}
+        {/* ================================================================ */}
 
         <button
+          ref={buttonRef}
           type="button"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-
-            setShowAssigneeMenu(
-              (value) => !value,
-            );
-          }}
+          aria-label="Действия с заявкой"
+          aria-expanded={open}
+          onClick={handleToggleMenu}
           className="
-            flex w-full items-center
-            justify-between gap-3
-            px-4 py-3
-            text-left text-sm
-            text-[var(--text-primary)]/80
+            rounded-lg p-2
+            text-[var(--text-primary)]/90
             transition-colors
-            hover:bg-[var(--hover-1)]
+            hover:bg-[var(--hover-2)]
+            hover:text-[var(--text-primary)]
           "
         >
-          <span className="flex min-w-0 items-center gap-3">
-            <UserCheck
-              size={17}
-              className="shrink-0 text-[var(--text-primary)]/45"
-            />
-
-            <span>
-              Исполнитель
-            </span>
-          </span>
-
-          <ChevronDown
-            size={16}
-            className={`
-              shrink-0
-              text-[var(--text-primary)]/40
-              transition-transform
-              ${
-                showAssigneeMenu
-                  ? 'rotate-180'
-                  : ''
-              }
-            `}
-          />
+          <MoreVertical size={20} />
         </button>
 
-        {showAssigneeMenu && (
+        {/* ================================================================ */}
+        {/* Меню */}
+        {/* ================================================================ */}
+
+        {open && (
           <div
-            className="
-              max-h-[220px]
-              overflow-y-auto
-              border-t border-[var(--border-color)]
-              bg-[var(--hover-1)]/40
-              py-1
-            "
+            ref={menuRef}
+            className={`
+              absolute right-0 z-[500]
+              w-[270px]
+              overflow-hidden
+              rounded-xl
+              border border-[var(--border-color)]
+              bg-[var(--bg-card)]
+              shadow-2xl
+
+              ${
+                openUp
+                  ? 'bottom-full mb-2'
+                  : 'top-full mt-2'
+              }
+            `}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
           >
-            {loadingUsers ? (
-              <div className="flex justify-center py-4">
-                <Loader2
-                  size={18}
-                  className="animate-spin text-[var(--text-primary)]/40"
+            {/* ============================================================ */}
+            {/* Задачи */}
+            {/* ============================================================ */}
+
+            <div className="py-1.5">
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+
+                  setOpen(false);
+
+                  navigate(
+                    `/tasks?ticket_id=${ticket.id}`,
+                  );
+                }}
+                className="
+                  flex w-full items-center gap-3
+                  px-4 py-3
+                  text-left text-sm
+                  text-[var(--text-primary)]/80
+                  transition-colors
+                  hover:bg-[var(--hover-1)]
+                "
+              >
+                <FolderOpen
+                  size={16}
+                  className="shrink-0 text-[var(--text-primary)]/40"
                 />
-              </div>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  disabled={
-                    updatingAssignee
-                  }
-                  onClick={(
-                    event,
-                  ) => {
-                    event.preventDefault();
-                    event.stopPropagation();
 
-                    handleAssigneeChange(
-                      null,
-                    );
-                  }}
-                  className="
-                    flex w-full items-center gap-3
-                    px-4 py-2.5
-                    text-left text-sm
-                    text-[var(--text-primary)]/70
-                    transition-colors
-                    hover:bg-[var(--hover-2)]
-                    disabled:opacity-50
-                  "
-                >
-                  <X
-                    size={15}
-                    className="shrink-0 text-[var(--text-primary)]/40"
-                  />
+                <span>
+                  Посмотреть задачи по заявке
+                </span>
+              </button>
 
-                  <span>
-                    Снять исполнителя
-                  </span>
-                </button>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
 
-                {supportUsers.map(
-                  (user) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      disabled={
-                        updatingAssignee
+                  setOpen(false);
+
+                  navigate(
+                    `/tasks?ticket_id=${ticket.id}&create=1`,
+                  );
+                }}
+                className="
+                  flex w-full items-center gap-3
+                  px-4 py-3
+                  text-left text-sm
+                  text-[var(--text-primary)]/80
+                  transition-colors
+                  hover:bg-[var(--hover-1)]
+                "
+              >
+                <Plus
+                  size={16}
+                  className="shrink-0 text-[var(--accent)]"
+                />
+
+                <span>
+                  Создать задачу на основании
+                </span>
+              </button>
+            </div>
+
+            <div className="mx-3 h-px bg-[var(--border-color)]" />
+
+            {/* ============================================================ */}
+            {/* Статус */}
+            {/* ============================================================ */}
+
+            <div className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)]/40">
+              Изменить статус
+            </div>
+
+            <div className="px-2 pb-2">
+              {availableStatuses.length === 0 ? (
+                <p className="px-2 py-2 text-sm text-[var(--text-primary)]/30">
+                  Нет доступных переходов
+                </p>
+              ) : (
+                availableStatuses.map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    disabled={updatingStatus}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+
+                      handleStatusChange(status);
+                    }}
+                    className={`
+                      flex w-full items-center gap-3
+                      rounded-lg px-3 py-2.5
+                      text-left text-sm
+                      transition-colors
+                      disabled:opacity-50
+                      ${
+                        STATUS_MAP[status]?.color ||
+                        'status-closed'
                       }
-                      onClick={(
-                        event,
-                      ) => {
+                    `}
+                  >
+                    {updatingStatus ? (
+                      <Loader2
+                        size={14}
+                        className="shrink-0 animate-spin"
+                      />
+                    ) : (
+                      <ChevronRight
+                        size={14}
+                        className="shrink-0 opacity-50"
+                      />
+                    )}
+
+                    <span className="font-medium">
+                      {STATUS_MAP[status]?.label || status}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+
+            <div className="mx-3 h-px bg-[var(--border-color)]" />
+
+            {/* ============================================================ */}
+            {/* Исполнитель */}
+            {/* ============================================================ */}
+
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                setShowAssigneeMenu(
+                  (value) => !value,
+                );
+              }}
+              className="
+                flex w-full items-center
+                justify-between gap-3
+                px-4 py-3
+                text-left text-sm
+                text-[var(--text-primary)]/80
+                transition-colors
+                hover:bg-[var(--hover-1)]
+              "
+            >
+              <span className="flex min-w-0 items-center gap-3">
+                <UserCheck
+                  size={16}
+                  className="shrink-0 text-[var(--text-primary)]/40"
+                />
+
+                <span>
+                  Исполнитель
+                </span>
+              </span>
+
+              <ChevronDown
+                size={16}
+                className={`
+                  shrink-0
+                  text-[var(--text-primary)]/40
+                  transition-transform
+
+                  ${
+                    showAssigneeMenu
+                      ? 'rotate-180'
+                      : ''
+                  }
+                `}
+              />
+            </button>
+
+            {showAssigneeMenu && (
+              <div
+                className="
+                  max-h-[180px]
+                  overflow-y-auto
+                  border-t border-[var(--border-color)]
+                  bg-[var(--hover-1)]/50
+                  py-1
+                "
+              >
+                {loadingUsers ? (
+                  <div className="flex justify-center py-3">
+                    <Loader2
+                      size={16}
+                      className="animate-spin text-[var(--text-primary)]/40"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      disabled={updatingAssignee}
+                      onClick={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
 
-                        handleAssigneeChange(
-                          user.id,
-                        );
+                        handleAssigneeChange(null);
                       }}
                       className="
                         flex w-full items-center gap-3
@@ -1068,224 +1034,210 @@ function TicketActions({
                         disabled:opacity-50
                       "
                     >
-                      <User
-                        size={15}
+                      <X
+                        size={14}
                         className="shrink-0 text-[var(--text-primary)]/40"
                       />
 
-                      <span className="min-w-0 flex-1 truncate">
-                        {user.full_name ||
-                          user.username ||
-                          user.email}
+                      <span>
+                        Снять исполнителя
                       </span>
-
-                      {ticket.assignee
-                        ?.id === user.id && (
-                        <Check
-                          size={15}
-                          className="ml-auto shrink-0 text-[var(--success)]"
-                        />
-                      )}
                     </button>
-                  ),
+
+                    {supportUsers.map((staffUser) => (
+                      <button
+                        key={staffUser.id}
+                        type="button"
+                        disabled={updatingAssignee}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+
+                          handleAssigneeChange(staffUser.id);
+                        }}
+                        className="
+                          flex w-full items-center gap-3
+                          px-4 py-2.5
+                          text-left text-sm
+                          text-[var(--text-primary)]/70
+                          transition-colors
+                          hover:bg-[var(--hover-2)]
+                          disabled:opacity-50
+                        "
+                      >
+                        <User
+                          size={14}
+                          className="shrink-0 text-[var(--text-primary)]/40"
+                        />
+
+                        <span className="min-w-0 flex-1 truncate">
+                          {staffUser.full_name ||
+                            staffUser.username ||
+                            staffUser.email}
+                        </span>
+
+                        {ticket.assignee?.id === staffUser.id && (
+                          <Check
+                            size={14}
+                            className="ml-auto shrink-0 text-[var(--success)]"
+                          />
+                        )}
+                      </button>
+                    ))}
+                  </>
                 )}
-              </>
+              </div>
             )}
-          </div>
-        )}
 
-        <div className="mx-3 h-px bg-[var(--border-color)]" />
+            <div className="mx-3 h-px bg-[var(--border-color)]" />
 
-        {/* Archive */}
+            {/* ============================================================ */}
+            {/* Архив */}
+            {/* ============================================================ */}
 
-        <button
-          type="button"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-
-            setOpen(false);
-            setShowAssigneeMenu(false);
-            setShowArchiveConfirm(true);
-          }}
-          className="
-            flex w-full items-center gap-3
-            px-4 py-3
-            text-left text-sm
-            text-[var(--text-primary)]/80
-            transition-colors
-            hover:bg-amber-500/10
-            hover:text-amber-400
-          "
-        >
-          <Archive
-            size={17}
-            className="shrink-0"
-          />
-
-          <span>В архив</span>
-        </button>
-      </div>,
-      document.body,
-    );
-
-  /* ── Archive modal ── */
-
-  const archiveModal =
-    showArchiveConfirm &&
-    createPortal(
-      <div
-        className="
-          fixed inset-0 z-[10000]
-          flex items-center justify-center
-          p-4
-        "
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-
-          if (!archiving) {
-            setShowArchiveConfirm(
-              false,
-            );
-          }
-        }}
-      >
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-
-        <div
-          className="
-            relative w-full max-w-sm
-            overflow-hidden rounded-2xl
-            border border-[var(--border-color)]
-            bg-[var(--bg-card)]
-            shadow-2xl
-          "
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-        >
-          <div className="p-6 text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10">
-              <Archive className="h-6 w-6 text-amber-500" />
-            </div>
-
-            <h3 className="mb-2 text-lg font-bold text-[var(--text-primary)]">
-              Переместить в архив?
-            </h3>
-
-            <p className="text-sm text-[var(--text-primary)]/50">
-              Заявка{' '}
-              <span className="font-mono text-[var(--accent)]">
-                {ticket.number}
-              </span>{' '}
-              будет скрыта из основного
-              списка
-            </p>
-          </div>
-
-          <div className="flex border-t border-[var(--border-color)]">
             <button
               type="button"
-              disabled={archiving}
-              onClick={(
-                event,
-              ) => {
+              onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
 
-                setShowArchiveConfirm(
-                  false,
-                );
+                setOpen(false);
+                setShowAssigneeMenu(false);
+                setShowArchiveConfirm(true);
               }}
               className="
-                flex-1 py-3.5
-                text-sm font-medium
-                text-[var(--text-primary)]/60
+                flex w-full items-center gap-3
+                px-4 py-3
+                text-left text-sm
+                text-[var(--text-primary)]/80
                 transition-colors
                 hover:bg-[var(--hover-1)]
-                disabled:opacity-50
               "
             >
-              Отмена
-            </button>
+              <Archive
+                size={16}
+                className="shrink-0 text-[var(--text-primary)]/40"
+              />
 
-            <button
-              type="button"
-              disabled={archiving}
-              onClick={(
-                event,
-              ) => {
-                event.preventDefault();
-                event.stopPropagation();
-
-                handleArchive();
-              }}
-              className="
-                flex flex-1 items-center
-                justify-center gap-2
-                border-l border-[var(--border-color)]
-                py-3.5
-                text-sm font-semibold text-amber-500
-                transition-colors
-                hover:bg-amber-500/10
-                disabled:opacity-50
-              "
-            >
-              {archiving ? (
-                <Loader2
-                  size={16}
-                  className="animate-spin"
-                />
-              ) : (
-                <Archive size={16} />
-              )}
-
-              В архив
+              <span>
+                В архив
+              </span>
             </button>
           </div>
+        )}
+      </div>
+
+      {/* ================================================================== */}
+      {/* Подтверждение архива */}
+      {/* ================================================================== */}
+
+      {showArchiveConfirm && (
+        <div
+          className="
+            fixed inset-0 z-[1000]
+            flex items-center justify-center
+            p-4
+          "
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (!archiving) {
+              setShowArchiveConfirm(false);
+            }
+          }}
+        >
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+          <div
+            className="
+              relative w-full max-w-sm
+              overflow-hidden rounded-2xl
+              border border-[var(--border-color)]
+              bg-[var(--bg-card)]
+              shadow-2xl
+            "
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
+            <div className="p-6 text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10">
+                <Archive className="h-6 w-6 text-amber-500" />
+              </div>
+
+              <h3 className="mb-2 text-lg font-bold text-[var(--text-primary)]">
+                Переместить в архив?
+              </h3>
+
+              <p className="text-sm text-[var(--text-primary)]/50">
+                Заявка{' '}
+                <span className="font-mono text-[var(--accent)]">
+                  {ticket.number}
+                </span>{' '}
+                будет скрыта из основного списка
+              </p>
+            </div>
+
+            <div className="flex border-t border-[var(--border-color)]">
+              <button
+                type="button"
+                disabled={archiving}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+
+                  setShowArchiveConfirm(false);
+                }}
+                className="
+                  flex-1 py-3.5
+                  text-sm font-medium
+                  text-[var(--text-primary)]/60
+                  transition-colors
+                  hover:bg-[var(--hover-1)]
+                  disabled:opacity-50
+                "
+              >
+                Отмена
+              </button>
+
+              <button
+                type="button"
+                disabled={archiving}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+
+                  handleArchive();
+                }}
+                className="
+                  flex flex-1 items-center
+                  justify-center gap-2
+                  border-l border-[var(--border-color)]
+                  py-3.5
+                  text-sm font-semibold
+                  text-amber-500
+                  transition-colors
+                  hover:bg-amber-500/10
+                  disabled:opacity-50
+                "
+              >
+                {archiving ? (
+                  <Loader2
+                    size={16}
+                    className="animate-spin"
+                  />
+                ) : (
+                  <Archive size={16} />
+                )}
+
+                В архив
+              </button>
+            </div>
+          </div>
         </div>
-      </div>,
-      document.body,
-    );
-
-  return (
-    <>
-      <button
-        ref={buttonRef}
-        type="button"
-        aria-label="Действия с заявкой"
-        aria-expanded={open}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-
-          if (!open) {
-            /*
-             * Сначала вычисляем позицию,
-             * чтобы при первом render не было
-             * скачка из 0,0.
-             */
-            updateMenuPosition();
-          }
-
-          setOpen((value) => !value);
-          setShowAssigneeMenu(false);
-        }}
-        className="
-          rounded-lg p-2
-          text-[var(--text-primary)]/60
-          transition-colors
-          hover:bg-[var(--hover-2)]
-          hover:text-[var(--text-primary)]
-        "
-      >
-        <MoreVertical size={20} />
-      </button>
-
-      {menu}
-      {archiveModal}
+      )}
     </>
   );
 }
@@ -1961,7 +1913,7 @@ export default function TicketsPage() {
       ) : tickets.length > 0 ? (
         <>
           {/* Desktop */}
-          <div className="hidden lg:block rounded-xl border border-[var(--border-color)] overflow-hidden">
+          <div className="hidden lg:block rounded-xl border border-[var(--border-color)] relative overflow-visible">
             <TableHeader showAssigneeCol={showAssigneeCol || showReporterCol} />
             <div className="divide-y divide-[var(--border-color)]/40 px-1 py-1">
               {tickets.map(ticket => (
