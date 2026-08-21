@@ -24,7 +24,6 @@ import {
   SignalHigh,
   SignalLow,
   SignalMedium,
-  Tag,
   Trash2,
   Upload,
   User,
@@ -72,8 +71,7 @@ const PRIORITIES = [
     desc: 'Можно выполнить планово',
     icon: SignalLow,
     iconColor: 'text-emerald-400',
-    selected:
-      'border-emerald-500/50 bg-emerald-500/10',
+    selected: 'border-emerald-500/50 bg-emerald-500/10',
   },
   {
     value: 'medium',
@@ -81,8 +79,7 @@ const PRIORITIES = [
     desc: 'Обычный приоритет',
     icon: SignalMedium,
     iconColor: 'text-yellow-400',
-    selected:
-      'border-yellow-500/50 bg-yellow-500/10',
+    selected: 'border-yellow-500/50 bg-yellow-500/10',
   },
   {
     value: 'high',
@@ -90,8 +87,7 @@ const PRIORITIES = [
     desc: 'Требует внимания',
     icon: SignalHigh,
     iconColor: 'text-orange-400',
-    selected:
-      'border-orange-500/50 bg-orange-500/10',
+    selected: 'border-orange-500/50 bg-orange-500/10',
   },
   {
     value: 'critical',
@@ -99,8 +95,7 @@ const PRIORITIES = [
     desc: 'Нужна срочная реакция',
     icon: Flame,
     iconColor: 'text-red-400',
-    selected:
-      'border-red-500/50 bg-red-500/10',
+    selected: 'border-red-500/50 bg-red-500/10',
   },
 ] as const;
 
@@ -171,22 +166,26 @@ const TICKET_TYPES = [
 ] as const;
 
 /*
- * Здесь теги намеренно НЕ повторяют типы заявки.
- * Тип отвечает за характер обращения, тег — за предмет обращения.
+ * Теги описывают предмет обращения, а не его тип.
+ * Подходят для B2B/support работы с клиентами ДИО-Консалт.
  */
 const PRESET_TAGS: TicketTag[] = [
-  { name: '1С', color: '#ef4444' },
-  { name: 'Сайт', color: '#3b82f6' },
-  { name: 'API', color: '#8b5cf6' },
-  { name: 'Интеграция', color: '#6366f1' },
-  { name: 'Доступ', color: '#f59e0b' },
-  { name: 'Почта', color: '#06b6d4' },
-  { name: 'Отчёты', color: '#10b981' },
+  { name: '1С', color: '#eab308' },
+  { name: 'Доступы', color: '#3b82f6' },
+  { name: 'Интеграция', color: '#8b5cf6' },
+  { name: 'Обмен данными', color: '#06b6d4' },
+  { name: 'ЭДО', color: '#10b981' },
+  { name: 'Отчётность', color: '#14b8a6' },
+  { name: 'Печатные формы', color: '#64748b' },
+  { name: 'Настройка', color: '#0ea5e9' },
+  { name: 'Обновление', color: '#22c55e' },
   { name: 'Производительность', color: '#f97316' },
-  { name: 'Данные', color: '#14b8a6' },
-  { name: 'Документы', color: '#64748b' },
-  { name: 'Мобильное приложение', color: '#a855f7' },
-  { name: 'Безопасность', color: '#dc2626' },
+  { name: 'База данных', color: '#6366f1' },
+  { name: 'API', color: '#a855f7' },
+  { name: 'Веб-сервис', color: '#0284c7' },
+  { name: 'Права пользователей', color: '#f59e0b' },
+  { name: 'Личный кабинет', color: '#2563eb' },
+  { name: 'Импорт / экспорт', color: '#0d9488' },
 ];
 
 const CAN_SELECT_COUNTERPARTY_ROLES = [
@@ -222,7 +221,6 @@ interface DraftData {
   step: number;
   title: string;
   descriptionBlocks: DescriptionBlock[];
-
   priority: TicketPriority;
   type: TicketType;
   tags: TicketTag[];
@@ -278,7 +276,7 @@ function saveDraft(data: DraftData, key: string) {
       }),
     );
   } catch {
-    // localStorage unavailable
+    // noop
   }
 }
 
@@ -310,7 +308,7 @@ function clearDraft(key: string) {
 }
 
 // =============================================================================
-// UI components
+// Select input
 // =============================================================================
 
 function SelectSearch({
@@ -326,17 +324,15 @@ function SelectSearch({
   onChange: (value: string) => void;
   onFocus?: () => void;
 }) {
-  /*
-   * Важно: input не получает pl-* под absolute-иконку.
-   * Иконка, input и стрелка — обычные flex children.
-   * Поэтому вертикально/горизонтально иконки не должны "ехать".
-   */
   return (
     <div
       className="
-        flex min-h-[50px] w-full items-center
-        rounded-xl border border-[var(--border-color)]
+        group flex h-[52px] w-full items-center
+        overflow-hidden rounded-xl
+        border border-[var(--border-color)]
         bg-[var(--hover-1)]
+        transition-colors
+        focus-within:border-[var(--accent)]
       "
     >
       <div className="flex h-full w-12 shrink-0 items-center justify-center">
@@ -353,15 +349,23 @@ function SelectSearch({
         onChange={(event) => onChange(event.target.value)}
         onFocus={onFocus}
         className="
-          min-w-0 flex-1
-          bg-transparent py-3
+          h-full min-w-0 flex-1
+          !border-0 !bg-transparent !p-0
           text-base text-[var(--text-primary)]
-          outline-none
+          !outline-none !ring-0
           placeholder:text-[var(--text-primary)]/35
         "
+        style={{
+          border: 'none',
+          outline: 'none',
+          boxShadow: 'none',
+          background: 'transparent',
+          WebkitAppearance: 'none',
+          appearance: 'none',
+        }}
       />
 
-      <div className="flex h-full w-11 shrink-0 items-center justify-center">
+      <div className="flex h-full w-12 shrink-0 items-center justify-center">
         <ChevronDown className="h-5 w-5 text-[var(--text-primary)]/35" />
       </div>
     </div>
@@ -416,8 +420,7 @@ export default function NewTicketPage() {
   const preselectedCounterpartyId =
     searchParams.get('counterparty_id');
 
-  const preselectedProjectId =
-    searchParams.get('project_id');
+  const preselectedProjectId = searchParams.get('project_id');
 
   const currentUserId = user?.id ?? user?.user_id;
 
@@ -429,7 +432,6 @@ export default function NewTicketPage() {
   // =============================================================================
 
   const [step, setStep] = useState(draft.current?.step || 1);
-
   const [title, setTitle] = useState(draft.current?.title || '');
 
   const [descriptionBlocks, setDescriptionBlocks] =
@@ -537,6 +539,7 @@ export default function NewTicketPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiTimedOut, setAiTimedOut] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<any>(null);
+
   const [aiSuggestedTags, setAiSuggestedTags] =
     useState<TicketTag[]>([]);
 
@@ -550,10 +553,11 @@ export default function NewTicketPage() {
   descriptionRef.current = description;
 
   // =============================================================================
-  // Misc
+  // Other
   // =============================================================================
 
   const [newTagInput, setNewTagInput] = useState('');
+
   const [showCustomTagInput, setShowCustomTagInput] =
     useState(false);
 
@@ -584,7 +588,7 @@ export default function NewTicketPage() {
   );
 
   // =============================================================================
-  // Current user as reporter
+  // Reporter
   // =============================================================================
 
   const currentUserAsReporter: SimpleUser | null = currentUserId
@@ -597,10 +601,6 @@ export default function NewTicketPage() {
       }
     : null;
 
-  /*
-   * Если selectedReporter === null, инициатором считается текущий пользователь.
-   * При этом текущего пользователя не показываем второй раз в users.
-   */
   const actualReporter = selectedReporter || currentUserAsReporter;
 
   // =============================================================================
@@ -636,7 +636,6 @@ export default function NewTicketPage() {
       setGeneralFiles([]);
 
       setSelectionType(null);
-
       setSelectedCounterparty(null);
       setSelectedProject(null);
       setSelectedReporter(null);
@@ -680,8 +679,7 @@ export default function NewTicketPage() {
           tags,
           selectionType,
 
-          selectedCounterpartyId:
-            selectedCounterparty?.id || null,
+          selectedCounterpartyId: selectedCounterparty?.id || null,
 
           selectedCounterpartyName: selectedCounterparty
             ? selectedCounterparty.name ||
@@ -738,7 +736,7 @@ export default function NewTicketPage() {
   ]);
 
   // =============================================================================
-  // Restore
+  // Restore draft
   // =============================================================================
 
   useEffect(() => {
@@ -757,7 +755,10 @@ export default function NewTicketPage() {
           );
 
           setSelectedCounterparty(cp);
-          setCounterpartySearch(cp.name || cp.legal_name || '');
+
+          setCounterpartySearch(
+            cp.name || cp.legal_name || '',
+          );
         } catch {
           // noop
         }
@@ -787,6 +788,7 @@ export default function NewTicketPage() {
                 );
 
                 setSelectedCounterparty(cp);
+
                 setCounterpartySearch(
                   cp.name || cp.legal_name || '',
                 );
@@ -811,7 +813,7 @@ export default function NewTicketPage() {
   }, [canSelectCounterparty]);
 
   // =============================================================================
-  // Outside dropdown
+  // Outside click
   // =============================================================================
 
   useEffect(() => {
@@ -847,7 +849,7 @@ export default function NewTicketPage() {
   }, []);
 
   // =============================================================================
-  // Page scroll
+  // Scroll
   // =============================================================================
 
   useEffect(() => {
@@ -858,7 +860,7 @@ export default function NewTicketPage() {
   }, [step]);
 
   // =============================================================================
-  // Initial data
+  // Initial loaders
   // =============================================================================
 
   useEffect(() => {
@@ -908,7 +910,7 @@ export default function NewTicketPage() {
   ]);
 
   // =============================================================================
-  // Preselected project
+  // URL project
   // =============================================================================
 
   useEffect(() => {
@@ -940,7 +942,10 @@ export default function NewTicketPage() {
             );
 
             setSelectedCounterparty(cp);
-            setCounterpartySearch(cp.name || cp.legal_name || '');
+
+            setCounterpartySearch(
+              cp.name || cp.legal_name || '',
+            );
           } catch {
             // noop
           }
@@ -1013,8 +1018,10 @@ export default function NewTicketPage() {
           setPriority(result.suggested_priority);
         }
 
-        setTags(result.suggested_tags || []);
-
+        /*
+         * Не затираем пользовательские теги ответом AI.
+         * Просто сохраняем AI suggestions отдельно.
+         */
         setAiLoading(false);
         setAiTimedOut(false);
       })
@@ -1036,7 +1043,7 @@ export default function NewTicketPage() {
   }, [step]);
 
   // =============================================================================
-  // API loaders
+  // API
   // =============================================================================
 
   async function loadCustomerCounterparty() {
@@ -1134,10 +1141,6 @@ export default function NewTicketPage() {
     try {
       const response = await usersApi.getCustomers(cpId, 1, 100);
 
-      /*
-       * Текущего пользователя намеренно выкидываем из API-списка.
-       * Он уже присутствует первым пунктом как "Вы".
-       */
       const items: SimpleUser[] = response.items
         .map((customer) => ({
           id: customer.id,
@@ -1146,7 +1149,14 @@ export default function NewTicketPage() {
           email: customer.email,
           role: customer.role,
         }))
-        .filter((customer) => customer.id !== currentUserId);
+        .filter((customer) => customer.id !== currentUserId)
+        .filter((customer) => {
+          if (!user?.email || !customer.email) return true;
+
+          return (
+            customer.email.toLowerCase() !== user.email.toLowerCase()
+          );
+        });
 
       setUsers(items);
 
@@ -1190,7 +1200,7 @@ export default function NewTicketPage() {
   };
 
   // =============================================================================
-  // Binding
+  // Selection
   // =============================================================================
 
   const handleSelectionTypeChange = (next: SelectionType) => {
@@ -1219,6 +1229,7 @@ export default function NewTicketPage() {
   const selectCounterparty = (cp: Counterparty) => {
     setSelectedCounterparty(cp);
     setCounterpartySearch(cpName(cp));
+
     setShowCounterpartyDropdown(false);
 
     setValidationErrors((current) =>
@@ -1229,6 +1240,7 @@ export default function NewTicketPage() {
   const selectProject = async (project: Project) => {
     setSelectedProject(project);
     setProjectSearch(prjName(project));
+
     setShowProjectDropdown(false);
 
     setValidationErrors((current) =>
@@ -1256,7 +1268,8 @@ export default function NewTicketPage() {
   const toggleTag = (tag: TicketTag) => {
     setTags((current) => {
       const exists = current.some(
-        (item) => item.name.toLowerCase() === tag.name.toLowerCase(),
+        (item) =>
+          item.name.toLowerCase() === tag.name.toLowerCase(),
       );
 
       if (exists) {
@@ -1268,6 +1281,15 @@ export default function NewTicketPage() {
 
       return [...current, tag];
     });
+  };
+
+  const removeTag = (name: string) => {
+    setTags((current) =>
+      current.filter(
+        (tag) =>
+          tag.name.toLowerCase() !== name.toLowerCase(),
+      ),
+    );
   };
 
   const addCustomTag = () => {
@@ -1294,14 +1316,6 @@ export default function NewTicketPage() {
 
     setNewTagInput('');
     setShowCustomTagInput(false);
-  };
-
-  const removeTag = (name: string) => {
-    setTags((current) =>
-      current.filter(
-        (tag) => tag.name.toLowerCase() !== name.toLowerCase(),
-      ),
-    );
   };
 
   // =============================================================================
@@ -1335,11 +1349,6 @@ export default function NewTicketPage() {
       errors.push('Выберите проект');
     }
 
-    /*
-     * Инициатор обязателен.
-     * actualReporter содержит либо выбранного пользователя,
-     * либо текущего пользователя.
-     */
     if (!actualReporter?.id) {
       errors.push('Укажите инициатора');
     }
@@ -1370,7 +1379,10 @@ export default function NewTicketPage() {
           return false;
         }
 
-        if (error === 'Добавьте описание заявки' && hasDescription) {
+        if (
+          error === 'Добавьте описание заявки' &&
+          hasDescription
+        ) {
           return false;
         }
 
@@ -1416,6 +1428,7 @@ export default function NewTicketPage() {
 
     const mapped: GeneralFile[] = accepted.map((file) => ({
       id: `${file.name}_${Date.now()}_${Math.random()}`,
+
       file,
 
       preview: file.type.startsWith('image/')
@@ -1463,7 +1476,7 @@ export default function NewTicketPage() {
   };
 
   // =============================================================================
-  // Clear
+  // Clear draft
   // =============================================================================
 
   const handleClearDraft = () => {
@@ -1643,10 +1656,6 @@ export default function NewTicketPage() {
   // Derived
   // =============================================================================
 
-  /*
-   * Если поле уже содержит полное название выбранного проекта,
-   * не фильтруем список им же при повторном открытии.
-   */
   const filteredProjects = projects.filter((project) => {
     if (!projectSearch || selectedProject) return true;
 
@@ -1658,10 +1667,6 @@ export default function NewTicketPage() {
     );
   });
 
-  /*
-   * Текущий пользователь уже показывается отдельным первым пунктом.
-   * Дополнительно страхуемся от дубля по id/email.
-   */
   const filteredUsers = users.filter((item) => {
     if (item.id === currentUserId) return false;
 
@@ -1685,21 +1690,42 @@ export default function NewTicketPage() {
   });
 
   /*
-   * AI может прислать "Инцидент", "Ошибка" и т.п.
-   * Не показываем в тегах то, что совпадает с типами заявки.
+   * Не показываем AI-теги, которые:
+   * - совпадают с типами заявки;
+   * - уже выбраны;
+   * - совпадают с нашими preset-тегами (они и так ниже).
    */
-  const ticketTypeNames = new Set(
+  const typeNames = new Set(
     TICKET_TYPES.map((item) => item.value.toLowerCase()),
   );
 
-  const cleanAiTags = aiSuggestedTags.filter(
-    (tag) =>
-      !ticketTypeNames.has(tag.name.toLowerCase()) &&
-      !PRESET_TAGS.some(
+  const cleanAiTags = aiSuggestedTags.filter((tag) => {
+    const name = tag.name.trim().toLowerCase();
+
+    if (!name) return false;
+
+    if (typeNames.has(name)) return false;
+
+    if (
+      tags.some(
+        (current) =>
+          current.name.toLowerCase() === name,
+      )
+    ) {
+      return false;
+    }
+
+    if (
+      PRESET_TAGS.some(
         (preset) =>
-          preset.name.toLowerCase() === tag.name.toLowerCase(),
-      ),
-  );
+          preset.name.toLowerCase() === name,
+      )
+    ) {
+      return false;
+    }
+
+    return true;
+  });
 
   const currentPriority = PRIORITIES.find(
     (item) => item.value === priority,
@@ -1730,9 +1756,7 @@ export default function NewTicketPage() {
       ref={pageRef}
       className="mx-auto max-w-6xl px-4 pb-14 sm:px-6"
     >
-      {/* =================================================================== */}
       {/* Header */}
-      {/* =================================================================== */}
 
       <header className="mb-7">
         <button
@@ -1781,9 +1805,7 @@ export default function NewTicketPage() {
         </div>
       </header>
 
-      {/* =================================================================== */}
-      {/* Steps */}
-      {/* =================================================================== */}
+      {/* Stepper */}
 
       <div
         className="
@@ -1848,9 +1870,7 @@ export default function NewTicketPage() {
         })}
       </div>
 
-      {/* =================================================================== */}
       {/* Draft notice */}
-      {/* =================================================================== */}
 
       {hasDraft && step === 1 && title && (
         <div className="mb-5 flex items-center gap-3 rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3">
@@ -1862,9 +1882,7 @@ export default function NewTicketPage() {
         </div>
       )}
 
-      {/* =================================================================== */}
       {/* Main */}
-      {/* =================================================================== */}
 
       <main
         className="
@@ -1880,7 +1898,7 @@ export default function NewTicketPage() {
 
           {step === 1 && (
             <div className="space-y-8">
-              {/* Errors */}
+              {/* Validation */}
 
               {validationErrors.length > 0 && (
                 <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4">
@@ -1907,9 +1925,7 @@ export default function NewTicketPage() {
                 </div>
               )}
 
-              {/* =========================================================== */}
               {/* Binding */}
-              {/* =========================================================== */}
 
               {canSelectCounterparty && (
                 <section>
@@ -1919,7 +1935,7 @@ export default function NewTicketPage() {
                     </h2>
 
                     <p className="mt-1 text-base text-[var(--text-primary)]/50">
-                      К чему относится эта заявка?
+                      К чему относится заявка?
                     </p>
                   </div>
 
@@ -1950,18 +1966,18 @@ export default function NewTicketPage() {
                         `}
                       />
 
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <div className="text-base font-semibold text-[var(--text-primary)]">
                           Проект
                         </div>
 
                         <div className="text-sm text-[var(--text-primary)]/45">
-                          Связать с проектом
+                          Проект клиента
                         </div>
                       </div>
 
                       {selectionType === 'project' && (
-                        <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-amber-400" />
+                        <CheckCircle2 className="h-5 w-5 shrink-0 text-amber-400" />
                       )}
                     </button>
 
@@ -1991,18 +2007,18 @@ export default function NewTicketPage() {
                         `}
                       />
 
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <div className="text-base font-semibold text-[var(--text-primary)]">
                           Контрагент
                         </div>
 
                         <div className="text-sm text-[var(--text-primary)]/45">
-                          Связать с компанией
+                          Компания клиента
                         </div>
                       </div>
 
                       {selectionType === 'counterparty' && (
-                        <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-blue-400" />
+                        <CheckCircle2 className="h-5 w-5 shrink-0 text-blue-400" />
                       )}
                     </button>
 
@@ -2021,7 +2037,7 @@ export default function NewTicketPage() {
                     >
                       <X className="h-6 w-6 shrink-0 text-[var(--text-primary)]/45" />
 
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <div className="text-base font-semibold text-[var(--text-primary)]">
                           Без привязки
                         </div>
@@ -2032,12 +2048,10 @@ export default function NewTicketPage() {
                       </div>
 
                       {selectionType === null && (
-                        <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-[var(--text-primary)]/60" />
+                        <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--text-primary)]/60" />
                       )}
                     </button>
                   </div>
-
-                  {/* Selection + reporter */}
 
                   {selectionType !== null && (
                     <div className="mt-5 grid gap-5 lg:grid-cols-2">
@@ -2046,7 +2060,7 @@ export default function NewTicketPage() {
                       {selectionType === 'project' && (
                         <div>
                           <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
-                            Выберите проект
+                            Проект
                             <span className="ml-1 text-red-400">*</span>
                           </label>
 
@@ -2133,7 +2147,7 @@ export default function NewTicketPage() {
                       {selectionType === 'counterparty' && (
                         <div>
                           <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
-                            Выберите контрагента
+                            Контрагент
                             <span className="ml-1 text-red-400">*</span>
                           </label>
 
@@ -2153,7 +2167,6 @@ export default function NewTicketPage() {
                                 }
 
                                 setShowCounterpartyDropdown(true);
-
                                 loadCounterparties(value);
                               }}
                               onFocus={() => {
@@ -2234,12 +2247,6 @@ export default function NewTicketPage() {
                               className="relative"
                             >
                               <SelectSearch
-                                /*
-                                 * Если выбран другой пользователь,
-                                 * показываем его имя.
-                                 * Если выбран текущий — показываем имя текущего,
-                                 * а не пустое поле с отдельным "Выбран: Вы".
-                                 */
                                 value={
                                   selectedReporter
                                     ? reporterSearch
@@ -2252,12 +2259,6 @@ export default function NewTicketPage() {
                                 loading={loadingUsers}
                                 placeholder="Выберите инициатора"
                                 onChange={(value) => {
-                                  /*
-                                   * Как только пользователь начинает искать,
-                                   * очищаем явный выбор, но actualReporter
-                                   * всё ещё остаётся текущим пользователем
-                                   * до выбора другого.
-                                   */
                                   setReporterSearch(value);
 
                                   if (selectedReporter) {
@@ -2267,11 +2268,6 @@ export default function NewTicketPage() {
                                   setShowReporterDropdown(true);
                                 }}
                                 onFocus={() => {
-                                  /*
-                                   * Для поиска по списку очищаем только
-                                   * отображаемый search, если сейчас используется
-                                   * implicit current user.
-                                   */
                                   if (!selectedReporter) {
                                     setReporterSearch('');
                                   }
@@ -2287,11 +2283,13 @@ export default function NewTicketPage() {
                                       type="button"
                                       onClick={() => {
                                         setSelectedReporter(null);
+
                                         setReporterSearch(
                                           currentUserAsReporter.full_name ||
                                             currentUserAsReporter.username ||
                                             currentUserAsReporter.email,
                                         );
+
                                         setShowReporterDropdown(false);
                                       }}
                                       className="
@@ -2454,9 +2452,7 @@ export default function NewTicketPage() {
                 </div>
               </section>
 
-              {/* =========================================================== */}
               {/* Files */}
-              {/* =========================================================== */}
 
               <section>
                 <div className="mb-3 flex items-baseline justify-between gap-3">
@@ -2520,8 +2516,7 @@ export default function NewTicketPage() {
                     group flex min-h-[130px] cursor-pointer
                     items-center justify-center
                     rounded-2xl border-2 border-dashed
-                    px-6 py-6
-                    outline-none transition
+                    px-6 py-6 outline-none transition
                     ${
                       isDraggingFiles
                         ? 'border-amber-400 bg-amber-500/10'
@@ -2613,10 +2608,6 @@ export default function NewTicketPage() {
                         <button
                           type="button"
                           onClick={(event) => {
-                            /*
-                             * Не открываем file picker при клике
-                             * по удалению файла.
-                             */
                             event.stopPropagation();
                             removeGeneralFile(item.id);
                           }}
@@ -2649,7 +2640,7 @@ export default function NewTicketPage() {
                 </h2>
 
                 <p className="mt-1 text-base text-[var(--text-primary)]/50">
-                  Укажите тип, приоритет и тематику заявки
+                  Укажите тип, приоритет и теги заявки
                 </p>
               </div>
 
@@ -2783,7 +2774,7 @@ export default function NewTicketPage() {
                             setPriority(item.value as TicketPriority)
                           }
                           className={`
-                            relative flex min-h-[98px]
+                            relative flex min-h-[96px]
                             items-center gap-3
                             rounded-xl border px-4 py-4
                             text-left transition
@@ -2803,7 +2794,7 @@ export default function NewTicketPage() {
                               {item.label}
                             </p>
 
-                            <p className="mt-0.5 text-sm leading-snug text-[var(--text-primary)]/45">
+                            <p className="text-sm text-[var(--text-primary)]/45">
                               {item.desc}
                             </p>
                           </div>
@@ -2817,22 +2808,20 @@ export default function NewTicketPage() {
                   </div>
                 </section>
 
-                {/* ========================================================= */}
                 {/* Tags */}
-                {/* ========================================================= */}
 
                 <section className="mt-8 border-t border-[var(--border-color)] pt-7">
                   <div>
                     <h3 className="text-lg font-semibold text-[var(--text-primary)]">
-                      Тематика
+                      Теги
                     </h3>
 
                     <p className="mt-1 text-base text-[var(--text-primary)]/50">
-                      Что затрагивает заявка? Можно выбрать несколько вариантов.
+                      Выберите, чего касается заявка
                     </p>
                   </div>
 
-                  {/* Selected */}
+                  {/* Selected tags */}
 
                   {tags.length > 0 && (
                     <div className="mt-5">
@@ -2849,8 +2838,7 @@ export default function NewTicketPage() {
                             className="
                               inline-flex items-center gap-2
                               rounded-lg border
-                              px-3.5 py-2
-                              text-base font-medium
+                              px-3.5 py-2 text-base font-medium
                               transition hover:brightness-110
                             "
                             style={{
@@ -2862,9 +2850,9 @@ export default function NewTicketPage() {
                               }55`,
                               color: tag.color || '#cbd5e1',
                             }}
-                            title="Нажмите, чтобы убрать"
                           >
                             {tag.name}
+
                             <X className="h-4 w-4 opacity-70" />
                           </button>
                         ))}
@@ -2881,42 +2869,35 @@ export default function NewTicketPage() {
                       </p>
 
                       <div className="flex flex-wrap gap-2">
-                        {cleanAiTags
-                          .filter(
-                            (tag) =>
-                              !tags.some(
-                                (current) =>
-                                  current.name.toLowerCase() ===
-                                  tag.name.toLowerCase(),
-                              ),
-                          )
-                          .map((tag) => (
-                            <button
-                              key={tag.name}
-                              type="button"
-                              onClick={() => toggleTag(tag)}
-                              className="
-                                inline-flex items-center gap-2
-                                rounded-lg border border-amber-500/30
-                                bg-amber-500/[0.06]
-                                px-3.5 py-2
-                                text-base text-amber-300
-                                transition hover:bg-amber-500/10
-                              "
-                            >
-                              <Plus className="h-4 w-4" />
-                              {tag.name}
-                            </button>
-                          ))}
+                        {cleanAiTags.map((tag) => (
+                          <button
+                            key={tag.name}
+                            type="button"
+                            onClick={() => toggleTag(tag)}
+                            className="
+                              inline-flex items-center gap-2
+                              rounded-lg
+                              border border-amber-500/30
+                              bg-amber-500/[0.06]
+                              px-3.5 py-2 text-base
+                              text-amber-300
+                              transition
+                              hover:bg-amber-500/10
+                            "
+                          >
+                            <Plus className="h-4 w-4" />
+                            {tag.name}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Available */}
+                  {/* Presets */}
 
                   <div className="mt-5">
                     <p className="mb-2 text-sm font-medium text-[var(--text-primary)]/55">
-                      Добавить тематику
+                      Доступные теги
                     </p>
 
                     <div className="flex flex-wrap gap-2">
@@ -2934,10 +2915,11 @@ export default function NewTicketPage() {
                           onClick={() => toggleTag(tag)}
                           className="
                             inline-flex items-center gap-2
-                            rounded-lg border border-[var(--border-color)]
+                            rounded-lg
+                            border border-[var(--border-color)]
                             bg-[var(--hover-1)]
-                            px-3.5 py-2
-                            text-base text-[var(--text-primary)]/70
+                            px-3.5 py-2 text-base
+                            text-[var(--text-primary)]/70
                             transition
                             hover:bg-[var(--hover-2)]
                             hover:text-[var(--text-primary)]
@@ -2950,9 +2932,7 @@ export default function NewTicketPage() {
 
                       <button
                         type="button"
-                        onClick={() =>
-                          setShowCustomTagInput(true)
-                        }
+                        onClick={() => setShowCustomTagInput(true)}
                         className="
                           inline-flex items-center gap-2
                           rounded-lg border border-dashed
@@ -2989,7 +2969,7 @@ export default function NewTicketPage() {
                             setShowCustomTagInput(false);
                           }
                         }}
-                        placeholder="Например: касса, ЭДО, телефония..."
+                        placeholder="Название тега"
                         className="input-field min-w-0 flex-1 py-3 text-base"
                       />
 
@@ -2999,8 +2979,7 @@ export default function NewTicketPage() {
                         onClick={addCustomTag}
                         className="
                           rounded-xl bg-[var(--accent)]
-                          px-5 py-3
-                          text-base font-medium text-white
+                          px-5 py-3 text-base font-medium text-white
                           disabled:opacity-40
                         "
                       >
@@ -3036,13 +3015,11 @@ export default function NewTicketPage() {
                 </h2>
 
                 <p className="mt-1 text-base text-[var(--text-primary)]/50">
-                  Проверьте основные данные перед отправкой
+                  Проверьте данные перед отправкой
                 </p>
               </div>
 
-              {/* =========================================================== */}
-              {/* Main information */}
-              {/* =========================================================== */}
+              {/* Main data */}
 
               <section>
                 <div className="mb-4 flex items-center justify-between gap-4">
@@ -3053,17 +3030,16 @@ export default function NewTicketPage() {
                   <button
                     type="button"
                     onClick={() => setStep(1)}
-                    className="
-                      text-sm font-medium text-[var(--accent)]
-                      transition hover:opacity-80
-                    "
+                    className="text-sm font-medium text-[var(--accent)] hover:opacity-80"
                   >
                     Изменить
                   </button>
                 </div>
 
-                <div className="rounded-xl border border-[var(--border-color)]">
-                  <div className="grid gap-5 border-b border-[var(--border-color)] p-5 md:grid-cols-2">
+                <div className="overflow-hidden rounded-xl border border-[var(--border-color)]">
+                  <div className="grid gap-6 border-b border-[var(--border-color)] p-5 md:grid-cols-2">
+                    {/* Binding */}
+
                     <div>
                       <p className="mb-2 text-sm text-[var(--text-primary)]/45">
                         Привязка
@@ -3071,7 +3047,7 @@ export default function NewTicketPage() {
 
                       {selectedProject ? (
                         <div className="flex items-center gap-3">
-                          <FolderOpen className="h-5 w-5 shrink-0 text-amber-400" />
+                          <FolderOpen className="h-5 w-5 text-amber-400" />
 
                           <div>
                             <p className="text-base font-medium text-[var(--text-primary)]">
@@ -3085,19 +3061,19 @@ export default function NewTicketPage() {
                         </div>
                       ) : selectedCounterparty ? (
                         <div className="flex items-center gap-3">
-                          <Building2 className="h-5 w-5 shrink-0 text-blue-400" />
+                          <Building2 className="h-5 w-5 text-blue-400" />
 
-                          <p className="text-base font-medium text-[var(--text-primary)]">
+                          <span className="text-base font-medium text-[var(--text-primary)]">
                             {cpName(selectedCounterparty)}
-                          </p>
+                          </span>
                         </div>
                       ) : isCustomer && customerCounterparty ? (
                         <div className="flex items-center gap-3">
-                          <Building2 className="h-5 w-5 shrink-0 text-blue-400" />
+                          <Building2 className="h-5 w-5 text-blue-400" />
 
-                          <p className="text-base font-medium text-[var(--text-primary)]">
+                          <span className="text-base font-medium text-[var(--text-primary)]">
                             {cpName(customerCounterparty)}
-                          </p>
+                          </span>
                         </div>
                       ) : (
                         <p className="text-base text-[var(--text-primary)]/60">
@@ -3106,13 +3082,15 @@ export default function NewTicketPage() {
                       )}
                     </div>
 
+                    {/* Reporter */}
+
                     <div>
                       <p className="mb-2 text-sm text-[var(--text-primary)]/45">
                         Инициатор
                       </p>
 
                       <div className="flex items-center gap-3">
-                        <User className="h-5 w-5 shrink-0 text-emerald-400" />
+                        <User className="h-5 w-5 text-emerald-400" />
 
                         <div>
                           <p className="text-base font-medium text-[var(--text-primary)]">
@@ -3131,16 +3109,16 @@ export default function NewTicketPage() {
                     </div>
                   </div>
 
-                  {/* Subject + description now form one logical unit */}
+                  {/* Ticket content */}
 
                   <div className="p-5">
-                    <p className="mb-2 text-sm text-[var(--text-primary)]/45">
+                    <p className="text-sm text-[var(--text-primary)]/45">
                       Тема
                     </p>
 
-                    <p className="text-lg font-semibold text-[var(--text-primary)]">
+                    <h4 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
                       {title || '—'}
-                    </p>
+                    </h4>
 
                     <div className="my-5 border-t border-[var(--border-color)]" />
 
@@ -3178,8 +3156,7 @@ export default function NewTicketPage() {
                               alt="Вложение"
                               className="
                                 max-h-[420px] max-w-full
-                                rounded-xl
-                                border border-[var(--border-color)]
+                                rounded-xl border border-[var(--border-color)]
                                 object-contain
                               "
                             />
@@ -3193,12 +3170,10 @@ export default function NewTicketPage() {
                 </div>
               </section>
 
-              {/* =========================================================== */}
               {/* Classification */}
-              {/* =========================================================== */}
 
               <section className="mt-8">
-                <div className="mb-4 flex items-center justify-between gap-4">
+                <div className="mb-4 flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-[var(--text-primary)]">
                     Классификация
                   </h3>
@@ -3206,10 +3181,7 @@ export default function NewTicketPage() {
                   <button
                     type="button"
                     onClick={() => setStep(2)}
-                    className="
-                      text-sm font-medium text-[var(--accent)]
-                      transition hover:opacity-80
-                    "
+                    className="text-sm font-medium text-[var(--accent)] hover:opacity-80"
                   >
                     Изменить
                   </button>
@@ -3219,7 +3191,7 @@ export default function NewTicketPage() {
                   <div className="grid gap-6 sm:grid-cols-2">
                     <div>
                       <p className="mb-2 text-sm text-[var(--text-primary)]/45">
-                        Тип заявки
+                        Тип
                       </p>
 
                       {currentType && (
@@ -3259,7 +3231,7 @@ export default function NewTicketPage() {
                       <div className="my-5 border-t border-[var(--border-color)]" />
 
                       <p className="mb-3 text-sm text-[var(--text-primary)]/45">
-                        Тематика
+                        Теги
                       </p>
 
                       <div className="flex flex-wrap gap-2">
@@ -3283,9 +3255,7 @@ export default function NewTicketPage() {
                 </div>
               </section>
 
-              {/* =========================================================== */}
-              {/* Files review */}
-              {/* =========================================================== */}
+              {/* Files */}
 
               {generalFiles.length > 0 && (
                 <section className="mt-8">
@@ -3320,9 +3290,7 @@ export default function NewTicketPage() {
           )}
         </div>
 
-        {/* ================================================================= */}
         {/* Navigation */}
-        {/* ================================================================= */}
 
         <footer
           className="
@@ -3383,7 +3351,6 @@ export default function NewTicketPage() {
                 px-7 py-3
                 text-base font-semibold text-white
                 transition hover:brightness-110
-                disabled:cursor-not-allowed
                 disabled:opacity-50
               "
             >
