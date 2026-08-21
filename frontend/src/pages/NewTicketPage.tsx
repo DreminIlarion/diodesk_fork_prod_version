@@ -355,9 +355,7 @@ function SelectSearch({
         }}
       />
 
-      <div className="flex h-full w-12 shrink-0 items-center justify-center">
-        <ChevronDown className="h-5 w-5 text-[var(--text-primary)]/35" />
-      </div>
+      
     </div>
   );
 }
@@ -2020,7 +2018,7 @@ export default function NewTicketPage() {
                         rounded-xl border px-4 text-left transition
                         ${
                           selectionType === null
-                            ? 'border-[var(--text-primary)]/30 bg-[var(--hover-2)]'
+                            ? 'border-[var(--text-primary)]/50 bg-[var(--hover-2)]'
                             : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'
                         }
                       `}
@@ -2372,7 +2370,7 @@ export default function NewTicketPage() {
               {isCustomer && customerCounterparty && (
                 <section>
                   <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
-                    Организация
+                    Контрагент
                   </label>
 
                   <div className="flex items-center gap-3 text-base text-[var(--text-primary)]">
