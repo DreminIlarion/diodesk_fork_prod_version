@@ -165,27 +165,17 @@ const TICKET_TYPES = [
   },
 ] as const;
 
-/*
- * Теги описывают предмет обращения, а не его тип.
- * Подходят для B2B/support работы с клиентами ДИО-Консалт.
- */
+//теги
 const PRESET_TAGS: TicketTag[] = [
-  { name: '1С', color: '#eab308' },
-  { name: 'Доступы', color: '#3b82f6' },
-  { name: 'Интеграция', color: '#8b5cf6' },
-  { name: 'Обмен данными', color: '#06b6d4' },
-  { name: 'ЭДО', color: '#10b981' },
-  { name: 'Отчётность', color: '#14b8a6' },
-  { name: 'Печатные формы', color: '#64748b' },
-  { name: 'Настройка', color: '#0ea5e9' },
-  { name: 'Обновление', color: '#22c55e' },
-  { name: 'Производительность', color: '#f97316' },
-  { name: 'База данных', color: '#6366f1' },
-  { name: 'API', color: '#a855f7' },
-  { name: 'Веб-сервис', color: '#0284c7' },
-  { name: 'Права пользователей', color: '#f59e0b' },
-  { name: 'Личный кабинет', color: '#2563eb' },
-  { name: 'Импорт / экспорт', color: '#0d9488' },
+  { name: 'Ошибка', color: '#ea580c' },
+  { name: 'Доработка', color: '#059669' },
+  { name: 'Интеграция', color: '#2563eb' },
+  { name: 'Обучение', color: '#16a34a' },
+
+  { name: 'Доступы', color: '#ca8a04' },
+  { name: 'Отчёты', color: '#0891b2' },
+  { name: 'Обмен данными', color: '#7c3aed' },
+  { name: 'Настройка', color: '#64748b' },
 ];
 
 const CAN_SELECT_COUNTERPARTY_ROLES = [
