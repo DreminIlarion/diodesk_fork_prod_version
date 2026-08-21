@@ -35,7 +35,7 @@ class TaskAuthZService:
         return auth_policy.check()
 
     async def can_edit_task(self, subject: Subject, task: Task) -> PermissionResult:
-        rules = [IsAdminRule(subject), TaskEditingRule(subject, task)]
+        rules = [IsAdminRule(subject), IsStaffRule(subject), TaskEditingRule(subject, task)]
 
         if task.project_id is not None:
             project_member = await self.project_membership_repo.find(task.project_id, subject.id)
