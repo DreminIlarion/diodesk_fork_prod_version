@@ -80,6 +80,7 @@ ALLOWED_EDIT_STATUSES: set[TaskStatus] = {
     TaskStatus.BLOCKED,
     TaskStatus.TO_FIX,
     TaskStatus.TO_TEST,
+    TaskStatus.TO_REVIEW, 
 }
 
 # Разрешённые статусы для назначения задачи
