@@ -69,38 +69,38 @@ const PRIORITIES = [
   {
     value: 'low',
     label: 'Низкий',
-    desc: 'Плановый порядок',
+    desc: 'Можно выполнить планово',
     icon: SignalLow,
-    color: 'text-emerald-400',
+    iconColor: 'text-emerald-400',
     selected:
-      'border-emerald-500/50 bg-emerald-500/10 ring-1 ring-emerald-500/20',
+      'border-emerald-500/50 bg-emerald-500/10',
   },
   {
     value: 'medium',
     label: 'Средний',
-    desc: 'Стандартный',
+    desc: 'Обычный приоритет',
     icon: SignalMedium,
-    color: 'text-yellow-400',
+    iconColor: 'text-yellow-400',
     selected:
-      'border-yellow-500/50 bg-yellow-500/10 ring-1 ring-yellow-500/20',
+      'border-yellow-500/50 bg-yellow-500/10',
   },
   {
     value: 'high',
     label: 'Высокий',
     desc: 'Требует внимания',
     icon: SignalHigh,
-    color: 'text-orange-400',
+    iconColor: 'text-orange-400',
     selected:
-      'border-orange-500/50 bg-orange-500/10 ring-1 ring-orange-500/20',
+      'border-orange-500/50 bg-orange-500/10',
   },
   {
     value: 'critical',
     label: 'Критический',
-    desc: 'Немедленно',
+    desc: 'Нужна срочная реакция',
     icon: Flame,
-    color: 'text-red-400',
+    iconColor: 'text-red-400',
     selected:
-      'border-red-500/50 bg-red-500/10 ring-1 ring-red-500/20',
+      'border-red-500/50 bg-red-500/10',
   },
 ] as const;
 
@@ -143,7 +143,7 @@ const TICKET_TYPES = [
   {
     value: 'Проблема',
     label: 'Проблема',
-    desc: 'Корневая причина',
+    desc: 'Поиск корневой причины',
     icon: AlertTriangle,
     color: 'text-yellow-400',
   },
@@ -157,7 +157,7 @@ const TICKET_TYPES = [
   {
     value: 'Улучшение',
     label: 'Улучшение',
-    desc: 'Предложение по улучшению',
+    desc: 'Улучшение функциональности',
     icon: Zap,
     color: 'text-emerald-400',
   },
@@ -170,14 +170,23 @@ const TICKET_TYPES = [
   },
 ] as const;
 
-const PRESET_TAGS = [
-  { name: 'Инцидент', color: '#dc2626' },
-  { name: 'Консультация', color: '#2563eb' },
-  { name: 'Доработка', color: '#059669' },
-  { name: 'Ошибка', color: '#ea580c' },
-  { name: 'Интеграция', color: '#2563eb' },
-  { name: 'Обучение', color: '#059669' },
-  { name: 'Срочное', color: '#dc2626' },
+/*
+ * Здесь теги намеренно НЕ повторяют типы заявки.
+ * Тип отвечает за характер обращения, тег — за предмет обращения.
+ */
+const PRESET_TAGS: TicketTag[] = [
+  { name: '1С', color: '#ef4444' },
+  { name: 'Сайт', color: '#3b82f6' },
+  { name: 'API', color: '#8b5cf6' },
+  { name: 'Интеграция', color: '#6366f1' },
+  { name: 'Доступ', color: '#f59e0b' },
+  { name: 'Почта', color: '#06b6d4' },
+  { name: 'Отчёты', color: '#10b981' },
+  { name: 'Производительность', color: '#f97316' },
+  { name: 'Данные', color: '#14b8a6' },
+  { name: 'Документы', color: '#64748b' },
+  { name: 'Мобильное приложение', color: '#a855f7' },
+  { name: 'Безопасность', color: '#dc2626' },
 ];
 
 const CAN_SELECT_COUNTERPARTY_ROLES = [
@@ -213,6 +222,7 @@ interface DraftData {
   step: number;
   title: string;
   descriptionBlocks: DescriptionBlock[];
+
   priority: TicketPriority;
   type: TicketType;
   tags: TicketTag[];
@@ -237,10 +247,10 @@ interface DraftData {
 }
 
 // =============================================================================
-// Draft helpers
+// Draft
 // =============================================================================
 
-function getDraftKey(userId: string | undefined): string {
+function getDraftKey(userId: string | undefined) {
   return userId
     ? `new_ticket_draft:${userId}`
     : 'new_ticket_draft:anonymous';
@@ -248,7 +258,7 @@ function getDraftKey(userId: string | undefined): string {
 
 function saveDraft(data: DraftData, key: string) {
   try {
-    const descriptionBlocks = data.descriptionBlocks.map((block) => {
+    const cleanBlocks = data.descriptionBlocks.map((block) => {
       if (block.type === 'image') {
         return {
           id: block.id,
@@ -264,11 +274,11 @@ function saveDraft(data: DraftData, key: string) {
       key,
       JSON.stringify({
         ...data,
-        descriptionBlocks,
+        descriptionBlocks: cleanBlocks,
       }),
     );
   } catch {
-    // localStorage может быть недоступен
+    // localStorage unavailable
   }
 }
 
@@ -300,25 +310,36 @@ function clearDraft(key: string) {
 }
 
 // =============================================================================
-// Small UI
+// UI components
 // =============================================================================
 
-function SearchInput({
+function SelectSearch({
   value,
-  onChange,
-  onFocus,
   placeholder,
   loading,
+  onChange,
+  onFocus,
 }: {
   value: string;
-  onChange: (value: string) => void;
-  onFocus?: () => void;
   placeholder: string;
   loading?: boolean;
+  onChange: (value: string) => void;
+  onFocus?: () => void;
 }) {
+  /*
+   * Важно: input не получает pl-* под absolute-иконку.
+   * Иконка, input и стрелка — обычные flex children.
+   * Поэтому вертикально/горизонтально иконки не должны "ехать".
+   */
   return (
-    <div className="relative flex items-center">
-      <div className="pointer-events-none absolute left-4 z-10 flex items-center">
+    <div
+      className="
+        flex min-h-[50px] w-full items-center
+        rounded-xl border border-[var(--border-color)]
+        bg-[var(--hover-1)]
+      "
+    >
+      <div className="flex h-full w-12 shrink-0 items-center justify-center">
         {loading ? (
           <Loader2 className="h-5 w-5 animate-spin text-[var(--text-primary)]/45" />
         ) : (
@@ -328,13 +349,21 @@ function SearchInput({
 
       <input
         value={value}
+        placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
         onFocus={onFocus}
-        placeholder={placeholder}
-        className="input-field w-full py-3.5 pl-12 pr-11 text-base"
+        className="
+          min-w-0 flex-1
+          bg-transparent py-3
+          text-base text-[var(--text-primary)]
+          outline-none
+          placeholder:text-[var(--text-primary)]/35
+        "
       />
 
-      <ChevronDown className="pointer-events-none absolute right-4 h-5 w-5 text-[var(--text-primary)]/35" />
+      <div className="flex h-full w-11 shrink-0 items-center justify-center">
+        <ChevronDown className="h-5 w-5 text-[var(--text-primary)]/35" />
+      </div>
     </div>
   );
 }
@@ -348,8 +377,8 @@ function Dropdown({
     <div
       className="
         absolute left-0 right-0 top-full z-50 mt-2
-        max-h-80 overflow-y-auto rounded-xl
-        border border-[var(--border-color)]
+        max-h-80 overflow-y-auto
+        rounded-xl border border-[var(--border-color)]
         bg-[var(--bg-primary)]
         p-1.5 shadow-2xl
       "
@@ -365,22 +394,24 @@ function DropdownEmpty({
   children: React.ReactNode;
 }) {
   return (
-    <div className="px-4 py-7 text-center text-base text-[var(--text-primary)]/40">
+    <div className="px-4 py-7 text-center text-base text-[var(--text-primary)]/45">
       {children}
     </div>
   );
 }
 
 // =============================================================================
-// Page
+// Component
 // =============================================================================
 
 export default function NewTicketPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
   const { user } = useAuthStore();
 
   const pageRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const preselectedCounterpartyId =
     searchParams.get('counterparty_id');
@@ -389,19 +420,17 @@ export default function NewTicketPage() {
     searchParams.get('project_id');
 
   const currentUserId = user?.id ?? user?.user_id;
-  const draftKey = getDraftKey(currentUserId);
 
+  const draftKey = getDraftKey(currentUserId);
   const draft = useRef(loadDraft(draftKey));
 
   // =============================================================================
-  // Main state
+  // Main
   // =============================================================================
 
   const [step, setStep] = useState(draft.current?.step || 1);
 
-  const [title, setTitle] = useState(
-    draft.current?.title || '',
-  );
+  const [title, setTitle] = useState(draft.current?.title || '');
 
   const [descriptionBlocks, setDescriptionBlocks] =
     useState<DescriptionBlock[]>(
@@ -418,133 +447,101 @@ export default function NewTicketPage() {
 
   const description = serializeBlocks(descriptionBlocks);
 
-  const [priority, setPriority] =
-    useState<TicketPriority>(
-      draft.current?.priority || 'medium',
-    );
+  const [priority, setPriority] = useState<TicketPriority>(
+    draft.current?.priority || 'medium',
+  );
 
-  const [type, setType] =
-    useState<TicketType>(
-      draft.current?.type || 'Инцидент',
-    );
+  const [type, setType] = useState<TicketType>(
+    draft.current?.type || 'Инцидент',
+  );
 
   const [tags, setTags] = useState<TicketTag[]>(
     draft.current?.tags || [],
   );
 
-  const [generalFiles, setGeneralFiles] =
-    useState<GeneralFile[]>([]);
-
-  const [isDraggingFiles, setIsDraggingFiles] =
-    useState(false);
-
   const [validationErrors, setValidationErrors] =
     useState<string[]>([]);
 
-  const [hasDraft, setHasDraft] =
-    useState(Boolean(draft.current));
+  const [hasDraft, setHasDraft] = useState(Boolean(draft.current));
 
   // =============================================================================
-  // Binding state
+  // Files
   // =============================================================================
 
-  const [
-    customerCounterparty,
-    setCustomerCounterparty,
-  ] = useState<Counterparty | null>(null);
+  const [generalFiles, setGeneralFiles] = useState<GeneralFile[]>([]);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
 
-  const [selectionType, setSelectionType] =
-    useState<SelectionType>(
-      draft.current?.selectionType ?? null,
-    );
+  // =============================================================================
+  // Binding
+  // =============================================================================
 
-  const [
-    selectedCounterparty,
-    setSelectedCounterparty,
-  ] = useState<Counterparty | null>(null);
+  const [customerCounterparty, setCustomerCounterparty] =
+    useState<Counterparty | null>(null);
+
+  const [selectionType, setSelectionType] = useState<SelectionType>(
+    draft.current?.selectionType ?? null,
+  );
+
+  const [selectedCounterparty, setSelectedCounterparty] =
+    useState<Counterparty | null>(null);
 
   const [counterparties, setCounterparties] =
     useState<Counterparty[]>([]);
 
-  const [
-    counterpartySearch,
-    setCounterpartySearch,
-  ] = useState(
+  const [counterpartySearch, setCounterpartySearch] = useState(
     draft.current?.counterpartySearch || '',
   );
 
-  const [
-    showCounterpartyDropdown,
-    setShowCounterpartyDropdown,
-  ] = useState(false);
+  const [showCounterpartyDropdown, setShowCounterpartyDropdown] =
+    useState(false);
 
-  const [
-    loadingCounterparties,
-    setLoadingCounterparties,
-  ] = useState(false);
+  const [loadingCounterparties, setLoadingCounterparties] =
+    useState(false);
 
-  const [projects, setProjects] =
-    useState<Project[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   const [selectedProject, setSelectedProject] =
     useState<Project | null>(null);
 
-  const [projectSearch, setProjectSearch] =
-    useState(
-      draft.current?.projectSearch || '',
-    );
+  const [projectSearch, setProjectSearch] = useState(
+    draft.current?.projectSearch || '',
+  );
 
-  const [
-    showProjectDropdown,
-    setShowProjectDropdown,
-  ] = useState(false);
-
-  const [loadingProjects, setLoadingProjects] =
+  const [showProjectDropdown, setShowProjectDropdown] =
     useState(false);
+
+  const [loadingProjects, setLoadingProjects] = useState(false);
 
   // =============================================================================
   // Reporter
   // =============================================================================
 
-  const [users, setUsers] =
-    useState<SimpleUser[]>([]);
+  const [users, setUsers] = useState<SimpleUser[]>([]);
 
   const [selectedReporter, setSelectedReporter] =
     useState<SimpleUser | null>(null);
 
-  const [reporterSearch, setReporterSearch] =
-    useState(
-      draft.current?.reporterSearch || '',
-    );
+  const [reporterSearch, setReporterSearch] = useState(
+    draft.current?.reporterSearch || '',
+  );
 
-  const [
-    showReporterDropdown,
-    setShowReporterDropdown,
-  ] = useState(false);
-
-  const [loadingUsers, setLoadingUsers] =
+  const [showReporterDropdown, setShowReporterDropdown] =
     useState(false);
+
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   // =============================================================================
   // AI
   // =============================================================================
 
-  const [aiLoading, setAiLoading] =
-    useState(false);
-
-  const [aiTimedOut, setAiTimedOut] =
-    useState(false);
-
-  const [aiSuggestion, setAiSuggestion] =
-    useState<any>(null);
-
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiTimedOut, setAiTimedOut] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<any>(null);
   const [aiSuggestedTags, setAiSuggestedTags] =
     useState<TicketTag[]>([]);
 
   const aiDoneRef = useRef(false);
-
-  const aiAbortRef =
-    useRef<AbortController | null>(null);
+  const aiAbortRef = useRef<AbortController | null>(null);
 
   const titleRef = useRef(title);
   const descriptionRef = useRef(description);
@@ -556,68 +553,68 @@ export default function NewTicketPage() {
   // Misc
   // =============================================================================
 
-  const [newTagInput, setNewTagInput] =
-    useState('');
-
-  const [
-    showCustomTagInput,
-    setShowCustomTagInput,
-  ] = useState(false);
-
-  const [submitting, setSubmitting] =
+  const [newTagInput, setNewTagInput] = useState('');
+  const [showCustomTagInput, setShowCustomTagInput] =
     useState(false);
 
-  const counterpartyDropdownRef =
-    useRef<HTMLDivElement>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const projectDropdownRef =
-    useRef<HTMLDivElement>(null);
-
-  const reporterDropdownRef =
-    useRef<HTMLDivElement>(null);
+  const counterpartyDropdownRef = useRef<HTMLDivElement>(null);
+  const projectDropdownRef = useRef<HTMLDivElement>(null);
+  const reporterDropdownRef = useRef<HTMLDivElement>(null);
 
   const isCustomer =
     user?.roles?.some(
-      (role) =>
-        role === 'customer' ||
-        role === 'customer_admin',
+      (role) => role === 'customer' || role === 'customer_admin',
     ) ?? false;
 
   const canSelectCounterparty =
     (!isCustomer &&
       user?.roles?.some((role) =>
-        CAN_SELECT_COUNTERPARTY_ROLES.includes(
-          role,
-        ),
+        CAN_SELECT_COUNTERPARTY_ROLES.includes(role),
       )) ??
     false;
 
   const canSelectReporter = !isCustomer;
 
-  const hasDescription =
-    descriptionBlocks.some(
-      (block) =>
-        (block.type === 'text' &&
-          block.value.trim().length > 0) ||
-        (block.type === 'image' &&
-          block.localFile),
-    );
+  const hasDescription = descriptionBlocks.some(
+    (block) =>
+      (block.type === 'text' && block.value.trim().length > 0) ||
+      (block.type === 'image' && block.localFile),
+  );
 
   // =============================================================================
-  // User change
+  // Current user as reporter
   // =============================================================================
 
-  const prevUserIdRef =
-    useRef<string | undefined>(currentUserId);
+  const currentUserAsReporter: SimpleUser | null = currentUserId
+    ? {
+        id: currentUserId,
+        username: user?.username || '',
+        full_name: user?.full_name || null,
+        email: user?.email || '',
+        role: user?.role,
+      }
+    : null;
+
+  /*
+   * Если selectedReporter === null, инициатором считается текущий пользователь.
+   * При этом текущего пользователя не показываем второй раз в users.
+   */
+  const actualReporter = selectedReporter || currentUserAsReporter;
+
+  // =============================================================================
+  // User switch
+  // =============================================================================
+
+  const prevUserIdRef = useRef<string | undefined>(currentUserId);
 
   useEffect(() => {
     if (
       prevUserIdRef.current !== undefined &&
       prevUserIdRef.current !== currentUserId
     ) {
-      clearDraft(
-        getDraftKey(prevUserIdRef.current),
-      );
+      clearDraft(getDraftKey(prevUserIdRef.current));
 
       draft.current = null;
 
@@ -639,6 +636,7 @@ export default function NewTicketPage() {
       setGeneralFiles([]);
 
       setSelectionType(null);
+
       setSelectedCounterparty(null);
       setSelectedProject(null);
       setSelectedReporter(null);
@@ -662,79 +660,63 @@ export default function NewTicketPage() {
   // =============================================================================
 
   const draftSaveTimerRef =
-    useRef<ReturnType<typeof setTimeout> | null>(
-      null,
-    );
+    useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (draftSaveTimerRef.current) {
-      clearTimeout(
-        draftSaveTimerRef.current,
-      );
+      clearTimeout(draftSaveTimerRef.current);
     }
 
-    draftSaveTimerRef.current = setTimeout(
-      () => {
-        if (!currentUserId) return;
+    draftSaveTimerRef.current = setTimeout(() => {
+      if (!currentUserId) return;
 
-        saveDraft(
-          {
-            step,
-            title,
-            descriptionBlocks,
-            priority,
-            type,
-            tags,
+      saveDraft(
+        {
+          step,
+          title,
+          descriptionBlocks,
+          priority,
+          type,
+          tags,
+          selectionType,
 
-            selectionType,
+          selectedCounterpartyId:
+            selectedCounterparty?.id || null,
 
-            selectedCounterpartyId:
-              selectedCounterparty?.id || null,
+          selectedCounterpartyName: selectedCounterparty
+            ? selectedCounterparty.name ||
+              selectedCounterparty.legal_name ||
+              ''
+            : null,
 
-            selectedCounterpartyName:
-              selectedCounterparty
-                ? selectedCounterparty.name ||
-                  selectedCounterparty.legal_name ||
-                  ''
-                : null,
+          selectedProjectId: selectedProject?.id || null,
 
-            selectedProjectId:
-              selectedProject?.id || null,
+          selectedProjectName: selectedProject
+            ? `${selectedProject.key} - ${selectedProject.name}`
+            : null,
 
-            selectedProjectName:
-              selectedProject
-                ? `${selectedProject.key} - ${selectedProject.name}`
-                : null,
+          selectedReporterId: selectedReporter?.id || null,
 
-            selectedReporterId:
-              selectedReporter?.id || null,
+          selectedReporterName: selectedReporter
+            ? selectedReporter.full_name || selectedReporter.username
+            : null,
 
-            selectedReporterName:
-              selectedReporter
-                ? selectedReporter.full_name ||
-                  selectedReporter.username
-                : null,
+          counterpartySearch,
+          projectSearch,
+          reporterSearch,
 
-            counterpartySearch,
-            projectSearch,
-            reporterSearch,
+          savedAt: Date.now(),
+          userId: currentUserId,
+        },
+        draftKey,
+      );
 
-            savedAt: Date.now(),
-            userId: currentUserId,
-          },
-          draftKey,
-        );
-
-        setHasDraft(true);
-      },
-      500,
-    );
+      setHasDraft(true);
+    }, 500);
 
     return () => {
       if (draftSaveTimerRef.current) {
-        clearTimeout(
-          draftSaveTimerRef.current,
-        );
+        clearTimeout(draftSaveTimerRef.current);
       }
     };
   }, [
@@ -756,37 +738,28 @@ export default function NewTicketPage() {
   ]);
 
   // =============================================================================
-  // Restore draft
+  // Restore
   // =============================================================================
 
   useEffect(() => {
-    if (
-      !draft.current ||
-      !canSelectCounterparty
-    ) {
-      return;
-    }
+    if (!draft.current || !canSelectCounterparty) return;
 
     const data = draft.current;
 
     const restore = async () => {
       if (
-        data.selectionType ===
-          'counterparty' &&
+        data.selectionType === 'counterparty' &&
         data.selectedCounterpartyId
       ) {
         try {
-          const cp =
-            await counterpartiesApi.getById(
-              data.selectedCounterpartyId,
-            );
+          const cp = await counterpartiesApi.getById(
+            data.selectedCounterpartyId,
+          );
 
           setSelectedCounterparty(cp);
-          setCounterpartySearch(
-            cp.name || cp.legal_name || '',
-          );
+          setCounterpartySearch(cp.name || cp.legal_name || '');
         } catch {
-          // deleted/unavailable
+          // noop
         }
       }
 
@@ -795,37 +768,27 @@ export default function NewTicketPage() {
         data.selectedProjectId
       ) {
         try {
-          const response =
-            await projectsApi.getAll(1, 100);
+          const response = await projectsApi.getAll(1, 100);
 
-          const items = response.items;
+          setProjects(response.items);
 
-          setProjects(items);
-
-          const found = items.find(
-            (project) =>
-              project.id ===
-              data.selectedProjectId,
+          const found = response.items.find(
+            (project) => project.id === data.selectedProjectId,
           );
 
           if (found) {
             setSelectedProject(found);
-            setProjectSearch(
-              `${found.key} - ${found.name}`,
-            );
+            setProjectSearch(`${found.key} - ${found.name}`);
 
             if (found.counterparty_id) {
               try {
-                const cp =
-                  await counterpartiesApi.getById(
-                    found.counterparty_id,
-                  );
+                const cp = await counterpartiesApi.getById(
+                  found.counterparty_id,
+                );
 
                 setSelectedCounterparty(cp);
                 setCounterpartySearch(
-                  cp.name ||
-                    cp.legal_name ||
-                    '',
+                  cp.name || cp.legal_name || '',
                 );
               } catch {
                 // noop
@@ -838,9 +801,7 @@ export default function NewTicketPage() {
       }
 
       if (data.selectedReporterId) {
-        setReporterSearch(
-          data.selectedReporterName || '',
-        );
+        setReporterSearch(data.selectedReporterName || '');
       }
 
       draft.current = null;
@@ -850,58 +811,43 @@ export default function NewTicketPage() {
   }, [canSelectCounterparty]);
 
   // =============================================================================
-  // Outside click
+  // Outside dropdown
   // =============================================================================
 
   useEffect(() => {
-    const handleMouseDown = (
-      event: MouseEvent,
-    ) => {
+    const handleMouseDown = (event: MouseEvent) => {
       const target = event.target as Node;
 
       if (
         counterpartyDropdownRef.current &&
-        !counterpartyDropdownRef.current.contains(
-          target,
-        )
+        !counterpartyDropdownRef.current.contains(target)
       ) {
         setShowCounterpartyDropdown(false);
       }
 
       if (
         projectDropdownRef.current &&
-        !projectDropdownRef.current.contains(
-          target,
-        )
+        !projectDropdownRef.current.contains(target)
       ) {
         setShowProjectDropdown(false);
       }
 
       if (
         reporterDropdownRef.current &&
-        !reporterDropdownRef.current.contains(
-          target,
-        )
+        !reporterDropdownRef.current.contains(target)
       ) {
         setShowReporterDropdown(false);
       }
     };
 
-    document.addEventListener(
-      'mousedown',
-      handleMouseDown,
-    );
+    document.addEventListener('mousedown', handleMouseDown);
 
-    return () => {
-      document.removeEventListener(
-        'mousedown',
-        handleMouseDown,
-      );
-    };
+    return () =>
+      document.removeEventListener('mousedown', handleMouseDown);
   }, []);
 
   // =============================================================================
-  // Scroll
+  // Page scroll
   // =============================================================================
 
   useEffect(() => {
@@ -912,20 +858,14 @@ export default function NewTicketPage() {
   }, [step]);
 
   // =============================================================================
-  // Initial loading
+  // Initial data
   // =============================================================================
 
   useEffect(() => {
-    if (
-      isCustomer &&
-      user?.counterparty_id
-    ) {
+    if (isCustomer && user?.counterparty_id) {
       loadCustomerCounterparty();
     }
-  }, [
-    isCustomer,
-    user?.counterparty_id,
-  ]);
+  }, [isCustomer, user?.counterparty_id]);
 
   useEffect(() => {
     if (canSelectCounterparty) {
@@ -938,10 +878,7 @@ export default function NewTicketPage() {
       selectionType === 'counterparty' &&
       selectedCounterparty
     ) {
-      loadProjects(
-        selectedCounterparty.id,
-      );
-
+      loadProjects(selectedCounterparty.id);
       return;
     }
 
@@ -951,15 +888,11 @@ export default function NewTicketPage() {
     }
 
     setProjects([]);
-  }, [
-    selectionType,
-    selectedCounterparty?.id,
-  ]);
+  }, [selectionType, selectedCounterparty?.id]);
 
   useEffect(() => {
     const cpId =
-      selectedCounterparty?.id ||
-      selectedProject?.counterparty_id;
+      selectedCounterparty?.id || selectedProject?.counterparty_id;
 
     if (cpId) {
       loadUsers(cpId);
@@ -979,72 +912,48 @@ export default function NewTicketPage() {
   // =============================================================================
 
   useEffect(() => {
-    if (
-      !preselectedProjectId ||
-      !canSelectCounterparty
-    ) {
-      return;
-    }
+    if (!preselectedProjectId || !canSelectCounterparty) return;
 
     const run = async () => {
       setSelectionType('project');
       setLoadingProjects(true);
 
       try {
-        const response =
-          await projectsApi.getAll(1, 100);
-
+        const response = await projectsApi.getAll(1, 100);
         const items = response.items;
 
         setProjects(items);
 
         const found = items.find(
-          (project) =>
-            project.id ===
-            preselectedProjectId,
+          (project) => project.id === preselectedProjectId,
         );
 
         if (!found) return;
 
         setSelectedProject(found);
-
-        setProjectSearch(
-          `${found.key} - ${found.name}`,
-        );
+        setProjectSearch(`${found.key} - ${found.name}`);
 
         if (found.counterparty_id) {
           try {
-            const cp =
-              await counterpartiesApi.getById(
-                found.counterparty_id,
-              );
+            const cp = await counterpartiesApi.getById(
+              found.counterparty_id,
+            );
 
             setSelectedCounterparty(cp);
-
-            setCounterpartySearch(
-              cp.name ||
-                cp.legal_name ||
-                '',
-            );
+            setCounterpartySearch(cp.name || cp.legal_name || '');
           } catch {
             // noop
           }
         }
       } catch (error) {
-        console.error(
-          'Failed to auto-select project:',
-          error,
-        );
+        console.error('Failed to auto-select project:', error);
       } finally {
         setLoadingProjects(false);
       }
     };
 
     run();
-  }, [
-    preselectedProjectId,
-    canSelectCounterparty,
-  ]);
+  }, [preselectedProjectId, canSelectCounterparty]);
 
   // =============================================================================
   // AI
@@ -1064,27 +973,16 @@ export default function NewTicketPage() {
       return;
     }
 
-    if (aiDoneRef.current) {
-      return;
-    }
+    if (aiDoneRef.current) return;
 
-    const currentTitle =
-      titleRef.current.trim();
+    const currentTitle = titleRef.current.trim();
+    const currentDescription = descriptionRef.current.trim();
 
-    const currentDescription =
-      descriptionRef.current.trim();
-
-    if (
-      !currentTitle ||
-      !currentDescription
-    ) {
-      return;
-    }
+    if (!currentTitle || !currentDescription) return;
 
     aiAbortRef.current?.abort();
 
-    const controller =
-      new AbortController();
+    const controller = new AbortController();
 
     aiAbortRef.current = controller;
     aiDoneRef.current = true;
@@ -1094,43 +992,28 @@ export default function NewTicketPage() {
     setAiTimedOut(false);
 
     const timeoutId = setTimeout(() => {
-      if (controller.signal.aborted) {
-        return;
-      }
+      if (controller.signal.aborted) return;
 
       setAiTimedOut(true);
       setAiLoading(false);
     }, AI_TIMEOUT_MS);
 
     ticketsApi
-      .predict(
-        currentTitle,
-        currentDescription,
-      )
+      .predict(currentTitle, currentDescription)
       .then((result) => {
         clearTimeout(timeoutId);
 
-        if (controller.signal.aborted) {
-          return;
-        }
+        if (controller.signal.aborted) return;
 
         setAiSuggestion(result);
 
-        setAiSuggestedTags(
-          result.suggested_tags || [],
-        );
+        setAiSuggestedTags(result.suggested_tags || []);
 
-        if (
-          result.suggested_priority
-        ) {
-          setPriority(
-            result.suggested_priority,
-          );
+        if (result.suggested_priority) {
+          setPriority(result.suggested_priority);
         }
 
-        setTags(
-          result.suggested_tags || [],
-        );
+        setTags(result.suggested_tags || []);
 
         setAiLoading(false);
         setAiTimedOut(false);
@@ -1138,14 +1021,9 @@ export default function NewTicketPage() {
       .catch((error) => {
         clearTimeout(timeoutId);
 
-        if (controller.signal.aborted) {
-          return;
-        }
+        if (controller.signal.aborted) return;
 
-        console.error(
-          'AI prediction failed:',
-          error,
-        );
+        console.error('AI prediction failed:', error);
 
         setAiLoading(false);
         setAiTimedOut(true);
@@ -1158,19 +1036,16 @@ export default function NewTicketPage() {
   }, [step]);
 
   // =============================================================================
-  // Loaders
+  // API loaders
   // =============================================================================
 
   async function loadCustomerCounterparty() {
-    if (!user?.counterparty_id) {
-      return;
-    }
+    if (!user?.counterparty_id) return;
 
     try {
-      const cp =
-        await counterpartiesApi.getById(
-          user.counterparty_id,
-        );
+      const cp = await counterpartiesApi.getById(
+        user.counterparty_id,
+      );
 
       setCustomerCounterparty(cp);
     } catch {
@@ -1178,31 +1053,19 @@ export default function NewTicketPage() {
     }
   }
 
-  async function loadCounterparties(
-    search?: string,
-  ) {
+  async function loadCounterparties(search?: string) {
     setLoadingCounterparties(true);
 
     try {
-      let items = (
-        await counterpartiesApi.getAll(
-          1,
-          50,
-        )
-      ).items;
+      let items = (await counterpartiesApi.getAll(1, 50)).items;
 
       if (search) {
-        const query =
-          search.toLowerCase();
+        const query = search.toLowerCase();
 
         items = items.filter(
           (cp) =>
-            cp.name
-              ?.toLowerCase()
-              .includes(query) ||
-            cp.legal_name
-              ?.toLowerCase()
-              .includes(query) ||
+            cp.name?.toLowerCase().includes(query) ||
+            cp.legal_name?.toLowerCase().includes(query) ||
             cp.inn?.includes(search),
         );
       }
@@ -1215,23 +1078,13 @@ export default function NewTicketPage() {
         !selectedCounterparty
       ) {
         const found = items.find(
-          (cp) =>
-            cp.id ===
-            preselectedCounterpartyId,
+          (cp) => cp.id === preselectedCounterpartyId,
         );
 
         if (found) {
-          setSelectionType(
-            'counterparty',
-          );
-
-          setSelectedCounterparty(
-            found,
-          );
-
-          setCounterpartySearch(
-            cpName(found),
-          );
+          setSelectionType('counterparty');
+          setSelectedCounterparty(found);
+          setCounterpartySearch(cpName(found));
         }
       }
     } catch {
@@ -1241,18 +1094,15 @@ export default function NewTicketPage() {
     }
   }
 
-  async function loadProjects(
-    cpId: string,
-  ) {
+  async function loadProjects(cpId: string) {
     setLoadingProjects(true);
 
     try {
-      const response =
-        await projectsApi.getByCounterparty(
-          cpId,
-          1,
-          50,
-        );
+      const response = await projectsApi.getByCounterparty(
+        cpId,
+        1,
+        50,
+      );
 
       setProjects(response.items);
     } catch {
@@ -1262,14 +1112,11 @@ export default function NewTicketPage() {
     }
   }
 
-  async function loadProjectsForAll(): Promise<
-    Project[]
-  > {
+  async function loadProjectsForAll(): Promise<Project[]> {
     setLoadingProjects(true);
 
     try {
-      const response =
-        await projectsApi.getAll(1, 100);
+      const response = await projectsApi.getAll(1, 100);
 
       setProjects(response.items);
 
@@ -1285,68 +1132,33 @@ export default function NewTicketPage() {
     setLoadingUsers(true);
 
     try {
-      const response =
-        await usersApi.getCustomers(
-          cpId,
-          1,
-          100,
-        );
+      const response = await usersApi.getCustomers(cpId, 1, 100);
 
-      const customerUsers: SimpleUser[] =
-        response.items.map(
-          (customer) => ({
-            id: customer.id,
-            username:
-              customer.username,
-            full_name:
-              customer.full_name,
-            email: customer.email,
-            role: customer.role,
-          }),
-        );
+      /*
+       * Текущего пользователя намеренно выкидываем из API-списка.
+       * Он уже присутствует первым пунктом как "Вы".
+       */
+      const items: SimpleUser[] = response.items
+        .map((customer) => ({
+          id: customer.id,
+          username: customer.username,
+          full_name: customer.full_name,
+          email: customer.email,
+          role: customer.role,
+        }))
+        .filter((customer) => customer.id !== currentUserId);
 
-      let all = [...customerUsers];
+      setUsers(items);
 
-      const ownId =
-        user?.id ?? user?.user_id;
+      setSelectedReporter((current) => {
+        if (!current) return null;
 
-      if (
-        ownId &&
-        !customerUsers.some(
-          (item) => item.id === ownId,
-        )
-      ) {
-        all = [
-          {
-            id: ownId,
-            username:
-              user?.username || '',
-            full_name:
-              user?.full_name || null,
-            email:
-              user?.email || '',
-            role: user?.role,
-          },
-          ...all,
-        ];
-      }
+        if (current.id === currentUserId) {
+          return null;
+        }
 
-      setUsers(all);
-
-      setSelectedReporter(
-        (current) => {
-          if (!current) {
-            return null;
-          }
-
-          return (
-            all.find(
-              (item) =>
-                item.id === current.id,
-            ) || null
-          );
-        },
-      );
+        return items.find((item) => item.id === current.id) || null;
+      });
     } catch {
       // noop
     } finally {
@@ -1355,56 +1167,33 @@ export default function NewTicketPage() {
   }
 
   // =============================================================================
-  // Helpers
+  // Names
   // =============================================================================
 
-  const cpName = (
-    cp: Counterparty,
-  ) =>
-    cp.name ||
-    cp.legal_name ||
-    cp.inn ||
-    'Без названия';
+  const cpName = (cp: Counterparty) =>
+    cp.name || cp.legal_name || cp.inn || 'Без названия';
 
-  const prjName = (
-    project: Project,
-  ) =>
+  const prjName = (project: Project) =>
     `${project.key} — ${project.name}`;
 
-  const uName = (
-    item: SimpleUser,
-  ) =>
-    item.full_name ||
-    item.username ||
-    item.email;
+  const uName = (item: SimpleUser) =>
+    item.full_name || item.username || item.email;
 
-  const formatFileSize = (
-    bytes: number,
-  ) => {
-    if (bytes < 1024) {
-      return `${bytes} B`;
-    }
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
 
     if (bytes < 1024 * 1024) {
-      return `${(
-        bytes / 1024
-      ).toFixed(1)} KB`;
+      return `${(bytes / 1024).toFixed(1)} KB`;
     }
 
-    return `${(
-      bytes /
-      1024 /
-      1024
-    ).toFixed(1)} MB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   };
 
   // =============================================================================
-  // Selection
+  // Binding
   // =============================================================================
 
-  const handleSelectionTypeChange = (
-    next: SelectionType,
-  ) => {
+  const handleSelectionTypeChange = (next: SelectionType) => {
     setSelectionType(next);
 
     setSelectedCounterparty(null);
@@ -1418,72 +1207,42 @@ export default function NewTicketPage() {
     setProjects([]);
     setUsers([]);
 
-    setValidationErrors(
-      (current) =>
-        current.filter(
-          (error) =>
-            error !==
-              'Выберите контрагента' &&
-            error !==
-              'Выберите проект',
-        ),
+    setValidationErrors((current) =>
+      current.filter(
+        (error) =>
+          error !== 'Выберите контрагента' &&
+          error !== 'Выберите проект',
+      ),
     );
   };
 
-  const selectCounterparty = (
-    cp: Counterparty,
-  ) => {
+  const selectCounterparty = (cp: Counterparty) => {
     setSelectedCounterparty(cp);
-    setCounterpartySearch(
-      cpName(cp),
-    );
+    setCounterpartySearch(cpName(cp));
+    setShowCounterpartyDropdown(false);
 
-    setShowCounterpartyDropdown(
-      false,
-    );
-
-    setValidationErrors(
-      (current) =>
-        current.filter(
-          (error) =>
-            error !==
-            'Выберите контрагента',
-        ),
+    setValidationErrors((current) =>
+      current.filter((error) => error !== 'Выберите контрагента'),
     );
   };
 
-  const selectProject = async (
-    project: Project,
-  ) => {
+  const selectProject = async (project: Project) => {
     setSelectedProject(project);
-
-    setProjectSearch(
-      prjName(project),
-    );
-
+    setProjectSearch(prjName(project));
     setShowProjectDropdown(false);
 
-    setValidationErrors(
-      (current) =>
-        current.filter(
-          (error) =>
-            error !==
-            'Выберите проект',
-        ),
+    setValidationErrors((current) =>
+      current.filter((error) => error !== 'Выберите проект'),
     );
 
     if (project.counterparty_id) {
       try {
-        const cp =
-          await counterpartiesApi.getById(
-            project.counterparty_id,
-          );
+        const cp = await counterpartiesApi.getById(
+          project.counterparty_id,
+        );
 
         setSelectedCounterparty(cp);
-
-        setCounterpartySearch(
-          cpName(cp),
-        );
+        setCounterpartySearch(cpName(cp));
       } catch {
         // noop
       }
@@ -1494,19 +1253,16 @@ export default function NewTicketPage() {
   // Tags
   // =============================================================================
 
-  const togglePresetTag = (
-    tag: TicketTag,
-  ) => {
+  const toggleTag = (tag: TicketTag) => {
     setTags((current) => {
       const exists = current.some(
-        (item) =>
-          item.name === tag.name,
+        (item) => item.name.toLowerCase() === tag.name.toLowerCase(),
       );
 
       if (exists) {
         return current.filter(
           (item) =>
-            item.name !== tag.name,
+            item.name.toLowerCase() !== tag.name.toLowerCase(),
         );
       }
 
@@ -1515,20 +1271,16 @@ export default function NewTicketPage() {
   };
 
   const addCustomTag = () => {
-    const name =
-      newTagInput.trim();
+    const name = newTagInput.trim();
 
-    if (!name) {
-      return;
-    }
+    if (!name) return;
 
     if (
       tags.some(
-        (tag) =>
-          tag.name.toLowerCase() ===
-          name.toLowerCase(),
+        (tag) => tag.name.toLowerCase() === name.toLowerCase(),
       )
     ) {
+      setNewTagInput('');
       return;
     }
 
@@ -1536,7 +1288,7 @@ export default function NewTicketPage() {
       ...current,
       {
         name,
-        color: '#a1a1aa',
+        color: '#94a3b8',
       },
     ]);
 
@@ -1544,56 +1296,52 @@ export default function NewTicketPage() {
     setShowCustomTagInput(false);
   };
 
-  const removeTag = (
-    name: string,
-  ) => {
+  const removeTag = (name: string) => {
     setTags((current) =>
       current.filter(
-        (tag) =>
-          tag.name !== name,
+        (tag) => tag.name.toLowerCase() !== name.toLowerCase(),
       ),
     );
   };
 
   // =============================================================================
-  // Validation/navigation
+  // Validation
   // =============================================================================
 
   const validateStep1 = () => {
     const errors: string[] = [];
 
     if (!title.trim()) {
-      errors.push(
-        'Укажите тему заявки',
-      );
+      errors.push('Укажите тему заявки');
     }
 
     if (!hasDescription) {
-      errors.push(
-        'Добавьте описание заявки',
-      );
+      errors.push('Добавьте описание заявки');
     }
 
     if (
       canSelectCounterparty &&
-      selectionType ===
-        'counterparty' &&
+      selectionType === 'counterparty' &&
       !selectedCounterparty
     ) {
-      errors.push(
-        'Выберите контрагента',
-      );
+      errors.push('Выберите контрагента');
     }
 
     if (
       canSelectCounterparty &&
-      selectionType ===
-        'project' &&
+      selectionType === 'project' &&
       !selectedProject
     ) {
-      errors.push(
-        'Выберите проект',
-      );
+      errors.push('Выберите проект');
+    }
+
+    /*
+     * Инициатор обязателен.
+     * actualReporter содержит либо выбранного пользователя,
+     * либо текущего пользователя.
+     */
+    if (!actualReporter?.id) {
+      errors.push('Укажите инициатора');
     }
 
     setValidationErrors(errors);
@@ -1602,134 +1350,92 @@ export default function NewTicketPage() {
   };
 
   const goToNextStep = () => {
-    if (
-      step === 1 &&
-      !validateStep1()
-    ) {
-      return;
-    }
+    if (step === 1 && !validateStep1()) return;
 
     setValidationErrors([]);
 
-    setStep((current) =>
-      Math.min(3, current + 1),
-    );
+    setStep((current) => Math.min(3, current + 1));
   };
 
   const goToPreviousStep = () => {
     setValidationErrors([]);
 
-    setStep((current) =>
-      Math.max(1, current - 1),
-    );
-  };
-
-  const goToTickets = () => {
-    navigate('/tickets');
+    setStep((current) => Math.max(1, current - 1));
   };
 
   useEffect(() => {
-    if (
-      validationErrors.length === 0
-    ) {
-      return;
-    }
+    setValidationErrors((current) =>
+      current.filter((error) => {
+        if (error === 'Укажите тему заявки' && title.trim()) {
+          return false;
+        }
 
-    setValidationErrors(
-      (current) =>
-        current.filter((error) => {
-          if (
-            error ===
-              'Укажите тему заявки' &&
-            title.trim()
-          ) {
-            return false;
-          }
+        if (error === 'Добавьте описание заявки' && hasDescription) {
+          return false;
+        }
 
-          if (
-            error ===
-              'Добавьте описание заявки' &&
-            hasDescription
-          ) {
-            return false;
-          }
+        if (
+          error === 'Выберите контрагента' &&
+          selectedCounterparty
+        ) {
+          return false;
+        }
 
-          if (
-            error ===
-              'Выберите контрагента' &&
-            selectedCounterparty
-          ) {
-            return false;
-          }
+        if (error === 'Выберите проект' && selectedProject) {
+          return false;
+        }
 
-          if (
-            error ===
-              'Выберите проект' &&
-            selectedProject
-          ) {
-            return false;
-          }
+        if (error === 'Укажите инициатора' && actualReporter?.id) {
+          return false;
+        }
 
-          return true;
-        }),
+        return true;
+      }),
     );
   }, [
     title,
     descriptionBlocks,
     selectedCounterparty,
     selectedProject,
+    actualReporter?.id,
   ]);
 
   // =============================================================================
   // Files
   // =============================================================================
 
-  const appendFiles = (
-    files: File[],
-  ) => {
+  const appendFiles = (files: File[]) => {
     const available = Math.max(
       0,
-      MAX_FILES -
-        generalFiles.length,
+      MAX_FILES - generalFiles.length,
     );
 
     const accepted = files
-      .filter(
-        (file) =>
-          file.size <=
-          MAX_FILE_SIZE,
-      )
+      .filter((file) => file.size <= MAX_FILE_SIZE)
       .slice(0, available);
 
-    const mapped: GeneralFile[] =
-      accepted.map((file) => ({
-        id: `${file.name}_${Date.now()}_${Math.random()}`,
-        file,
-        preview:
-          file.type.startsWith(
-            'image/',
-          )
-            ? URL.createObjectURL(
-                file,
-              )
-            : undefined,
-        status: 'pending',
-      }));
+    const mapped: GeneralFile[] = accepted.map((file) => ({
+      id: `${file.name}_${Date.now()}_${Math.random()}`,
+      file,
 
-    setGeneralFiles((current) => [
-      ...current,
-      ...mapped,
-    ]);
+      preview: file.type.startsWith('image/')
+        ? URL.createObjectURL(file)
+        : undefined,
+
+      status: 'pending',
+    }));
+
+    setGeneralFiles((current) => [...current, ...mapped]);
+  };
+
+  const openFilePicker = () => {
+    fileInputRef.current?.click();
   };
 
   const handleGeneralFileSelect = (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    appendFiles(
-      Array.from(
-        event.target.files || [],
-      ),
-    );
+    appendFiles(Array.from(event.target.files || []));
 
     event.target.value = '';
   };
@@ -1741,37 +1447,23 @@ export default function NewTicketPage() {
 
     setIsDraggingFiles(false);
 
-    appendFiles(
-      Array.from(
-        event.dataTransfer.files,
-      ),
-    );
+    appendFiles(Array.from(event.dataTransfer.files));
   };
 
-  const removeGeneralFile = (
-    id: string,
-  ) => {
-    const found =
-      generalFiles.find(
-        (file) => file.id === id,
-      );
+  const removeGeneralFile = (id: string) => {
+    const found = generalFiles.find((file) => file.id === id);
 
     if (found?.preview) {
-      URL.revokeObjectURL(
-        found.preview,
-      );
+      URL.revokeObjectURL(found.preview);
     }
 
     setGeneralFiles((current) =>
-      current.filter(
-        (file) =>
-          file.id !== id,
-      ),
+      current.filter((file) => file.id !== id),
     );
   };
 
   // =============================================================================
-  // Clear draft
+  // Clear
   // =============================================================================
 
   const handleClearDraft = () => {
@@ -1816,100 +1508,63 @@ export default function NewTicketPage() {
   // =============================================================================
 
   const handleSubmit = async () => {
-    if (submitting) {
-      return;
-    }
+    if (submitting) return;
 
     setSubmitting(true);
 
     try {
-      const textOnlyDescription =
-        descriptionBlocks
-          .filter(
-            (
-              block,
-            ): block is Extract<
-              DescriptionBlock,
-              { type: 'text' }
-            > =>
-              block.type ===
-              'text',
-          )
-          .map((block) =>
-            block.value.trim(),
-          )
-          .filter(Boolean)
-          .join('\n\n');
+      const textOnlyDescription = descriptionBlocks
+        .filter(
+          (
+            block,
+          ): block is Extract<
+            DescriptionBlock,
+            { type: 'text' }
+          > => block.type === 'text',
+        )
+        .map((block) => block.value.trim())
+        .filter(Boolean)
+        .join('\n\n');
 
       const data: any = {
         title: title.trim(),
 
         description:
-          textOnlyDescription ||
-          '(описание с изображениями)',
+          textOnlyDescription || '(описание с изображениями)',
 
         priority,
         type,
 
         tags: tags.map((tag) => ({
           name: tag.name,
-          color:
-            tag.color ||
-            '#64748b',
+          color: tag.color || '#64748b',
         })),
 
-        reporter_id:
-          currentUserId,
+        reporter_id: actualReporter?.id,
       };
 
-      if (
-        isCustomer &&
-        customerCounterparty
-      ) {
-        data.counterparty_id =
-          customerCounterparty.id;
+      if (isCustomer && customerCounterparty) {
+        data.counterparty_id = customerCounterparty.id;
       } else if (selectedProject) {
-        data.project_id =
-          selectedProject.id;
-      } else if (
-        selectedCounterparty
-      ) {
-        data.counterparty_id =
-          selectedCounterparty.id;
+        data.project_id = selectedProject.id;
+      } else if (selectedCounterparty) {
+        data.counterparty_id = selectedCounterparty.id;
       }
 
-      if (
-        canSelectReporter &&
-        selectedReporter
-      ) {
-        data.reporter_id =
-          selectedReporter.id;
-      }
+      const ticket = await ticketsApi.create(data);
 
-      const ticket =
-        await ticketsApi.create(
-          data,
-        );
+      const imageBlocks = descriptionBlocks.filter(
+        (
+          block,
+        ): block is Extract<
+          DescriptionBlock,
+          { type: 'image' }
+        > =>
+          block.type === 'image' &&
+          Boolean(block.localFile),
+      );
 
-      const imageBlocks =
-        descriptionBlocks.filter(
-          (
-            block,
-          ): block is Extract<
-            DescriptionBlock,
-            { type: 'image' }
-          > =>
-            block.type ===
-              'image' &&
-            Boolean(
-              block.localFile,
-            ),
-        );
-
-      const uploadMap: Record<
-        string,
-        string
-      > = {};
+      const uploadMap: Record<string, string> = {};
 
       for (const block of imageBlocks) {
         try {
@@ -1920,8 +1575,7 @@ export default function NewTicketPage() {
               ticket.id,
             );
 
-          uploadMap[block.id] =
-            attachment.id;
+          uploadMap[block.id] = attachment.id;
         } catch (error) {
           console.error(
             'Image upload failed:',
@@ -1932,43 +1586,29 @@ export default function NewTicketPage() {
       }
 
       if (imageBlocks.length > 0) {
-        let finalDescription =
-          serializeBlocks(
-            descriptionBlocks,
-          );
+        let finalDescription = serializeBlocks(descriptionBlocks);
 
-        for (const [
-          blockId,
-          attachmentId,
-        ] of Object.entries(
+        for (const [blockId, attachmentId] of Object.entries(
           uploadMap,
         )) {
-          finalDescription =
-            finalDescription.replaceAll(
-              `![image](local:${blockId})`,
-              `![image](media://${attachmentId})`,
-            );
+          finalDescription = finalDescription.replaceAll(
+            `![image](local:${blockId})`,
+            `![image](media://${attachmentId})`,
+          );
         }
 
-        finalDescription =
-          finalDescription.replace(
-            /!\[image\]\(local:[a-f0-9-]+\)\n*/gi,
-            '',
-          );
-
-        await ticketsApi.update(
-          ticket.id,
-          {
-            description:
-              finalDescription,
-          },
+        finalDescription = finalDescription.replace(
+          /!\[image\]\(local:[a-f0-9-]+\)\n*/gi,
+          '',
         );
+
+        await ticketsApi.update(ticket.id, {
+          description: finalDescription,
+        });
       }
 
       for (const file of generalFiles.filter(
-        (item) =>
-          item.status ===
-          'pending',
+        (item) => item.status === 'pending',
       )) {
         try {
           await attachmentsApi.uploadAttachment(
@@ -1992,8 +1632,7 @@ export default function NewTicketPage() {
     } catch (error: any) {
       console.error(
         'Submit failed:',
-        error?.response?.data ||
-          error,
+        error?.response?.data || error,
       );
     } finally {
       setSubmitting(false);
@@ -2004,74 +1643,83 @@ export default function NewTicketPage() {
   // Derived
   // =============================================================================
 
-  const filteredProjects =
-    projects.filter((project) => {
-      if (!projectSearch) {
-        return true;
-      }
+  /*
+   * Если поле уже содержит полное название выбранного проекта,
+   * не фильтруем список им же при повторном открытии.
+   */
+  const filteredProjects = projects.filter((project) => {
+    if (!projectSearch || selectedProject) return true;
 
-      const query =
-        projectSearch.toLowerCase();
+    const query = projectSearch.toLowerCase();
 
-      return (
-        project.name
-          .toLowerCase()
-          .includes(query) ||
-        project.key
-          .toLowerCase()
-          .includes(query)
-      );
-    });
-
-  const filteredUsers =
-    users.filter((item) => {
-      if (!reporterSearch) {
-        return true;
-      }
-
-      const query =
-        reporterSearch.toLowerCase();
-
-      return (
-        item.full_name
-          ?.toLowerCase()
-          .includes(query) ||
-        item.username
-          ?.toLowerCase()
-          .includes(query) ||
-        item.email
-          .toLowerCase()
-          .includes(query)
-      );
-    });
-
-  const currentPriority =
-    PRIORITIES.find(
-      (item) =>
-        item.value === priority,
+    return (
+      project.name.toLowerCase().includes(query) ||
+      project.key.toLowerCase().includes(query)
     );
+  });
 
-  const currentType =
-    TICKET_TYPES.find(
-      (item) =>
-        item.value === type,
+  /*
+   * Текущий пользователь уже показывается отдельным первым пунктом.
+   * Дополнительно страхуемся от дубля по id/email.
+   */
+  const filteredUsers = users.filter((item) => {
+    if (item.id === currentUserId) return false;
+
+    if (
+      user?.email &&
+      item.email &&
+      item.email.toLowerCase() === user.email.toLowerCase()
+    ) {
+      return false;
+    }
+
+    if (!reporterSearch || selectedReporter) return true;
+
+    const query = reporterSearch.toLowerCase();
+
+    return (
+      item.full_name?.toLowerCase().includes(query) ||
+      item.username?.toLowerCase().includes(query) ||
+      item.email.toLowerCase().includes(query)
     );
+  });
+
+  /*
+   * AI может прислать "Инцидент", "Ошибка" и т.п.
+   * Не показываем в тегах то, что совпадает с типами заявки.
+   */
+  const ticketTypeNames = new Set(
+    TICKET_TYPES.map((item) => item.value.toLowerCase()),
+  );
+
+  const cleanAiTags = aiSuggestedTags.filter(
+    (tag) =>
+      !ticketTypeNames.has(tag.name.toLowerCase()) &&
+      !PRESET_TAGS.some(
+        (preset) =>
+          preset.name.toLowerCase() === tag.name.toLowerCase(),
+      ),
+  );
+
+  const currentPriority = PRIORITIES.find(
+    (item) => item.value === priority,
+  );
+
+  const currentType = TICKET_TYPES.find(
+    (item) => item.value === type,
+  );
 
   const nextButtonDisabled =
     step === 1 &&
     (!title.trim() ||
       !hasDescription ||
-      (selectionType ===
-        'counterparty' &&
+      !actualReporter?.id ||
+      (selectionType === 'counterparty' &&
         !selectedCounterparty) ||
-      (selectionType ===
-        'project' &&
-        !selectedProject));
+      (selectionType === 'project' && !selectedProject));
 
   const backButtonLabel =
-    step === 2
-      ? 'К описанию'
-      : 'К классификации';
+    step === 2 ? 'К описанию' : 'К классификации';
 
   // =============================================================================
   // Render
@@ -2082,18 +1730,18 @@ export default function NewTicketPage() {
       ref={pageRef}
       className="mx-auto max-w-6xl px-4 pb-14 sm:px-6"
     >
-      {/* ===================================================================== */}
+      {/* =================================================================== */}
       {/* Header */}
-      {/* ===================================================================== */}
+      {/* =================================================================== */}
 
       <header className="mb-7">
         <button
           type="button"
-          onClick={goToTickets}
+          onClick={() => navigate('/tickets')}
           className="
             mb-5 inline-flex items-center gap-2
             text-base font-medium
-            text-[var(--text-primary)]/55
+            text-[var(--text-primary)]/60
             transition-colors
             hover:text-[var(--text-primary)]
           "
@@ -2120,11 +1768,9 @@ export default function NewTicketPage() {
               className="
                 hidden items-center gap-2
                 rounded-lg px-3 py-2
-                text-sm
-                text-[var(--text-primary)]/45
+                text-sm text-[var(--text-primary)]/45
                 transition
-                hover:bg-red-500/10
-                hover:text-red-400
+                hover:bg-red-500/10 hover:text-red-400
                 sm:flex
               "
             >
@@ -2135,57 +1781,38 @@ export default function NewTicketPage() {
         </div>
       </header>
 
-      {/* ===================================================================== */}
-      {/* Stepper */}
-      {/* ===================================================================== */}
+      {/* =================================================================== */}
+      {/* Steps */}
+      {/* =================================================================== */}
 
       <div
         className="
-          mb-6 grid grid-cols-3
-          overflow-hidden rounded-xl
-          border border-[var(--border-color)]
+          mb-6 grid grid-cols-3 overflow-hidden
+          rounded-xl border border-[var(--border-color)]
           bg-[var(--hover-1)]
         "
       >
         {[
-          {
-            num: 1,
-            label: 'Описание',
-          },
-          {
-            num: 2,
-            label: 'Классификация',
-          },
-          {
-            num: 3,
-            label: 'Проверка',
-          },
+          { num: 1, label: 'Описание' },
+          { num: 2, label: 'Классификация' },
+          { num: 3, label: 'Проверка' },
         ].map((item) => {
-          const active =
-            step === item.num;
-
-          const done =
-            step > item.num;
+          const active = step === item.num;
+          const done = step > item.num;
 
           return (
             <button
               key={item.num}
               type="button"
-              disabled={
-                item.num > step
-              }
+              disabled={item.num > step}
               onClick={() => {
-                if (
-                  item.num < step
-                ) {
+                if (item.num < step) {
                   setStep(item.num);
                 }
               }}
               className={`
                 relative flex items-center justify-center gap-3
-                px-3 py-4
-                text-base font-medium
-                transition
+                px-3 py-4 text-base font-medium transition
                 ${
                   active
                     ? 'bg-[var(--hover-2)] text-[var(--text-primary)]'
@@ -2208,16 +1835,10 @@ export default function NewTicketPage() {
                   }
                 `}
               >
-                {done ? (
-                  <Check className="h-4 w-4" />
-                ) : (
-                  item.num
-                )}
+                {done ? <Check className="h-4 w-4" /> : item.num}
               </span>
 
-              <span className="hidden sm:block">
-                {item.label}
-              </span>
+              <span className="hidden sm:block">{item.label}</span>
 
               {active && (
                 <span className="absolute inset-x-0 bottom-0 h-0.5 bg-[var(--accent)]" />
@@ -2227,26 +1848,23 @@ export default function NewTicketPage() {
         })}
       </div>
 
-      {/* ===================================================================== */}
-      {/* Draft */}
-      {/* ===================================================================== */}
+      {/* =================================================================== */}
+      {/* Draft notice */}
+      {/* =================================================================== */}
 
-      {hasDraft &&
-        step === 1 &&
-        title && (
-          <div className="mb-5 flex items-center gap-3 rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3">
-            <Clock className="h-5 w-5 shrink-0 text-blue-400" />
+      {hasDraft && step === 1 && title && (
+        <div className="mb-5 flex items-center gap-3 rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3">
+          <Clock className="h-5 w-5 shrink-0 text-blue-400" />
 
-            <span className="text-base text-[var(--text-primary)]/65">
-              Восстановлен сохранённый
-              черновик
-            </span>
-          </div>
-        )}
+          <span className="text-base text-[var(--text-primary)]/65">
+            Восстановлен сохранённый черновик
+          </span>
+        </div>
+      )}
 
-      {/* ===================================================================== */}
+      {/* =================================================================== */}
       {/* Main */}
-      {/* ===================================================================== */}
+      {/* =================================================================== */}
 
       <main
         className="
@@ -2261,187 +1879,198 @@ export default function NewTicketPage() {
           {/* ================================================================= */}
 
           {step === 1 && (
-            <div className="space-y-9">
-              {/* Validation */}
+            <div className="space-y-8">
+              {/* Errors */}
 
-              {validationErrors.length >
-                0 && (
+              {validationErrors.length > 0 && (
                 <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4">
                   <div className="flex items-start gap-3">
                     <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
 
                     <div>
                       <p className="font-medium text-red-300">
-                        Проверьте заполнение
-                        формы
+                        Проверьте заполнение формы
                       </p>
 
                       <div className="mt-1.5 space-y-1">
-                        {validationErrors.map(
-                          (error) => (
-                            <p
-                              key={error}
-                              className="text-sm text-red-300/80"
-                            >
-                              {error}
-                            </p>
-                          ),
-                        )}
+                        {validationErrors.map((error) => (
+                          <p
+                            key={error}
+                            className="text-sm text-red-300/80"
+                          >
+                            {error}
+                          </p>
+                        ))}
                       </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* ============================================================= */}
+              {/* =========================================================== */}
               {/* Binding */}
-              {/* ============================================================= */}
+              {/* =========================================================== */}
 
               {canSelectCounterparty && (
                 <section>
-                  <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                      Привязка
+                  <div className="mb-4">
+                    <h2 className="text-xl font-semibold text-[var(--text-primary)]">
+                      Привязка заявки
                     </h2>
 
-                    <div className="inline-flex w-full rounded-xl bg-[var(--hover-1)] p-1 lg:w-auto">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleSelectionTypeChange(
-                            'project',
-                          )
-                        }
-                        className={`
-                          flex flex-1 items-center justify-center gap-2
-                          rounded-lg px-4 py-2.5
-                          text-sm font-medium
-                          transition-colors lg:flex-none
-                          ${
-                            selectionType ===
-                            'project'
-                              ? 'bg-[var(--hover-3)] text-amber-400'
-                              : 'text-[var(--text-primary)]/60 hover:text-[var(--text-primary)]'
-                          }
-                        `}
-                      >
-                        <FolderOpen className="h-4 w-4" />
-                        Проект
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleSelectionTypeChange(
-                            'counterparty',
-                          )
-                        }
-                        className={`
-                          flex flex-1 items-center justify-center gap-2
-                          rounded-lg px-4 py-2.5
-                          text-sm font-medium
-                          transition-colors lg:flex-none
-                          ${
-                            selectionType ===
-                            'counterparty'
-                              ? 'bg-[var(--hover-3)] text-blue-400'
-                              : 'text-[var(--text-primary)]/60 hover:text-[var(--text-primary)]'
-                          }
-                        `}
-                      >
-                        <Building2 className="h-4 w-4" />
-                        Контрагент
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleSelectionTypeChange(
-                            null,
-                          )
-                        }
-                        className={`
-                          flex flex-1 items-center justify-center
-                          rounded-lg px-4 py-2.5
-                          text-sm font-medium
-                          transition-colors lg:flex-none
-                          ${
-                            selectionType ===
-                            null
-                              ? 'bg-[var(--hover-3)] text-[var(--text-primary)]'
-                              : 'text-[var(--text-primary)]/60 hover:text-[var(--text-primary)]'
-                          }
-                        `}
-                      >
-                        Без привязки
-                      </button>
-                    </div>
+                    <p className="mt-1 text-base text-[var(--text-primary)]/50">
+                      К чему относится эта заявка?
+                    </p>
                   </div>
 
-                  {selectionType !== null && (
-                    <div
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleSelectionTypeChange('project')
+                      }
                       className={`
-                        grid gap-5
+                        flex min-h-[64px] items-center gap-3
+                        rounded-xl border px-4 text-left transition
                         ${
-                          canSelectReporter
-                            ? 'lg:grid-cols-2'
-                            : 'grid-cols-1'
+                          selectionType === 'project'
+                            ? 'border-amber-500/50 bg-amber-500/10'
+                            : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'
                         }
                       `}
                     >
+                      <FolderOpen
+                        className={`
+                          h-6 w-6 shrink-0
+                          ${
+                            selectionType === 'project'
+                              ? 'text-amber-400'
+                              : 'text-[var(--text-primary)]/45'
+                          }
+                        `}
+                      />
+
+                      <div>
+                        <div className="text-base font-semibold text-[var(--text-primary)]">
+                          Проект
+                        </div>
+
+                        <div className="text-sm text-[var(--text-primary)]/45">
+                          Связать с проектом
+                        </div>
+                      </div>
+
+                      {selectionType === 'project' && (
+                        <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-amber-400" />
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleSelectionTypeChange('counterparty')
+                      }
+                      className={`
+                        flex min-h-[64px] items-center gap-3
+                        rounded-xl border px-4 text-left transition
+                        ${
+                          selectionType === 'counterparty'
+                            ? 'border-blue-500/50 bg-blue-500/10'
+                            : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'
+                        }
+                      `}
+                    >
+                      <Building2
+                        className={`
+                          h-6 w-6 shrink-0
+                          ${
+                            selectionType === 'counterparty'
+                              ? 'text-blue-400'
+                              : 'text-[var(--text-primary)]/45'
+                          }
+                        `}
+                      />
+
+                      <div>
+                        <div className="text-base font-semibold text-[var(--text-primary)]">
+                          Контрагент
+                        </div>
+
+                        <div className="text-sm text-[var(--text-primary)]/45">
+                          Связать с компанией
+                        </div>
+                      </div>
+
+                      {selectionType === 'counterparty' && (
+                        <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-blue-400" />
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSelectionTypeChange(null)}
+                      className={`
+                        flex min-h-[64px] items-center gap-3
+                        rounded-xl border px-4 text-left transition
+                        ${
+                          selectionType === null
+                            ? 'border-[var(--text-primary)]/30 bg-[var(--hover-2)]'
+                            : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'
+                        }
+                      `}
+                    >
+                      <X className="h-6 w-6 shrink-0 text-[var(--text-primary)]/45" />
+
+                      <div>
+                        <div className="text-base font-semibold text-[var(--text-primary)]">
+                          Без привязки
+                        </div>
+
+                        <div className="text-sm text-[var(--text-primary)]/45">
+                          Общая заявка
+                        </div>
+                      </div>
+
+                      {selectionType === null && (
+                        <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-[var(--text-primary)]/60" />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Selection + reporter */}
+
+                  {selectionType !== null && (
+                    <div className="mt-5 grid gap-5 lg:grid-cols-2">
                       {/* Project */}
 
-                      {selectionType ===
-                        'project' && (
+                      {selectionType === 'project' && (
                         <div>
                           <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
-                            Проект
-                            <span className="ml-1 text-red-400">
-                              *
-                            </span>
+                            Выберите проект
+                            <span className="ml-1 text-red-400">*</span>
                           </label>
 
                           <div
-                            ref={
-                              projectDropdownRef
-                            }
+                            ref={projectDropdownRef}
                             className="relative"
                           >
-                            <SearchInput
-                              value={
-                                projectSearch
-                              }
-                              loading={
-                                loadingProjects
-                              }
+                            <SelectSearch
+                              value={projectSearch}
+                              loading={loadingProjects}
                               placeholder="Название или код проекта"
-                              onChange={(
-                                value,
-                              ) => {
-                                setProjectSearch(
-                                  value,
-                                );
+                              onChange={(value) => {
+                                setProjectSearch(value);
 
-                                if (
-                                  selectedProject
-                                ) {
-                                  setSelectedProject(
-                                    null,
-                                  );
+                                if (selectedProject) {
+                                  setSelectedProject(null);
                                 }
 
-                                setShowProjectDropdown(
-                                  true,
-                                );
+                                setShowProjectDropdown(true);
                               }}
                               onFocus={() => {
-                                setShowProjectDropdown(
-                                  true,
-                                );
+                                setShowProjectDropdown(true);
 
-                                if (
-                                  !projects.length
-                                ) {
+                                if (!projects.length) {
                                   loadProjectsForAll();
                                 }
                               }}
@@ -2451,61 +2080,47 @@ export default function NewTicketPage() {
                               <Dropdown>
                                 {loadingProjects ? (
                                   <DropdownEmpty>
-                                    Загружаем
-                                    проекты...
+                                    Загружаем проекты...
                                   </DropdownEmpty>
-                                ) : filteredProjects.length ===
-                                  0 ? (
+                                ) : filteredProjects.length === 0 ? (
                                   <DropdownEmpty>
-                                    Проекты не
-                                    найдены
+                                    Проекты не найдены
                                   </DropdownEmpty>
                                 ) : (
-                                  filteredProjects.map(
-                                    (
-                                      project,
-                                    ) => (
-                                      <button
-                                        key={
-                                          project.id
-                                        }
-                                        type="button"
-                                        onClick={() =>
-                                          selectProject(
-                                            project,
-                                          )
-                                        }
-                                        className="
-                                          flex w-full items-center gap-3
-                                          rounded-lg px-3 py-3
-                                          text-left
-                                          transition-colors
-                                          hover:bg-[var(--hover-2)]
-                                        "
-                                      >
-                                        <FolderOpen className="h-5 w-5 shrink-0 text-amber-400" />
+                                  filteredProjects.map((project) => (
+                                    <button
+                                      key={project.id}
+                                      type="button"
+                                      onClick={() =>
+                                        selectProject(project)
+                                      }
+                                      className="
+                                        flex w-full items-center gap-3
+                                        rounded-lg px-3 py-3
+                                        text-left transition-colors
+                                        hover:bg-[var(--hover-2)]
+                                      "
+                                    >
+                                      <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                                        <FolderOpen className="h-5 w-5 text-amber-400" />
+                                      </div>
 
-                                        <div className="min-w-0 flex-1">
-                                          <div className="truncate text-base text-[var(--text-primary)]">
-                                            {
-                                              project.name
-                                            }
-                                          </div>
-
-                                          <div className="mt-0.5 text-sm text-[var(--text-primary)]/45">
-                                            {
-                                              project.key
-                                            }
-                                          </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="truncate text-base font-medium text-[var(--text-primary)]">
+                                          {project.name}
                                         </div>
 
-                                        {selectedProject?.id ===
-                                          project.id && (
-                                          <Check className="h-5 w-5 shrink-0 text-emerald-400" />
-                                        )}
-                                      </button>
-                                    ),
-                                  )
+                                        <div className="text-sm text-[var(--text-primary)]/45">
+                                          {project.key}
+                                        </div>
+                                      </div>
+
+                                      {selectedProject?.id ===
+                                        project.id && (
+                                        <Check className="h-5 w-5 text-emerald-400" />
+                                      )}
+                                    </button>
+                                  ))
                                 )}
                               </Dropdown>
                             )}
@@ -2515,61 +2130,36 @@ export default function NewTicketPage() {
 
                       {/* Counterparty */}
 
-                      {selectionType ===
-                        'counterparty' && (
+                      {selectionType === 'counterparty' && (
                         <div>
                           <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
-                            Контрагент
-                            <span className="ml-1 text-red-400">
-                              *
-                            </span>
+                            Выберите контрагента
+                            <span className="ml-1 text-red-400">*</span>
                           </label>
 
                           <div
-                            ref={
-                              counterpartyDropdownRef
-                            }
+                            ref={counterpartyDropdownRef}
                             className="relative"
                           >
-                            <SearchInput
-                              value={
-                                counterpartySearch
-                              }
-                              loading={
-                                loadingCounterparties
-                              }
+                            <SelectSearch
+                              value={counterpartySearch}
+                              loading={loadingCounterparties}
                               placeholder="Название или ИНН"
-                              onChange={(
-                                value,
-                              ) => {
-                                setCounterpartySearch(
-                                  value,
-                                );
+                              onChange={(value) => {
+                                setCounterpartySearch(value);
 
-                                if (
-                                  selectedCounterparty
-                                ) {
-                                  setSelectedCounterparty(
-                                    null,
-                                  );
+                                if (selectedCounterparty) {
+                                  setSelectedCounterparty(null);
                                 }
 
-                                setShowCounterpartyDropdown(
-                                  true,
-                                );
+                                setShowCounterpartyDropdown(true);
 
-                                loadCounterparties(
-                                  value,
-                                );
+                                loadCounterparties(value);
                               }}
                               onFocus={() => {
-                                setShowCounterpartyDropdown(
-                                  true,
-                                );
+                                setShowCounterpartyDropdown(true);
 
-                                if (
-                                  !counterparties.length
-                                ) {
+                                if (!counterparties.length) {
                                   loadCounterparties();
                                 }
                               }}
@@ -2579,62 +2169,49 @@ export default function NewTicketPage() {
                               <Dropdown>
                                 {loadingCounterparties ? (
                                   <DropdownEmpty>
-                                    Загружаем
-                                    контрагентов...
+                                    Загружаем контрагентов...
                                   </DropdownEmpty>
-                                ) : counterparties.length ===
-                                  0 ? (
+                                ) : counterparties.length === 0 ? (
                                   <DropdownEmpty>
-                                    Контрагенты
-                                    не найдены
+                                    Контрагенты не найдены
                                   </DropdownEmpty>
                                 ) : (
-                                  counterparties.map(
-                                    (cp) => (
-                                      <button
-                                        key={
-                                          cp.id
-                                        }
-                                        type="button"
-                                        onClick={() =>
-                                          selectCounterparty(
-                                            cp,
-                                          )
-                                        }
-                                        className="
-                                          flex w-full items-center gap-3
-                                          rounded-lg px-3 py-3
-                                          text-left
-                                          transition-colors
-                                          hover:bg-[var(--hover-2)]
-                                        "
-                                      >
-                                        <Building2 className="h-5 w-5 shrink-0 text-blue-400" />
+                                  counterparties.map((cp) => (
+                                    <button
+                                      key={cp.id}
+                                      type="button"
+                                      onClick={() =>
+                                        selectCounterparty(cp)
+                                      }
+                                      className="
+                                        flex w-full items-center gap-3
+                                        rounded-lg px-3 py-3
+                                        text-left transition-colors
+                                        hover:bg-[var(--hover-2)]
+                                      "
+                                    >
+                                      <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                                        <Building2 className="h-5 w-5 text-blue-400" />
+                                      </div>
 
-                                        <div className="min-w-0 flex-1">
-                                          <div className="truncate text-base text-[var(--text-primary)]">
-                                            {cpName(
-                                              cp,
-                                            )}
-                                          </div>
-
-                                          {cp.inn && (
-                                            <div className="mt-0.5 text-sm text-[var(--text-primary)]/45">
-                                              ИНН{' '}
-                                              {
-                                                cp.inn
-                                              }
-                                            </div>
-                                          )}
+                                      <div className="min-w-0 flex-1">
+                                        <div className="truncate text-base font-medium text-[var(--text-primary)]">
+                                          {cpName(cp)}
                                         </div>
 
-                                        {selectedCounterparty?.id ===
-                                          cp.id && (
-                                          <Check className="h-5 w-5 shrink-0 text-emerald-400" />
+                                        {cp.inn && (
+                                          <div className="text-sm text-[var(--text-primary)]/45">
+                                            ИНН {cp.inn}
+                                          </div>
                                         )}
-                                      </button>
-                                    ),
-                                  )
+                                      </div>
+
+                                      {selectedCounterparty?.id ===
+                                        cp.id && (
+                                        <Check className="h-5 w-5 text-emerald-400" />
+                                      )}
+                                    </button>
+                                  ))
                                 )}
                               </Dropdown>
                             )}
@@ -2645,170 +2222,152 @@ export default function NewTicketPage() {
                       {/* Reporter */}
 
                       {canSelectReporter &&
-                        (selectedCounterparty ||
-                          selectedProject) && (
+                        (selectedCounterparty || selectedProject) && (
                           <div>
                             <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
                               Инициатор
-                              <span className="ml-2 text-sm font-normal text-[var(--text-primary)]/45">
-                                необязательно
-                              </span>
+                              <span className="ml-1 text-red-400">*</span>
                             </label>
 
                             <div
-                              ref={
-                                reporterDropdownRef
-                              }
+                              ref={reporterDropdownRef}
                               className="relative"
                             >
-                              <SearchInput
+                              <SelectSearch
+                                /*
+                                 * Если выбран другой пользователь,
+                                 * показываем его имя.
+                                 * Если выбран текущий — показываем имя текущего,
+                                 * а не пустое поле с отдельным "Выбран: Вы".
+                                 */
                                 value={
-                                  reporterSearch
+                                  selectedReporter
+                                    ? reporterSearch
+                                    : reporterSearch ||
+                                      actualReporter?.full_name ||
+                                      actualReporter?.username ||
+                                      actualReporter?.email ||
+                                      ''
                                 }
-                                loading={
-                                  loadingUsers
-                                }
-                                placeholder={
-                                  user?.full_name ||
-                                  user?.username ||
-                                  'Вы'
-                                }
-                                onChange={(
-                                  value,
-                                ) => {
-                                  setReporterSearch(
-                                    value,
-                                  );
+                                loading={loadingUsers}
+                                placeholder="Выберите инициатора"
+                                onChange={(value) => {
+                                  /*
+                                   * Как только пользователь начинает искать,
+                                   * очищаем явный выбор, но actualReporter
+                                   * всё ещё остаётся текущим пользователем
+                                   * до выбора другого.
+                                   */
+                                  setReporterSearch(value);
 
-                                  if (
-                                    selectedReporter
-                                  ) {
-                                    setSelectedReporter(
-                                      null,
-                                    );
+                                  if (selectedReporter) {
+                                    setSelectedReporter(null);
                                   }
 
-                                  setShowReporterDropdown(
-                                    true,
-                                  );
+                                  setShowReporterDropdown(true);
                                 }}
-                                onFocus={() =>
-                                  setShowReporterDropdown(
-                                    true,
-                                  )
-                                }
+                                onFocus={() => {
+                                  /*
+                                   * Для поиска по списку очищаем только
+                                   * отображаемый search, если сейчас используется
+                                   * implicit current user.
+                                   */
+                                  if (!selectedReporter) {
+                                    setReporterSearch('');
+                                  }
+
+                                  setShowReporterDropdown(true);
+                                }}
                               />
 
                               {showReporterDropdown && (
                                 <Dropdown>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedReporter(
-                                        null,
-                                      );
-                                      setReporterSearch(
-                                        '',
-                                      );
-                                      setShowReporterDropdown(
-                                        false,
-                                      );
-                                    }}
-                                    className="
-                                      flex w-full items-center gap-3
-                                      rounded-lg px-3 py-3
-                                      text-left
-                                      transition-colors
-                                      hover:bg-[var(--hover-2)]
-                                    "
-                                  >
-                                    <User className="h-5 w-5 shrink-0 text-emerald-400" />
-
-                                    <div className="min-w-0 flex-1">
-                                      <div className="truncate text-base text-[var(--text-primary)]">
-                                        {user?.full_name ||
-                                          user?.username ||
-                                          'Вы'}
+                                  {currentUserAsReporter && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedReporter(null);
+                                        setReporterSearch(
+                                          currentUserAsReporter.full_name ||
+                                            currentUserAsReporter.username ||
+                                            currentUserAsReporter.email,
+                                        );
+                                        setShowReporterDropdown(false);
+                                      }}
+                                      className="
+                                        flex w-full items-center gap-3
+                                        rounded-lg px-3 py-3
+                                        text-left transition-colors
+                                        hover:bg-[var(--hover-2)]
+                                      "
+                                    >
+                                      <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                                        <User className="h-5 w-5 text-emerald-400" />
                                       </div>
 
-                                      <div className="text-sm text-[var(--text-primary)]/45">
-                                        Текущий
-                                        пользователь
-                                      </div>
-                                    </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="truncate text-base font-medium text-[var(--text-primary)]">
+                                          {uName(currentUserAsReporter)}
+                                        </div>
 
-                                    {!selectedReporter && (
-                                      <Check className="h-5 w-5 text-emerald-400" />
-                                    )}
-                                  </button>
+                                        <div className="truncate text-sm text-[var(--text-primary)]/45">
+                                          {currentUserAsReporter.email}
+                                        </div>
+                                      </div>
+
+                                      {!selectedReporter && (
+                                        <Check className="h-5 w-5 text-emerald-400" />
+                                      )}
+                                    </button>
+                                  )}
 
                                   {loadingUsers ? (
                                     <DropdownEmpty>
-                                      Загружаем
-                                      пользователей...
+                                      Загружаем пользователей...
                                     </DropdownEmpty>
-                                  ) : filteredUsers.length ===
-                                    0 ? (
-                                    <DropdownEmpty>
-                                      Пользователи
-                                      не найдены
-                                    </DropdownEmpty>
+                                  ) : filteredUsers.length === 0 ? (
+                                    reporterSearch ? (
+                                      <DropdownEmpty>
+                                        Пользователи не найдены
+                                      </DropdownEmpty>
+                                    ) : null
                                   ) : (
-                                    filteredUsers.map(
-                                      (
-                                        item,
-                                      ) => (
-                                        <button
-                                          key={
-                                            item.id
-                                          }
-                                          type="button"
-                                          onClick={() => {
-                                            setSelectedReporter(
-                                              item,
-                                            );
+                                    filteredUsers.map((item) => (
+                                      <button
+                                        key={item.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedReporter(item);
+                                          setReporterSearch(uName(item));
+                                          setShowReporterDropdown(false);
+                                        }}
+                                        className="
+                                          flex w-full items-center gap-3
+                                          rounded-lg px-3 py-3
+                                          text-left transition-colors
+                                          hover:bg-[var(--hover-2)]
+                                        "
+                                      >
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                                          <User className="h-5 w-5 text-[var(--text-primary)]/45" />
+                                        </div>
 
-                                            setReporterSearch(
-                                              uName(
-                                                item,
-                                              ),
-                                            );
-
-                                            setShowReporterDropdown(
-                                              false,
-                                            );
-                                          }}
-                                          className="
-                                            flex w-full items-center gap-3
-                                            rounded-lg px-3 py-3
-                                            text-left
-                                            transition-colors
-                                            hover:bg-[var(--hover-2)]
-                                          "
-                                        >
-                                          <User className="h-5 w-5 shrink-0 text-[var(--text-primary)]/45" />
-
-                                          <div className="min-w-0 flex-1">
-                                            <div className="truncate text-base text-[var(--text-primary)]">
-                                              {uName(
-                                                item,
-                                              )}
-                                            </div>
-
-                                            <div className="truncate text-sm text-[var(--text-primary)]/45">
-                                              {
-                                                item.email
-                                              }
-                                            </div>
+                                        <div className="min-w-0 flex-1">
+                                          <div className="truncate text-base font-medium text-[var(--text-primary)]">
+                                            {uName(item)}
                                           </div>
 
-                                          {selectedReporter?.id ===
-                                            item.id && (
-                                            <Check className="h-5 w-5 text-emerald-400" />
-                                          )}
-                                        </button>
-                                      ),
-                                    )
+                                          <div className="truncate text-sm text-[var(--text-primary)]/45">
+                                            {item.email}
+                                          </div>
+                                        </div>
+
+                                        {selectedReporter?.id ===
+                                          item.id && (
+                                          <Check className="h-5 w-5 text-emerald-400" />
+                                        )}
+                                      </button>
+                                    ))
                                   )}
                                 </Dropdown>
                               )}
@@ -2822,33 +2381,27 @@ export default function NewTicketPage() {
 
               {/* Customer */}
 
-              {isCustomer &&
-                customerCounterparty && (
-                  <section>
-                    <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
-                      Организация
-                    </label>
+              {isCustomer && customerCounterparty && (
+                <section>
+                  <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
+                    Организация
+                  </label>
 
-                    <div className="flex items-center gap-3 text-base text-[var(--text-primary)]">
-                      <Building2 className="h-5 w-5 text-blue-400" />
+                  <div className="flex items-center gap-3 text-base text-[var(--text-primary)]">
+                    <Building2 className="h-5 w-5 text-blue-400" />
 
-                      <span>
-                        {cpName(
-                          customerCounterparty,
-                        )}
+                    <span>{cpName(customerCounterparty)}</span>
+
+                    {customerCounterparty.inn && (
+                      <span className="text-[var(--text-primary)]/45">
+                        · ИНН {customerCounterparty.inn}
                       </span>
+                    )}
+                  </div>
+                </section>
+              )}
 
-                      {customerCounterparty.inn && (
-                        <span className="text-[var(--text-primary)]/45">
-                          · ИНН{' '}
-                          {
-                            customerCounterparty.inn
-                          }
-                        </span>
-                      )}
-                    </div>
-                  </section>
-                )}
+              <div className="border-t border-[var(--border-color)]" />
 
               {/* Title */}
 
@@ -2861,13 +2414,7 @@ export default function NewTicketPage() {
                   <input
                     type="text"
                     value={title}
-                    onChange={(
-                      event,
-                    ) =>
-                      setTitle(
-                        event.target.value,
-                      )
-                    }
+                    onChange={(event) => setTitle(event.target.value)}
                     placeholder="Кратко опишите проблему или задачу"
                     className={`
                       input-field w-full py-3.5 text-lg
@@ -2888,9 +2435,7 @@ export default function NewTicketPage() {
               <section>
                 <label className="mb-3 block text-lg font-semibold text-[var(--text-primary)]">
                   Описание
-                  <span className="ml-1 text-red-400">
-                    *
-                  </span>
+                  <span className="ml-1 text-red-400">*</span>
                 </label>
 
                 <div
@@ -2903,17 +2448,15 @@ export default function NewTicketPage() {
                   }
                 >
                   <TicketEditor
-                    blocks={
-                      descriptionBlocks
-                    }
-                    onChange={
-                      setDescriptionBlocks
-                    }
+                    blocks={descriptionBlocks}
+                    onChange={setDescriptionBlocks}
                   />
                 </div>
               </section>
 
+              {/* =========================================================== */}
               {/* Files */}
+              {/* =========================================================== */}
 
               <section>
                 <div className="mb-3 flex items-baseline justify-between gap-3">
@@ -2926,90 +2469,86 @@ export default function NewTicketPage() {
                   </span>
                 </div>
 
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={handleGeneralFileSelect}
+                />
+
                 <div
-                  onDragEnter={(
-                    event,
-                  ) => {
-                    event.preventDefault();
-                    setIsDraggingFiles(
-                      true,
-                    );
+                  role="button"
+                  tabIndex={0}
+                  onClick={openFilePicker}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === 'Enter' ||
+                      event.key === ' '
+                    ) {
+                      event.preventDefault();
+                      openFilePicker();
+                    }
                   }}
-                  onDragOver={(
-                    event,
-                  ) => {
+                  onDragEnter={(event) => {
                     event.preventDefault();
-
-                    event.dataTransfer.dropEffect =
-                      'copy';
-
-                    setIsDraggingFiles(
-                      true,
-                    );
+                    setIsDraggingFiles(true);
                   }}
-                  onDragLeave={(
-                    event,
-                  ) => {
+                  onDragOver={(event) => {
                     event.preventDefault();
 
-                    const related =
-                      event.relatedTarget as
-                        | Node
-                        | null;
+                    event.dataTransfer.dropEffect = 'copy';
+
+                    setIsDraggingFiles(true);
+                  }}
+                  onDragLeave={(event) => {
+                    event.preventDefault();
+
+                    const related = event.relatedTarget as Node | null;
 
                     if (
                       related &&
-                      event.currentTarget.contains(
-                        related,
-                      )
+                      event.currentTarget.contains(related)
                     ) {
                       return;
                     }
 
-                    setIsDraggingFiles(
-                      false,
-                    );
+                    setIsDraggingFiles(false);
                   }}
-                  onDrop={
-                    handleGeneralDrop
-                  }
+                  onDrop={handleGeneralDrop}
                   className={`
-                    relative flex min-h-[135px]
+                    group flex min-h-[130px] cursor-pointer
                     items-center justify-center
                     rounded-2xl border-2 border-dashed
-                    px-6 py-5
-                    transition-all duration-150
+                    px-6 py-6
+                    outline-none transition
                     ${
                       isDraggingFiles
                         ? 'border-amber-400 bg-amber-500/10'
-                        : 'border-[var(--border-color)] bg-[var(--hover-1)]/35 hover:bg-[var(--hover-1)]/60'
+                        : 'border-[var(--border-color)] bg-[var(--hover-1)]/35 hover:border-amber-500/40 hover:bg-amber-500/[0.04]'
                     }
                   `}
                 >
-                  {isDraggingFiles && (
-                    <div className="pointer-events-none absolute inset-2 rounded-xl border border-amber-400/30" />
-                  )}
-
-                  <div className="relative flex flex-col items-center text-center sm:flex-row sm:gap-4 sm:text-left">
+                  <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:text-left">
                     <div
                       className={`
-                        mb-3 flex h-12 w-12 shrink-0
-                        items-center justify-center
-                        rounded-xl sm:mb-0
+                        flex h-14 w-14 shrink-0
+                        items-center justify-center rounded-xl
+                        transition
                         ${
                           isDraggingFiles
                             ? 'bg-amber-500/20'
-                            : 'bg-[var(--hover-2)]'
+                            : 'bg-[var(--hover-2)] group-hover:bg-amber-500/10'
                         }
                       `}
                     >
                       <Upload
                         className={`
-                          h-6 w-6
+                          h-7 w-7 transition
                           ${
                             isDraggingFiles
                               ? 'text-amber-400'
-                              : 'text-[var(--text-primary)]/50'
+                              : 'text-[var(--text-primary)]/50 group-hover:text-amber-400'
                           }
                         `}
                       />
@@ -3018,7 +2557,7 @@ export default function NewTicketPage() {
                     <div>
                       <p
                         className={`
-                          text-base font-medium
+                          text-base font-semibold
                           ${
                             isDraggingFiles
                               ? 'text-amber-300'
@@ -3028,100 +2567,70 @@ export default function NewTicketPage() {
                       >
                         {isDraggingFiles
                           ? 'Отпустите файлы здесь'
-                          : 'Перетащите файлы сюда'}
+                          : 'Нажмите или перетащите файлы сюда'}
                       </p>
 
-                      {!isDraggingFiles && (
-                        <div className="mt-1 flex flex-wrap items-center justify-center gap-1 text-sm text-[var(--text-primary)]/45 sm:justify-start">
-                          <span>
-                            или
-                          </span>
-
-                          <label className="cursor-pointer font-medium text-amber-400 hover:text-amber-300">
-                            выберите на
-                            компьютере
-
-                            <input
-                              type="file"
-                              multiple
-                              className="hidden"
-                              onChange={
-                                handleGeneralFileSelect
-                              }
-                            />
-                          </label>
-                        </div>
-                      )}
+                      <p className="mt-1 text-sm text-[var(--text-primary)]/45">
+                        Нажать можно в любом месте этой области
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                {generalFiles.length >
-                  0 && (
+                {generalFiles.length > 0 && (
                   <div className="mt-3 space-y-2">
-                    {generalFiles.map(
-                      (item) => (
-                        <div
-                          key={
-                            item.id
-                          }
+                    {generalFiles.map((item) => (
+                      <div
+                        key={item.id}
+                        className="
+                          flex items-center gap-3
+                          rounded-xl bg-[var(--hover-1)]
+                          px-3 py-3
+                        "
+                      >
+                        {item.preview ? (
+                          <img
+                            src={item.preview}
+                            alt=""
+                            className="h-11 w-11 shrink-0 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[var(--hover-2)]">
+                            <File className="h-5 w-5 text-[var(--text-primary)]/45" />
+                          </div>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-base text-[var(--text-primary)]">
+                            {item.file.name}
+                          </p>
+
+                          <p className="text-sm text-[var(--text-primary)]/40">
+                            {formatFileSize(item.file.size)}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            /*
+                             * Не открываем file picker при клике
+                             * по удалению файла.
+                             */
+                            event.stopPropagation();
+                            removeGeneralFile(item.id);
+                          }}
                           className="
-                            flex items-center gap-3
-                            rounded-xl
-                            bg-[var(--hover-1)]
-                            px-3 py-3
+                            rounded-lg p-2
+                            text-[var(--text-primary)]/40
+                            transition
+                            hover:bg-red-500/10 hover:text-red-400
                           "
                         >
-                          {item.preview ? (
-                            <img
-                              src={
-                                item.preview
-                              }
-                              alt=""
-                              className="h-11 w-11 shrink-0 rounded-lg object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[var(--hover-2)]">
-                              <File className="h-5 w-5 text-[var(--text-primary)]/45" />
-                            </div>
-                          )}
-
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-base text-[var(--text-primary)]">
-                              {
-                                item.file
-                                  .name
-                              }
-                            </p>
-
-                            <p className="text-sm text-[var(--text-primary)]/40">
-                              {formatFileSize(
-                                item.file
-                                  .size,
-                              )}
-                            </p>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              removeGeneralFile(
-                                item.id,
-                              )
-                            }
-                            className="
-                              rounded-lg p-2
-                              text-[var(--text-primary)]/40
-                              transition
-                              hover:bg-red-500/10
-                              hover:text-red-400
-                            "
-                          >
-                            <X className="h-5 w-5" />
-                          </button>
-                        </div>
-                      ),
-                    )}
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </section>
@@ -3140,82 +2649,63 @@ export default function NewTicketPage() {
                 </h2>
 
                 <p className="mt-1 text-base text-[var(--text-primary)]/50">
-                  Укажите тип, приоритет
-                  и подходящие теги
+                  Укажите тип, приоритет и тематику заявки
                 </p>
               </div>
 
-              {/* AI loading */}
+              {/* AI */}
 
-              {aiLoading &&
-                !aiTimedOut && (
-                  <div className="mb-7 flex items-center gap-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-5 py-4">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
-                      <Loader2 className="h-6 w-6 animate-spin text-amber-400" />
-                    </div>
+              {aiLoading && !aiTimedOut && (
+                <div className="mb-7 flex items-center gap-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-5 py-4">
+                  <Loader2 className="h-6 w-6 shrink-0 animate-spin text-amber-400" />
 
-                    <div>
-                      <p className="text-base font-semibold text-[var(--text-primary)]">
-                        Анализируем
-                        заявку
-                      </p>
+                  <div>
+                    <p className="text-base font-semibold text-[var(--text-primary)]">
+                      Анализируем заявку
+                    </p>
 
-                      <p className="mt-0.5 text-sm text-[var(--text-primary)]/55">
-                        Подбираем
-                        приоритет и теги
-                      </p>
-                    </div>
+                    <p className="text-sm text-[var(--text-primary)]/55">
+                      Подбираем приоритет и теги
+                    </p>
                   </div>
-                )}
+                </div>
+              )}
 
-              {/* AI timeout */}
+              {aiTimedOut && !aiSuggestion && (
+                <div className="mb-7 flex items-center gap-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-5 py-4">
+                  <Clock className="h-6 w-6 shrink-0 text-amber-400" />
 
-              {aiTimedOut &&
-                !aiSuggestion && (
-                  <div className="mb-7 flex items-center gap-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-5 py-4">
-                    <Clock className="h-6 w-6 shrink-0 text-amber-400" />
+                  <div>
+                    <p className="text-base font-semibold text-[var(--text-primary)]">
+                      Не удалось подобрать классификацию
+                    </p>
 
-                    <div>
-                      <p className="text-base font-semibold text-[var(--text-primary)]">
-                        Не удалось подобрать
-                        классификацию
-                      </p>
-
-                      <p className="mt-0.5 text-sm text-[var(--text-primary)]/55">
-                        Выберите параметры
-                        вручную
-                      </p>
-                    </div>
+                    <p className="text-sm text-[var(--text-primary)]/55">
+                      Выберите параметры вручную
+                    </p>
                   </div>
-                )}
+                </div>
+              )}
 
-              {/* AI result */}
+              {aiSuggestion && !aiLoading && (
+                <div className="mb-7 flex items-center gap-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-5 py-4">
+                  <Zap className="h-6 w-6 shrink-0 text-amber-400" />
 
-              {aiSuggestion &&
-                !aiLoading && (
-                  <div className="mb-7 flex items-center gap-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-5 py-4">
-                    <Zap className="h-6 w-6 shrink-0 text-amber-400" />
+                  <div>
+                    <p className="text-base font-semibold text-[var(--text-primary)]">
+                      Классификация подобрана
+                    </p>
 
-                    <div>
-                      <p className="text-base font-semibold text-[var(--text-primary)]">
-                        Классификация
-                        подобрана
-                      </p>
-
-                      <p className="mt-0.5 text-sm text-[var(--text-primary)]/55">
-                        Проверьте
-                        предложенные
-                        параметры перед
-                        продолжением
-                      </p>
-                    </div>
+                    <p className="text-sm text-[var(--text-primary)]/55">
+                      Проверьте параметры и измените при необходимости
+                    </p>
                   </div>
-                )}
+                </div>
+              )}
 
               <div
                 className={
-                  aiLoading &&
-                  !aiTimedOut
+                  aiLoading && !aiTimedOut
                     ? 'pointer-events-none opacity-50'
                     : ''
                 }
@@ -3228,400 +2718,305 @@ export default function NewTicketPage() {
                   </label>
 
                   <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {TICKET_TYPES.map(
-                      (item) => {
-                        const selected =
-                          type ===
-                          item.value;
+                    {TICKET_TYPES.map((item) => {
+                      const selected = type === item.value;
+                      const Icon = item.icon;
 
-                        const Icon =
-                          item.icon;
-
-                        return (
-                          <button
-                            key={
-                              item.value
+                      return (
+                        <button
+                          key={item.value}
+                          type="button"
+                          onClick={() =>
+                            setType(item.value as TicketType)
+                          }
+                          className={`
+                            flex min-h-[76px] items-center gap-3
+                            rounded-xl border px-4 py-3
+                            text-left transition
+                            ${
+                              selected
+                                ? 'border-[var(--accent)]/50 bg-[var(--accent)]/10'
+                                : 'border-[var(--border-color)] bg-[var(--hover-1)]/40 hover:bg-[var(--hover-1)]'
                             }
-                            type="button"
-                            onClick={() =>
-                              setType(
-                                item.value as TicketType,
-                              )
-                            }
-                            className={`
-                              flex min-h-[78px] items-center gap-4
-                              rounded-xl border
-                              px-4 py-3.5
-                              text-left
-                              transition
-                              ${
-                                selected
-                                  ? 'border-[var(--accent)]/50 bg-[var(--accent)]/10'
-                                  : 'border-[var(--border-color)] bg-[var(--hover-1)]/40 hover:bg-[var(--hover-1)]'
-                              }
-                            `}
-                          >
-                            <Icon
-                              className={`h-6 w-6 shrink-0 ${item.color}`}
-                            />
+                          `}
+                        >
+                          <Icon
+                            className={`h-6 w-6 shrink-0 ${item.color}`}
+                          />
 
-                            <div className="min-w-0 flex-1">
-                              <p className="text-base font-semibold text-[var(--text-primary)]">
-                                {
-                                  item.label
-                                }
-                              </p>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-base font-semibold text-[var(--text-primary)]">
+                              {item.label}
+                            </p>
 
-                              <p className="mt-0.5 text-sm text-[var(--text-primary)]/45">
-                                {
-                                  item.desc
-                                }
-                              </p>
-                            </div>
+                            <p className="text-sm text-[var(--text-primary)]/45">
+                              {item.desc}
+                            </p>
+                          </div>
 
-                            {selected && (
-                              <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)]" />
-                            )}
-                          </button>
-                        );
-                      },
-                    )}
+                          {selected && (
+                            <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)]" />
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </section>
 
                 {/* Priority */}
 
-                <section className="mt-9 border-t border-[var(--border-color)] pt-8">
+                <section className="mt-8 border-t border-[var(--border-color)] pt-7">
                   <label className="block text-lg font-semibold text-[var(--text-primary)]">
                     Приоритет
                   </label>
 
                   <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    {PRIORITIES.map(
-                      (item) => {
-                        const selected =
-                          priority ===
-                          item.value;
+                    {PRIORITIES.map((item) => {
+                      const selected = priority === item.value;
+                      const Icon = item.icon;
 
-                        const Icon =
-                          item.icon;
-
-                        return (
-                          <button
-                            key={
-                              item.value
+                      return (
+                        <button
+                          key={item.value}
+                          type="button"
+                          onClick={() =>
+                            setPriority(item.value as TicketPriority)
+                          }
+                          className={`
+                            relative flex min-h-[98px]
+                            items-center gap-3
+                            rounded-xl border px-4 py-4
+                            text-left transition
+                            ${
+                              selected
+                                ? item.selected
+                                : 'border-[var(--border-color)] bg-[var(--hover-1)]/40 hover:bg-[var(--hover-1)]'
                             }
-                            type="button"
-                            onClick={() =>
-                              setPriority(
-                                item.value as TicketPriority,
-                              )
-                            }
-                            className={`
-                              relative min-h-[145px]
-                              rounded-xl border
-                              px-4 py-5
-                              text-center
-                              transition-all
-                              ${
-                                selected
-                                  ? item.selected
-                                  : 'border-[var(--border-color)] bg-[var(--hover-1)]/40 hover:bg-[var(--hover-1)]'
-                              }
-                            `}
-                          >
-                            {selected && (
-                              <CheckCircle2 className="absolute right-3 top-3 h-5 w-5 text-[var(--text-primary)]/65" />
-                            )}
+                          `}
+                        >
+                          <Icon
+                            className={`h-8 w-8 shrink-0 ${item.iconColor}`}
+                          />
 
-                            <Icon
-                              className={`
-                                mx-auto mb-3
-                                h-10 w-10
-                                ${item.color}
-                                ${
-                                  selected
-                                    ? 'opacity-100'
-                                    : 'opacity-70'
-                                }
-                              `}
-                            />
-
+                          <div className="min-w-0">
                             <p className="text-base font-semibold text-[var(--text-primary)]">
-                              {
-                                item.label
-                              }
+                              {item.label}
                             </p>
 
-                            <p className="mt-1 text-sm text-[var(--text-primary)]/50">
-                              {
-                                item.desc
-                              }
+                            <p className="mt-0.5 text-sm leading-snug text-[var(--text-primary)]/45">
+                              {item.desc}
                             </p>
-                          </button>
-                        );
-                      },
-                    )}
+                          </div>
+
+                          {selected && (
+                            <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-[var(--text-primary)]/60" />
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </section>
 
+                {/* ========================================================= */}
                 {/* Tags */}
+                {/* ========================================================= */}
 
-                <section className="mt-9 border-t border-[var(--border-color)] pt-8">
-                  <div className="flex items-baseline gap-2">
-                    <label className="text-lg font-semibold text-[var(--text-primary)]">
-                      Теги
-                    </label>
+                <section className="mt-8 border-t border-[var(--border-color)] pt-7">
+                  <div>
+                    <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+                      Тематика
+                    </h3>
 
-                    <span className="text-sm text-[var(--text-primary)]/40">
-                      необязательно
-                    </span>
+                    <p className="mt-1 text-base text-[var(--text-primary)]/50">
+                      Что затрагивает заявка? Можно выбрать несколько вариантов.
+                    </p>
                   </div>
 
-                  {aiSuggestedTags.length >
-                    0 && (
-                    <div className="mt-4">
-                      <p className="mb-2 text-sm font-medium text-amber-400">
-                        Предложенные теги
+                  {/* Selected */}
+
+                  {tags.length > 0 && (
+                    <div className="mt-5">
+                      <p className="mb-2 text-sm font-medium text-[var(--text-primary)]/55">
+                        Выбрано
                       </p>
 
                       <div className="flex flex-wrap gap-2">
-                        {aiSuggestedTags.map(
-                          (tag) => {
-                            const selected =
-                              tags.some(
-                                (
-                                  current,
-                                ) =>
-                                  current.name ===
-                                  tag.name,
-                              );
-
-                            return (
-                              <button
-                                key={
-                                  tag.name
-                                }
-                                type="button"
-                                onClick={() =>
-                                  togglePresetTag(
-                                    tag,
-                                  )
-                                }
-                                className={`
-                                  inline-flex items-center gap-2
-                                  rounded-lg border
-                                  px-4 py-2
-                                  text-base
-                                  transition
-                                  ${
-                                    selected
-                                      ? 'border-amber-500/40 bg-amber-500/10 text-amber-300'
-                                      : 'border-[var(--border-color)] bg-[var(--hover-1)] text-[var(--text-primary)]/65 hover:bg-[var(--hover-2)]'
-                                  }
-                                `}
-                              >
-                                {selected && (
-                                  <Check className="h-4 w-4" />
-                                )}
-
-                                {
-                                  tag.name
-                                }
-                              </button>
-                            );
-                          },
-                        )}
+                        {tags.map((tag) => (
+                          <button
+                            key={tag.name}
+                            type="button"
+                            onClick={() => removeTag(tag.name)}
+                            className="
+                              inline-flex items-center gap-2
+                              rounded-lg border
+                              px-3.5 py-2
+                              text-base font-medium
+                              transition hover:brightness-110
+                            "
+                            style={{
+                              backgroundColor: `${
+                                tag.color || '#94a3b8'
+                              }18`,
+                              borderColor: `${
+                                tag.color || '#94a3b8'
+                              }55`,
+                              color: tag.color || '#cbd5e1',
+                            }}
+                            title="Нажмите, чтобы убрать"
+                          >
+                            {tag.name}
+                            <X className="h-4 w-4 opacity-70" />
+                          </button>
+                        ))}
                       </div>
                     </div>
                   )}
 
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {PRESET_TAGS.map(
-                      (tag) => {
-                        const selected =
-                          tags.some(
+                  {/* AI tags */}
+
+                  {cleanAiTags.length > 0 && (
+                    <div className="mt-5">
+                      <p className="mb-2 text-sm font-medium text-amber-400">
+                        Предложено по описанию
+                      </p>
+
+                      <div className="flex flex-wrap gap-2">
+                        {cleanAiTags
+                          .filter(
+                            (tag) =>
+                              !tags.some(
+                                (current) =>
+                                  current.name.toLowerCase() ===
+                                  tag.name.toLowerCase(),
+                              ),
+                          )
+                          .map((tag) => (
+                            <button
+                              key={tag.name}
+                              type="button"
+                              onClick={() => toggleTag(tag)}
+                              className="
+                                inline-flex items-center gap-2
+                                rounded-lg border border-amber-500/30
+                                bg-amber-500/[0.06]
+                                px-3.5 py-2
+                                text-base text-amber-300
+                                transition hover:bg-amber-500/10
+                              "
+                            >
+                              <Plus className="h-4 w-4" />
+                              {tag.name}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Available */}
+
+                  <div className="mt-5">
+                    <p className="mb-2 text-sm font-medium text-[var(--text-primary)]/55">
+                      Добавить тематику
+                    </p>
+
+                    <div className="flex flex-wrap gap-2">
+                      {PRESET_TAGS.filter(
+                        (tag) =>
+                          !tags.some(
                             (current) =>
-                              current.name ===
-                              tag.name,
-                          );
+                              current.name.toLowerCase() ===
+                              tag.name.toLowerCase(),
+                          ),
+                      ).map((tag) => (
+                        <button
+                          key={tag.name}
+                          type="button"
+                          onClick={() => toggleTag(tag)}
+                          className="
+                            inline-flex items-center gap-2
+                            rounded-lg border border-[var(--border-color)]
+                            bg-[var(--hover-1)]
+                            px-3.5 py-2
+                            text-base text-[var(--text-primary)]/70
+                            transition
+                            hover:bg-[var(--hover-2)]
+                            hover:text-[var(--text-primary)]
+                          "
+                        >
+                          <Plus className="h-4 w-4 text-[var(--text-primary)]/35" />
+                          {tag.name}
+                        </button>
+                      ))}
 
-                        return (
-                          <button
-                            key={
-                              tag.name
-                            }
-                            type="button"
-                            onClick={() =>
-                              togglePresetTag(
-                                tag,
-                              )
-                            }
-                            className={`
-                              inline-flex items-center gap-2
-                              rounded-lg border
-                              px-4 py-2
-                              text-base
-                              transition
-                              ${
-                                selected
-                                  ? ''
-                                  : 'border-[var(--border-color)] bg-[var(--hover-1)] text-[var(--text-primary)]/65 hover:bg-[var(--hover-2)]'
-                              }
-                            `}
-                            style={
-                              selected
-                                ? {
-                                    backgroundColor: `${tag.color}18`,
-                                    borderColor: `${tag.color}55`,
-                                    color:
-                                      tag.color,
-                                  }
-                                : undefined
-                            }
-                          >
-                            {selected && (
-                              <Check className="h-4 w-4" />
-                            )}
-
-                            {
-                              tag.name
-                            }
-                          </button>
-                        );
-                      },
-                    )}
-                  </div>
-
-                  <div className="mt-4">
-                    {!showCustomTagInput ? (
                       <button
                         type="button"
                         onClick={() =>
-                          setShowCustomTagInput(
-                            true,
-                          )
+                          setShowCustomTagInput(true)
                         }
-                        className="inline-flex items-center gap-2 text-base font-medium text-[var(--accent)] hover:opacity-80"
+                        className="
+                          inline-flex items-center gap-2
+                          rounded-lg border border-dashed
+                          border-[var(--text-primary)]/20
+                          px-3.5 py-2 text-base
+                          text-[var(--text-primary)]/55
+                          transition
+                          hover:border-[var(--text-primary)]/35
+                          hover:text-[var(--text-primary)]
+                        "
                       >
                         <Plus className="h-4 w-4" />
-                        Добавить свой тег
+                        Свой тег
                       </button>
-                    ) : (
-                      <div className="flex max-w-lg gap-2">
-                        <input
-                          value={
-                            newTagInput
-                          }
-                          onChange={(
-                            event,
-                          ) =>
-                            setNewTagInput(
-                              event.target
-                                .value,
-                            )
-                          }
-                          onKeyDown={(
-                            event,
-                          ) => {
-                            if (
-                              event.key ===
-                              'Enter'
-                            ) {
-                              event.preventDefault();
-                              addCustomTag();
-                            }
-                          }}
-                          placeholder="Название тега"
-                          className="input-field min-w-0 flex-1 py-3 text-base"
-                        />
-
-                        <button
-                          type="button"
-                          disabled={
-                            !newTagInput.trim()
-                          }
-                          onClick={
-                            addCustomTag
-                          }
-                          className="
-                            rounded-xl
-                            bg-[var(--accent)]
-                            px-5 py-3
-                            text-base font-medium
-                            text-white
-                            disabled:opacity-40
-                          "
-                        >
-                          Добавить
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowCustomTagInput(
-                              false,
-                            );
-                            setNewTagInput(
-                              '',
-                            );
-                          }}
-                          className="rounded-xl px-3 text-[var(--text-primary)]/40 hover:bg-[var(--hover-1)]"
-                        >
-                          <X className="h-5 w-5" />
-                        </button>
-                      </div>
-                    )}
+                    </div>
                   </div>
 
-                  {tags.length > 0 && (
-                    <div className="mt-5 flex flex-wrap gap-2">
-                      {tags.map(
-                        (tag) => (
-                          <span
-                            key={
-                              tag.name
-                            }
-                            className="
-                              inline-flex items-center gap-2
-                              rounded-lg border
-                              px-3 py-2
-                              text-sm font-medium
-                            "
-                            style={{
-                              backgroundColor: `${
-                                tag.color ||
-                                '#71717a'
-                              }14`,
+                  {showCustomTagInput && (
+                    <div className="mt-4 flex max-w-xl gap-2">
+                      <input
+                        autoFocus
+                        value={newTagInput}
+                        onChange={(event) =>
+                          setNewTagInput(event.target.value)
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            addCustomTag();
+                          }
 
-                              borderColor: `${
-                                tag.color ||
-                                '#71717a'
-                              }40`,
+                          if (event.key === 'Escape') {
+                            setNewTagInput('');
+                            setShowCustomTagInput(false);
+                          }
+                        }}
+                        placeholder="Например: касса, ЭДО, телефония..."
+                        className="input-field min-w-0 flex-1 py-3 text-base"
+                      />
 
-                              color:
-                                tag.color ||
-                                '#d1d5db',
-                            }}
-                          >
-                            {
-                              tag.name
-                            }
+                      <button
+                        type="button"
+                        disabled={!newTagInput.trim()}
+                        onClick={addCustomTag}
+                        className="
+                          rounded-xl bg-[var(--accent)]
+                          px-5 py-3
+                          text-base font-medium text-white
+                          disabled:opacity-40
+                        "
+                      >
+                        Добавить
+                      </button>
 
-                            <button
-                              type="button"
-                              onClick={() =>
-                                removeTag(
-                                  tag.name,
-                                )
-                              }
-                              className="opacity-60 hover:opacity-100"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </span>
-                        ),
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewTagInput('');
+                          setShowCustomTagInput(false);
+                        }}
+                        className="rounded-xl px-3 text-[var(--text-primary)]/45 hover:bg-[var(--hover-1)]"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
                     </div>
                   )}
                 </section>
@@ -3635,291 +3030,289 @@ export default function NewTicketPage() {
 
           {step === 3 && (
             <div>
-              <div className="mb-8">
+              <div className="mb-7">
                 <h2 className="text-2xl font-semibold text-[var(--text-primary)]">
-                  Проверьте заявку
+                  Проверка заявки
                 </h2>
 
                 <p className="mt-1 text-base text-[var(--text-primary)]/50">
-                  Убедитесь, что всё указано
-                  верно перед отправкой
+                  Проверьте основные данные перед отправкой
                 </p>
               </div>
 
-              <div className="grid gap-x-8 gap-y-7 lg:grid-cols-2">
-                {/* Binding */}
-
-                <section>
-                  <p className="mb-2 text-sm font-medium text-[var(--text-primary)]/45">
-                    Привязка
-                  </p>
-
-                  {selectedProject ? (
-                    <div className="flex items-center gap-3">
-                      <FolderOpen className="h-6 w-6 shrink-0 text-amber-400" />
-
-                      <div>
-                        <p className="text-base font-semibold text-[var(--text-primary)]">
-                          {
-                            selectedProject.name
-                          }
-                        </p>
-
-                        <p className="text-sm text-[var(--text-primary)]/45">
-                          {
-                            selectedProject.key
-                          }
-                        </p>
-                      </div>
-                    </div>
-                  ) : selectedCounterparty ? (
-                    <div className="flex items-center gap-3">
-                      <Building2 className="h-6 w-6 shrink-0 text-blue-400" />
-
-                      <p className="text-base font-semibold text-[var(--text-primary)]">
-                        {cpName(
-                          selectedCounterparty,
-                        )}
-                      </p>
-                    </div>
-                  ) : isCustomer &&
-                    customerCounterparty ? (
-                    <div className="flex items-center gap-3">
-                      <Building2 className="h-6 w-6 shrink-0 text-blue-400" />
-
-                      <p className="text-base font-semibold text-[var(--text-primary)]">
-                        {cpName(
-                          customerCounterparty,
-                        )}
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="text-base text-[var(--text-primary)]/55">
-                      Без привязки
-                    </p>
-                  )}
-                </section>
-
-                {/* Reporter */}
-
-                <section>
-                  <p className="mb-2 text-sm font-medium text-[var(--text-primary)]/45">
-                    Инициатор
-                  </p>
-
-                  <div className="flex items-center gap-3">
-                    <User className="h-6 w-6 shrink-0 text-emerald-400" />
-
-                    <div>
-                      <p className="text-base font-semibold text-[var(--text-primary)]">
-                        {selectedReporter
-                          ? uName(
-                              selectedReporter,
-                            )
-                          : user?.full_name ||
-                            user?.username ||
-                            'Вы'}
-                      </p>
-
-                      <p className="text-sm text-[var(--text-primary)]/45">
-                        {selectedReporter
-                          ? selectedReporter.email
-                          : user?.email}
-                      </p>
-                    </div>
-                  </div>
-                </section>
-              </div>
-
-              <div className="my-8 border-t border-[var(--border-color)]" />
-
-              {/* Title */}
+              {/* =========================================================== */}
+              {/* Main information */}
+              {/* =========================================================== */}
 
               <section>
-                <p className="mb-2 text-sm font-medium text-[var(--text-primary)]/45">
-                  Тема
-                </p>
+                <div className="mb-4 flex items-center justify-between gap-4">
+                  <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+                    Основное
+                  </h3>
 
-                <p className="break-words text-xl font-semibold text-[var(--text-primary)]">
-                  {title || '—'}
-                </p>
-              </section>
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="
+                      text-sm font-medium text-[var(--accent)]
+                      transition hover:opacity-80
+                    "
+                  >
+                    Изменить
+                  </button>
+                </div>
 
-              {/* Description */}
+                <div className="rounded-xl border border-[var(--border-color)]">
+                  <div className="grid gap-5 border-b border-[var(--border-color)] p-5 md:grid-cols-2">
+                    <div>
+                      <p className="mb-2 text-sm text-[var(--text-primary)]/45">
+                        Привязка
+                      </p>
 
-              <section className="mt-7">
-                <p className="mb-3 text-sm font-medium text-[var(--text-primary)]/45">
-                  Описание
-                </p>
+                      {selectedProject ? (
+                        <div className="flex items-center gap-3">
+                          <FolderOpen className="h-5 w-5 shrink-0 text-amber-400" />
 
-                <div className="space-y-4">
-                  {descriptionBlocks.map(
-                    (block) => {
-                      if (
-                        block.type ===
-                        'text'
-                      ) {
-                        if (
-                          !block.value.trim()
-                        ) {
-                          return null;
+                          <div>
+                            <p className="text-base font-medium text-[var(--text-primary)]">
+                              {selectedProject.name}
+                            </p>
+
+                            <p className="text-sm text-[var(--text-primary)]/45">
+                              {selectedProject.key}
+                            </p>
+                          </div>
+                        </div>
+                      ) : selectedCounterparty ? (
+                        <div className="flex items-center gap-3">
+                          <Building2 className="h-5 w-5 shrink-0 text-blue-400" />
+
+                          <p className="text-base font-medium text-[var(--text-primary)]">
+                            {cpName(selectedCounterparty)}
+                          </p>
+                        </div>
+                      ) : isCustomer && customerCounterparty ? (
+                        <div className="flex items-center gap-3">
+                          <Building2 className="h-5 w-5 shrink-0 text-blue-400" />
+
+                          <p className="text-base font-medium text-[var(--text-primary)]">
+                            {cpName(customerCounterparty)}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-base text-[var(--text-primary)]/60">
+                          Без привязки
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="mb-2 text-sm text-[var(--text-primary)]/45">
+                        Инициатор
+                      </p>
+
+                      <div className="flex items-center gap-3">
+                        <User className="h-5 w-5 shrink-0 text-emerald-400" />
+
+                        <div>
+                          <p className="text-base font-medium text-[var(--text-primary)]">
+                            {actualReporter
+                              ? uName(actualReporter)
+                              : '—'}
+                          </p>
+
+                          {actualReporter?.email && (
+                            <p className="text-sm text-[var(--text-primary)]/45">
+                              {actualReporter.email}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Subject + description now form one logical unit */}
+
+                  <div className="p-5">
+                    <p className="mb-2 text-sm text-[var(--text-primary)]/45">
+                      Тема
+                    </p>
+
+                    <p className="text-lg font-semibold text-[var(--text-primary)]">
+                      {title || '—'}
+                    </p>
+
+                    <div className="my-5 border-t border-[var(--border-color)]" />
+
+                    <p className="mb-3 text-sm text-[var(--text-primary)]/45">
+                      Описание
+                    </p>
+
+                    <div className="space-y-4">
+                      {descriptionBlocks.map((block) => {
+                        if (block.type === 'text') {
+                          if (!block.value.trim()) return null;
+
+                          return (
+                            <div
+                              key={block.id}
+                              className="
+                                whitespace-pre-wrap break-words
+                                text-base leading-7
+                                text-[var(--text-primary)]/90
+                              "
+                            >
+                              {renderInlineFormatting(block.value)}
+                            </div>
+                          );
                         }
 
-                        return (
-                          <div
-                            key={
-                              block.id
-                            }
-                            className="whitespace-pre-wrap break-words text-base leading-7 text-[var(--text-primary)]/90"
-                          >
-                            {renderInlineFormatting(
-                              block.value,
-                            )}
-                          </div>
-                        );
-                      }
+                        if (
+                          block.type === 'image' &&
+                          block.localPreview
+                        ) {
+                          return (
+                            <img
+                              key={block.id}
+                              src={block.localPreview}
+                              alt="Вложение"
+                              className="
+                                max-h-[420px] max-w-full
+                                rounded-xl
+                                border border-[var(--border-color)]
+                                object-contain
+                              "
+                            />
+                          );
+                        }
 
-                      if (
-                        block.type ===
-                          'image' &&
-                        block.localPreview
-                      ) {
-                        return (
-                          <img
-                            key={
-                              block.id
-                            }
-                            src={
-                              block.localPreview
-                            }
-                            alt="Вложение"
-                            className="max-h-[420px] max-w-full rounded-xl border border-[var(--border-color)] object-contain"
+                        return null;
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* =========================================================== */}
+              {/* Classification */}
+              {/* =========================================================== */}
+
+              <section className="mt-8">
+                <div className="mb-4 flex items-center justify-between gap-4">
+                  <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+                    Классификация
+                  </h3>
+
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="
+                      text-sm font-medium text-[var(--accent)]
+                      transition hover:opacity-80
+                    "
+                  >
+                    Изменить
+                  </button>
+                </div>
+
+                <div className="rounded-xl border border-[var(--border-color)] p-5">
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    <div>
+                      <p className="mb-2 text-sm text-[var(--text-primary)]/45">
+                        Тип заявки
+                      </p>
+
+                      {currentType && (
+                        <div className="flex items-center gap-3">
+                          <currentType.icon
+                            className={`h-6 w-6 ${currentType.color}`}
                           />
-                        );
-                      }
 
-                      return null;
-                    },
+                          <span className="text-base font-semibold text-[var(--text-primary)]">
+                            {currentType.label}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="mb-2 text-sm text-[var(--text-primary)]/45">
+                        Приоритет
+                      </p>
+
+                      {currentPriority && (
+                        <div className="flex items-center gap-3">
+                          <currentPriority.icon
+                            className={`h-7 w-7 ${currentPriority.iconColor}`}
+                          />
+
+                          <span className="text-base font-semibold text-[var(--text-primary)]">
+                            {currentPriority.label}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {tags.length > 0 && (
+                    <>
+                      <div className="my-5 border-t border-[var(--border-color)]" />
+
+                      <p className="mb-3 text-sm text-[var(--text-primary)]/45">
+                        Тематика
+                      </p>
+
+                      <div className="flex flex-wrap gap-2">
+                        {tags.map((tag) => (
+                          <span
+                            key={tag.name}
+                            className="rounded-lg px-3 py-1.5 text-sm font-medium"
+                            style={{
+                              backgroundColor: `${
+                                tag.color || '#94a3b8'
+                              }20`,
+                              color: tag.color || '#cbd5e1',
+                            }}
+                          >
+                            {tag.name}
+                          </span>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
               </section>
 
-              <div className="my-8 border-t border-[var(--border-color)]" />
-
-              {/* Classification */}
-
-              <div className="grid gap-6 sm:grid-cols-2">
-                <section>
-                  <p className="mb-3 text-sm font-medium text-[var(--text-primary)]/45">
-                    Тип заявки
-                  </p>
-
-                  {currentType && (
-                    <div className="flex items-center gap-3">
-                      <currentType.icon
-                        className={`h-6 w-6 ${currentType.color}`}
-                      />
-
-                      <span className="text-base font-semibold text-[var(--text-primary)]">
-                        {
-                          currentType.label
-                        }
-                      </span>
-                    </div>
-                  )}
-                </section>
-
-                <section>
-                  <p className="mb-3 text-sm font-medium text-[var(--text-primary)]/45">
-                    Приоритет
-                  </p>
-
-                  {currentPriority && (
-                    <div className="flex items-center gap-3">
-                      <currentPriority.icon
-                        className={`h-7 w-7 ${currentPriority.color}`}
-                      />
-
-                      <span className="text-base font-semibold text-[var(--text-primary)]">
-                        {
-                          currentPriority.label
-                        }
-                      </span>
-                    </div>
-                  )}
-                </section>
-              </div>
-
-              {/* Tags */}
-
-              {tags.length > 0 && (
-                <section className="mt-8">
-                  <p className="mb-3 text-sm font-medium text-[var(--text-primary)]/45">
-                    Теги
-                  </p>
-
-                  <div className="flex flex-wrap gap-2">
-                    {tags.map(
-                      (tag) => (
-                        <span
-                          key={
-                            tag.name
-                          }
-                          className="rounded-lg px-3 py-1.5 text-sm font-medium"
-                          style={{
-                            backgroundColor: `${
-                              tag.color ||
-                              '#71717a'
-                            }20`,
-                            color:
-                              tag.color ||
-                              '#d1d5db',
-                          }}
-                        >
-                          {tag.name}
-                        </span>
-                      ),
-                    )}
-                  </div>
-                </section>
-              )}
-
-              {/* Files */}
+              {/* =========================================================== */}
+              {/* Files review */}
+              {/* =========================================================== */}
 
               {generalFiles.length > 0 && (
                 <section className="mt-8">
-                  <p className="mb-3 text-sm font-medium text-[var(--text-primary)]/45">
-                    Файлы ·{' '}
-                    {generalFiles.length}
-                  </p>
+                  <h3 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">
+                    Файлы
+                    <span className="ml-2 font-normal text-[var(--text-primary)]/45">
+                      {generalFiles.length}
+                    </span>
+                  </h3>
 
-                  <div className="space-y-2">
-                    {generalFiles.map(
-                      (item) => (
-                        <div
-                          key={
-                            item.id
-                          }
-                          className="flex items-center gap-3"
-                        >
-                          <File className="h-5 w-5 shrink-0 text-[var(--text-primary)]/40" />
+                  <div className="space-y-2 rounded-xl border border-[var(--border-color)] p-4">
+                    {generalFiles.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-3 py-1"
+                      >
+                        <File className="h-5 w-5 shrink-0 text-[var(--text-primary)]/40" />
 
-                          <span className="min-w-0 flex-1 truncate text-base text-[var(--text-primary)]">
-                            {
-                              item.file
-                                .name
-                            }
-                          </span>
+                        <span className="min-w-0 flex-1 truncate text-base text-[var(--text-primary)]">
+                          {item.file.name}
+                        </span>
 
-                          <span className="shrink-0 text-sm text-[var(--text-primary)]/40">
-                            {formatFileSize(
-                              item.file
-                                .size,
-                            )}
-                          </span>
-                        </div>
-                      ),
-                    )}
+                        <span className="shrink-0 text-sm text-[var(--text-primary)]/40">
+                          {formatFileSize(item.file.size)}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </section>
               )}
@@ -3927,9 +3320,9 @@ export default function NewTicketPage() {
           )}
         </div>
 
-        {/* ===================================================================== */}
+        {/* ================================================================= */}
         {/* Navigation */}
-        {/* ===================================================================== */}
+        {/* ================================================================= */}
 
         <footer
           className="
@@ -3941,13 +3334,10 @@ export default function NewTicketPage() {
           {step > 1 ? (
             <button
               type="button"
-              onClick={
-                goToPreviousStep
-              }
+              onClick={goToPreviousStep}
               className="
                 inline-flex items-center gap-2
-                rounded-xl
-                border border-[var(--border-color)]
+                rounded-xl border border-[var(--border-color)]
                 px-5 py-3
                 text-base font-medium
                 text-[var(--text-primary)]/70
@@ -3966,29 +3356,19 @@ export default function NewTicketPage() {
           {step < 3 ? (
             <button
               type="button"
-              disabled={
-                nextButtonDisabled
-              }
-              onClick={
-                goToNextStep
-              }
+              disabled={nextButtonDisabled}
+              onClick={goToNextStep}
               className="
                 ml-auto inline-flex items-center gap-2
-                rounded-xl
-                bg-[var(--accent)]
+                rounded-xl bg-[var(--accent)]
                 px-7 py-3
-                text-base font-semibold
-                text-white
-                transition
-                hover:brightness-110
+                text-base font-semibold text-white
+                transition hover:brightness-110
                 disabled:cursor-not-allowed
                 disabled:opacity-40
-                disabled:hover:brightness-100
               "
             >
-              {step === 1
-                ? 'К классификации'
-                : 'К проверке'}
+              {step === 1 ? 'К классификации' : 'К проверке'}
 
               <ArrowRight className="h-5 w-5" />
             </button>
@@ -3996,18 +3376,13 @@ export default function NewTicketPage() {
             <button
               type="button"
               disabled={submitting}
-              onClick={
-                handleSubmit
-              }
+              onClick={handleSubmit}
               className="
                 ml-auto inline-flex items-center gap-2
-                rounded-xl
-                bg-[var(--accent)]
+                rounded-xl bg-[var(--accent)]
                 px-7 py-3
-                text-base font-semibold
-                text-white
-                transition
-                hover:brightness-110
+                text-base font-semibold text-white
+                transition hover:brightness-110
                 disabled:cursor-not-allowed
                 disabled:opacity-50
               "
