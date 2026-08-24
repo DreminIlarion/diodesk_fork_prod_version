@@ -10,6 +10,9 @@ from ..shared.domain.events import Event
 from ..shared.utils.helpers import iterate_batches
 from ..tickets.domain.events import TicketAssigned, TicketCreated
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 class NotificationPolicy[EventT: Event](Protocol):
     """
