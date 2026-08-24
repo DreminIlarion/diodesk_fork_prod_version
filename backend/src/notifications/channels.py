@@ -50,7 +50,7 @@ class EmailChannel:
             )
         try:
             await self.mail_sender.send(
-                to=user.email,
+                to=str(user.email),
                 subject=notification.title,
                 plain_text=notification.message,
                 template_name=template_name,
