@@ -3,247 +3,342 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Новый тикет #{{ ticket_number }} — {{ app_name | default("ДИО-Консалт") }}</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+  <meta name="color-scheme" content="light">
+  <title>
+    Заявка #{{ number }} создана —
+    {{ app_name | default("ДИО-Консалт", true) }}
+  </title>
 
-    body {
-      margin: 0;
-      padding: 0;
-      background: #f5f5f6;
-      color: #111111;
-      font-family: 'Open Sans', Arial, Helvetica, sans-serif;
-      line-height: 1.5;
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&amp;family=Open+Sans:ital,wght@0,300..800;1,300..800&amp;display=swap"
+  >
+
+  <style>
+    body,
+    table,
+    td,
+    a,
+    p,
+    h1 {
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+      font-family: "Google Sans", "Open Sans", Arial, Helvetica, sans-serif !important;
+    }
+
+    table,
+    td {
+      mso-table-lspace: 0;
+      mso-table-rspace: 0;
     }
 
     table {
-      border-collapse: collapse;
+      border-collapse: collapse !important;
     }
 
-    .page {
-      width: 100%;
-      background: #f5f5f6;
-      padding: 40px 16px;
-    }
-
-    .shell {
-      width: 100%;
-      max-width: 640px;
-      margin: 0 auto;
-    }
-
-    .glass {
-      overflow: hidden;
-      background: #ffffff;
-      background:
-        linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.72)),
-        rgba(255, 255, 255, 0.86);
-      border-radius: 20px;
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-    }
-
-    .inner {
-      background: rgba(255, 255, 255, 0.88);
-      border: 1px solid rgba(17, 17, 17, 0.07);
-      border-radius: 20px;
-      box-shadow:
-        0 2px 4px rgba(17, 17, 17, 0.06),
-        0 18px 42px rgba(17, 17, 17, 0.14),
-        inset 0 1px 0 rgba(255, 255, 255, 0.96);
-      padding: 32px;
-    }
-
-    .brand {
-      color: rgba(17, 17, 17, 0.48);
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .status-pill {
-      display: inline-block;
-      margin-top: 18px;
-      padding: 7px 12px;
-      color: #991b1b;
-      font-size: 13px;
-      font-weight: 700;
-      background: rgba(153, 27, 27, 0.10);
-      border: 1px solid rgba(185, 28, 28, 0.22);
-      border-radius: 999px;
-    }
-
-    h1 {
-      margin: 18px 0 12px;
-      color: #111111;
-      font-size: 30px;
-      line-height: 1.18;
-      font-weight: 800;
-    }
-
-    .lead {
-      margin: 0 0 26px;
-      color: #000000;
-      font-size: 16px;
-    }
-
-    .details {
-      width: 100%;
-      overflow: hidden;
-      background: rgba(255, 255, 255, 0.70);
-      border: 1px solid rgba(17, 17, 17, 0.08);
-      border-radius: 16px;
-    }
-
-    .detail-row {
-      border-bottom: 1px solid rgba(17, 17, 17, 0.07);
-    }
-
-    .detail-row:last-child {
-      border-bottom: 0;
-    }
-
-    .label {
-      width: 35%;
-      padding: 14px 16px;
-      color: #000000;
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      vertical-align: top;
-    }
-
-    .value {
-      padding: 14px 16px;
-      color: #111111;
-      font-size: 14px;
-      vertical-align: top;
-      word-break: break-word;
-    }
-
-    .ticket-number {
-      color: #991b1b;
-      font-weight: 800;
-    }
-
-    .button-wrap {
-      padding-top: 24px;
-      text-align: center;
-    }
-
-    .button {
-      display: inline-block;
-      padding: 13px 20px;
-      color: #ffffff;
-      background: #991b1b;
-      border-radius: 12px;
-      font-size: 14px;
-      font-weight: 700;
-      text-decoration: none;
-    }
-
-    .note {
-      margin: 24px 0 0;
-      padding: 16px;
-      color: rgba(17, 17, 17, 0.68);
-      font-size: 14px;
-      background: rgba(153, 27, 27, 0.07);
-      border: 1px solid rgba(153, 27, 27, 0.16);
-      border-radius: 14px;
-    }
-
-    .footer {
-      padding: 22px 8px 0;
-      color: rgba(17, 17, 17, 0.46);
-      font-size: 12px;
-      text-align: center;
-    }
-
-    .footer a {
+    a {
       color: #991b1b;
     }
 
-    @media screen and (max-width: 520px) {
-      .page {
-        padding: 24px 10px;
+    @media screen and (max-width: 620px) {
+      .email-container {
+        width: 100% !important;
       }
 
-      .inner {
-        padding: 24px 18px;
+      .mobile-gutter {
+        padding: 16px 10px !important;
       }
 
-      h1 {
-        font-size: 25px;
+      .mobile-content {
+        padding: 28px 20px !important;
       }
 
-      .label,
-      .value {
-        display: block;
-        width: auto;
-        padding: 12px 14px;
+      .mobile-button {
+        display: block !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
       }
 
-      .label {
-        padding-bottom: 2px;
-      }
-
-      .value {
-        padding-top: 2px;
+      .mobile-title {
+        font-size: 26px !important;
+        line-height: 32px !important;
       }
     }
   </style>
 </head>
-<body>
-  <table role="presentation" class="page" width="100%" cellpadding="0" cellspacing="0">
+
+<body style="
+  margin: 0;
+  padding: 0;
+  background-color: #f3f4f6;
+  color: #111827;
+  font-family: 'Google Sans', 'Open Sans', Arial, Helvetica, sans-serif;
+">
+
+  {% set display_title = ticket_title | default(title, true) %}
+
+  <div style="
+    display: none;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    color: transparent;
+    font-size: 1px;
+    line-height: 1px;
+  ">
+    Заявка #{{ number }} «{{ display_title }}» зарегистрирована.
+  </div>
+
+  <table
+    role="presentation"
+    width="100%"
+    cellpadding="0"
+    cellspacing="0"
+    style="width: 100%; background-color: #f3f4f6;"
+  >
     <tr>
-      <td align="center">
-        <table role="presentation" class="shell" width="100%" cellpadding="0" cellspacing="0">
+      <td
+        align="center"
+        class="mobile-gutter"
+        style="padding: 32px 16px;"
+      >
+        <table
+          role="presentation"
+          width="600"
+          cellpadding="0"
+          cellspacing="0"
+          class="email-container"
+          style="
+            width: 100%;
+            max-width: 600px;
+            background-color: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            overflow: hidden;
+          "
+        >
           <tr>
-            <td class="glass">
-              <div class="inner">
-                <div class="brand">Система тикетов</div>
-                <div class="status-pill">Новый тикет</div>
-
-                <h1>Тикет создан</h1>
-
-                <p class="lead">
-                  В системе появился новый тикет. Ниже указаны основные детали.
-                </p>
-
-                <table role="presentation" class="details" width="100%" cellpadding="0" cellspacing="0">
-                  <tr class="detail-row">
-                    <td class="label">Номер</td>
-                    <td class="value ticket-number">#{{ ticket_number }}</td>
-                  </tr>
-                  <tr class="detail-row">
-                    <td class="label">Тикет</td>
-                    <td class="value">{{ ticket_title | default(title) }}</td>
-                  </tr>
-                  <tr class="detail-row">
-                    <td class="label">ID</td>
-                    <td class="value">{{ ticket_id }}</td>
-                  </tr>
-                </table>
-
-                {% if ticket_url %}
-                <div class="button-wrap">
-                  <a class="button" href="{{ ticket_url }}">Открыть тикет</a>
-                </div>
-                {% endif %}
-
-                <div class="note">
-                  Это системное уведомление. Если тикет относится к вашей зоне ответственности, обработайте его в системе.
-                </div>
-              </div>
+            <td style="
+              padding: 20px 32px;
+              background-color: #991b1b;
+              color: #ffffff;
+              font-size: 15px;
+              line-height: 22px;
+              font-weight: 700;
+            ">
+              {{ app_name | default("ДИО-Консалт", true) }}
+              <span style="font-weight: 400; opacity: 0.9;">
+                · Система поддержки
+              </span>
             </td>
           </tr>
+
           <tr>
-            <td class="footer">
-              С уважением,<br>
-              Команда {{ app_name | default("ДИО-Консалт") }}<br>
-              <a href="mailto:{{ support_email | default('diocon.support@mail.ru') }}">{{ support_email | default("diocon.support@mail.ru") }}</a><br><br>
-              Уведомление сформировано автоматически. Пожалуйста, не отвечайте на это письмо.
+            <td
+              class="mobile-content"
+              style="padding: 36px 40px 40px;"
+            >
+              <h1
+                class="mobile-title"
+                style="
+                  margin: 0 0 14px;
+                  color: #111827;
+                  font-size: 30px;
+                  line-height: 38px;
+                  font-weight: 700;
+                "
+              >
+                Заявка #{{ number }} создана
+              </h1>
+
+              <p style="
+                margin: 0 0 28px;
+                color: #374151;
+                font-size: 16px;
+                line-height: 25px;
+              ">
+                Мы зарегистрировали заявку. Все подробности и дальнейшие
+                обновления доступны в её карточке.
+              </p>
+
+              <table
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                style="
+                  width: 100%;
+                  background-color: #f9fafb;
+                  border: 1px solid #e5e7eb;
+                  border-radius: 12px;
+                "
+              >
+                <tr>
+                  <td style="padding: 20px 22px;">
+                    <p style="
+                      margin: 0 0 6px;
+                      color: #6b7280;
+                      font-size: 12px;
+                      line-height: 18px;
+                      font-weight: 700;
+                      text-transform: uppercase;
+                      letter-spacing: 0.04em;
+                    ">
+                      Тема
+                    </p>
+
+                    <p style="
+                      margin: 0 0 18px;
+                      color: #111827;
+                      font-size: 17px;
+                      line-height: 25px;
+                      font-weight: 700;
+                      word-break: break-word;
+                    ">
+                      {{ display_title }}
+                    </p>
+
+                    <p style="
+                      margin: 0 0 4px;
+                      color: #6b7280;
+                      font-size: 12px;
+                      line-height: 18px;
+                      font-weight: 700;
+                      text-transform: uppercase;
+                      letter-spacing: 0.04em;
+                    ">
+                      Номер заявки
+                    </p>
+
+                    <p style="
+                      margin: 0;
+                      color: #991b1b;
+                      font-size: 16px;
+                      line-height: 24px;
+                      font-weight: 700;
+                    ">
+                      #{{ number }}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              {% if ticket_url %}
+              <table
+                role="presentation"
+                cellpadding="0"
+                cellspacing="0"
+                style="margin-top: 28px;"
+              >
+                <tr>
+                  <td
+                    align="center"
+                    bgcolor="#991b1b"
+                    style="border-radius: 10px;"
+                  >
+                    <a
+                      href="{{ ticket_url }}"
+                      class="mobile-button"
+                      style="
+                        display: inline-block;
+                        padding: 14px 24px;
+                        color: #ffffff;
+                        background-color: #991b1b;
+                        border: 1px solid #991b1b;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        line-height: 22px;
+                        font-weight: 700;
+                        text-align: center;
+                        text-decoration: none;
+                      "
+                    >
+                      Перейти к заявке
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="
+                margin: 18px 0 0;
+                color: #6b7280;
+                font-size: 13px;
+                line-height: 20px;
+              ">
+                Если кнопка не работает, откройте ссылку:<br>
+                <a
+                  href="{{ ticket_url }}"
+                  style="
+                    color: #991b1b;
+                    text-decoration: underline;
+                    word-break: break-all;
+                  "
+                >
+                  {{ ticket_url }}
+                </a>
+              </p>
+              {% endif %}
+
+              <!-- Следующий шаг -->
+              <table
+                role="presentation"
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                style="
+                  width: 100%;
+                  margin-top: 28px;
+                  border-top: 1px solid #e5e7eb;
+                "
+              >
+                <tr>
+                  <td style="padding-top: 22px;">
+                    <p style="
+                      margin: 0 0 6px;
+                      color: #111827;
+                      font-size: 15px;
+                      line-height: 22px;
+                      font-weight: 700;
+                    ">
+                      Что дальше
+                    </p>
+
+                    <p style="
+                      margin: 0;
+                      color: #4b5563;
+                      font-size: 14px;
+                      line-height: 22px;
+                    ">
+                      Откройте карточку заявки, чтобы посмотреть подробности,
+                      оставить комментарий или продолжить работу.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="
+              padding: 22px 32px;
+              background-color: #f9fafb;
+              border-top: 1px solid #e5e7eb;
+              color: #4b5563;
+              font-size: 13px;
+              line-height: 20px;
+              text-align: center;
+            ">
+              Нужна помощь?
+              <a
+                href="mailto:{{ support_email | default('diocon.support@mail.ru', true) }}"
+                style="color: #991b1b; text-decoration: underline;"
+              >
+                {{ support_email | default("diocon.support@mail.ru", true) }}
+              </a>
+
+              <br><br>
+
+              Это автоматическое уведомление.
+              Отвечать на него не нужно.
             </td>
           </tr>
         </table>
