@@ -36,6 +36,10 @@ class TaskView:
     estimated_hours: Decimal | None = None 
     actual_hours: Decimal | None = None
 
+    started_at: datetime | None = None  # ← Добавил
+    completed_at: datetime | None = None  # ← Добавил
+    working_since: datetime | None = None  # ← Добавил (таймер)
+
     project_id: UUID | None = None
     ticket_id: UUID | None = None
     attachments: list = field(default_factory=list)  # ← ДОБАВИ

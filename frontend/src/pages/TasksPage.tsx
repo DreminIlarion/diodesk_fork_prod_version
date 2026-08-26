@@ -7,7 +7,7 @@ import {
   ArrowUpRight, ChevronDown, Flag, AlertCircle, CheckCircle2, Ban, RotateCcw,
   RefreshCw, Archive, FolderOpen, Ticket, Zap, Star, User, Layers, UserCheck,
   GitPullRequest, ThumbsUp, ThumbsDown, Pencil, List, LayoutGrid, Clock3,
-  FileText, File as FileIcon, Download,
+  FileText, File as FileIcon, Download, BarChart3,
 } from 'lucide-react';
 import { tasksApi, projectsApi, ticketsApi, usersApi } from '../api/client';
 import { attachmentsApi } from '../api/attachments';
@@ -18,6 +18,17 @@ import type {
   TaskCreateInput, TaskUpdateInput, TaskKanbanContext,
   SimpleUser, CounterpartyCustomer,
 } from '../types';
+
+import TaskAnalytics from '../components/tasks/TaskAnalytics';
+
+import {
+  TicketEditor,
+  deserializeToBlocks,
+  serializeBlocks,
+  type DescriptionBlock,
+} from '../components/helpers/TicketEditor';
+
+import { TicketDescriptionContent } from '../components/helpers/TicketDescriptionContent';
 
 /* ───────────────── types ───────────────── */
 
@@ -67,10 +78,21 @@ type TaskViewColumn = Omit<TaskKanbanColumn, 'tasks'> & {
 };
 
 type CtxMode = 'my' | 'internal' | 'project' | 'assignee' | 'ticket';
-type ViewMode = 'kanban' | 'list';
+type ViewMode =
+  | 'kanban'
+  | 'list'
+  | 'analytics';
 
 type CompleteIntent = { task: TaskViewItem; mode: 'status_done' | 'review_done' };
 type AssignIntent = { task: TaskViewItem; targetStatus: 'todo' | 'in_progress' };
+
+type LastMove = {
+  taskId: string;
+  number: string;
+  title: string;
+  from: TaskStatus;
+  to: TaskStatus;
+};
 
 /* ───────────────── constants ───────────────── */
 
@@ -103,7 +125,8 @@ const TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   to_review: ['in_progress', 'done', 'to_fix', 'to_test', 'cancelled'],
   to_fix: ['in_progress', 'to_review', 'cancelled'],
   to_test: ['in_progress', 'to_review', 'done', 'cancelled'],
-  done: [], cancelled: [],
+  done: ['in_progress', 'to_fix'],
+  cancelled: [],
 };
 
 const ASSIGN_OK: Set<TaskStatus> = new Set([
@@ -116,6 +139,9 @@ const COL_ORDER: TaskStatus[] = [
   'backlog', 'todo', 'in_progress', 'paused', 'blocked',
   'to_review', 'to_fix', 'to_test', 'done', 'cancelled',
 ];
+
+const DRAG_TRANSITIONS = (from: TaskStatus): TaskStatus[] =>
+  COL_ORDER.filter((status) => status !== from);
 
 const CM: Record<string, {
   icon: React.ComponentType<{ className?: string }>; tc: string; dot: string;
@@ -848,61 +874,126 @@ function ListView({ tasks, umap, onView }: {
 
 /* ───────────────── task card ───────────────── */
 
-function TCard({ task: t, umap, dragging, onDS, onDE, onView }: {
+function TCard({
+  task: t,
+  umap,
+  dragging,
+  highlighted,
+  onDS,
+  onDE,
+  onView,
+}: {
   task: TaskViewItem;
   umap: Map<string, SimpleUser | CounterpartyCustomer>;
   dragging: boolean;
+  highlighted: boolean;
   onDS: (id: string, f: TaskStatus) => void;
   onDE: () => void;
   onView: (t: TaskViewItem) => void;
 }) {
   const od = overdue(t);
   const a = t.assignee_id ? umap.get(t.assignee_id) : null;
-  const assigneeSurname = a ? (a.full_name || a.username || '').split(' ')[0] : null;
+  const assigneeSurname = a
+    ? (a.full_name || a.username || '').split(' ')[0]
+    : null;
 
   return (
     <motion.div
       layout
+      data-task-id={t.id}
       draggable
-      onDragStart={(e) => { (e as any).dataTransfer.effectAllowed = 'move'; onDS(t.id, t.status); }}
+      onDragStart={(e) => {
+        (e as any).dataTransfer.effectAllowed = 'move';
+        onDS(t.id, t.status);
+      }}
       onDragEnd={onDE}
       onClick={() => onView(t)}
-      className={`group bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer transition-all duration-200 shadow-sm min-h-[140px] flex flex-col relative
+
+      className={`group bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer transition-all duration-300 shadow-sm min-h-[140px] flex flex-col relative
         hover:bg-[var(--hover-2)] hover:border-[var(--accent)]/40
-        ${dragging ? 'opacity-40 rotate-2 scale-[1.02] shadow-xl z-50 ring-1 ring-[var(--accent)]' : od ? 'border-red-500/40 bg-red-500/5 hover:bg-red-500/15' : 'border-[var(--border-color)]'}`}
+
+        ${highlighted
+          ? 'border-emerald-500/70 bg-emerald-500/[0.06]'
+          : ''
+        }
+
+        ${dragging
+          ? 'opacity-35 rotate-2 scale-[1.02] shadow-xl z-50 ring-2 ring-[var(--accent)]'
+          : od
+            ? 'border-red-500/40 bg-red-500/5 hover:bg-red-500/15'
+            : highlighted
+              ? ''
+              : 'border-[var(--border-color)]'
+        }`}
     >
-      <span className="text-xs font-mono text-[var(--text-primary)]/45 mb-1.5 leading-none">#{t.number}</span>
-      <h4 className="text-[15px] font-bold text-[var(--text-primary)] leading-snug tracking-tight line-clamp-2 mb-3">{t.title}</h4>
+      {highlighted && (
+        <div className="absolute -top-2 right-3 z-10 px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-medium">
+          Перенесено сюда
+        </div>
+      )}
+      <span className="text-xs font-mono text-[var(--text-primary)]/45 mb-1.5 leading-none">
+        #{t.number}
+      </span>
+
+      <h4 className="text-[15px] font-bold text-[var(--text-primary)] leading-snug tracking-tight line-clamp-2 mb-3">
+        {t.title}
+      </h4>
+
       <div className="flex items-center gap-2 mb-3.5 flex-wrap">
         <PriBadge p={t.priority} />
         {t.story_points != null && <ComplexityBadge v={t.story_points} />}
       </div>
+
       <div className="flex items-center justify-between border-t border-[var(--border-color)] pt-3 mt-auto">
         <div className="flex items-center gap-2 min-w-0">
           {a ? (
             <>
-              <Ava name={a.full_name || a.username} url={a.avatar_url} sz="xs" />
-              <span className="text-[13px] text-[var(--text-primary)]/75 font-medium truncate max-w-[100px]">{assigneeSurname}</span>
+              <Ava
+                name={a.full_name || a.username}
+                url={a.avatar_url}
+                sz="xs"
+              />
+              <span className="text-[13px] text-[var(--text-primary)]/75 font-medium truncate max-w-[100px]">
+                {assigneeSurname}
+              </span>
             </>
-          ) : <span className="text-xs text-[var(--text-primary)]/30">—</span>}
+          ) : (
+            <span className="text-xs text-[var(--text-primary)]/30">—</span>
+          )}
         </div>
+
         <div className="flex items-center gap-1.5 shrink-0">
-          {t.ticket_id && <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />}
-          {t.project_id && <FolderOpen className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />}
-          {t.due_date && <span className={`text-[12px] font-semibold ml-0.5 ${od ? 'text-red-400' : 'text-[var(--text-primary)]/45'}`}>{fmtDue(t.due_date)}</span>}
+          {t.ticket_id && (
+            <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+          )}
+
+          {t.project_id && (
+            <FolderOpen className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+          )}
+
+          {t.due_date && (
+            <span
+              className={`text-[12px] font-semibold ml-0.5 ${od
+                ? 'text-red-400'
+                : 'text-[var(--text-primary)]/45'
+                }`}
+            >
+              {fmtDue(t.due_date)}
+            </span>
+          )}
         </div>
       </div>
     </motion.div>
   );
 }
-
 /* ───────────────── kanban column ───────────────── */
 
-function KCol({ col, umap, isDO, dragId, ldMore, onDS, onDE, onDO, onDL, onDrop, onAdd, onView, onMore }: {
+function KCol({ col, umap, isDO, dragId, highlightTaskId, ldMore, onDS, onDE, onDO, onDL, onDrop, onAdd, onView, onMore }: {
   col: TaskViewColumn;
   umap: Map<string, SimpleUser | CounterpartyCustomer>;
   isDO: boolean;
   dragId: string | null;
+  highlightTaskId: string | null;
   ldMore: boolean;
   onDS: (id: string, f: TaskStatus) => void;
   onDE: () => void;
@@ -942,7 +1033,16 @@ function KCol({ col, umap, isDO, dragId, ldMore, onDS, onDE, onDO, onDL, onDrop,
         ) : (
           <AnimatePresence mode="popLayout">
             {col.tasks.items.map((t) => (
-              <TCard key={t.id} task={t} umap={umap} dragging={dragId === t.id} onDS={onDS} onDE={onDE} onView={onView} />
+              <TCard
+                key={t.id}
+                task={t}
+                umap={umap}
+                dragging={dragId === t.id}
+                highlighted={highlightTaskId === t.id}
+                onDS={onDS}
+                onDE={onDE}
+                onView={onView}
+              />
             ))}
           </AnimatePresence>
         )}
@@ -965,44 +1065,102 @@ function KCol({ col, umap, isDO, dragId, ldMore, onDS, onDE, onDO, onDL, onDrop,
 
 /* ───────────────── drag panel ───────────────── */
 
-function DragPanel({ task, onDrop }: {
-  task: { id: string; from: TaskStatus; title: string; number: string } | null;
+function DragPanel({
+  task,
+  onDrop,
+}: {
+  task: {
+    id: string;
+    from: TaskStatus;
+    title: string;
+    number: string;
+  } | null;
   onDrop: (e: React.DragEvent, to: TaskStatus) => void;
 }) {
   const [hov, setHov] = useState<TaskStatus | null>(null);
+
   if (!task) return null;
-  const al = TRANSITIONS[task.from];
-  if (!al.length) return null;
+
+  const available = TRANSITIONS[task.from];
 
   return createPortal(
     <motion.div
-      initial={{ x: '100%', opacity: 0 }}
+      initial={{ x: 50, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      exit={{ x: '100%', opacity: 0 }}
+      exit={{ x: 50, opacity: 0 }}
       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-      className="fixed right-4 top-0 h-full z-[100] flex items-center pointer-events-none"
+      className="fixed right-4 top-1/2 -translate-y-1/2 z-[100] pointer-events-none"
     >
-      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl overflow-hidden pointer-events-auto" style={{ width: 220 }}>
-        <div className="px-3 py-2.5 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
-          <p className="text-xs uppercase tracking-wider text-[var(--text-primary)]/40 mb-0.5 font-medium">Перетащить</p>
-          <p className="text-sm font-bold text-[var(--text-primary)] truncate">#{task.number}</p>
+      <div className="w-[310px] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-2xl overflow-hidden pointer-events-auto">
+        <div className="px-4 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
+          <p className="text-[10px] uppercase tracking-widest text-[var(--text-primary)]/40 font-semibold mb-2">
+            Вы переносите
+          </p>
+
+          <div className="flex items-start gap-2.5">
+            <span className="w-2.5 h-2.5 mt-1.5 rounded-full bg-[var(--accent)] animate-pulse shrink-0" />
+
+            <div className="min-w-0">
+              <div className="text-xs font-mono font-bold text-[var(--accent)]">
+                #{task.number}
+              </div>
+
+              <div className="text-sm font-bold text-[var(--text-primary)] leading-snug mt-1 line-clamp-3">
+                {task.title}
+              </div>
+
+              <div className="text-[11px] text-[var(--text-primary)]/40 mt-2">
+                Сейчас: {ST_LABEL[task.from]}
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="p-1.5 space-y-1">
-          {al.map((s) => {
+
+        <div className="px-3 pt-3 pb-1">
+          <div className="text-[10px] uppercase tracking-widest text-[var(--text-primary)]/30 font-semibold">
+            Переместить в
+          </div>
+        </div>
+
+        <div className="p-2 space-y-1 max-h-[60vh] overflow-y-auto">
+          {available.map((s) => {
             const c = CM[s];
             const I = c.icon;
-            const h = hov === s;
+            const active = hov === s;
+
             return (
-              <div key={s}
-                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setHov(s); }}
+              <div
+                key={s}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  setHov(s);
+                }}
                 onDragLeave={() => setHov(null)}
-                onDrop={(e) => { setHov(null); onDrop(e, s); }}
-                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border transition-all ${h ? `${c.brd} bg-[var(--accent)]/10 scale-[1.02] shadow-sm` : 'border-transparent hover:bg-[var(--hover-2)]'}`}
+                onDrop={(e) => {
+                  setHov(null);
+                  onDrop(e, s);
+                }}
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all ${active
+                  ? `${c.brd} bg-[var(--accent)]/10 scale-[1.015] shadow-sm`
+                  : 'border-transparent hover:bg-[var(--hover-2)]'
+                  }`}
               >
-                <div className={`w-1 h-5 rounded-full ${c.dot}`} />
+                <div className={`w-1 h-6 rounded-full ${c.dot}`} />
                 <I className={`w-4 h-4 ${c.tc}`} />
-                <span className={`text-sm font-medium truncate ${h ? c.tc : 'text-[var(--text-primary)]/70'}`}>{ST_LABEL[s]}</span>
-                {h && <Check className={`w-4 h-4 ml-auto ${c.tc}`} />}
+
+                <span
+                  className={`text-sm font-medium flex-1 ${active
+                    ? c.tc
+                    : 'text-[var(--text-primary)]/70'
+                    }`}
+                >
+                  {ST_LABEL[s]}
+                </span>
+
+                {active && (
+                  <Check className={`w-4 h-4 ${c.tc}`} />
+                )}
               </div>
             );
           })}
@@ -1143,7 +1301,10 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
   const { toast } = useToast();
 
   const [title, setTitle] = useState(task?.title ?? '');
-  const [desc, setDesc] = useState(task?.description ?? '');
+  const [descriptionBlocks, setDescriptionBlocks] =
+    useState<DescriptionBlock[]>(() =>
+      deserializeToBlocks(task?.description ?? ''),
+    );
   const [pri, setPri] = useState<TaskPriority>(task?.priority ?? 'medium');
   const [sp, setSp] = useState(task?.story_points != null ? String(task.story_points) : '');
   const [estimatedHours, setEstimatedHours] = useState(
@@ -1205,21 +1366,21 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
   };
 
   const handleDragOver = (e: React.DragEvent) => {
-  e.preventDefault();
-  setIsDragOver(true);
-};
+    e.preventDefault();
+    setIsDragOver(true);
+  };
 
-const handleDragLeave = (e: React.DragEvent) => {
-  e.preventDefault();
-  setIsDragOver(false);
-};
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
 
-const handleDrop = (e: React.DragEvent) => {
-  e.preventDefault();
-  setIsDragOver(false);
-  const droppedFiles = Array.from(e.dataTransfer.files || []);
-  setFiles((prev) => [...prev, ...droppedFiles].slice(0, 10));
-};
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const droppedFiles = Array.from(e.dataTransfer.files || []);
+    setFiles((prev) => [...prev, ...droppedFiles].slice(0, 10));
+  };
 
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
@@ -1263,74 +1424,274 @@ const handleDrop = (e: React.DragEvent) => {
     };
   }, [projectId]);
 
+  const uploadInlineImages = async (
+    blocks: DescriptionBlock[],
+    taskId: string,
+  ): Promise<DescriptionBlock[]> => {
+    const result: DescriptionBlock[] = [];
+
+    for (const block of blocks) {
+      if (
+        block.type === 'image' &&
+        block.localFile &&
+        !block.attachmentId
+      ) {
+        const uploaded: any =
+          await attachmentsApi.uploadAttachment(
+            block.localFile,
+            'task',
+            taskId,
+          );
+
+        const attachmentId =
+          uploaded?.id ??
+          uploaded?.attachment_id ??
+          uploaded?.data?.id;
+
+        if (!attachmentId) {
+          throw new Error(
+            `Не удалось получить ID загруженного изображения: ${block.localFile.name}`,
+          );
+        }
+
+        result.push({
+          ...block,
+          attachmentId,
+          localFile: undefined,
+        });
+
+        continue;
+      }
+
+      result.push(block);
+    }
+
+    return result;
+  };
+
   const submit = async () => {
     if (!title.trim()) return;
+
     setSaving(true);
 
     try {
       let taskId = task?.id;
 
       if (mode === 'create') {
-        const payload: Record<string, any> = { title: title.trim(), priority: pri };
-        if (desc.trim()) payload.description = desc.trim();
+        /*
+         * Сначала создаём задачу.
+         *
+         * Inline-картинки ещё нельзя загрузить,
+         * поскольку attachment требует taskId.
+         */
+        const initialDescription = serializeBlocks(
+          descriptionBlocks.filter(
+            (b) =>
+              b.type !== 'image' ||
+              !!b.attachmentId,
+          ),
+        );
+
+        const payload: Record<string, any> = {
+          title: title.trim(),
+          priority: pri,
+        };
+
+        if (initialDescription.trim()) {
+          payload.description = initialDescription;
+        }
+
         if (projectId) payload.project_id = projectId;
         if (ticketId) payload.ticket_id = ticketId;
         if (sp) payload.story_points = Number(sp);
-        if (estimatedHours) payload.estimated_hours = Number(estimatedHours);
+
+        if (estimatedHours) {
+          payload.estimated_hours = Number(estimatedHours);
+        }
+
         if (assigneeId) payload.assignee_id = assigneeId;
         if (dueDate) payload.due_date = dueDate;
 
-        const created = await tasksApi.create(payload as TaskCreateInput);
+        const created = await tasksApi.create(
+          payload as TaskCreateInput,
+        );
+
         taskId = created.id;
+
+        /*
+         * Теперь taskId существует:
+         * загружаем картинки, вставленные непосредственно
+         * в описание.
+         */
+        const preparedBlocks = await uploadInlineImages(
+          descriptionBlocks,
+          created.id,
+        );
+
+        const finalDescription =
+          serializeBlocks(preparedBlocks);
+
+        if (
+          finalDescription !== initialDescription
+        ) {
+          await tasksApi.update(created.id, {
+            description: finalDescription || null,
+          } as TaskUpdateInput);
+        }
+
+        /*
+         * Обычные вложения.
+         */
+        for (const file of files) {
+          try {
+            await attachmentsApi.uploadAttachment(
+              file,
+              'task',
+              created.id,
+            );
+          } catch (err) {
+            console.error(
+              'File upload failed:',
+              file.name,
+              err,
+            );
+          }
+        }
 
         if (todo) {
           await tasksApi.changeStatus(created.id, 'todo');
         }
 
-        toast({ title: 'Задача создана', description: `${created.number} — ${created.title}` });
+        toast({
+          title: 'Задача создана',
+          description: `${created.number} — ${created.title}`,
+        });
       } else if (task) {
+        /*
+         * При редактировании ID уже известен,
+         * поэтому картинки можно загрузить до update.
+         */
+        const preparedBlocks = await uploadInlineImages(
+          descriptionBlocks,
+          task.id,
+        );
+
+        const finalDescription =
+          serializeBlocks(preparedBlocks);
+
         const payload: Record<string, any> = {};
 
-        if (title.trim() !== task.title) payload.title = title.trim();
-        if ((desc.trim() || '') !== (task.description?.trim() || '')) {
-          payload.description = desc.trim() || null;
+        if (title.trim() !== task.title) {
+          payload.title = title.trim();
         }
-        if (pri !== task.priority) payload.priority = pri;
 
-        const currentSP = task.story_points != null ? String(task.story_points) : '';
-        if (sp !== currentSP) payload.story_points = sp ? Number(sp) : null;
+        if (
+          finalDescription.trim() !==
+          (task.description?.trim() ?? '')
+        ) {
+          payload.description =
+            finalDescription.trim() || null;
+        }
 
-        const currentEst = task.estimated_hours != null ? String(toNumberOrNull(task.estimated_hours) ?? '') : '';
+        if (pri !== task.priority) {
+          payload.priority = pri;
+        }
+
+        const currentSP =
+          task.story_points != null
+            ? String(task.story_points)
+            : '';
+
+        if (sp !== currentSP) {
+          payload.story_points = sp
+            ? Number(sp)
+            : null;
+        }
+
+        const currentEst =
+          task.estimated_hours != null
+            ? String(
+              toNumberOrNull(
+                task.estimated_hours,
+              ) ?? '',
+            )
+            : '';
+
         if (estimatedHours !== currentEst) {
-          payload.estimated_hours = estimatedHours ? Number(estimatedHours) : null;
+          payload.estimated_hours =
+            estimatedHours
+              ? Number(estimatedHours)
+              : null;
         }
 
-        if (dueDate !== (task.due_date ?? '')) payload.due_date = dueDate || null;
-        if (assigneeId !== (task.assignee_id ?? '')) payload.assignee_id = assigneeId || null;
-        if (projectId !== (task.project_id ?? '')) payload.project_id = projectId || null;
-        if (ticketId !== (task.ticket_id ?? '')) payload.ticket_id = ticketId || null;
+        if (dueDate !== (task.due_date ?? '')) {
+          payload.due_date = dueDate || null;
+        }
+
+        if (
+          assigneeId !==
+          (task.assignee_id ?? '')
+        ) {
+          payload.assignee_id =
+            assigneeId || null;
+        }
+
+        if (
+          projectId !==
+          (task.project_id ?? '')
+        ) {
+          payload.project_id =
+            projectId || null;
+        }
+
+        if (
+          ticketId !==
+          (task.ticket_id ?? '')
+        ) {
+          payload.ticket_id =
+            ticketId || null;
+        }
 
         if (Object.keys(payload).length > 0) {
-          await tasksApi.update(task.id, payload as TaskUpdateInput);
+          await tasksApi.update(
+            task.id,
+            payload as TaskUpdateInput,
+          );
         }
 
-        toast({ title: 'Задача обновлена', description: `${task.number} — ${title.trim()}` });
-      }
-
-      if (taskId && files.length > 0) {
+        /*
+         * Новые обычные вложения.
+         */
         for (const file of files) {
           try {
-            await attachmentsApi.uploadAttachment(file, 'task', taskId);
+            await attachmentsApi.uploadAttachment(
+              file,
+              'task',
+              task.id,
+            );
           } catch (err) {
-            console.error('File upload failed:', file.name, err);
+            console.error(
+              'File upload failed:',
+              file.name,
+              err,
+            );
           }
         }
+
+        toast({
+          title: 'Задача обновлена',
+          description: `${task.number} — ${title.trim()}`,
+        });
       }
 
       await onSaved();
       onClose();
     } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      toast({
+        title: 'Ошибка',
+        description: apiErr(e),
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }
@@ -1341,9 +1702,12 @@ const handleDrop = (e: React.DragEvent) => {
   const lockTicket = context.type === 'ticket' && mode === 'create';
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-2 md:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !saving && onClose()} />
-      <div className="relative w-full max-w-4xl max-h-[88vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="relative w-full max-w-7xl h-[94vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
           <div>
             <div className="flex items-center gap-2">
@@ -1361,8 +1725,9 @@ const handleDrop = (e: React.DragEvent) => {
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-5">
-          <div className="grid lg:grid-cols-2 gap-6">
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 lg:p-8">
+          <div className="grid xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.75fr)] gap-8">
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
@@ -1372,8 +1737,18 @@ const handleDrop = (e: React.DragEvent) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Описание</label>
-                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Опиши задачу " rows={7} className={`${INP} resize-none`} />
+                <label className="block text-base font-semibold text-[var(--text-primary)] mb-3">
+                  Описание
+                </label>
+
+                <TicketEditor
+                  blocks={descriptionBlocks}
+                  onChange={setDescriptionBlocks}
+                />
+
+                <p className="mt-2 text-xs text-[var(--text-primary)]/35">
+                  Изображение можно вставить кнопкой, перетащить сюда или вставить из буфера обмена.
+                </p>
               </div>
 
               <div className="space-y-3">
@@ -1395,46 +1770,43 @@ const handleDrop = (e: React.DragEvent) => {
                         У задачи пока нет вложений
                       </div>
                     )}
-                    
+
                   </div>
                 )}
 
                 <div>
-  <div className="text-xs font-medium text-[var(--text-primary)]/45 mb-2">
-    {mode === 'edit' ? 'Добавить новые файлы' : 'Файлы'}
-  </div>
-  <button 
-  type="button" 
-  onClick={() => fileInputRef.current?.click()}
-  onDragOver={handleDragOver}
-  onDragLeave={handleDragLeave}
-  onDrop={handleDrop}
-  className={`w-full border-2 border-dashed rounded-xl p-4 text-center transition-colors group ${
-    isDragOver 
-      ? 'border-[var(--accent)] bg-[var(--accent)]/5' 
-      : 'border-[var(--border-color)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)] hover:border-[var(--accent)]/30'
-  }`}
->
-  <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} className="hidden" />
-  <div className="flex flex-col items-center gap-2">
-    <div className={`w-12 h-12 rounded-xl border flex items-center justify-center transition-colors ${
-      isDragOver 
-        ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30' 
-        : 'bg-[var(--hover-3)] border-[var(--border-color)] group-hover:bg-[var(--accent)]/10 group-hover:border-[var(--accent)]/30'
-    }`}>
-      <Plus className={`w-6 h-6 transition-colors ${
-        isDragOver ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40 group-hover:text-[var(--accent)]'
-      }`} />
-    </div>
-    <div>
-      <p className="text-sm text-[var(--accent)] font-medium">
-        {isDragOver ? 'Отпустите файлы' : 'Выбрать файлы'}
-      </p>
-      <p className="text-xs text-[var(--text-primary)]/40 mt-0.5">или перетащите их сюда</p>
-    </div>
-  </div>
-</button>
-</div>
+                  <div className="text-xs font-medium text-[var(--text-primary)]/45 mb-2">
+                    {mode === 'edit' ? 'Добавить новые файлы' : 'Файлы'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`w-full border-2 border-dashed rounded-xl p-4 text-center transition-colors group ${isDragOver
+                      ? 'border-[var(--accent)] bg-[var(--accent)]/5'
+                      : 'border-[var(--border-color)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)] hover:border-[var(--accent)]/30'
+                      }`}
+                  >
+                    <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} className="hidden" />
+                    <div className="flex flex-col items-center gap-2">
+                      <div className={`w-12 h-12 rounded-xl border flex items-center justify-center transition-colors ${isDragOver
+                        ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30'
+                        : 'bg-[var(--hover-3)] border-[var(--border-color)] group-hover:bg-[var(--accent)]/10 group-hover:border-[var(--accent)]/30'
+                        }`}>
+                        <Plus className={`w-6 h-6 transition-colors ${isDragOver ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40 group-hover:text-[var(--accent)]'
+                          }`} />
+                      </div>
+                      <div>
+                        <p className="text-sm text-[var(--accent)] font-medium">
+                          {isDragOver ? 'Отпустите файлы' : 'Выбрать файлы'}
+                        </p>
+                        <p className="text-xs text-[var(--text-primary)]/40 mt-0.5">или перетащите их сюда</p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
 
                 {files.length > 0 && (
                   <div className="space-y-2">
@@ -1475,49 +1847,7 @@ const handleDrop = (e: React.DragEvent) => {
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Приоритет</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {PRI_LIST.map((p) => {
-                    const m = PM[p.value];
-                    return (
-                      <button key={p.value} onClick={() => setPri(p.value)}
-                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${pri === p.value ? `${m.bg} ${m.c} ${m.brd}` : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                          }`}>
-                        <span className={`w-2 h-2 rounded-full ${m.dot}`} />{p.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
-                  Сложность
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {SP_SERIES.map((v) => (
-                    <button
-                      key={v}
-                      onClick={() => setSp(String(v))}
-                      className={`px-3 py-2 rounded-xl text-sm border transition-all ${sp === String(v)
-                          ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
-                          : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                        }`}
-                    >
-                      {v}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => setSp('')}
-                    className={`px-3 py-2 rounded-xl text-sm border transition-all ${sp === ''
-                        ? 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30'
-                        : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                      }`}
-                  >
-                    Без сложности
-                  </button>
-                </div>
-              </div>
+
 
             </div>
 
@@ -1545,7 +1875,55 @@ const handleDrop = (e: React.DragEvent) => {
                 </div>
               )}
 
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Приоритет</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {PRI_LIST.map((p) => {
+                    const m = PM[p.value];
+                    return (
+                      <button key={p.value} onClick={() => setPri(p.value)}
+                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${pri === p.value ? `${m.bg} ${m.c} ${m.brd}` : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                          }`}>
+                        <span className={`w-2 h-2 rounded-full ${m.dot}`} />{p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
+                  Сложность
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {SP_SERIES.map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => setSp(String(v))}
+                      className={`px-3 py-2 rounded-xl text-sm border transition-all ${sp === String(v)
+                        ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                        : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                        }`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setSp('')}
+                    className={`px-3 py-2 rounded-xl text-sm border transition-all ${sp === ''
+                      ? 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30'
+                      : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                      }`}
+                  >
+                    Без сложности
+                  </button>
+                </div>
+              </div>
+
               <div className="grid md:grid-cols-2 gap-4">
+
+
+
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5" title="Плановые трудозатраты">Трудозатраты (ч)</label>
                   <input type="number" min="0" step="0.5" value={estimatedHours} onChange={(e) => setEstimatedHours(e.target.value)} placeholder="Например 4" className={INP} />
@@ -1587,23 +1965,39 @@ const handleDrop = (e: React.DragEvent) => {
         </div>
       </div>
 
-      {previewItem && (
-        <AttachmentPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
-      )}
-    </div>
+      {
+        previewItem && (
+          <AttachmentPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
+        )
+      }
+    </div >
   );
 }
 
 /* ───────────────── detail modal ───────────────── */
 
-function DetailModal({ task: t, umap, onClose, onRefresh, onNeedAssign, onEdit, onNeedComplete }: {
+function DetailModal({
+  task: t,
+  umap,
+  onClose,
+  onRefresh,
+  onNeedAssign,
+  onEdit,
+  onNeedComplete,
+}: {
   task: TaskViewItem;
   umap: Map<string, SimpleUser | CounterpartyCustomer>;
   onClose: () => void;
   onRefresh: () => Promise<void>;
-  onNeedAssign: (t: TaskViewItem, targetStatus: 'todo' | 'in_progress') => void;
+  onNeedAssign: (
+    t: TaskViewItem,
+    targetStatus: 'todo' | 'in_progress',
+  ) => void;
   onEdit: (t: TaskViewItem) => void;
-  onNeedComplete: (t: TaskViewItem, mode: 'status_done' | 'review_done') => void;
+  onNeedComplete: (
+    t: TaskViewItem,
+    mode: 'status_done' | 'review_done',
+  ) => void;
 }) {
   const { toast } = useToast();
   const { user } = useAuthStore();
@@ -1612,336 +2006,984 @@ function DetailModal({ task: t, umap, onClose, onRefresh, onNeedAssign, onEdit, 
   const [showSt, setShowSt] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
   const [showRR, setShowRR] = useState(false);
+
+  const assignSectionRef = useRef<HTMLElement | null>(null);
+  const reviewSectionRef = useRef<HTMLElement | null>(null);
+
   const [busy, setBusy] = useState('');
   const [aId, setAId] = useState(t.assignee_id ?? '');
   const [rvId, setRvId] = useState('');
-  const [previewItem, setPreviewItem] = useState<AttachmentPreviewItem | null>(null);
+  const [previewItem, setPreviewItem] =
+    useState<AttachmentPreviewItem | null>(null);
 
-  const assignee = t.assignee_id ? umap.get(t.assignee_id) : null;
+  const assignee = t.assignee_id
+    ? umap.get(t.assignee_id)
+    : null;
+
   const cm = CM[t.status];
-  const SI = cm.icon;
-  const users = Array.from(umap.values());
-  const uOpts: DDOpt[] = users.map((u) => ({ value: u.id, label: u.full_name || u.username || u.email, sublabel: u.email }));
 
-  const isStaff = user?.roles?.some((r) => ['admin', 'support_manager', 'support_agent', 'executor'].includes(r)) ?? false;
+  const users = Array.from(umap.values());
+
+  const uOpts: DDOpt[] = users.map((u) => ({
+    value: u.id,
+    label:
+      u.full_name ||
+      u.username ||
+      u.email,
+    sublabel: u.email,
+  }));
+
+  const isStaff =
+    user?.roles?.some((r) =>
+      [
+        'admin',
+        'support_manager',
+        'support_agent',
+        'executor',
+      ].includes(r),
+    ) ?? false;
 
   const statusAsString = String(t.status);
-  const canReview = (statusAsString === 'to_review' || statusAsString === 'review') && isStaff;
+
+  const revealExpandedSection = useCallback(
+    (ref: React.RefObject<HTMLElement | null>) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const container = contentScrollRef.current;
+          const el = ref.current;
+
+          if (!container || !el) return;
+
+          const containerRect = container.getBoundingClientRect();
+          const elementRect = el.getBoundingClientRect();
+
+          const padding = 24;
+
+          if (elementRect.bottom > containerRect.bottom - padding) {
+            container.scrollBy({
+              top:
+                elementRect.bottom -
+                containerRect.bottom +
+                padding,
+              behavior: 'smooth',
+            });
+          } else if (elementRect.top < containerRect.top + padding) {
+            container.scrollBy({
+              top:
+                elementRect.top -
+                containerRect.top -
+                padding,
+              behavior: 'smooth',
+            });
+          }
+        });
+      });
+    },
+    [],
+  );
+
+  const canReview =
+    (statusAsString === 'to_review' ||
+      statusAsString === 'review') &&
+    isStaff;
+
+
+
   const canRR = t.status === 'in_progress';
-  const canAssign = ASSIGN_OK.has(t.status) && users.length > 0;
+
+  const canAssign =
+    ASSIGN_OK.has(t.status) &&
+    users.length > 0;
+
   const canEdit = EDIT_OK.has(t.status);
+
   const allowed = TRANSITIONS[t.status];
+
   const ticketPath = getTaskTicketPath(t);
   const ticketNo = getTaskTicketNumber(t);
+
   const tags = getTaskTags(t);
-  const attachments = Array.isArray(t.attachments) ? t.attachments : [];
+
+  const attachments = Array.isArray(
+    t.attachments,
+  )
+    ? t.attachments
+    : [];
 
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const h = (e: KeyboardEvent) => {
+      if (
+        e.key === 'Escape' &&
+        !showArchive
+      ) {
+        onClose();
+      }
+    };
+
     document.addEventListener('keydown', h);
     document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
-  }, [onClose]);
 
-  const act = async (lbl: string, fn: () => Promise<any>, msg?: string) => {
+    return () => {
+      document.removeEventListener(
+        'keydown',
+        h,
+      );
+      document.body.style.overflow = '';
+    };
+  }, [onClose, showArchive]);
+
+  const act = async (
+    lbl: string,
+    fn: () => Promise<any>,
+    msg?: string,
+  ) => {
     setBusy(lbl);
+
     try {
       await fn();
-      if (msg) toast({ title: msg });
+
+      if (msg) {
+        toast({ title: msg });
+      }
+
       await onRefresh();
       onClose();
     } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      toast({
+        title: 'Ошибка',
+        description: apiErr(e),
+        variant: 'destructive',
+      });
     } finally {
       setBusy('');
     }
   };
 
   const chSt = async (s: TaskStatus) => {
-    if (s === 'todo' && t.status === 'backlog' && !t.assignee_id) {
+    if (
+      s === 'todo' &&
+      t.status === 'backlog' &&
+      !t.assignee_id
+    ) {
       setShowSt(false);
       onNeedAssign(t, 'todo');
       return;
     }
-    if (s === 'in_progress' && !t.assignee_id) {
+
+    if (
+      s === 'in_progress' &&
+      !t.assignee_id
+    ) {
       setShowSt(false);
       onNeedAssign(t, 'in_progress');
       return;
     }
+
     if (s === 'done') {
       setShowSt(false);
       onNeedComplete(t, 'status_done');
       return;
     }
+
     setShowSt(false);
     setBusy('st');
+
     try {
-      await tasksApi.changeStatus(t.id, s);
-      toast({ title: `Статус изменён: ${ST_LABEL[s]}` });
+      await tasksApi.changeStatus(
+        t.id,
+        s,
+      );
+
+      toast({
+        title: `Статус изменён: ${ST_LABEL[s]}`,
+      });
+
       await onRefresh();
       onClose();
     } catch (e: any) {
       const m = statusErr(e, t, s);
-      toast({ title: m.title, description: m.description, variant: 'destructive' });
+
+      toast({
+        title: m.title,
+        description: m.description,
+        variant: 'destructive',
+      });
     } finally {
       setBusy('');
     }
   };
 
+  const contentScrollRef = useRef<HTMLDivElement | null>(null);
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-3xl max-h-[88vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 md:p-4">
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      <div
+        className="relative w-full max-w-7xl h-[94vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
+        onClick={(e) =>
+          e.stopPropagation()
+        }
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-5 px-6 py-5 border-b border-[var(--border-color)] shrink-0">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className="font-mono text-xs text-[var(--text-primary)]/60 bg-[var(--hover-2)] border border-[var(--border-color)] px-1.5 py-0.5 rounded-md">{t.number}</span>
-              <PriBadge p={t.priority} />
-              {t.story_points != null && <ComplexityBadge v={t.story_points} />}
-              {t.estimated_hours != null && <HoursBadge label="Трудозатраты" value={t.estimated_hours} title="Плановые трудозатраты" />}
-              {t.actual_hours != null && <HoursBadge label="Факт" value={t.actual_hours} tone="accent" />}
+            <div className="flex items-center gap-2.5 mb-2.5">
+              <span className="font-mono text-xs font-medium text-[var(--text-primary)]/45">
+                {t.number}
+              </span>
+
+              <span className="w-1 h-1 rounded-full bg-[var(--text-primary)]/20" />
+
+              <span
+                className={`inline-flex items-center gap-1.5 text-xs font-medium ${cm.tc}`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${cm.dot}`}
+                />
+                {ST_LABEL[t.status]}
+              </span>
             </div>
-            <h2 className="text-lg font-bold text-[var(--text-primary)] leading-snug">{t.title}</h2>
+
+            <h2 className="text-xl md:text-2xl font-bold text-[var(--text-primary)] leading-snug tracking-tight">
+              {t.title}
+            </h2>
           </div>
+
           <div className="flex items-center gap-2 shrink-0">
             {canEdit && (
-              <button onClick={() => onEdit(t)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/75 text-sm font-medium hover:bg-[var(--hover-3)]">
-                <Pencil className="w-4 h-4" />Редактировать
+              <button
+                type="button"
+                onClick={() => onEdit(t)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/75 text-sm font-medium hover:bg-[var(--hover-3)] transition-colors"
+              >
+                <Pencil className="w-4 h-4" />
+                Редактировать
               </button>
             )}
-            <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]">
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)] transition-colors"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
-          {t.status === 'in_progress' && !t.assignee_id && (
-            <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-500 font-medium">
-              ⚠ У задачи нет исполнителя, но она находится в статусе «В работе».
-            </div>
-          )}
+        {/* Content */}
+        <div
+          ref={contentScrollRef}
+          className="flex-1 min-h-0 overflow-y-auto p-5 md:p-6"
+        >
+          {t.status ===
+            'in_progress' &&
+            !t.assignee_id && (
+              <div className="mb-5 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-sm text-amber-500">
+                У задачи нет исполнителя,
+                хотя она находится в статусе
+                «В работе».
+              </div>
+            )}
 
-          <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
-            <div className="px-4 py-3 bg-[var(--hover-1)] border-b border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)]">Описание</div>
-            <div className="px-4 py-4">
-              {t.description ? (
-                <div className="text-sm text-[var(--text-primary)]/80 whitespace-pre-wrap leading-6">{t.description}</div>
-              ) : (
-                <div className="text-sm text-[var(--text-primary)]/35">Описание не заполнено</div>
+          <div className="grid xl:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
+
+            {/* LEFT */}
+            <div className="min-w-0 space-y-5">
+              {/* Description */}
+              <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden bg-[var(--bg-card)]">
+                <div className="px-5 py-3.5 border-b border-[var(--border-color)]">
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]/70">
+                    Описание
+                  </h3>
+                </div>
+
+                <div className="px-5 py-5 min-h-[240px]">
+                  {t.description ? (
+                    <TicketDescriptionContent
+                      text={t.description}
+                      className="text-[15px] text-[var(--text-primary)]/85 leading-7"
+                    />
+                  ) : (
+                    <div className="min-h-[190px] flex items-center justify-center text-sm text-[var(--text-primary)]/30">
+                      Описание не заполнено
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Attachments */}
+              {attachments.length > 0 && (
+                <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-color)]">
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]/70">
+                      Вложения
+                    </h3>
+
+                    <span className="text-xs text-[var(--text-primary)]/35">
+                      {attachments.length}
+                    </span>
+                  </div>
+
+                  <div className="p-4 grid md:grid-cols-2 gap-3">
+                    {attachments.map(
+                      (att, i) => (
+                        <TaskAttachmentItem
+                          key={
+                            att.id ??
+                            `${getAttachmentName(
+                              att,
+                            )}-${i}`
+                          }
+                          attachment={att}
+                          onPreview={
+                            setPreviewItem
+                          }
+                        />
+                      ),
+                    )}
+                  </div>
+                </section>
               )}
-            </div>
-          </div>
 
-          {attachments.length > 0 && (
-            <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
-              <div className="px-4 py-3 bg-[var(--hover-1)] border-b border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)]">Вложения</div>
-              <div className="px-4 py-4 grid sm:grid-cols-2 gap-3">
-                {attachments.map((att, i) => (
-                  <TaskAttachmentItem key={att.id ?? `${getAttachmentName(att)}-${i}`} attachment={att} onPreview={setPreviewItem} />
-                ))}
-              </div>
-            </div>
-          )}
+              {/* Tags */}
+              {tags.length > 0 && (
+                <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-[var(--border-color)]">
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]/70">
+                      Теги
+                    </h3>
+                  </div>
 
-          {tags.length > 0 && (
-            <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
-              <div className="px-4 py-3 bg-[var(--hover-1)] border-b border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)]">Теги</div>
-              <div className="px-4 py-4 flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <span key={`${tag.name}-${tag.color ?? 'x'}`}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs border"
-                    style={{ borderColor: tag.color ?? 'var(--border-color)', color: tag.color ?? 'var(--text-primary)', background: `${tag.color ?? '#888'}14` }}>
-                    <span className="w-2 h-2 rounded-full" style={{ background: tag.color ?? '#888' }} />
-                    {tag.name}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+                  <div className="px-5 py-4 flex flex-wrap gap-2">
+                    {tags.map((tag) => (
+                      <span
+                        key={`${tag.name}-${tag.color ?? 'x'}`}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border"
+                        style={{
+                          borderColor:
+                            tag.color ??
+                            'var(--border-color)',
+                          color:
+                            tag.color ??
+                            'var(--text-primary)',
+                          background: `${tag.color ??
+                            '#888'
+                            }14`,
+                        }}
+                      >
+                        <span
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{
+                            background:
+                              tag.color ??
+                              '#888',
+                          }}
+                        />
 
-          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">Статус</p>
-              <div className="relative">
-                <button onClick={() => allowed.length > 0 && setShowSt((v) => !v)} disabled={busy !== '' || !allowed.length}
-                  className={`flex items-center gap-1.5 text-sm font-semibold ${cm.tc} disabled:opacity-40`}>
-                  {busy === 'st' ? <Loader2 className="w-4 h-4 animate-spin" /> : <SI className="w-4 h-4" />}
-                  {ST_LABEL[t.status]}
-                  {allowed.length > 0 && <ChevronDown className="w-4 h-4 opacity-50" />}
-                </button>
-                {showSt && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setShowSt(false)} />
-                    <div className="absolute left-0 top-full mt-2 z-20 w-56 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-2xl">
-                      <div className="p-1.5">
-                        {allowed.map((s) => {
-                          const sm = CM[s];
-                          const SII = sm.icon;
-                          return (
-                            <button key={s} onClick={() => chSt(s)}
-                              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] font-medium">
-                              <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`} />
-                              <SII className={`w-4 h-4 ${sm.tc}`} />
-                              <span className="flex-1 text-left">{ST_LABEL[s]}</span>
-                            </button>
-                          );
-                        })}
+                        {tag.name}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Relations */}
+              {(ticketPath ||
+                t.project_id) && (
+                  <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+                    {ticketPath && (
+                      <div className="flex items-center gap-4 px-5 py-4 border-b border-[var(--border-color)] last:border-b-0">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs text-[var(--text-primary)]/40 mb-1">
+                            Заявка
+                          </div>
+
+                          <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">
+                            {ticketNo ??
+                              'Открыть заявку'}
+                          </div>
+                        </div>
+
+                        <Link
+                          to={ticketPath}
+                          onClick={onClose}
+                          className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline shrink-0"
+                        >
+                          Открыть
+                          <ArrowUpRight className="w-4 h-4" />
+                        </Link>
+                      </div>
+                    )}
+
+                    {t.project_id && (
+                      <div className="flex items-center gap-4 px-5 py-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs text-[var(--text-primary)]/40 mb-1">
+                            Проект
+                          </div>
+
+                          <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">
+                            {t.project_name ||
+                              'Открыть проект'}
+                          </div>
+                        </div>
+
+                        <Link
+                          to={`/projects/${t.project_id}`}
+                          onClick={onClose}
+                          className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline shrink-0"
+                        >
+                          Открыть
+                          <ArrowUpRight className="w-4 h-4" />
+                        </Link>
+                      </div>
+                    )}
+                  </section>
+                )}
+            </div>
+
+            {/* RIGHT */}
+            <aside className="space-y-4 xl:sticky xl:top-0">
+              {/* Details */}
+              <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden bg-[var(--bg-card)]">
+                <div className="px-4 py-3.5 border-b border-[var(--border-color)]">
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                    Детали
+                  </h3>
+                </div>
+
+                <div className="divide-y divide-[var(--border-color)]">
+                  {/* Priority */}
+                  <div className="flex items-center justify-between gap-4 px-4 py-3">
+                    <span className="text-sm text-[var(--text-primary)]/45">
+                      Приоритет
+                    </span>
+
+                    <PriBadge
+                      p={t.priority}
+                    />
+                  </div>
+
+                  {/* Complexity */}
+                  <div className="flex items-center justify-between gap-4 px-4 py-3">
+                    <span className="text-sm text-[var(--text-primary)]/45">
+                      Сложность
+                    </span>
+
+                    <span className="text-sm font-medium text-[var(--text-primary)]/80">
+                      {t.story_points ??
+                        '—'}
+                    </span>
+                  </div>
+
+                  {/* Assignee */}
+                  <div className="px-4 py-3">
+                    <div className="text-sm text-[var(--text-primary)]/45 mb-2">
+                      Исполнитель
+                    </div>
+
+                    {assignee ? (
+                      <div className="flex items-center gap-2">
+                        <Ava
+                          name={
+                            assignee.full_name ||
+                            assignee.username
+                          }
+                          url={
+                            assignee.avatar_url
+                          }
+                          sz="xs"
+                        />
+
+                        <span className="text-sm font-medium text-[var(--text-primary)]/80 truncate">
+                          {assignee.full_name ||
+                            assignee.username}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-[var(--text-primary)]/30">
+                        Не назначен
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Due date */}
+                  <div className="flex items-center justify-between gap-4 px-4 py-3">
+                    <span className="text-sm text-[var(--text-primary)]/45">
+                      Срок
+                    </span>
+
+                    <span
+                      className={`text-sm font-medium ${t.due_date &&
+                        overdue(t)
+                        ? 'text-red-400'
+                        : 'text-[var(--text-primary)]/80'
+                        }`}
+                    >
+                      {t.due_date
+                        ? fmtDue(
+                          t.due_date,
+                        )
+                        : '—'}
+                    </span>
+                  </div>
+
+                  {/* Hours */}
+                  <div className="px-4 py-3.5">
+                    <div className="text-sm text-[var(--text-primary)]/45 mb-2.5">
+                      Трудозатраты
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-[11px] text-[var(--text-primary)]/35">
+                          План
+                        </div>
+
+                        <div className="mt-0.5 text-sm font-medium text-[var(--text-primary)]/80">
+                          {fmtHours(
+                            t.estimated_hours,
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-[11px] text-[var(--text-primary)]/35">
+                          Факт
+                        </div>
+
+                        <div className="mt-0.5 text-sm font-medium text-[var(--text-primary)]/80">
+                          {fmtHours(
+                            t.actual_hours,
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">Исполнитель</p>
-              <div className="h-[24px] flex items-center">
-                {assignee ? (
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <Ava name={assignee.full_name || assignee.username} url={assignee.avatar_url} sz="xs" />
-                    <span className="text-sm text-[var(--text-primary)]/70 font-medium truncate">{assignee.full_name || assignee.username}</span>
                   </div>
-                ) : <span className="text-sm text-[var(--text-primary)]/30">Не назначен</span>}
-              </div>
-            </div>
 
-            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">Срок</p>
-              <div className="h-[24px] flex items-center">
-                {t.due_date ? (
-                  <span className={`flex items-center gap-1.5 text-sm font-medium ${overdue(t) ? 'text-red-400' : 'text-[var(--text-primary)]/70'}`}>
-                    <Calendar className="w-4 h-4" />{fmtDue(t.due_date)}
-                  </span>
-                ) : <span className="text-sm text-[var(--text-primary)]/30">Не задан</span>}
-              </div>
-            </div>
+                  {/* Created */}
+                  <div className="flex items-center justify-between gap-4 px-4 py-3">
+                    <span className="text-sm text-[var(--text-primary)]/45">
+                      Создана
+                    </span>
 
-            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]" title="Плановые трудозатраты">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">Трудозатраты (ч)</p>
-              <span className="text-sm text-[var(--text-primary)]/70 font-medium h-[24px] flex items-center">{fmtHours(t.estimated_hours)}</span>
-            </div>
+                    <span className="text-sm font-medium text-[var(--text-primary)]/70">
+                      {new Date(
+                        t.created_at,
+                      ).toLocaleDateString(
+                        'ru-RU',
+                        {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        },
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </section>
 
-            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">Факт (ч)</p>
-              <span className="text-sm text-[var(--text-primary)]/70 font-medium h-[24px] flex items-center">{fmtHours(t.actual_hours)}</span>
-            </div>
+              {/* Status */}
+              <section className="rounded-2xl border border-[var(--border-color)] p-3 bg-[var(--bg-card)]">
+                <div className="text-xs text-[var(--text-primary)]/40 mb-2">
+                  Статус
+                </div>
 
-            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">Создана</p>
-              <span className="text-sm text-[var(--text-primary)]/70 font-medium h-[24px] flex items-center">
-                {new Date(t.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}
-              </span>
-            </div>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      allowed.length >
+                      0 &&
+                      setShowSt(
+                        (v) => !v,
+                      )
+                    }
+                    disabled={
+                      busy !== '' ||
+                      !allowed.length
+                    }
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)] hover:bg-[var(--hover-2)] transition-colors disabled:opacity-50"
+                  >
+                    {busy === 'st' ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-[var(--text-primary)]/40" />
+                    ) : (
+                      <span
+                        className={`w-2 h-2 rounded-full ${cm.dot}`}
+                      />
+                    )}
+
+                    <span className="flex-1 text-left text-sm font-medium text-[var(--text-primary)]">
+                      {ST_LABEL[
+                        t.status
+                      ]}
+                    </span>
+
+                    {allowed.length >
+                      0 && (
+                        <ChevronDown
+                          className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform ${showSt
+                            ? 'rotate-180'
+                            : ''
+                            }`}
+                        />
+                      )}
+                  </button>
+
+                  {showSt && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() =>
+                          setShowSt(false)
+                        }
+                      />
+
+                      <div className="absolute left-0 right-0 bottom-full mb-2 z-20 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-2xl">
+                        <div className="p-1.5 max-h-[320px] overflow-y-auto">
+                          {allowed.map((s) => {
+                            const sm = CM[s];
+
+                            return (
+                              <button
+                                type="button"
+                                key={s}
+                                onClick={() => chSt(s)}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] font-medium transition-colors"
+                              >
+                                <span className={`w-2 h-2 rounded-full ${sm.dot}`} />
+
+                                <span className="flex-1 text-left">
+                                  {ST_LABEL[s]}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </section>
+
+              {/* Assignment */}
+              {canAssign && (
+                <section
+                  ref={assignSectionRef}
+                  className="rounded-2xl border border-[var(--border-color)] overflow-hidden"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const opening = !showAssign;
+
+                      setShowAssign(opening);
+
+                      if (opening) {
+                        // Заодно закрываем другой раскрытый блок,
+                        // чтобы sidebar не разрастался.
+                        setShowRR(false);
+                        revealExpandedSection(assignSectionRef);
+                      }
+                    }}
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/65 hover:bg-[var(--hover-1)] font-medium transition-colors"
+                  >
+                    <span>
+                      {t.assignee_id
+                        ? 'Сменить исполнителя'
+                        : 'Назначить исполнителя'}
+                    </span>
+
+                    <ChevronDown
+                      className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform ${showAssign
+                        ? 'rotate-180'
+                        : ''
+                        }`}
+                    />
+                  </button>
+
+                  {showAssign && (
+                    <div className="px-4 pb-4 pt-1 space-y-2.5">
+                      <SelectDD
+                        value={aId}
+                        onChange={
+                          setAId
+                        }
+                        options={uOpts}
+                        placeholder="Выберите исполнителя"
+                        icon={
+                          UserCheck
+                        }
+                        searchable
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          act(
+                            'assign',
+                            () =>
+                              tasksApi.assign(
+                                t.id,
+                                {
+                                  assignee_id:
+                                    aId,
+                                },
+                              ),
+                            'Исполнитель назначен',
+                          )
+                        }
+                        disabled={
+                          !aId ||
+                          busy ===
+                          'assign'
+                        }
+                        className="w-full py-2.5 rounded-xl bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-40"
+                      >
+                        {busy ===
+                          'assign' ? (
+                          <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                        ) : (
+                          'Сохранить'
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {/* Review request */}
+              {canRR &&
+                users.length > 0 && (
+                  <section
+                    ref={reviewSectionRef}
+                    className="rounded-2xl border border-[var(--border-color)] overflow-hidden"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const opening = !showRR;
+
+                        setShowRR(opening);
+
+                        if (opening) {
+                          setShowAssign(false);
+                          revealExpandedSection(reviewSectionRef);
+                        }
+                      }}
+                      className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/65 hover:bg-[var(--hover-1)] font-medium transition-colors"
+                    >
+                      <span>
+                        Отправить на
+                        ревью
+                      </span>
+
+                      <ChevronDown
+                        className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform ${showRR
+                          ? 'rotate-180'
+                          : ''
+                          }`}
+                      />
+                    </button>
+
+                    {showRR && (
+                      <div className="px-4 pb-4 pt-1 space-y-2.5">
+                        <SelectDD
+                          value={rvId}
+                          onChange={
+                            setRvId
+                          }
+                          options={
+                            uOpts
+                          }
+                          placeholder="Выберите ревьюера"
+                          searchable
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            act(
+                              'rr',
+                              () =>
+                                tasksApi.requestReview(
+                                  t.id,
+                                  {
+                                    reviewer_id:
+                                      rvId,
+                                  },
+                                ),
+                              'Задача отправлена на ревью',
+                            )
+                          }
+                          disabled={
+                            !rvId ||
+                            busy ===
+                            'rr'
+                          }
+                          className="w-full py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/25 text-violet-400 text-sm font-medium disabled:opacity-40 hover:bg-violet-500/15 transition-colors"
+                        >
+                          {busy ===
+                            'rr' ? (
+                            <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                          ) : (
+                            'Отправить'
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </section>
+                )}
+
+              {/* Review */}
+              {canReview && (
+                <section className="rounded-2xl border border-[var(--border-color)] p-3">
+                  <div className="text-xs text-[var(--text-primary)]/40 mb-2.5">
+                    Решение по ревью
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onNeedComplete(
+                          t,
+                          'review_done',
+                        )
+                      }
+                      disabled={
+                        busy === 'rv'
+                      }
+                      className="py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-sm font-medium disabled:opacity-50 hover:bg-emerald-500/15 transition-colors"
+                    >
+                      Принять
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        act(
+                          'rv',
+                          () =>
+                            tasksApi.review(
+                              t.id,
+                              {
+                                decision:
+                                  'to_fix',
+                              },
+                            ),
+                          'Задача возвращена на доработку',
+                        )
+                      }
+                      disabled={
+                        busy === 'rv'
+                      }
+                      className="py-2.5 rounded-xl bg-red-500/10 border border-red-500/25 text-red-400 text-sm font-medium disabled:opacity-50 hover:bg-red-500/15 transition-colors"
+                    >
+                      Вернуть
+                    </button>
+                  </div>
+                </section>
+              )}
+            </aside>
           </div>
-
-          {canAssign && (
-            <div className="rounded-xl border border-[var(--border-color)] overflow-hidden">
-              <button onClick={() => setShowAssign((v) => !v)}
-                className="w-full flex items-center justify-between px-4 py-2.5 bg-[var(--hover-1)] text-sm text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)] font-medium transition-colors">
-                <span className="flex items-center gap-2"><UserCheck className="w-4 h-4" />{t.assignee_id ? 'Сменить исполнителя' : 'Назначить исполнителя'}</span>
-                <ChevronDown className={`w-4 h-4 transition-transform ${showAssign ? 'rotate-180' : ''}`} />
-              </button>
-              {showAssign && (
-                <div className="px-4 py-3 border-t border-[var(--border-color)] space-y-2.5 bg-[var(--bg-card)]">
-                  <SelectDD value={aId} onChange={setAId} options={uOpts} placeholder="Выберите исполнителя" icon={UserCheck} searchable />
-                  <button onClick={() => act('assign', () => tasksApi.assign(t.id, { assignee_id: aId }), 'Исполнитель назначен')}
-                    disabled={!aId || busy === 'assign'} className="w-full py-2.5 rounded-xl bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-40">
-                    {busy === 'assign' ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Сохранить исполнителя'}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {canRR && users.length > 0 && (
-            <div className="rounded-xl border border-violet-500/30 overflow-hidden">
-              <button onClick={() => setShowRR((v) => !v)}
-                className="w-full flex items-center justify-between px-4 py-2.5 bg-violet-500/10 text-sm text-violet-400 font-medium hover:bg-violet-500/15 transition-colors">
-                <span className="flex items-center gap-2"><GitPullRequest className="w-4 h-4" />Отправить на ревью</span>
-                <ChevronDown className={`w-4 h-4 opacity-70 transition-transform ${showRR ? 'rotate-180' : ''}`} />
-              </button>
-              {showRR && (
-                <div className="px-4 py-3 border-t border-violet-500/30 space-y-2.5 bg-violet-500/5">
-                  <SelectDD value={rvId} onChange={setRvId} options={uOpts} placeholder="Выберите ревьюера" searchable />
-                  <button onClick={() => act('rr', () => tasksApi.requestReview(t.id, { reviewer_id: rvId }), 'Задача отправлена на ревью')}
-                    disabled={!rvId || busy === 'rr'} className="w-full py-2.5 rounded-xl bg-violet-500/20 border border-violet-500/40 text-violet-400 text-sm font-medium disabled:opacity-40">
-                    Отправить
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {canReview && (
-            <div className="flex gap-3">
-              <button onClick={() => onNeedComplete(t, 'review_done')} disabled={busy === 'rv'}
-                className="flex-1 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm font-medium disabled:opacity-50 hover:bg-emerald-500/20 transition-colors">
-                <ThumbsUp className="w-4 h-4 inline mr-1.5" />Принять
-              </button>
-              <button onClick={() => act('rv', () => tasksApi.review(t.id, { decision: 'to_fix' }), 'Задача возвращена на доработку')}
-                disabled={busy === 'rv'} className="flex-1 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-medium disabled:opacity-50 hover:bg-red-500/20 transition-colors">
-                <ThumbsDown className="w-4 h-4 inline mr-1.5" />Вернуть
-              </button>
-            </div>
-          )}
-
-          {ticketPath && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
-              <Ticket className="w-4 h-4 text-[var(--text-primary)]/30" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-[var(--text-primary)]/45">Заявка</div>
-                <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">{ticketNo ?? 'Открыть заявку'}</div>
-              </div>
-              <Link to={ticketPath} onClick={onClose} className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline">
-                Открыть<ArrowUpRight className="w-4 h-4" />
-              </Link>
-            </div>
-          )}
-
-          {t.project_id && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
-              <FolderOpen className="w-4 h-4 text-[var(--text-primary)]/30" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-[var(--text-primary)]/45">Проект</div>
-                <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">{t.project_name || 'Открыть проект'}</div>
-              </div>
-              <Link to={`/projects/${t.project_id}`} onClick={onClose} className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline">
-                Открыть<ArrowUpRight className="w-4 h-4" />
-              </Link>
-            </div>
-          )}
         </div>
 
-        <div className="flex items-center justify-between px-5 py-3.5 border-t border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
-          <button onClick={() => setShowArchive(true)} disabled={busy === 'arch'}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-[var(--text-primary)]/40 hover:bg-red-500/10 hover:text-red-400 transition-colors">
-            <Archive className="w-4 h-4" />В архив
+        {/* Footer */}
+        <div className="flex items-center justify-between gap-3 px-6 py-3.5 border-t border-[var(--border-color)] shrink-0">
+          <button
+            type="button"
+            onClick={() =>
+              setShowArchive(true)
+            }
+            disabled={busy === 'arch'}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-[var(--text-primary)]/40 hover:bg-red-500/10 hover:text-red-400 transition-colors disabled:opacity-40"
+          >
+            <Archive className="w-4 h-4" />
+            В архив
           </button>
-          <button onClick={onClose} className="px-5 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 text-sm font-medium hover:bg-[var(--hover-3)]">Закрыть</button>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 text-sm font-medium hover:bg-[var(--hover-3)] transition-colors"
+          >
+            Закрыть
+          </button>
         </div>
       </div>
 
+      {/* Archive confirmation */}
       {showArchive && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowArchive(false)} />
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() =>
+              setShowArchive(false)
+            }
+          />
+
           <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl">
             <div className="p-6 text-center">
-              <Archive className="w-10 h-10 text-[var(--text-primary)]/20 mx-auto mb-3" />
-              <p className="text-base font-bold text-[var(--text-primary)]">Архивировать задачу?</p>
-              <p className="text-sm text-[var(--text-primary)]/50 mt-1">«{t.title}»</p>
+              <Archive className="w-9 h-9 text-[var(--text-primary)]/20 mx-auto mb-3" />
+
+              <p className="text-base font-bold text-[var(--text-primary)]">
+                Архивировать задачу?
+              </p>
+
+              <p className="text-sm text-[var(--text-primary)]/50 mt-1 line-clamp-2">
+                {t.title}
+              </p>
             </div>
+
             <div className="flex border-t border-[var(--border-color)]">
-              <button onClick={() => setShowArchive(false)} className="flex-1 py-3 text-sm text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)] font-medium">Отмена</button>
-              <button onClick={() => { setShowArchive(false); act('arch', () => tasksApi.archive(t.id), 'Задача архивирована'); }}
-                className="flex-1 py-3 text-sm font-bold text-red-500 hover:bg-red-500/10 border-l border-[var(--border-color)]">Да</button>
+              <button
+                type="button"
+                onClick={() =>
+                  setShowArchive(false)
+                }
+                className="flex-1 py-3 text-sm text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)] font-medium"
+              >
+                Отмена
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowArchive(
+                    false,
+                  );
+
+                  act(
+                    'arch',
+                    () =>
+                      tasksApi.archive(
+                        t.id,
+                      ),
+                    'Задача архивирована',
+                  );
+                }}
+                className="flex-1 py-3 text-sm font-bold text-red-500 hover:bg-red-500/10 border-l border-[var(--border-color)]"
+              >
+                Архивировать
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {previewItem && (
-        <AttachmentPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
+        <AttachmentPreviewModal
+          item={previewItem}
+          onClose={() =>
+            setPreviewItem(null)
+          }
+        />
       )}
     </div>
   );
@@ -1967,13 +3009,13 @@ export default function TasksPage() {
   const [boardViewportWidth, setBoardViewportWidth] = useState(0);
 
   const [fixedBoardScrollbarStyle, setFixedBoardScrollbarStyle] = useState<React.CSSProperties>({
-  position: 'fixed',
-  left: 0,
-  width: 0,
-  bottom: 12,
-  zIndex: 55,
-  display: 'none',
-});
+    position: 'fixed',
+    left: 0,
+    width: 0,
+    bottom: 12,
+    zIndex: 55,
+    display: 'none',
+  });
 
   const staff = (user?.roles ?? []).some((r) => ['admin', 'support_manager', 'support_agent', 'executor'].includes(r));
 
@@ -1999,6 +3041,87 @@ export default function TasksPage() {
 
   const [drag, setDrag] = useState<{ id: string; from: TaskStatus } | null>(null);
   const [dragO, setDragO] = useState<TaskStatus | null>(null);
+
+  const [highlightTaskId, setHighlightTaskId] =
+    useState<string | null>(null);
+
+  const highlightTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [lastMove, setLastMove] =
+    useState<LastMove | null>(null);
+
+
+  const [undoingMove, setUndoingMove] =
+    useState(false);
+
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const highlightMovedTask = useCallback(
+    (id: string) => {
+      setHighlightTaskId(id);
+
+      if (highlightTimerRef.current) {
+        clearTimeout(highlightTimerRef.current);
+      }
+
+      highlightTimerRef.current = setTimeout(() => {
+        setHighlightTaskId(null);
+      }, 4000);
+    },
+    [],
+  );
+
+
+
+  const showUndoMove = useCallback((move: LastMove) => {
+    setLastMove(move);
+
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+    }
+
+    undoTimerRef.current = setTimeout(() => {
+      setLastMove(null);
+    }, 10000);
+  }, []);
+
+  const revealTask = useCallback(
+    (id: string) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const elements =
+            document.querySelectorAll<HTMLElement>(
+              '[data-task-id]',
+            );
+
+          const element = Array.from(elements).find(
+            (el) =>
+              el.getAttribute('data-task-id') === id,
+          );
+
+          element?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'center',
+          });
+        });
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current) {
+        clearTimeout(highlightTimerRef.current);
+      }
+
+      if (undoTimerRef.current) {
+        clearTimeout(undoTimerRef.current);
+      }
+    };
+  }, []);
 
   const [q, setQ] = useState('');
   const [fp, setFp] = useState<TaskPriority[]>([]);
@@ -2040,40 +3163,40 @@ export default function TasksPage() {
     return { type: 'my' };
   }, [mode, selP, selA, selT]);
 
-const syncBoardScrollbarMetrics = useCallback(() => {
-  const board = boardScrollRef.current;
-  const inner = boardInnerRef.current;
+  const syncBoardScrollbarMetrics = useCallback(() => {
+    const board = boardScrollRef.current;
+    const inner = boardInnerRef.current;
 
-  if (!board || !inner) {
-    setFixedBoardScrollbarStyle((prev) => ({
-      ...prev,
-      display: 'none',
-    }));
-    return;
-  }
+    if (!board || !inner) {
+      setFixedBoardScrollbarStyle((prev) => ({
+        ...prev,
+        display: 'none',
+      }));
+      return;
+    }
 
-  const contentWidth = inner.scrollWidth;
-  const viewportWidth = board.clientWidth;
-  const rect = board.getBoundingClientRect();
-  const hasHorizontalOverflow = contentWidth > viewportWidth + 2;
+    const contentWidth = inner.scrollWidth;
+    const viewportWidth = board.clientWidth;
+    const rect = board.getBoundingClientRect();
+    const hasHorizontalOverflow = contentWidth > viewportWidth + 2;
 
-  setBoardScrollWidth(contentWidth);
-  setBoardViewportWidth(viewportWidth);
+    setBoardScrollWidth(contentWidth);
+    setBoardViewportWidth(viewportWidth);
 
-  setFixedBoardScrollbarStyle({
-    position: 'fixed',
-    left: rect.left,
-    width: rect.width,
-    bottom: 12,
-    zIndex: 55,
-    display: hasHorizontalOverflow ? 'block' : 'none',
-    pointerEvents: 'auto',
-  });
+    setFixedBoardScrollbarStyle({
+      position: 'fixed',
+      left: rect.left,
+      width: rect.width,
+      bottom: 12,
+      zIndex: 55,
+      display: hasHorizontalOverflow ? 'block' : 'none',
+      pointerEvents: 'auto',
+    });
 
-  if (bottomBoardScrollRef.current) {
-    bottomBoardScrollRef.current.scrollLeft = board.scrollLeft;
-  }
-}, []);
+    if (bottomBoardScrollRef.current) {
+      bottomBoardScrollRef.current.scrollLeft = board.scrollLeft;
+    }
+  }, []);
 
   const handleBoardScroll = useCallback(() => {
     if (boardScrollSyncRef.current) return;
@@ -2093,41 +3216,41 @@ const syncBoardScrollbarMetrics = useCallback(() => {
     requestAnimationFrame(() => boardScrollSyncRef.current = false);
   }, []);
 
-useEffect(() => {
-  if (viewMode !== 'kanban' || loading || !cols.length) {
-    setFixedBoardScrollbarStyle((prev) => ({
-      ...prev,
-      display: 'none',
-    }));
-    return;
-  }
+  useEffect(() => {
+    if (viewMode !== 'kanban' || loading || !cols.length) {
+      setFixedBoardScrollbarStyle((prev) => ({
+        ...prev,
+        display: 'none',
+      }));
+      return;
+    }
 
-  const run = () => {
-    requestAnimationFrame(syncBoardScrollbarMetrics);
-  };
+    const run = () => {
+      requestAnimationFrame(syncBoardScrollbarMetrics);
+    };
 
-  run();
+    run();
 
-  const board = boardScrollRef.current;
-  const inner = boardInnerRef.current;
+    const board = boardScrollRef.current;
+    const inner = boardInnerRef.current;
 
-  let ro: ResizeObserver | null = null;
+    let ro: ResizeObserver | null = null;
 
-  if (typeof ResizeObserver !== 'undefined' && board && inner) {
-    ro = new ResizeObserver(run);
-    ro.observe(board);
-    ro.observe(inner);
-  }
+    if (typeof ResizeObserver !== 'undefined' && board && inner) {
+      ro = new ResizeObserver(run);
+      ro.observe(board);
+      ro.observe(inner);
+    }
 
-  window.addEventListener('resize', run);
-  window.addEventListener('scroll', run, true);
+    window.addEventListener('resize', run);
+    window.addEventListener('scroll', run, true);
 
-  return () => {
-    ro?.disconnect();
-    window.removeEventListener('resize', run);
-    window.removeEventListener('scroll', run, true);
-  };
-}, [viewMode, loading, cols.length, syncBoardScrollbarMetrics]);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', run);
+      window.removeEventListener('scroll', run, true);
+    };
+  }, [viewMode, loading, cols.length, syncBoardScrollbarMetrics]);
 
   const loadUsersMap = useCallback(async () => {
     const m = new Map<string, SimpleUser | CounterpartyCustomer>();
@@ -2189,52 +3312,150 @@ useEffect(() => {
     }
   }, [cols, ctx, toast]);
 
-  const moveTo = useCallback(async (id: string, from: TaskStatus, to: TaskStatus) => {
-    const src = cols.find((c) => c.status === from);
-    const task = src?.tasks.items.find((x) => x.id === id);
-    if (!task) return;
+  const moveTo = useCallback(
+    async (
+      id: string,
+      from: TaskStatus,
+      to: TaskStatus,
+    ) => {
+      const src = cols.find(
+        (c) => c.status === from,
+      );
 
-    if (to === 'todo' && from === 'backlog' && !task.assignee_id) {
-      setAssignIntent({ task, targetStatus: 'todo' });
-      return;
-    }
-    if (to === 'in_progress' && !task.assignee_id) {
-      setAssignIntent({ task, targetStatus: 'in_progress' });
-      return;
-    }
-    if (to === 'done') {
-      setCompleteIntent({ task, mode: 'status_done' });
-      return;
-    }
+      const task = src?.tasks.items.find(
+        (x) => x.id === id,
+      );
 
-    const snap = snapCols(cols);
-    let moved: TaskViewItem | undefined;
+      if (!task) return;
 
-    setCols((prev) => {
-      const n = prev.map((c) => {
-        if (c.status === from) {
-          const items = c.tasks.items.filter((x) => {
-            if (x.id === id) { moved = x; return false; }
-            return true;
-          });
-          return { ...c, tasks: { ...c.tasks, items, total_items: c.tasks.total_items - 1 } };
-        }
-        return c;
+      if (
+        to === 'todo' &&
+        from === 'backlog' &&
+        !task.assignee_id
+      ) {
+        setAssignIntent({
+          task,
+          targetStatus: 'todo',
+        });
+        return;
+      }
+
+      if (
+        to === 'in_progress' &&
+        !task.assignee_id
+      ) {
+        setAssignIntent({
+          task,
+          targetStatus: 'in_progress',
+        });
+        return;
+      }
+
+      if (to === 'done') {
+        setCompleteIntent({
+          task,
+          mode: 'status_done',
+        });
+        return;
+      }
+
+      const snap = snapCols(cols);
+
+      let moved: TaskViewItem | undefined;
+
+      setCols((prev) => {
+        const next = prev.map((c) => {
+          if (c.status !== from) return c;
+
+          const items = c.tasks.items.filter(
+            (x) => {
+              if (x.id === id) {
+                moved = x;
+                return false;
+              }
+
+              return true;
+            },
+          );
+
+          return {
+            ...c,
+            tasks: {
+              ...c.tasks,
+              items,
+              total_items: Math.max(
+                c.tasks.total_items - 1,
+                0,
+              ),
+            },
+          };
+        });
+
+        if (!moved) return prev;
+
+        const updated: TaskViewItem = {
+          ...moved,
+          status: to,
+        };
+
+        return next.map((c) =>
+          c.status === to
+            ? {
+              ...c,
+              tasks: {
+                ...c.tasks,
+                items: [
+                  updated,
+                  ...c.tasks.items.filter(
+                    (x) => x.id !== id,
+                  ),
+                ],
+                total_items:
+                  c.tasks.total_items + 1,
+              },
+            }
+            : c,
+        );
       });
-      if (!moved) return prev;
-      const updated = { ...moved, status: to };
-      return n.map((c) => c.status === to ? { ...c, tasks: { ...c.tasks, items: [updated, ...c.tasks.items], total_items: c.tasks.total_items + 1 } } : c);
-    });
 
-    try {
-      await tasksApi.changeStatus(id, to);
-      toast({ title: `Статус: ${ST_LABEL[to]}` });
-    } catch (e: any) {
-      setCols(snap);
-      const m = statusErr(e, task, to);
-      toast({ title: m.title, description: m.description, variant: 'destructive' });
-    }
-  }, [cols, toast]);
+      try {
+        await tasksApi.changeStatus(id, to);
+
+        showUndoMove({
+          taskId: id,
+          number: task.number,
+          title: task.title,
+          from,
+          to,
+        });
+
+        highlightMovedTask(id);
+        revealTask(id);
+
+        toast({
+          title: `Задача перенесена в «${ST_LABEL[to]}»`,
+          description: `${task.number} — ${task.title}`,
+        });
+      } catch (e: any) {
+        setCols(snap);
+
+        const message = statusErr(e, task, to);
+
+        toast({
+          title: message.title,
+          description: message.description,
+          variant: 'destructive',
+        });
+      }
+    },
+    [
+      cols,
+      toast,
+      highlightMovedTask,
+      revealTask,
+      showUndoMove,
+    ],
+  );
 
   const handleAssignAndMove = useCallback(async (aid: string) => {
     if (!assignIntent) return;
@@ -2277,24 +3498,92 @@ useEffect(() => {
   const onDE = useCallback(() => { setDrag(null); setDragO(null); }, []);
   const onDO = useCallback((e: React.DragEvent, st: TaskStatus) => {
     e.preventDefault();
-    if (drag && !TRANSITIONS[drag.from].includes(st)) return;
+
+    if (
+      drag &&
+      !TRANSITIONS[drag.from].includes(st)
+    ) {
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
+
     e.dataTransfer.dropEffect = 'move';
     setDragO(st);
   }, [drag]);
   const onDL = useCallback(() => setDragO(null), []);
-  const onDrop = useCallback(async (e: React.DragEvent, to: TaskStatus) => {
+  const onDrop = useCallback(async (
+    e: React.DragEvent,
+    to: TaskStatus,
+  ) => {
     e.preventDefault();
     setDragO(null);
-    if (!drag || drag.from === to) { setDrag(null); return; }
-    if (!TRANSITIONS[drag.from].includes(to)) {
-      toast({ title: 'Переход недоступен', variant: 'destructive' });
+
+    if (!drag || drag.from === to) {
       setDrag(null);
       return;
     }
+
+    if (!TRANSITIONS[drag.from].includes(to)) {
+      toast({
+        title: 'Переход недоступен',
+        variant: 'destructive',
+      });
+
+      setDrag(null);
+      return;
+    }
+
     const { id, from } = drag;
+
     setDrag(null);
+
     await moveTo(id, from, to);
   }, [drag, moveTo, toast]);
+
+  const undoLastMove = useCallback(async () => {
+    if (!lastMove || undoingMove) return;
+
+    const move = lastMove;
+
+    setUndoingMove(true);
+
+    try {
+      await tasksApi.changeStatus(
+        move.taskId,
+        move.from,
+      );
+
+      setLastMove(null);
+
+      await fetchBoard(true);
+
+      highlightMovedTask(move.taskId);
+
+      setTimeout(() => {
+        revealTask(move.taskId);
+      }, 100);
+
+      toast({
+        title: 'Перенос отменён',
+        description: `${move.number} возвращена в «${ST_LABEL[move.from]}»`,
+      });
+    } catch (e: any) {
+      toast({
+        title: 'Не удалось отменить перенос',
+        description: apiErr(e),
+        variant: 'destructive',
+      });
+    } finally {
+      setUndoingMove(false);
+    }
+  }, [
+    lastMove,
+    undoingMove,
+    fetchBoard,
+    highlightMovedTask,
+    revealTask,
+    toast,
+  ]);
 
   const ql = q.trim().toLowerCase();
   const disp = cols.map((c) => !ql ? c : {
@@ -2408,75 +3697,187 @@ useEffect(() => {
 
         <div className="flex items-center gap-1 p-1 bg-[var(--hover-1)] rounded-lg border border-[var(--border-color)]">
           <button onClick={() => setViewMode('kanban')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'kanban' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}><LayoutGrid className="w-3.5 h-3.5" />Доска</button>
+
           <button onClick={() => setViewMode('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'list' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}><List className="w-3.5 h-3.5" />Список</button>
+          <button
+            type="button"
+            onClick={() =>
+              setViewMode('analytics')
+            }
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'analytics'
+                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
+              }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            Аналитика
+          </button>
         </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        {loading ? (
-          <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" /></div>
-        ) : viewMode === 'list' ? (
-          <ListView tasks={disp.flatMap((c) => c.tasks.items)} umap={umap} onView={setView} />
-        ) : !cols.length ? (
-          <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30"><FileText className="w-12 h-12 mb-3 opacity-50" /><p className="text-base font-medium">{mode === 'project' && !selP ? 'Выберите проект' : mode === 'assignee' && !selA ? 'Выберите исполнителя' : mode === 'ticket' && !selT ? 'Выберите заявку' : 'Нет задач'}</p></div>
-        ) : (
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-  <div
-    ref={boardScrollRef}
-    onScroll={handleBoardScroll}
-    className="flex-1 overflow-x-auto overflow-y-hidden pb-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-  >
-    <div
-      ref={boardInnerRef}
-      className="flex gap-3 h-full w-max min-w-full"
-    >
-      {disp.map((c) => (
-        <KCol
-          key={c.status}
-          col={c}
-          umap={umap}
-          isDO={dragO === c.status}
-          dragId={drag?.id ?? null}
-          ldMore={moreCol === c.status}
-          onDS={onDS}
-          onDE={onDE}
-          onDO={onDO}
-          onDL={onDL}
-          onDrop={onDrop}
-          onAdd={setCreate}
-          onView={setView}
-          onMore={more}
-        />
-      ))}
-    </div>
-  </div>
-</div>
-        )}
-      </div>
+  {viewMode === 'analytics' ? (
+    (
+      (mode === 'project' && !selP) ||
+      (mode === 'assignee' && !selA) ||
+      (mode === 'ticket' && !selT)
+    ) ? (
+      <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30">
+        <BarChart3 className="w-12 h-12 mb-3 opacity-50" />
 
-{viewMode === 'kanban' &&
-  !loading &&
-  cols.length > 0 &&
-  createPortal(
-    <div
-      style={fixedBoardScrollbarStyle}
-      className="px-1"
-    >
+        <p className="text-base font-medium">
+          {mode === 'project' && !selP
+            ? 'Выберите проект'
+            : mode === 'assignee' && !selA
+              ? 'Выберите исполнителя'
+              : 'Выберите заявку'}
+        </p>
+
+        <p className="text-sm mt-1 text-[var(--text-primary)]/25">
+          После выбора здесь появится аналитика
+        </p>
+      </div>
+    ) : (
+      <TaskAnalytics
+        context={ctx()}
+        priorities={fp}
+        overdueOnly={fo}
+        onTaskOpen={(task) => {
+          setView(task as TaskViewItem);
+        }}
+      />
+    )
+  ) : loading ? (
+    <div className="flex items-center justify-center h-full">
+      <Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" />
+    </div>
+  ) : viewMode === 'list' ? (
+    <ListView
+      tasks={disp.flatMap((c) => c.tasks.items)}
+      umap={umap}
+      onView={setView}
+    />
+  ) : !cols.length ? (
+    <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30">
+      <FileText className="w-12 h-12 mb-3 opacity-50" />
+
+      <p className="text-base font-medium">
+        {mode === 'project' && !selP
+          ? 'Выберите проект'
+          : mode === 'assignee' && !selA
+            ? 'Выберите исполнителя'
+            : mode === 'ticket' && !selT
+              ? 'Выберите заявку'
+              : 'Нет задач'}
+      </p>
+    </div>
+  ) : (
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div
-        ref={bottomBoardScrollRef}
-        onScroll={handleBottomBoardScroll}
-        className="h-2 rounded-xl bg-[var(--bg-card)]/95 border border-[var(--border-color)] shadow-2xl backdrop-blur-md overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/60 scrollbar-track-transparent"
+        ref={boardScrollRef}
+        onScroll={handleBoardScroll}
+        className="flex-1 overflow-x-auto overflow-y-hidden pb-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <div
-          style={{
-            width: Math.max(boardScrollWidth, boardViewportWidth),
-            height: '100%',
-          }}
-        />
+          ref={boardInnerRef}
+          className="flex gap-3 h-full w-max min-w-full"
+        >
+          {disp.map((c) => (
+            <KCol
+              key={c.status}
+              col={c}
+              umap={umap}
+              isDO={dragO === c.status}
+              dragId={drag?.id ?? null}
+              highlightTaskId={highlightTaskId}
+              ldMore={moreCol === c.status}
+              onDS={onDS}
+              onDE={onDE}
+              onDO={onDO}
+              onDL={onDL}
+              onDrop={onDrop}
+              onAdd={setCreate}
+              onView={setView}
+              onMore={more}
+            />
+          ))}
+        </div>
       </div>
-    </div>,
-    document.body,
+    </div>
   )}
+</div>
+
+      {viewMode === 'kanban' &&
+        !loading &&
+        cols.length > 0 &&
+        createPortal(
+          <div
+            style={fixedBoardScrollbarStyle}
+            className="px-1"
+          >
+            <div
+              ref={bottomBoardScrollRef}
+              onScroll={handleBottomBoardScroll}
+              className="h-2 rounded-xl bg-[var(--bg-card)]/95 border border-[var(--border-color)] shadow-2xl backdrop-blur-md overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/60 scrollbar-track-transparent"
+            >
+              <div
+                style={{
+                  width: Math.max(boardScrollWidth, boardViewportWidth),
+                  height: '100%',
+                }}
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      <AnimatePresence>
+        {lastMove && !drag && (
+          <motion.div
+            initial={{ y: 12, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 8, opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120]"
+          >
+            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-lg">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+
+              <div className="min-w-0 max-w-[300px]">
+                <div className="text-xs font-medium text-[var(--text-primary)] truncate">
+                  #{lastMove.number} перенесена в {ST_LABEL[lastMove.to]}
+                </div>
+              </div>
+
+              <div className="w-px h-5 bg-[var(--border-color)]" />
+
+              <button
+                type="button"
+                onClick={undoLastMove}
+                disabled={undoingMove}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)] transition-colors disabled:opacity-40 whitespace-nowrap"
+              >
+                {undoingMove ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-3.5 h-3.5" />
+                )}
+
+                Вернуть
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLastMove(null)}
+                className="p-1 rounded text-[var(--text-primary)]/30 hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)] transition-colors"
+                title="Скрыть"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>{dragInfo && <DragPanel task={dragInfo} onDrop={onDrop} />}</AnimatePresence>
 

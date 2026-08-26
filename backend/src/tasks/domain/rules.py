@@ -55,6 +55,11 @@ class TaskReviewerStatusRule:
         TaskStatus.DONE,
         TaskStatus.CANCELLED,
     }
+    
+    ALLOWED_FROM_STATUSES: ClassVar[set[TaskStatus]] = {
+        TaskStatus.TO_REVIEW,
+        TaskStatus.DONE,
+    }
 
     def __init__(self, subject: Subject, task: Task, new_status: TaskStatus) -> None:
         self.subject = subject
@@ -65,18 +70,19 @@ class TaskReviewerStatusRule:
         if str(self.task.reviewer_id) != str(self.subject.id):
             return PermissionResult(False, "You are not the reviewer for this task")
 
-        if self.task.status != TaskStatus.TO_REVIEW:
-            return PermissionResult(False, "Task is not in TO_REVIEW status")
+        if self.task.status not in self.ALLOWED_FROM_STATUSES:
+            return PermissionResult(
+                False,
+                f"Task reviewer can only change from: "
+                f"{', '.join([status.value for status in self.ALLOWED_FROM_STATUSES])}",
+            )
 
         if self.new_status not in self.ALLOWED_NEXT_STATUSES:
             return PermissionResult(
                 False,
                 f"Task reviewer can only change to: "
-                f"{', '.join([status.value() for status in self.ALLOWED_NEXT_STATUSES])}",
+                f"{', '.join([status.value for status in self.ALLOWED_NEXT_STATUSES])}",
             )
-
-        return PermissionResult(True)
-
 
 class TaskAssigneeStatusRule:
     """
