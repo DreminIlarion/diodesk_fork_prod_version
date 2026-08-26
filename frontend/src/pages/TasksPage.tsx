@@ -64,6 +64,9 @@ type TaskViewItem = TaskKanbanItem & {
   description?: string | null;
   estimated_hours?: number | string | null;
   actual_hours?: number | string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  working_since?: string | null;
   reviewer_id?: string | null;
   ticket_number?: string | null;
   ticket_title?: string | null;
@@ -175,15 +178,120 @@ const INP =
 const ini = (n?: string | null) =>
   n ? n.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase() : '?';
 
-const overdue = (t: TaskViewItem) =>
-  !!t.due_date && t.status !== 'done' && t.status !== 'cancelled' && new Date(t.due_date) < new Date();
+const getDueTimestamp = (dueDate?: string | null): number | null => {
+  if (!dueDate) return null;
+
+  // date без времени трактуем как конец указанного дня,
+  // а не 00:00 этого дня.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+    const [year, month, day] = dueDate.split('-').map(Number);
+
+    return new Date(
+      year,
+      month - 1,
+      day,
+      23,
+      59,
+      59,
+      999,
+    ).getTime();
+  }
+
+  const timestamp = new Date(dueDate).getTime();
+
+  return Number.isFinite(timestamp)
+    ? timestamp
+    : null;
+};
+
+const completedLate = (t: TaskViewItem) => {
+  if (!t.completed_at) return false;
+
+  const dueAt = getDueTimestamp(t.due_date);
+  if (dueAt == null) return false;
+
+  const completedAt = new Date(t.completed_at).getTime();
+
+  return (
+    Number.isFinite(completedAt) &&
+    completedAt > dueAt
+  );
+};
+
+const overdue = (t: TaskViewItem) => {
+  if (
+    t.status === 'done' ||
+    t.status === 'cancelled'
+  ) {
+    return false;
+  }
+
+  const dueAt = getDueTimestamp(t.due_date);
+
+  return dueAt != null && Date.now() > dueAt;
+};
 
 const fmtDue = (d: string) => {
-  const diff = Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
-  if (diff < 0) return `${-diff} дн. просрочено`;
-  if (diff === 0) return 'Сегодня';
-  if (diff === 1) return 'Завтра';
-  return new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  const dueAt = getDueTimestamp(d);
+
+  if (dueAt == null) {
+    return '—';
+  }
+
+  const now = new Date();
+
+  const todayEnd = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    23,
+    59,
+    59,
+    999,
+  ).getTime();
+
+  const diff = Math.ceil(
+    (dueAt - todayEnd) / 86400000,
+  );
+
+  if (diff < 0) {
+    return `${-diff} дн. просрочено`;
+  }
+
+  if (diff === 0) {
+    return 'Сегодня';
+  }
+
+  if (diff === 1) {
+    return 'Завтра';
+  }
+
+  return new Date(dueAt).toLocaleDateString(
+    'ru-RU',
+    {
+      day: 'numeric',
+      month: 'short',
+    },
+  );
+};
+
+const fmtTaskDue = (t: TaskViewItem) => {
+  if (!t.due_date) return '—';
+
+  if (t.status === 'done') {
+    if (completedLate(t)) {
+      return 'Завершена с опозданием';
+    }
+
+    return new Date(
+      getDueTimestamp(t.due_date) ?? t.due_date,
+    ).toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'short',
+    });
+  }
+
+  return fmtDue(t.due_date);
 };
 
 const apiErr = (e: any) =>
@@ -857,7 +965,7 @@ function ListView({ tasks, umap, onView }: {
                   </td>
                   <td className="px-4 py-3">
                     {t.due_date ? (
-                      <span className={`text-sm ${od ? 'text-red-400 font-medium' : 'text-[var(--text-primary)]/50'}`}>{fmtDue(t.due_date)}</span>
+                      <span className={`text-sm ${od ? 'text-red-400 font-medium' : 'text-[var(--text-primary)]/50'}`}>{fmtTaskDue(t)}</span>
                     ) : <span className="text-[var(--text-primary)]/30">—</span>}
                   </td>
                   <td className="px-4 py-3 text-[var(--text-primary)]/60 whitespace-nowrap" title="Плановые трудозатраты">{fmtHours(t.estimated_hours)}</td>
@@ -913,7 +1021,7 @@ function TCard({
         hover:bg-[var(--hover-2)] hover:border-[var(--accent)]/40
 
         ${highlighted
-          ? 'border-emerald-500/70 bg-emerald-500/[0.06]'
+          ? 'border-2 border-emerald-500 bg-emerald-500/[0.06]'
           : ''
         }
 
@@ -927,10 +1035,10 @@ function TCard({
         }`}
     >
       {highlighted && (
-        <div className="absolute -top-2 right-3 z-10 px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-medium">
-          Перенесено сюда
-        </div>
-      )}
+  <div className="absolute top-2.5 right-3 px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-[10px] font-semibold">
+    Перенесено
+  </div>
+)}
       <span className="text-xs font-mono text-[var(--text-primary)]/45 mb-1.5 leading-none">
         #{t.number}
       </span>
@@ -978,7 +1086,7 @@ function TCard({
                 : 'text-[var(--text-primary)]/45'
                 }`}
             >
-              {fmtDue(t.due_date)}
+              {fmtTaskDue(t)}
             </span>
           )}
         </div>
@@ -2567,24 +2675,90 @@ function DetailModal({
                   </div>
 
                   {/* Created */}
-                  <div className="flex items-center justify-between gap-4 px-4 py-3">
-                    <span className="text-sm text-[var(--text-primary)]/45">
-                      Создана
-                    </span>
+                  <div className="px-4 py-3.5">
+  <div className="text-sm text-[var(--text-primary)]/45 mb-2.5">
+    Жизненный цикл
+  </div>
 
-                    <span className="text-sm font-medium text-[var(--text-primary)]/70">
-                      {new Date(
-                        t.created_at,
-                      ).toLocaleDateString(
-                        'ru-RU',
-                        {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        },
-                      )}
-                    </span>
-                  </div>
+  <div className="space-y-2">
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-xs text-[var(--text-primary)]/35">
+        Создана
+      </span>
+
+      <span className="text-xs font-medium text-[var(--text-primary)]/70 text-right">
+        {new Date(t.created_at).toLocaleString('ru-RU', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })}
+      </span>
+    </div>
+
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-xs text-[var(--text-primary)]/35">
+        Начата
+      </span>
+
+      <span className="text-xs font-medium text-[var(--text-primary)]/70 text-right">
+        {t.started_at
+          ? new Date(t.started_at).toLocaleString('ru-RU', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '—'}
+      </span>
+    </div>
+
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-xs text-[var(--text-primary)]/35">
+        Завершена
+      </span>
+
+      <span
+        className={`text-xs font-medium text-right ${
+          t.completed_at && completedLate(t)
+            ? 'text-amber-400'
+            : 'text-[var(--text-primary)]/70'
+        }`}
+      >
+        {t.completed_at
+          ? new Date(t.completed_at).toLocaleString('ru-RU', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '—'}
+      </span>
+    </div>
+  </div>
+</div>
+
+                  {t.working_since && (
+                    <div className="px-4 py-3">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-sm text-[var(--text-primary)]/45">
+                          Текущая работа
+                        </span>
+
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-500">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          С {new Date(t.working_since).toLocaleTimeString('ru-RU', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  
                 </div>
               </section>
 
@@ -3085,6 +3259,25 @@ export default function TasksPage() {
       setLastMove(null);
     }, 10000);
   }, []);
+
+   const pauseUndoTimer = useCallback(() => {
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+  }, []);
+
+  const resumeUndoTimer = useCallback(() => {
+    if (!lastMove) return;
+
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+    }
+
+    undoTimerRef.current = setTimeout(() => {
+      setLastMove(null);
+    }, 4000); // Если убрал мышку, даём ещё 4 секунды
+  }, [lastMove]);
 
   const revealTask = useCallback(
     (id: string) => {
@@ -3832,52 +4025,58 @@ export default function TasksPage() {
         )}
 
       <AnimatePresence>
-        {lastMove && !drag && (
-          <motion.div
-            initial={{ y: 12, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 8, opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120]"
-          >
-            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-lg">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+  {lastMove && !drag && (
+    <motion.div
+      initial={{ y: 16, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 10, opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120] w-[min(520px,calc(100vw-24px))]"
+    >
+      <div  onMouseEnter={pauseUndoTimer}
+              onMouseLeave={resumeUndoTimer}
+      className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-[var(--bg-card)] border border-emerald-500/50 shadow-lg">
+        <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
+          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+        </div>
 
-              <div className="min-w-0 max-w-[300px]">
-                <div className="text-xs font-medium text-[var(--text-primary)] truncate">
-                  #{lastMove.number} перенесена в {ST_LABEL[lastMove.to]}
-                </div>
-              </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-semibold text-[var(--text-primary)]">
+            Задача перенесена
+          </div>
 
-              <div className="w-px h-5 bg-[var(--border-color)]" />
+          <div className="mt-0.5 text-xs text-[var(--text-primary)]/50 truncate">
+            #{lastMove.number} · {ST_LABEL[lastMove.to]}
+          </div>
+        </div>
 
-              <button
-                type="button"
-                onClick={undoLastMove}
-                disabled={undoingMove}
-                className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)] transition-colors disabled:opacity-40 whitespace-nowrap"
-              >
-                {undoingMove ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <RotateCcw className="w-3.5 h-3.5" />
-                )}
+        <button
+          type="button"
+          onClick={undoLastMove}
+          disabled={undoingMove}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-50 shrink-0"
+        >
+          {undoingMove ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <RotateCcw className="w-3.5 h-3.5" />
+          )}
 
-                Вернуть
-              </button>
+          {undoingMove ? 'Возвращаем...' : 'Вернуть'}
+        </button>
 
-              <button
-                type="button"
-                onClick={() => setLastMove(null)}
-                className="p-1 rounded text-[var(--text-primary)]/30 hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)] transition-colors"
-                title="Скрыть"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        <button
+          type="button"
+          onClick={() => setLastMove(null)}
+          title="Скрыть"
+          className="p-1.5 rounded-lg text-[var(--text-primary)]/30 hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)] transition-colors shrink-0"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </motion.div>
+  )}
+</AnimatePresence>
 
       <AnimatePresence>{dragInfo && <DragPanel task={dragInfo} onDrop={onDrop} />}</AnimatePresence>
 
