@@ -678,10 +678,7 @@ export function TaskAnalytics({
               task.actual_hours,
             );
 
-            return (
-              planned > 0 &&
-              actual > planned
-            );
+            return planned > 0 && actual > 0;
           })
           .map((task) => {
             const planned = toNumber(
@@ -696,7 +693,9 @@ export function TaskAnalytics({
               actual - planned;
 
             const percent =
-              (variance / planned) * 100;
+              planned > 0
+                ? (variance / planned) * 100
+                : 0;
 
             return {
               task,
@@ -706,10 +705,36 @@ export function TaskAnalytics({
               percent,
             };
           })
-          .sort(
-            (a, b) =>
-              b.variance - a.variance,
-          );
+          .sort((a, b) => {
+            /*
+             * Сначала задачи с превышением.
+             * Чем больше дополнительных часов —
+             * тем выше задача.
+             */
+            const aOver = a.variance > 0;
+            const bOver = b.variance > 0;
+
+            if (aOver && !bOver) return -1;
+            if (!aOver && bOver) return 1;
+
+            /*
+             * Среди превышений:
+             * самое большое превышение сверху.
+             */
+            if (aOver && bOver) {
+              return b.variance - a.variance;
+            }
+
+            /*
+             * Среди выполненных в пределах плана
+             * сначала показываем те, что были
+             * ближе всего к плану.
+             *
+             * Например:
+             * -1 ч будет раньше -19 ч.
+             */
+            return b.variance - a.variance;
+          });
 
       return {
         planned,
@@ -1154,11 +1179,11 @@ export function TaskAnalytics({
           <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] overflow-hidden">
             <div className="px-5 py-4 border-b border-[var(--border-color)]">
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-                Превышение трудозатрат
+                План / факт по задачам
               </h3>
 
               <p className="mt-0.5 text-xs text-[var(--text-primary)]/35">
-                Задачи, на которые ушло больше времени, чем планировалось
+                Сравнение фактических и плановых трудозатрат
               </p>
             </div>
 
@@ -1232,23 +1257,25 @@ export function TaskAnalytics({
 
                           <div className="text-right shrink-0">
                             <div
-                              className={`text-sm font-semibold ${over
-                                ? 'text-red-400'
-                                : item.variance <
-                                  0
-                                  ? 'text-emerald-500'
-                                  : 'text-[var(--text-primary)]/60'
+                              className={`text-sm font-semibold ${item.variance > 0
+                                  ? 'text-red-400'
+                                  : item.variance < 0
+                                    ? 'text-emerald-500'
+                                    : 'text-[var(--text-primary)]/60'
                                 }`}
                             >
-                              {formatSignedHours(
-                                item.variance,
-                              )}
+                              {formatSignedHours(item.variance)}
                             </div>
 
-                            <div className="mt-0.5 text-[11px] text-[var(--text-primary)]/35">
-                              {formatPercent(
-                                item.percent,
-                              )}
+                            <div
+                              className={`mt-0.5 text-[11px] ${item.percent > 0
+                                  ? 'text-red-400/60'
+                                  : item.percent < 0
+                                    ? 'text-emerald-500/60'
+                                    : 'text-[var(--text-primary)]/35'
+                                }`}
+                            >
+                              {formatPercent(item.percent)}
                             </div>
                           </div>
 
@@ -1264,9 +1291,9 @@ export function TaskAnalytics({
               <div className="py-14 text-center">
                 <Clock3 className="w-7 h-7 mx-auto text-[var(--text-primary)]/20" />
 
-               <div className="mt-2 text-sm text-[var(--text-primary)]/35">
-  Нет задач с превышением плановых трудозатрат
-</div>
+                <div className="mt-2 text-sm text-[var(--text-primary)]/35">
+                  Нет задач с превышением плановых трудозатрат
+                </div>
               </div>
             )}
           </section>
