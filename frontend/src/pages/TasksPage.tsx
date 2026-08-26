@@ -120,7 +120,8 @@ const TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   to_review: ['in_progress', 'done', 'to_fix', 'to_test', 'cancelled'],
   to_fix: ['in_progress', 'to_review', 'cancelled'],
   to_test: ['in_progress', 'to_review', 'done', 'cancelled'],
-  done: [], cancelled: [],
+  done: ['in_progress', 'to_fix'],
+  cancelled: [],
 };
 
 const ASSIGN_OK: Set<TaskStatus> = new Set([
@@ -1075,7 +1076,7 @@ function DragPanel({
 
   if (!task) return null;
 
-  const available = DRAG_TRANSITIONS(task.from);
+  const available = TRANSITIONS[task.from];
 
   return createPortal(
     <motion.div
@@ -3424,60 +3425,49 @@ export default function TasksPage() {
 
   const onDS = useCallback((id: string, from: TaskStatus) => setDrag({ id, from }), []);
   const onDE = useCallback(() => { setDrag(null); setDragO(null); }, []);
-  const onDO = useCallback(
-    (
-      e: React.DragEvent,
-      st: TaskStatus,
-    ) => {
-      e.preventDefault();
+ const onDO = useCallback((e: React.DragEvent, st: TaskStatus) => {
+  e.preventDefault();
 
-      if (
-        drag &&
-        !DRAG_TRANSITIONS(drag.from).includes(st)
-      ) {
-        e.dataTransfer.dropEffect = 'none';
-        return;
-      }
+  if (
+    drag &&
+    !TRANSITIONS[drag.from].includes(st)
+  ) {
+    e.dataTransfer.dropEffect = 'none';
+    return;
+  }
 
-      e.dataTransfer.dropEffect = 'move';
-      setDragO(st);
-    },
-    [drag],
-  );
+  e.dataTransfer.dropEffect = 'move';
+  setDragO(st);
+}, [drag]);
   const onDL = useCallback(() => setDragO(null), []);
-  const onDrop = useCallback(
-    async (
-      e: React.DragEvent,
-      to: TaskStatus,
-    ) => {
-      e.preventDefault();
-      setDragO(null);
+  const onDrop = useCallback(async (
+  e: React.DragEvent,
+  to: TaskStatus,
+) => {
+  e.preventDefault();
+  setDragO(null);
 
-      if (!drag || drag.from === to) {
-        setDrag(null);
-        return;
-      }
+  if (!drag || drag.from === to) {
+    setDrag(null);
+    return;
+  }
 
-      if (
-        !DRAG_TRANSITIONS(drag.from).includes(to)
-      ) {
-        toast({
-          title: 'Переход недоступен',
-          variant: 'destructive',
-        });
+  if (!TRANSITIONS[drag.from].includes(to)) {
+    toast({
+      title: 'Переход недоступен',
+      variant: 'destructive',
+    });
 
-        setDrag(null);
-        return;
-      }
+    setDrag(null);
+    return;
+  }
 
-      const { id, from } = drag;
+  const { id, from } = drag;
 
-      setDrag(null);
+  setDrag(null);
 
-      await moveTo(id, from, to);
-    },
-    [drag, moveTo, toast],
-  );
+  await moveTo(id, from, to);
+}, [drag, moveTo, toast]);
 
   const undoLastMove = useCallback(async () => {
     if (!lastMove || undoingMove) return;
