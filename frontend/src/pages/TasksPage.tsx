@@ -902,27 +902,14 @@ function TCard({
       }}
       onDragEnd={onDE}
       onClick={() => onView(t)}
-      animate={
-        highlighted
-          ? {
-              scale: [1, 1.035, 1],
-              boxShadow: [
-                '0 0 0 rgba(16,185,129,0)',
-                '0 0 28px rgba(16,185,129,0.30)',
-                '0 0 12px rgba(16,185,129,0.12)',
-              ],
-            }
-          : undefined
-      }
-      transition={{ duration: 0.7 }}
+
       className={`group bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer transition-all duration-300 shadow-sm min-h-[140px] flex flex-col relative
         hover:bg-[var(--hover-2)] hover:border-[var(--accent)]/40
 
-        ${
-  highlighted
-    ? 'border-emerald-500 ring-2 ring-emerald-500/60 bg-emerald-500/10 shadow-xl shadow-emerald-500/10'
-    : ''
-}
+        ${highlighted
+          ? 'border-emerald-500/70 bg-emerald-500/[0.06]'
+          : ''
+        }
 
         ${dragging
           ? 'opacity-35 rotate-2 scale-[1.02] shadow-xl z-50 ring-2 ring-[var(--accent)]'
@@ -934,10 +921,10 @@ function TCard({
         }`}
     >
       {highlighted && (
-  <div className="absolute -top-2.5 right-3 z-10 px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold shadow-lg shadow-emerald-500/20">
-    Перенесено сюда
-  </div>
-)}
+        <div className="absolute -top-2 right-3 z-10 px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-medium">
+          Перенесено сюда
+        </div>
+      )}
       <span className="text-xs font-mono text-[var(--text-primary)]/45 mb-1.5 leading-none">
         #{t.number}
       </span>
@@ -1709,12 +1696,12 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
   const lockTicket = context.type === 'ticket' && mode === 'create';
 
   return (
-      <div className="fixed inset-0 z-[70] flex items-center justify-center p-2 md:p-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-2 md:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !saving && onClose()} />
       <div
-  className="relative w-full max-w-7xl h-[94vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
-  onClick={(e) => e.stopPropagation()}
->
+        className="relative w-full max-w-7xl h-[94vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
           <div>
             <div className="flex items-center gap-2">
@@ -1732,8 +1719,8 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
           </button>
         </div>
 
-<div className="flex-1 min-h-0 overflow-y-auto p-6 lg:p-8">
-  <div className="grid xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.75fr)] gap-8">
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 lg:p-8">
+          <div className="grid xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.75fr)] gap-8">
 
             <div className="space-y-4">
               <div>
@@ -1743,20 +1730,20 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                 <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Что нужно сделать?" autoFocus className={INP} />
               </div>
 
-             <div>
-  <label className="block text-base font-semibold text-[var(--text-primary)] mb-3">
-    Описание
-  </label>
+              <div>
+                <label className="block text-base font-semibold text-[var(--text-primary)] mb-3">
+                  Описание
+                </label>
 
-  <TicketEditor
-    blocks={descriptionBlocks}
-    onChange={setDescriptionBlocks}
-  />
+                <TicketEditor
+                  blocks={descriptionBlocks}
+                  onChange={setDescriptionBlocks}
+                />
 
-  <p className="mt-2 text-xs text-[var(--text-primary)]/35">
-    Изображение можно вставить кнопкой, перетащить сюда или вставить из буфера обмена.
-  </p>
-</div>
+                <p className="mt-2 text-xs text-[var(--text-primary)]/35">
+                  Изображение можно вставить кнопкой, перетащить сюда или вставить из буфера обмена.
+                </p>
+              </div>
 
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70">
@@ -1854,6 +1841,35 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                 )}
               </div>
 
+
+
+            </div>
+
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Проект</label>
+                <AsyncDD value={projectId} onChange={setProjectId} loadFn={loadProjects} placeholder="Не выбран" icon={FolderOpen} />
+              </div>
+
+              {!lockTicket && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Заявка</label>
+                  <AsyncDD value={ticketId} onChange={setTicketId} loadFn={loadTickets} placeholder={projectId ? 'Выберите заявку' : 'Выберите заявку'} icon={Ticket} wide />
+                </div>
+              )}
+
+              {lockTicket && (
+                <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 flex items-center gap-3">
+                  <Ticket className="w-5 h-5 text-blue-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[var(--text-primary)]">Создание на основании заявки</p>
+                    <p className="text-xs text-blue-400 truncate mt-0.5">{ticketLabel || 'Заявка будет привязана автоматически'}</p>
+                  </div>
+                </div>
+              )}
+
+
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Приоритет</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1898,33 +1914,10 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                 </div>
               </div>
 
-            </div>
-
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Проект</label>
-                <AsyncDD value={projectId} onChange={setProjectId} loadFn={loadProjects} placeholder="Не выбран" icon={FolderOpen} />
-              </div>
-
-              {!lockTicket && (
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Заявка</label>
-                  <AsyncDD value={ticketId} onChange={setTicketId} loadFn={loadTickets} placeholder={projectId ? 'Выберите заявку' : 'Выберите заявку'} icon={Ticket} wide />
-                </div>
-              )}
-
-              {lockTicket && (
-                <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 flex items-center gap-3">
-                  <Ticket className="w-5 h-5 text-blue-400 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-primary)]">Создание на основании заявки</p>
-                    <p className="text-xs text-blue-400 truncate mt-0.5">{ticketLabel || 'Заявка будет привязана автоматически'}</p>
-                  </div>
-                </div>
-              )}
-
               <div className="grid md:grid-cols-2 gap-4">
+
+
+
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5" title="Плановые трудозатраты">Трудозатраты (ч)</label>
                   <input type="number" min="0" step="0.5" value={estimatedHours} onChange={(e) => setEstimatedHours(e.target.value)} placeholder="Например 4" className={INP} />
@@ -1967,10 +1960,10 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
       </div>
 
       {
-    previewItem && (
-      <AttachmentPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
-    )
-  }
+        previewItem && (
+          <AttachmentPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
+        )
+      }
     </div >
   );
 }
@@ -2070,12 +2063,12 @@ function DetailModal({ task: t, umap, onClose, onRefresh, onNeedAssign, onEdit, 
   };
 
   return (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 md:p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 md:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div
-  className="relative w-full max-w-7xl h-[94vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
-  onClick={(e) => e.stopPropagation()}
->
+        className="relative w-full max-w-7xl h-[94vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -2086,8 +2079,8 @@ function DetailModal({ task: t, umap, onClose, onRefresh, onNeedAssign, onEdit, 
               {t.actual_hours != null && <HoursBadge label="Факт" value={t.actual_hours} tone="accent" />}
             </div>
             <h2 className="text-xl md:text-2xl font-bold text-[var(--text-primary)] leading-snug">
-  {t.title}
-</h2>
+              {t.title}
+            </h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {canEdit && (
@@ -2109,24 +2102,24 @@ function DetailModal({ task: t, umap, onClose, onRefresh, onNeedAssign, onEdit, 
           )}
 
           <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
-  <div className="px-5 py-4 bg-[var(--hover-1)] border-b border-[var(--border-color)] flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
-    <FileText className="w-4 h-4 text-[var(--accent)]" />
-    Описание
-  </div>
+            <div className="px-5 py-4 bg-[var(--hover-1)] border-b border-[var(--border-color)] flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+              <FileText className="w-4 h-4 text-[var(--accent)]" />
+              Описание
+            </div>
 
-  <div className="px-5 py-5 min-h-[220px]">
-    {t.description ? (
-      <TicketDescriptionContent
-        text={t.description}
-        className="text-[15px] text-[var(--text-primary)]/85 leading-7"
-      />
-    ) : (
-      <div className="min-h-[160px] flex items-center justify-center text-sm text-[var(--text-primary)]/30">
-        Описание не заполнено
-      </div>
-    )}
-  </div>
-</div>
+            <div className="px-5 py-5 min-h-[220px]">
+              {t.description ? (
+                <TicketDescriptionContent
+                  text={t.description}
+                  className="text-[15px] text-[var(--text-primary)]/85 leading-7"
+                />
+              ) : (
+                <div className="min-h-[160px] flex items-center justify-center text-sm text-[var(--text-primary)]/30">
+                  Описание не заполнено
+                </div>
+              )}
+            </div>
+          </div>
 
           {attachments.length > 0 && (
             <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
@@ -2318,30 +2311,30 @@ function DetailModal({ task: t, umap, onClose, onRefresh, onNeedAssign, onEdit, 
       </div>
 
       {
-    showArchive && (
-      <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/50" onClick={() => setShowArchive(false)} />
-        <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl">
-          <div className="p-6 text-center">
-            <Archive className="w-10 h-10 text-[var(--text-primary)]/20 mx-auto mb-3" />
-            <p className="text-base font-bold text-[var(--text-primary)]">Архивировать задачу?</p>
-            <p className="text-sm text-[var(--text-primary)]/50 mt-1">«{t.title}»</p>
+        showArchive && (
+          <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setShowArchive(false)} />
+            <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl">
+              <div className="p-6 text-center">
+                <Archive className="w-10 h-10 text-[var(--text-primary)]/20 mx-auto mb-3" />
+                <p className="text-base font-bold text-[var(--text-primary)]">Архивировать задачу?</p>
+                <p className="text-sm text-[var(--text-primary)]/50 mt-1">«{t.title}»</p>
+              </div>
+              <div className="flex border-t border-[var(--border-color)]">
+                <button onClick={() => setShowArchive(false)} className="flex-1 py-3 text-sm text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)] font-medium">Отмена</button>
+                <button onClick={() => { setShowArchive(false); act('arch', () => tasksApi.archive(t.id), 'Задача архивирована'); }}
+                  className="flex-1 py-3 text-sm font-bold text-red-500 hover:bg-red-500/10 border-l border-[var(--border-color)]">Да</button>
+              </div>
+            </div>
           </div>
-          <div className="flex border-t border-[var(--border-color)]">
-            <button onClick={() => setShowArchive(false)} className="flex-1 py-3 text-sm text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)] font-medium">Отмена</button>
-            <button onClick={() => { setShowArchive(false); act('arch', () => tasksApi.archive(t.id), 'Задача архивирована'); }}
-              className="flex-1 py-3 text-sm font-bold text-red-500 hover:bg-red-500/10 border-l border-[var(--border-color)]">Да</button>
-          </div>
-        </div>
-      </div>
-    )
-  }
+        )
+      }
 
-  {
-    previewItem && (
-      <AttachmentPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
-    )
-  }
+      {
+        previewItem && (
+          <AttachmentPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
+        )
+      }
     </div >
   );
 }
@@ -2408,8 +2401,12 @@ export default function TasksPage() {
   const [lastMove, setLastMove] =
     useState<LastMove | null>(null);
 
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [undoingMove, setUndoingMove] =
     useState(false);
+
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const highlightMovedTask = useCallback(
     (id: string) => {
@@ -2421,10 +2418,24 @@ export default function TasksPage() {
 
       highlightTimerRef.current = setTimeout(() => {
         setHighlightTaskId(null);
-      }, 5000);
+      }, 4000);
     },
     [],
   );
+
+
+
+  const showUndoMove = useCallback((move: LastMove) => {
+    setLastMove(move);
+
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+    }
+
+    undoTimerRef.current = setTimeout(() => {
+      setLastMove(null);
+    }, 7000);
+  }, []);
 
   const revealTask = useCallback(
     (id: string) => {
@@ -2455,6 +2466,10 @@ export default function TasksPage() {
     return () => {
       if (highlightTimerRef.current) {
         clearTimeout(highlightTimerRef.current);
+      }
+
+      if (undoTimerRef.current) {
+        clearTimeout(undoTimerRef.current);
       }
     };
   }, []);
@@ -2757,7 +2772,7 @@ export default function TasksPage() {
       try {
         await tasksApi.changeStatus(id, to);
 
-        setLastMove({
+        showUndoMove({
           taskId: id,
           number: task.number,
           title: task.title,
@@ -2789,6 +2804,7 @@ export default function TasksPage() {
       toast,
       highlightMovedTask,
       revealTask,
+      showUndoMove,
     ],
   );
 
@@ -2887,49 +2903,49 @@ export default function TasksPage() {
   );
 
   const undoLastMove = useCallback(async () => {
-  if (!lastMove || undoingMove) return;
+    if (!lastMove || undoingMove) return;
 
-  const move = lastMove;
+    const move = lastMove;
 
-  setUndoingMove(true);
+    setUndoingMove(true);
 
-  try {
-    await tasksApi.changeStatus(
-      move.taskId,
-      move.from,
-    );
+    try {
+      await tasksApi.changeStatus(
+        move.taskId,
+        move.from,
+      );
 
-    setLastMove(null);
+      setLastMove(null);
 
-    await fetchBoard(true);
+      await fetchBoard(true);
 
-    highlightMovedTask(move.taskId);
+      highlightMovedTask(move.taskId);
 
-    setTimeout(() => {
-      revealTask(move.taskId);
-    }, 100);
+      setTimeout(() => {
+        revealTask(move.taskId);
+      }, 100);
 
-    toast({
-      title: 'Перенос отменён',
-      description: `${move.number} возвращена в «${ST_LABEL[move.from]}»`,
-    });
-  } catch (e: any) {
-    toast({
-      title: 'Не удалось отменить перенос',
-      description: apiErr(e),
-      variant: 'destructive',
-    });
-  } finally {
-    setUndoingMove(false);
-  }
-}, [
-  lastMove,
-  undoingMove,
-  fetchBoard,
-  highlightMovedTask,
-  revealTask,
-  toast,
-]);
+      toast({
+        title: 'Перенос отменён',
+        description: `${move.number} возвращена в «${ST_LABEL[move.from]}»`,
+      });
+    } catch (e: any) {
+      toast({
+        title: 'Не удалось отменить перенос',
+        description: apiErr(e),
+        variant: 'destructive',
+      });
+    } finally {
+      setUndoingMove(false);
+    }
+  }, [
+    lastMove,
+    undoingMove,
+    fetchBoard,
+    highlightMovedTask,
+    revealTask,
+    toast,
+  ]);
 
   const ql = q.trim().toLowerCase();
   const disp = cols.map((c) => !ql ? c : {
@@ -3114,86 +3130,53 @@ export default function TasksPage() {
           document.body,
         )}
 
-<AnimatePresence>
-  {lastMove && !drag && (
-    <motion.div
-      initial={{ y: 50, opacity: 0, scale: 0.96 }}
-      animate={{ y: 0, opacity: 1, scale: 1 }}
-      exit={{ y: 30, opacity: 0, scale: 0.97 }}
-      transition={{ type: 'spring', damping: 24, stiffness: 320 }}
-      className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[120] w-[min(640px,calc(100vw-32px))]"
-    >
-      <div className="bg-[var(--bg-card)] border-2 border-emerald-500/60 rounded-2xl shadow-[0_18px_60px_rgba(0,0,0,0.55)] overflow-hidden">
-
-        <div className="h-1 bg-emerald-500" />
-
-        <div className="flex items-center gap-4 p-4">
-          <div className="w-11 h-11 rounded-xl bg-emerald-500 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/20">
-            <CheckCircle2 className="w-5 h-5 text-white" />
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-bold text-[var(--text-primary)]">
-              Задача перенесена
-            </div>
-
-            <div className="text-sm text-[var(--text-primary)]/80 truncate mt-0.5 font-medium">
-              #{lastMove.number} — {lastMove.title}
-            </div>
-
-            <div className="flex items-center gap-2 mt-1.5 text-xs">
-              <span className="text-[var(--text-primary)]/50">
-                {ST_LABEL[lastMove.from]}
-              </span>
-
-              <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500 rotate-45" />
-
-              <span className="text-emerald-500 font-semibold">
-                {ST_LABEL[lastMove.to]}
-              </span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={undoLastMove}
-            disabled={undoingMove}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl
-                       bg-[var(--hover-2)]
-                       border border-[var(--border-color)]
-                       text-[var(--text-primary)]
-                       text-sm font-bold
-                       hover:bg-[var(--hover-3)]
-                       hover:border-emerald-500/50
-                       transition-all
-                       disabled:opacity-50
-                       shrink-0"
+      <AnimatePresence>
+        {lastMove && !drag && (
+          <motion.div
+            initial={{ y: 12, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 8, opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120]"
           >
-            {undoingMove ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <RotateCcw className="w-4 h-4 text-emerald-500" />
-            )}
+            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-lg">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
 
-            {undoingMove ? 'Возвращаем...' : 'Вернуть назад'}
-          </button>
+              <div className="min-w-0 max-w-[300px]">
+                <div className="text-xs font-medium text-[var(--text-primary)] truncate">
+                  #{lastMove.number} перенесена в {ST_LABEL[lastMove.to]}
+                </div>
+              </div>
 
-          <button
-            type="button"
-            onClick={() => setLastMove(null)}
-            title="Скрыть"
-            className="p-2 rounded-lg text-[var(--text-primary)]/50
-                       hover:text-[var(--text-primary)]
-                       hover:bg-[var(--hover-2)]
-                       transition-colors shrink-0"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-    </motion.div>
-  )}
-</AnimatePresence>
+              <div className="w-px h-5 bg-[var(--border-color)]" />
+
+              <button
+                type="button"
+                onClick={undoLastMove}
+                disabled={undoingMove}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)] transition-colors disabled:opacity-40 whitespace-nowrap"
+              >
+                {undoingMove ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-3.5 h-3.5" />
+                )}
+
+                Вернуть
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLastMove(null)}
+                className="p-1 rounded text-[var(--text-primary)]/30 hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)] transition-colors"
+                title="Скрыть"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>{dragInfo && <DragPanel task={dragInfo} onDrop={onDrop} />}</AnimatePresence>
 
