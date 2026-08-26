@@ -148,8 +148,15 @@ class TaskService:
 
         task = await get_or_raise_404(self.task_repo.read, task_id, Task)
 
+        if new_status == TaskStatus.TO_REVIEW:
+            raise InvalidStateError(
+                "Use the request-review endpoint to move a task to review"
+            )
+
         permission = await self.task_authz_service.can_change_status(
-            subject=current_subject, task=task, new_status=new_status
+            subject=current_subject,
+            task=task,
+            new_status=new_status
         )
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
@@ -240,8 +247,10 @@ class TaskService:
         task = await get_or_raise_404(self.task_repo.read, task_id, Task)
         reviewer = await get_or_raise_404(self.user_repo.read, reviewer_id, User)
 
-        permission = await self.task_authz_service.can_review_task(
-            subject=current_subject, task=task
+        permission = await self.task_authz_service.can_request_review(
+            subject=current_subject, 
+            task=task,
+            reviewer=reviewer
         )
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)

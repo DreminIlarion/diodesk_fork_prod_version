@@ -42,6 +42,7 @@ class TaskBoardService:
             kwargs = {
                 "created_by": current_user.id,
                 "assignee_id": current_user.id,
+                "reviewer_id": current_user.id,
             }
             
 

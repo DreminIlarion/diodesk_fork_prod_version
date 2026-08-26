@@ -148,6 +148,14 @@ class Task(AggregateRoot):
         if new_status == self.status:
             return
 
+        if (
+            new_status == TaskStatus.TO_REVIEW
+            and self.reviewer_id is None
+        ):
+            raise InvalidStateError(
+                "Task cannot be moved to review without a reviewer"
+            )
+
         transition = task_workflow.resolve(self.status, new_status)
         for action in transition.actions:
             action(self, changed_by)

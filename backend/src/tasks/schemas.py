@@ -131,6 +131,10 @@ class TaskViewResponse(BaseModel):
     estimated_hours: Decimal | None = Field(None, description="Предварительные трудозатраты (часы)")  
     actual_hours: Decimal | None = Field(None, description="Факт потраченных часов")
     assignee_id: UUID | None = Field(None, description="Исполнитель задачи")
+    reviewer_id: UUID | None = Field(
+        None,
+        description="Проверяющий задачу",
+    )
     status: TaskStatus = Field(..., description="Текущий cтатус задачи")
     due_date: date | None = Field(None, description="Срок выполнения (deadline)")
 

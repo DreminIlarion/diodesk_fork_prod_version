@@ -30,6 +30,7 @@ class TaskView:
 
 
     assignee_id: UUID | None = None
+    reviewer_id: UUID | None = None
     due_date: datetime | None = None
     story_points: Decimal | None = None
     estimated_hours: Decimal | None = None 
@@ -66,6 +67,7 @@ class TaskRepository(Repository[Task]):
             ticket_id: UUID | None = None,
             assignee_id: UUID | None = None,
             created_by: UUID | None = None,  # ← добавить
+            reviewer_id: UUID | None = None,
             # Дополнительные фильтры
             priorities: list[Priority] | None = None,
             overdue_only: bool = False,
