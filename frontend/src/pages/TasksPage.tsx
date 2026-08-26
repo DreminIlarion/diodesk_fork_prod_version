@@ -19,6 +19,15 @@ import type {
   SimpleUser, CounterpartyCustomer,
 } from '../types';
 
+import {
+  TicketEditor,
+  deserializeToBlocks,
+  serializeBlocks,
+  type DescriptionBlock,
+} from '../components/helpers/TicketEditor';
+
+import { TicketDescriptionContent } from '../components/helpers/TicketDescriptionContent';
+
 /* ───────────────── types ───────────────── */
 
 type TaskTag = { name: string; color?: string | null };
@@ -72,6 +81,14 @@ type ViewMode = 'kanban' | 'list';
 type CompleteIntent = { task: TaskViewItem; mode: 'status_done' | 'review_done' };
 type AssignIntent = { task: TaskViewItem; targetStatus: 'todo' | 'in_progress' };
 
+type LastMove = {
+  taskId: string;
+  number: string;
+  title: string;
+  from: TaskStatus;
+  to: TaskStatus;
+};
+
 /* ───────────────── constants ───────────────── */
 
 const SP_SERIES = [1, 2, 3, 5, 8, 13, 21];
@@ -116,6 +133,9 @@ const COL_ORDER: TaskStatus[] = [
   'backlog', 'todo', 'in_progress', 'paused', 'blocked',
   'to_review', 'to_fix', 'to_test', 'done', 'cancelled',
 ];
+
+const DRAG_TRANSITIONS = (from: TaskStatus): TaskStatus[] =>
+  COL_ORDER.filter((status) => status !== from);
 
 const CM: Record<string, {
   icon: React.ComponentType<{ className?: string }>; tc: string; dot: string;
@@ -848,61 +868,134 @@ function ListView({ tasks, umap, onView }: {
 
 /* ───────────────── task card ───────────────── */
 
-function TCard({ task: t, umap, dragging, onDS, onDE, onView }: {
+function TCard({
+  task: t,
+  umap,
+  dragging,
+  highlighted,
+  onDS,
+  onDE,
+  onView,
+}: {
   task: TaskViewItem;
   umap: Map<string, SimpleUser | CounterpartyCustomer>;
   dragging: boolean;
+  highlighted: boolean;
   onDS: (id: string, f: TaskStatus) => void;
   onDE: () => void;
   onView: (t: TaskViewItem) => void;
 }) {
   const od = overdue(t);
   const a = t.assignee_id ? umap.get(t.assignee_id) : null;
-  const assigneeSurname = a ? (a.full_name || a.username || '').split(' ')[0] : null;
+  const assigneeSurname = a
+    ? (a.full_name || a.username || '').split(' ')[0]
+    : null;
 
   return (
     <motion.div
       layout
+      data-task-id={t.id}
       draggable
-      onDragStart={(e) => { (e as any).dataTransfer.effectAllowed = 'move'; onDS(t.id, t.status); }}
+      onDragStart={(e) => {
+        (e as any).dataTransfer.effectAllowed = 'move';
+        onDS(t.id, t.status);
+      }}
       onDragEnd={onDE}
       onClick={() => onView(t)}
-      className={`group bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer transition-all duration-200 shadow-sm min-h-[140px] flex flex-col relative
+      animate={
+        highlighted
+          ? {
+            scale: [1, 1.025, 1],
+          }
+          : undefined
+      }
+      transition={{ duration: 0.35 }}
+      className={`group bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer transition-all duration-300 shadow-sm min-h-[140px] flex flex-col relative
         hover:bg-[var(--hover-2)] hover:border-[var(--accent)]/40
-        ${dragging ? 'opacity-40 rotate-2 scale-[1.02] shadow-xl z-50 ring-1 ring-[var(--accent)]' : od ? 'border-red-500/40 bg-red-500/5 hover:bg-red-500/15' : 'border-[var(--border-color)]'}`}
+
+        ${highlighted
+          ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/50 bg-[var(--accent)]/10 shadow-xl shadow-[var(--accent)]/10'
+          : ''
+        }
+
+        ${dragging
+          ? 'opacity-35 rotate-2 scale-[1.02] shadow-xl z-50 ring-2 ring-[var(--accent)]'
+          : od
+            ? 'border-red-500/40 bg-red-500/5 hover:bg-red-500/15'
+            : highlighted
+              ? ''
+              : 'border-[var(--border-color)]'
+        }`}
     >
-      <span className="text-xs font-mono text-[var(--text-primary)]/45 mb-1.5 leading-none">#{t.number}</span>
-      <h4 className="text-[15px] font-bold text-[var(--text-primary)] leading-snug tracking-tight line-clamp-2 mb-3">{t.title}</h4>
+      {highlighted && (
+        <div className="absolute -top-2.5 right-3 z-10 px-2.5 py-1 rounded-full bg-[var(--accent)] text-white text-[10px] font-bold shadow-lg">
+          Перенесено сюда
+        </div>
+      )}
+
+      <span className="text-xs font-mono text-[var(--text-primary)]/45 mb-1.5 leading-none">
+        #{t.number}
+      </span>
+
+      <h4 className="text-[15px] font-bold text-[var(--text-primary)] leading-snug tracking-tight line-clamp-2 mb-3">
+        {t.title}
+      </h4>
+
       <div className="flex items-center gap-2 mb-3.5 flex-wrap">
         <PriBadge p={t.priority} />
         {t.story_points != null && <ComplexityBadge v={t.story_points} />}
       </div>
+
       <div className="flex items-center justify-between border-t border-[var(--border-color)] pt-3 mt-auto">
         <div className="flex items-center gap-2 min-w-0">
           {a ? (
             <>
-              <Ava name={a.full_name || a.username} url={a.avatar_url} sz="xs" />
-              <span className="text-[13px] text-[var(--text-primary)]/75 font-medium truncate max-w-[100px]">{assigneeSurname}</span>
+              <Ava
+                name={a.full_name || a.username}
+                url={a.avatar_url}
+                sz="xs"
+              />
+              <span className="text-[13px] text-[var(--text-primary)]/75 font-medium truncate max-w-[100px]">
+                {assigneeSurname}
+              </span>
             </>
-          ) : <span className="text-xs text-[var(--text-primary)]/30">—</span>}
+          ) : (
+            <span className="text-xs text-[var(--text-primary)]/30">—</span>
+          )}
         </div>
+
         <div className="flex items-center gap-1.5 shrink-0">
-          {t.ticket_id && <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />}
-          {t.project_id && <FolderOpen className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />}
-          {t.due_date && <span className={`text-[12px] font-semibold ml-0.5 ${od ? 'text-red-400' : 'text-[var(--text-primary)]/45'}`}>{fmtDue(t.due_date)}</span>}
+          {t.ticket_id && (
+            <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+          )}
+
+          {t.project_id && (
+            <FolderOpen className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+          )}
+
+          {t.due_date && (
+            <span
+              className={`text-[12px] font-semibold ml-0.5 ${od
+                ? 'text-red-400'
+                : 'text-[var(--text-primary)]/45'
+                }`}
+            >
+              {fmtDue(t.due_date)}
+            </span>
+          )}
         </div>
       </div>
     </motion.div>
   );
 }
-
 /* ───────────────── kanban column ───────────────── */
 
-function KCol({ col, umap, isDO, dragId, ldMore, onDS, onDE, onDO, onDL, onDrop, onAdd, onView, onMore }: {
+function KCol({ col, umap, isDO, dragId, highlightTaskId, ldMore, onDS, onDE, onDO, onDL, onDrop, onAdd, onView, onMore }: {
   col: TaskViewColumn;
   umap: Map<string, SimpleUser | CounterpartyCustomer>;
   isDO: boolean;
   dragId: string | null;
+  highlightTaskId: string | null;
   ldMore: boolean;
   onDS: (id: string, f: TaskStatus) => void;
   onDE: () => void;
@@ -942,7 +1035,16 @@ function KCol({ col, umap, isDO, dragId, ldMore, onDS, onDE, onDO, onDL, onDrop,
         ) : (
           <AnimatePresence mode="popLayout">
             {col.tasks.items.map((t) => (
-              <TCard key={t.id} task={t} umap={umap} dragging={dragId === t.id} onDS={onDS} onDE={onDE} onView={onView} />
+              <TCard
+                key={t.id}
+                task={t}
+                umap={umap}
+                dragging={dragId === t.id}
+                highlighted={highlightTaskId === t.id}
+                onDS={onDS}
+                onDE={onDE}
+                onView={onView}
+              />
             ))}
           </AnimatePresence>
         )}
@@ -965,44 +1067,102 @@ function KCol({ col, umap, isDO, dragId, ldMore, onDS, onDE, onDO, onDL, onDrop,
 
 /* ───────────────── drag panel ───────────────── */
 
-function DragPanel({ task, onDrop }: {
-  task: { id: string; from: TaskStatus; title: string; number: string } | null;
+function DragPanel({
+  task,
+  onDrop,
+}: {
+  task: {
+    id: string;
+    from: TaskStatus;
+    title: string;
+    number: string;
+  } | null;
   onDrop: (e: React.DragEvent, to: TaskStatus) => void;
 }) {
   const [hov, setHov] = useState<TaskStatus | null>(null);
+
   if (!task) return null;
-  const al = TRANSITIONS[task.from];
-  if (!al.length) return null;
+
+  const available = DRAG_TRANSITIONS(task.from);
 
   return createPortal(
     <motion.div
-      initial={{ x: '100%', opacity: 0 }}
+      initial={{ x: 50, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      exit={{ x: '100%', opacity: 0 }}
+      exit={{ x: 50, opacity: 0 }}
       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-      className="fixed right-4 top-0 h-full z-[100] flex items-center pointer-events-none"
+      className="fixed right-4 top-1/2 -translate-y-1/2 z-[100] pointer-events-none"
     >
-      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl overflow-hidden pointer-events-auto" style={{ width: 220 }}>
-        <div className="px-3 py-2.5 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
-          <p className="text-xs uppercase tracking-wider text-[var(--text-primary)]/40 mb-0.5 font-medium">Перетащить</p>
-          <p className="text-sm font-bold text-[var(--text-primary)] truncate">#{task.number}</p>
+      <div className="w-[310px] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-2xl overflow-hidden pointer-events-auto">
+        <div className="px-4 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
+          <p className="text-[10px] uppercase tracking-widest text-[var(--text-primary)]/40 font-semibold mb-2">
+            Вы переносите
+          </p>
+
+          <div className="flex items-start gap-2.5">
+            <span className="w-2.5 h-2.5 mt-1.5 rounded-full bg-[var(--accent)] animate-pulse shrink-0" />
+
+            <div className="min-w-0">
+              <div className="text-xs font-mono font-bold text-[var(--accent)]">
+                #{task.number}
+              </div>
+
+              <div className="text-sm font-bold text-[var(--text-primary)] leading-snug mt-1 line-clamp-3">
+                {task.title}
+              </div>
+
+              <div className="text-[11px] text-[var(--text-primary)]/40 mt-2">
+                Сейчас: {ST_LABEL[task.from]}
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="p-1.5 space-y-1">
-          {al.map((s) => {
+
+        <div className="px-3 pt-3 pb-1">
+          <div className="text-[10px] uppercase tracking-widest text-[var(--text-primary)]/30 font-semibold">
+            Переместить в
+          </div>
+        </div>
+
+        <div className="p-2 space-y-1 max-h-[60vh] overflow-y-auto">
+          {available.map((s) => {
             const c = CM[s];
             const I = c.icon;
-            const h = hov === s;
+            const active = hov === s;
+
             return (
-              <div key={s}
-                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setHov(s); }}
+              <div
+                key={s}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  setHov(s);
+                }}
                 onDragLeave={() => setHov(null)}
-                onDrop={(e) => { setHov(null); onDrop(e, s); }}
-                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border transition-all ${h ? `${c.brd} bg-[var(--accent)]/10 scale-[1.02] shadow-sm` : 'border-transparent hover:bg-[var(--hover-2)]'}`}
+                onDrop={(e) => {
+                  setHov(null);
+                  onDrop(e, s);
+                }}
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all ${active
+                  ? `${c.brd} bg-[var(--accent)]/10 scale-[1.015] shadow-sm`
+                  : 'border-transparent hover:bg-[var(--hover-2)]'
+                  }`}
               >
-                <div className={`w-1 h-5 rounded-full ${c.dot}`} />
+                <div className={`w-1 h-6 rounded-full ${c.dot}`} />
                 <I className={`w-4 h-4 ${c.tc}`} />
-                <span className={`text-sm font-medium truncate ${h ? c.tc : 'text-[var(--text-primary)]/70'}`}>{ST_LABEL[s]}</span>
-                {h && <Check className={`w-4 h-4 ml-auto ${c.tc}`} />}
+
+                <span
+                  className={`text-sm font-medium flex-1 ${active
+                    ? c.tc
+                    : 'text-[var(--text-primary)]/70'
+                    }`}
+                >
+                  {ST_LABEL[s]}
+                </span>
+
+                {active && (
+                  <Check className={`w-4 h-4 ${c.tc}`} />
+                )}
               </div>
             );
           })}
@@ -1143,7 +1303,10 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
   const { toast } = useToast();
 
   const [title, setTitle] = useState(task?.title ?? '');
-  const [desc, setDesc] = useState(task?.description ?? '');
+  const [descriptionBlocks, setDescriptionBlocks] =
+    useState<DescriptionBlock[]>(() =>
+      deserializeToBlocks(task?.description ?? ''),
+    );
   const [pri, setPri] = useState<TaskPriority>(task?.priority ?? 'medium');
   const [sp, setSp] = useState(task?.story_points != null ? String(task.story_points) : '');
   const [estimatedHours, setEstimatedHours] = useState(
@@ -1205,21 +1368,21 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
   };
 
   const handleDragOver = (e: React.DragEvent) => {
-  e.preventDefault();
-  setIsDragOver(true);
-};
+    e.preventDefault();
+    setIsDragOver(true);
+  };
 
-const handleDragLeave = (e: React.DragEvent) => {
-  e.preventDefault();
-  setIsDragOver(false);
-};
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
 
-const handleDrop = (e: React.DragEvent) => {
-  e.preventDefault();
-  setIsDragOver(false);
-  const droppedFiles = Array.from(e.dataTransfer.files || []);
-  setFiles((prev) => [...prev, ...droppedFiles].slice(0, 10));
-};
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const droppedFiles = Array.from(e.dataTransfer.files || []);
+    setFiles((prev) => [...prev, ...droppedFiles].slice(0, 10));
+  };
 
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
@@ -1263,74 +1426,274 @@ const handleDrop = (e: React.DragEvent) => {
     };
   }, [projectId]);
 
+  const uploadInlineImages = async (
+    blocks: DescriptionBlock[],
+    taskId: string,
+  ): Promise<DescriptionBlock[]> => {
+    const result: DescriptionBlock[] = [];
+
+    for (const block of blocks) {
+      if (
+        block.type === 'image' &&
+        block.localFile &&
+        !block.attachmentId
+      ) {
+        const uploaded: any =
+          await attachmentsApi.uploadAttachment(
+            block.localFile,
+            'task',
+            taskId,
+          );
+
+        const attachmentId =
+          uploaded?.id ??
+          uploaded?.attachment_id ??
+          uploaded?.data?.id;
+
+        if (!attachmentId) {
+          throw new Error(
+            `Не удалось получить ID загруженного изображения: ${block.localFile.name}`,
+          );
+        }
+
+        result.push({
+          ...block,
+          attachmentId,
+          localFile: undefined,
+        });
+
+        continue;
+      }
+
+      result.push(block);
+    }
+
+    return result;
+  };
+
   const submit = async () => {
     if (!title.trim()) return;
+
     setSaving(true);
 
     try {
       let taskId = task?.id;
 
       if (mode === 'create') {
-        const payload: Record<string, any> = { title: title.trim(), priority: pri };
-        if (desc.trim()) payload.description = desc.trim();
+        /*
+         * Сначала создаём задачу.
+         *
+         * Inline-картинки ещё нельзя загрузить,
+         * поскольку attachment требует taskId.
+         */
+        const initialDescription = serializeBlocks(
+          descriptionBlocks.filter(
+            (b) =>
+              b.type !== 'image' ||
+              !!b.attachmentId,
+          ),
+        );
+
+        const payload: Record<string, any> = {
+          title: title.trim(),
+          priority: pri,
+        };
+
+        if (initialDescription.trim()) {
+          payload.description = initialDescription;
+        }
+
         if (projectId) payload.project_id = projectId;
         if (ticketId) payload.ticket_id = ticketId;
         if (sp) payload.story_points = Number(sp);
-        if (estimatedHours) payload.estimated_hours = Number(estimatedHours);
+
+        if (estimatedHours) {
+          payload.estimated_hours = Number(estimatedHours);
+        }
+
         if (assigneeId) payload.assignee_id = assigneeId;
         if (dueDate) payload.due_date = dueDate;
 
-        const created = await tasksApi.create(payload as TaskCreateInput);
+        const created = await tasksApi.create(
+          payload as TaskCreateInput,
+        );
+
         taskId = created.id;
+
+        /*
+         * Теперь taskId существует:
+         * загружаем картинки, вставленные непосредственно
+         * в описание.
+         */
+        const preparedBlocks = await uploadInlineImages(
+          descriptionBlocks,
+          created.id,
+        );
+
+        const finalDescription =
+          serializeBlocks(preparedBlocks);
+
+        if (
+          finalDescription !== initialDescription
+        ) {
+          await tasksApi.update(created.id, {
+            description: finalDescription || null,
+          } as TaskUpdateInput);
+        }
+
+        /*
+         * Обычные вложения.
+         */
+        for (const file of files) {
+          try {
+            await attachmentsApi.uploadAttachment(
+              file,
+              'task',
+              created.id,
+            );
+          } catch (err) {
+            console.error(
+              'File upload failed:',
+              file.name,
+              err,
+            );
+          }
+        }
 
         if (todo) {
           await tasksApi.changeStatus(created.id, 'todo');
         }
 
-        toast({ title: 'Задача создана', description: `${created.number} — ${created.title}` });
+        toast({
+          title: 'Задача создана',
+          description: `${created.number} — ${created.title}`,
+        });
       } else if (task) {
+        /*
+         * При редактировании ID уже известен,
+         * поэтому картинки можно загрузить до update.
+         */
+        const preparedBlocks = await uploadInlineImages(
+          descriptionBlocks,
+          task.id,
+        );
+
+        const finalDescription =
+          serializeBlocks(preparedBlocks);
+
         const payload: Record<string, any> = {};
 
-        if (title.trim() !== task.title) payload.title = title.trim();
-        if ((desc.trim() || '') !== (task.description?.trim() || '')) {
-          payload.description = desc.trim() || null;
+        if (title.trim() !== task.title) {
+          payload.title = title.trim();
         }
-        if (pri !== task.priority) payload.priority = pri;
 
-        const currentSP = task.story_points != null ? String(task.story_points) : '';
-        if (sp !== currentSP) payload.story_points = sp ? Number(sp) : null;
+        if (
+          finalDescription.trim() !==
+          (task.description?.trim() ?? '')
+        ) {
+          payload.description =
+            finalDescription.trim() || null;
+        }
 
-        const currentEst = task.estimated_hours != null ? String(toNumberOrNull(task.estimated_hours) ?? '') : '';
+        if (pri !== task.priority) {
+          payload.priority = pri;
+        }
+
+        const currentSP =
+          task.story_points != null
+            ? String(task.story_points)
+            : '';
+
+        if (sp !== currentSP) {
+          payload.story_points = sp
+            ? Number(sp)
+            : null;
+        }
+
+        const currentEst =
+          task.estimated_hours != null
+            ? String(
+              toNumberOrNull(
+                task.estimated_hours,
+              ) ?? '',
+            )
+            : '';
+
         if (estimatedHours !== currentEst) {
-          payload.estimated_hours = estimatedHours ? Number(estimatedHours) : null;
+          payload.estimated_hours =
+            estimatedHours
+              ? Number(estimatedHours)
+              : null;
         }
 
-        if (dueDate !== (task.due_date ?? '')) payload.due_date = dueDate || null;
-        if (assigneeId !== (task.assignee_id ?? '')) payload.assignee_id = assigneeId || null;
-        if (projectId !== (task.project_id ?? '')) payload.project_id = projectId || null;
-        if (ticketId !== (task.ticket_id ?? '')) payload.ticket_id = ticketId || null;
+        if (dueDate !== (task.due_date ?? '')) {
+          payload.due_date = dueDate || null;
+        }
+
+        if (
+          assigneeId !==
+          (task.assignee_id ?? '')
+        ) {
+          payload.assignee_id =
+            assigneeId || null;
+        }
+
+        if (
+          projectId !==
+          (task.project_id ?? '')
+        ) {
+          payload.project_id =
+            projectId || null;
+        }
+
+        if (
+          ticketId !==
+          (task.ticket_id ?? '')
+        ) {
+          payload.ticket_id =
+            ticketId || null;
+        }
 
         if (Object.keys(payload).length > 0) {
-          await tasksApi.update(task.id, payload as TaskUpdateInput);
+          await tasksApi.update(
+            task.id,
+            payload as TaskUpdateInput,
+          );
         }
 
-        toast({ title: 'Задача обновлена', description: `${task.number} — ${title.trim()}` });
-      }
-
-      if (taskId && files.length > 0) {
+        /*
+         * Новые обычные вложения.
+         */
         for (const file of files) {
           try {
-            await attachmentsApi.uploadAttachment(file, 'task', taskId);
+            await attachmentsApi.uploadAttachment(
+              file,
+              'task',
+              task.id,
+            );
           } catch (err) {
-            console.error('File upload failed:', file.name, err);
+            console.error(
+              'File upload failed:',
+              file.name,
+              err,
+            );
           }
         }
+
+        toast({
+          title: 'Задача обновлена',
+          description: `${task.number} — ${title.trim()}`,
+        });
       }
 
       await onSaved();
       onClose();
     } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      toast({
+        title: 'Ошибка',
+        description: apiErr(e),
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }
@@ -1341,9 +1704,12 @@ const handleDrop = (e: React.DragEvent) => {
   const lockTicket = context.type === 'ticket' && mode === 'create';
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[70] flex items-center justify-center p-2 md:p-4"></div>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !saving && onClose()} />
-      <div className="relative w-full max-w-4xl max-h-[88vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div
+  className="relative w-full max-w-7xl h-[94vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
+  onClick={(e) => e.stopPropagation()}
+>
         <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
           <div>
             <div className="flex items-center gap-2">
@@ -1361,8 +1727,9 @@ const handleDrop = (e: React.DragEvent) => {
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-5">
-          <div className="grid lg:grid-cols-2 gap-6">
+<div className="flex-1 min-h-0 overflow-y-auto p-6 lg:p-8">
+  <div className="grid xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.75fr)] gap-8">
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
@@ -1371,10 +1738,20 @@ const handleDrop = (e: React.DragEvent) => {
                 <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Что нужно сделать?" autoFocus className={INP} />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Описание</label>
-                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Опиши задачу " rows={7} className={`${INP} resize-none`} />
-              </div>
+             <div>
+  <label className="block text-base font-semibold text-[var(--text-primary)] mb-3">
+    Описание
+  </label>
+
+  <TicketEditor
+    blocks={descriptionBlocks}
+    onChange={setDescriptionBlocks}
+  />
+
+  <p className="mt-2 text-xs text-[var(--text-primary)]/35">
+    Изображение можно вставить кнопкой, перетащить сюда или вставить из буфера обмена.
+  </p>
+</div>
 
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70">
@@ -1395,46 +1772,43 @@ const handleDrop = (e: React.DragEvent) => {
                         У задачи пока нет вложений
                       </div>
                     )}
-                    
+
                   </div>
                 )}
 
                 <div>
-  <div className="text-xs font-medium text-[var(--text-primary)]/45 mb-2">
-    {mode === 'edit' ? 'Добавить новые файлы' : 'Файлы'}
-  </div>
-  <button 
-  type="button" 
-  onClick={() => fileInputRef.current?.click()}
-  onDragOver={handleDragOver}
-  onDragLeave={handleDragLeave}
-  onDrop={handleDrop}
-  className={`w-full border-2 border-dashed rounded-xl p-4 text-center transition-colors group ${
-    isDragOver 
-      ? 'border-[var(--accent)] bg-[var(--accent)]/5' 
-      : 'border-[var(--border-color)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)] hover:border-[var(--accent)]/30'
-  }`}
->
-  <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} className="hidden" />
-  <div className="flex flex-col items-center gap-2">
-    <div className={`w-12 h-12 rounded-xl border flex items-center justify-center transition-colors ${
-      isDragOver 
-        ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30' 
-        : 'bg-[var(--hover-3)] border-[var(--border-color)] group-hover:bg-[var(--accent)]/10 group-hover:border-[var(--accent)]/30'
-    }`}>
-      <Plus className={`w-6 h-6 transition-colors ${
-        isDragOver ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40 group-hover:text-[var(--accent)]'
-      }`} />
-    </div>
-    <div>
-      <p className="text-sm text-[var(--accent)] font-medium">
-        {isDragOver ? 'Отпустите файлы' : 'Выбрать файлы'}
-      </p>
-      <p className="text-xs text-[var(--text-primary)]/40 mt-0.5">или перетащите их сюда</p>
-    </div>
-  </div>
-</button>
-</div>
+                  <div className="text-xs font-medium text-[var(--text-primary)]/45 mb-2">
+                    {mode === 'edit' ? 'Добавить новые файлы' : 'Файлы'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`w-full border-2 border-dashed rounded-xl p-4 text-center transition-colors group ${isDragOver
+                      ? 'border-[var(--accent)] bg-[var(--accent)]/5'
+                      : 'border-[var(--border-color)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)] hover:border-[var(--accent)]/30'
+                      }`}
+                  >
+                    <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} className="hidden" />
+                    <div className="flex flex-col items-center gap-2">
+                      <div className={`w-12 h-12 rounded-xl border flex items-center justify-center transition-colors ${isDragOver
+                        ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30'
+                        : 'bg-[var(--hover-3)] border-[var(--border-color)] group-hover:bg-[var(--accent)]/10 group-hover:border-[var(--accent)]/30'
+                        }`}>
+                        <Plus className={`w-6 h-6 transition-colors ${isDragOver ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40 group-hover:text-[var(--accent)]'
+                          }`} />
+                      </div>
+                      <div>
+                        <p className="text-sm text-[var(--accent)] font-medium">
+                          {isDragOver ? 'Отпустите файлы' : 'Выбрать файлы'}
+                        </p>
+                        <p className="text-xs text-[var(--text-primary)]/40 mt-0.5">или перетащите их сюда</p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
 
                 {files.length > 0 && (
                   <div className="space-y-2">
@@ -1500,8 +1874,8 @@ const handleDrop = (e: React.DragEvent) => {
                       key={v}
                       onClick={() => setSp(String(v))}
                       className={`px-3 py-2 rounded-xl text-sm border transition-all ${sp === String(v)
-                          ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
-                          : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                        ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                        : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
                         }`}
                     >
                       {v}
@@ -1510,8 +1884,8 @@ const handleDrop = (e: React.DragEvent) => {
                   <button
                     onClick={() => setSp('')}
                     className={`px-3 py-2 rounded-xl text-sm border transition-all ${sp === ''
-                        ? 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30'
-                        : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                      ? 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30'
+                      : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
                       }`}
                   >
                     Без сложности
@@ -1587,10 +1961,12 @@ const handleDrop = (e: React.DragEvent) => {
         </div>
       </div>
 
-      {previewItem && (
-        <AttachmentPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
-      )}
-    </div>
+      {
+    previewItem && (
+      <AttachmentPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
+    )
+  }
+    </div >
   );
 }
 
@@ -1689,9 +2065,12 @@ function DetailModal({ task: t, umap, onClose, onRefresh, onNeedAssign, onEdit, 
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 md:p-4"></div>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-3xl max-h-[88vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div
+  className="relative w-full max-w-7xl h-[94vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
+  onClick={(e) => e.stopPropagation()}
+>
         <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -1701,7 +2080,9 @@ function DetailModal({ task: t, umap, onClose, onRefresh, onNeedAssign, onEdit, 
               {t.estimated_hours != null && <HoursBadge label="Трудозатраты" value={t.estimated_hours} title="Плановые трудозатраты" />}
               {t.actual_hours != null && <HoursBadge label="Факт" value={t.actual_hours} tone="accent" />}
             </div>
-            <h2 className="text-lg font-bold text-[var(--text-primary)] leading-snug">{t.title}</h2>
+            <h2 className="text-xl md:text-2xl font-bold text-[var(--text-primary)] leading-snug">
+  {t.title}
+</h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {canEdit && (
@@ -1723,15 +2104,24 @@ function DetailModal({ task: t, umap, onClose, onRefresh, onNeedAssign, onEdit, 
           )}
 
           <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
-            <div className="px-4 py-3 bg-[var(--hover-1)] border-b border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)]">Описание</div>
-            <div className="px-4 py-4">
-              {t.description ? (
-                <div className="text-sm text-[var(--text-primary)]/80 whitespace-pre-wrap leading-6">{t.description}</div>
-              ) : (
-                <div className="text-sm text-[var(--text-primary)]/35">Описание не заполнено</div>
-              )}
-            </div>
-          </div>
+  <div className="px-5 py-4 bg-[var(--hover-1)] border-b border-[var(--border-color)] flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+    <FileText className="w-4 h-4 text-[var(--accent)]" />
+    Описание
+  </div>
+
+  <div className="px-5 py-5 min-h-[220px]">
+    {t.description ? (
+      <TicketDescriptionContent
+        text={t.description}
+        className="text-[15px] text-[var(--text-primary)]/85 leading-7"
+      />
+    ) : (
+      <div className="min-h-[160px] flex items-center justify-center text-sm text-[var(--text-primary)]/30">
+        Описание не заполнено
+      </div>
+    )}
+  </div>
+</div>
 
           {attachments.length > 0 && (
             <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
@@ -1922,28 +2312,32 @@ function DetailModal({ task: t, umap, onClose, onRefresh, onNeedAssign, onEdit, 
         </div>
       </div>
 
-      {showArchive && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowArchive(false)} />
-          <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl">
-            <div className="p-6 text-center">
-              <Archive className="w-10 h-10 text-[var(--text-primary)]/20 mx-auto mb-3" />
-              <p className="text-base font-bold text-[var(--text-primary)]">Архивировать задачу?</p>
-              <p className="text-sm text-[var(--text-primary)]/50 mt-1">«{t.title}»</p>
-            </div>
-            <div className="flex border-t border-[var(--border-color)]">
-              <button onClick={() => setShowArchive(false)} className="flex-1 py-3 text-sm text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)] font-medium">Отмена</button>
-              <button onClick={() => { setShowArchive(false); act('arch', () => tasksApi.archive(t.id), 'Задача архивирована'); }}
-                className="flex-1 py-3 text-sm font-bold text-red-500 hover:bg-red-500/10 border-l border-[var(--border-color)]">Да</button>
-            </div>
+      {
+    showArchive && (
+      <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/50" onClick={() => setShowArchive(false)} />
+        <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl">
+          <div className="p-6 text-center">
+            <Archive className="w-10 h-10 text-[var(--text-primary)]/20 mx-auto mb-3" />
+            <p className="text-base font-bold text-[var(--text-primary)]">Архивировать задачу?</p>
+            <p className="text-sm text-[var(--text-primary)]/50 mt-1">«{t.title}»</p>
+          </div>
+          <div className="flex border-t border-[var(--border-color)]">
+            <button onClick={() => setShowArchive(false)} className="flex-1 py-3 text-sm text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)] font-medium">Отмена</button>
+            <button onClick={() => { setShowArchive(false); act('arch', () => tasksApi.archive(t.id), 'Задача архивирована'); }}
+              className="flex-1 py-3 text-sm font-bold text-red-500 hover:bg-red-500/10 border-l border-[var(--border-color)]">Да</button>
           </div>
         </div>
-      )}
+      </div>
+    )
+  }
 
-      {previewItem && (
-        <AttachmentPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
-      )}
-    </div>
+  {
+    previewItem && (
+      <AttachmentPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
+    )
+  }
+    </div >
   );
 }
 
@@ -1967,13 +2361,13 @@ export default function TasksPage() {
   const [boardViewportWidth, setBoardViewportWidth] = useState(0);
 
   const [fixedBoardScrollbarStyle, setFixedBoardScrollbarStyle] = useState<React.CSSProperties>({
-  position: 'fixed',
-  left: 0,
-  width: 0,
-  bottom: 12,
-  zIndex: 55,
-  display: 'none',
-});
+    position: 'fixed',
+    left: 0,
+    width: 0,
+    bottom: 12,
+    zIndex: 55,
+    display: 'none',
+  });
 
   const staff = (user?.roles ?? []).some((r) => ['admin', 'support_manager', 'support_agent', 'executor'].includes(r));
 
@@ -1999,6 +2393,66 @@ export default function TasksPage() {
 
   const [drag, setDrag] = useState<{ id: string; from: TaskStatus } | null>(null);
   const [dragO, setDragO] = useState<TaskStatus | null>(null);
+
+  const [highlightTaskId, setHighlightTaskId] =
+    useState<string | null>(null);
+
+  const highlightTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [lastMove, setLastMove] =
+    useState<LastMove | null>(null);
+
+  const [undoingMove, setUndoingMove] =
+    useState(false);
+
+  const highlightMovedTask = useCallback(
+    (id: string) => {
+      setHighlightTaskId(id);
+
+      if (highlightTimerRef.current) {
+        clearTimeout(highlightTimerRef.current);
+      }
+
+      highlightTimerRef.current = setTimeout(() => {
+        setHighlightTaskId(null);
+      }, 5000);
+    },
+    [],
+  );
+
+  const revealTask = useCallback(
+    (id: string) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const elements =
+            document.querySelectorAll<HTMLElement>(
+              '[data-task-id]',
+            );
+
+          const element = Array.from(elements).find(
+            (el) =>
+              el.getAttribute('data-task-id') === id,
+          );
+
+          element?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'center',
+          });
+        });
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current) {
+        clearTimeout(highlightTimerRef.current);
+      }
+    };
+  }, []);
 
   const [q, setQ] = useState('');
   const [fp, setFp] = useState<TaskPriority[]>([]);
@@ -2040,40 +2494,40 @@ export default function TasksPage() {
     return { type: 'my' };
   }, [mode, selP, selA, selT]);
 
-const syncBoardScrollbarMetrics = useCallback(() => {
-  const board = boardScrollRef.current;
-  const inner = boardInnerRef.current;
+  const syncBoardScrollbarMetrics = useCallback(() => {
+    const board = boardScrollRef.current;
+    const inner = boardInnerRef.current;
 
-  if (!board || !inner) {
-    setFixedBoardScrollbarStyle((prev) => ({
-      ...prev,
-      display: 'none',
-    }));
-    return;
-  }
+    if (!board || !inner) {
+      setFixedBoardScrollbarStyle((prev) => ({
+        ...prev,
+        display: 'none',
+      }));
+      return;
+    }
 
-  const contentWidth = inner.scrollWidth;
-  const viewportWidth = board.clientWidth;
-  const rect = board.getBoundingClientRect();
-  const hasHorizontalOverflow = contentWidth > viewportWidth + 2;
+    const contentWidth = inner.scrollWidth;
+    const viewportWidth = board.clientWidth;
+    const rect = board.getBoundingClientRect();
+    const hasHorizontalOverflow = contentWidth > viewportWidth + 2;
 
-  setBoardScrollWidth(contentWidth);
-  setBoardViewportWidth(viewportWidth);
+    setBoardScrollWidth(contentWidth);
+    setBoardViewportWidth(viewportWidth);
 
-  setFixedBoardScrollbarStyle({
-    position: 'fixed',
-    left: rect.left,
-    width: rect.width,
-    bottom: 12,
-    zIndex: 55,
-    display: hasHorizontalOverflow ? 'block' : 'none',
-    pointerEvents: 'auto',
-  });
+    setFixedBoardScrollbarStyle({
+      position: 'fixed',
+      left: rect.left,
+      width: rect.width,
+      bottom: 12,
+      zIndex: 55,
+      display: hasHorizontalOverflow ? 'block' : 'none',
+      pointerEvents: 'auto',
+    });
 
-  if (bottomBoardScrollRef.current) {
-    bottomBoardScrollRef.current.scrollLeft = board.scrollLeft;
-  }
-}, []);
+    if (bottomBoardScrollRef.current) {
+      bottomBoardScrollRef.current.scrollLeft = board.scrollLeft;
+    }
+  }, []);
 
   const handleBoardScroll = useCallback(() => {
     if (boardScrollSyncRef.current) return;
@@ -2093,41 +2547,41 @@ const syncBoardScrollbarMetrics = useCallback(() => {
     requestAnimationFrame(() => boardScrollSyncRef.current = false);
   }, []);
 
-useEffect(() => {
-  if (viewMode !== 'kanban' || loading || !cols.length) {
-    setFixedBoardScrollbarStyle((prev) => ({
-      ...prev,
-      display: 'none',
-    }));
-    return;
-  }
+  useEffect(() => {
+    if (viewMode !== 'kanban' || loading || !cols.length) {
+      setFixedBoardScrollbarStyle((prev) => ({
+        ...prev,
+        display: 'none',
+      }));
+      return;
+    }
 
-  const run = () => {
-    requestAnimationFrame(syncBoardScrollbarMetrics);
-  };
+    const run = () => {
+      requestAnimationFrame(syncBoardScrollbarMetrics);
+    };
 
-  run();
+    run();
 
-  const board = boardScrollRef.current;
-  const inner = boardInnerRef.current;
+    const board = boardScrollRef.current;
+    const inner = boardInnerRef.current;
 
-  let ro: ResizeObserver | null = null;
+    let ro: ResizeObserver | null = null;
 
-  if (typeof ResizeObserver !== 'undefined' && board && inner) {
-    ro = new ResizeObserver(run);
-    ro.observe(board);
-    ro.observe(inner);
-  }
+    if (typeof ResizeObserver !== 'undefined' && board && inner) {
+      ro = new ResizeObserver(run);
+      ro.observe(board);
+      ro.observe(inner);
+    }
 
-  window.addEventListener('resize', run);
-  window.addEventListener('scroll', run, true);
+    window.addEventListener('resize', run);
+    window.addEventListener('scroll', run, true);
 
-  return () => {
-    ro?.disconnect();
-    window.removeEventListener('resize', run);
-    window.removeEventListener('scroll', run, true);
-  };
-}, [viewMode, loading, cols.length, syncBoardScrollbarMetrics]);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', run);
+      window.removeEventListener('scroll', run, true);
+    };
+  }, [viewMode, loading, cols.length, syncBoardScrollbarMetrics]);
 
   const loadUsersMap = useCallback(async () => {
     const m = new Map<string, SimpleUser | CounterpartyCustomer>();
@@ -2189,52 +2643,149 @@ useEffect(() => {
     }
   }, [cols, ctx, toast]);
 
-  const moveTo = useCallback(async (id: string, from: TaskStatus, to: TaskStatus) => {
-    const src = cols.find((c) => c.status === from);
-    const task = src?.tasks.items.find((x) => x.id === id);
-    if (!task) return;
+  const moveTo = useCallback(
+    async (
+      id: string,
+      from: TaskStatus,
+      to: TaskStatus,
+    ) => {
+      const src = cols.find(
+        (c) => c.status === from,
+      );
 
-    if (to === 'todo' && from === 'backlog' && !task.assignee_id) {
-      setAssignIntent({ task, targetStatus: 'todo' });
-      return;
-    }
-    if (to === 'in_progress' && !task.assignee_id) {
-      setAssignIntent({ task, targetStatus: 'in_progress' });
-      return;
-    }
-    if (to === 'done') {
-      setCompleteIntent({ task, mode: 'status_done' });
-      return;
-    }
+      const task = src?.tasks.items.find(
+        (x) => x.id === id,
+      );
 
-    const snap = snapCols(cols);
-    let moved: TaskViewItem | undefined;
+      if (!task) return;
 
-    setCols((prev) => {
-      const n = prev.map((c) => {
-        if (c.status === from) {
-          const items = c.tasks.items.filter((x) => {
-            if (x.id === id) { moved = x; return false; }
-            return true;
-          });
-          return { ...c, tasks: { ...c.tasks, items, total_items: c.tasks.total_items - 1 } };
-        }
-        return c;
+      if (
+        to === 'todo' &&
+        from === 'backlog' &&
+        !task.assignee_id
+      ) {
+        setAssignIntent({
+          task,
+          targetStatus: 'todo',
+        });
+        return;
+      }
+
+      if (
+        to === 'in_progress' &&
+        !task.assignee_id
+      ) {
+        setAssignIntent({
+          task,
+          targetStatus: 'in_progress',
+        });
+        return;
+      }
+
+      if (to === 'done') {
+        setCompleteIntent({
+          task,
+          mode: 'status_done',
+        });
+        return;
+      }
+
+      const snap = snapCols(cols);
+
+      let moved: TaskViewItem | undefined;
+
+      setCols((prev) => {
+        const next = prev.map((c) => {
+          if (c.status !== from) return c;
+
+          const items = c.tasks.items.filter(
+            (x) => {
+              if (x.id === id) {
+                moved = x;
+                return false;
+              }
+
+              return true;
+            },
+          );
+
+          return {
+            ...c,
+            tasks: {
+              ...c.tasks,
+              items,
+              total_items: Math.max(
+                c.tasks.total_items - 1,
+                0,
+              ),
+            },
+          };
+        });
+
+        if (!moved) return prev;
+
+        const updated: TaskViewItem = {
+          ...moved,
+          status: to,
+        };
+
+        return next.map((c) =>
+          c.status === to
+            ? {
+              ...c,
+              tasks: {
+                ...c.tasks,
+                items: [
+                  updated,
+                  ...c.tasks.items.filter(
+                    (x) => x.id !== id,
+                  ),
+                ],
+                total_items:
+                  c.tasks.total_items + 1,
+              },
+            }
+            : c,
+        );
       });
-      if (!moved) return prev;
-      const updated = { ...moved, status: to };
-      return n.map((c) => c.status === to ? { ...c, tasks: { ...c.tasks, items: [updated, ...c.tasks.items], total_items: c.tasks.total_items + 1 } } : c);
-    });
 
-    try {
-      await tasksApi.changeStatus(id, to);
-      toast({ title: `Статус: ${ST_LABEL[to]}` });
-    } catch (e: any) {
-      setCols(snap);
-      const m = statusErr(e, task, to);
-      toast({ title: m.title, description: m.description, variant: 'destructive' });
-    }
-  }, [cols, toast]);
+      try {
+        await tasksApi.changeStatus(id, to);
+
+        setLastMove({
+          taskId: id,
+          number: task.number,
+          title: task.title,
+          from,
+          to,
+        });
+
+        highlightMovedTask(id);
+        revealTask(id);
+
+        toast({
+          title: `Задача перенесена в «${ST_LABEL[to]}»`,
+          description: `${task.number} — ${task.title}`,
+        });
+      } catch (e: any) {
+        setCols(snap);
+
+        const message = statusErr(e, task, to);
+
+        toast({
+          title: message.title,
+          description: message.description,
+          variant: 'destructive',
+        });
+      }
+    },
+    [
+      cols,
+      toast,
+      highlightMovedTask,
+      revealTask,
+    ],
+  );
 
   const handleAssignAndMove = useCallback(async (aid: string) => {
     if (!assignIntent) return;
@@ -2275,26 +2826,105 @@ useEffect(() => {
 
   const onDS = useCallback((id: string, from: TaskStatus) => setDrag({ id, from }), []);
   const onDE = useCallback(() => { setDrag(null); setDragO(null); }, []);
-  const onDO = useCallback((e: React.DragEvent, st: TaskStatus) => {
-    e.preventDefault();
-    if (drag && !TRANSITIONS[drag.from].includes(st)) return;
-    e.dataTransfer.dropEffect = 'move';
-    setDragO(st);
-  }, [drag]);
+  const onDO = useCallback(
+    (
+      e: React.DragEvent,
+      st: TaskStatus,
+    ) => {
+      e.preventDefault();
+
+      if (
+        drag &&
+        !DRAG_TRANSITIONS(drag.from).includes(st)
+      ) {
+        e.dataTransfer.dropEffect = 'none';
+        return;
+      }
+
+      e.dataTransfer.dropEffect = 'move';
+      setDragO(st);
+    },
+    [drag],
+  );
   const onDL = useCallback(() => setDragO(null), []);
-  const onDrop = useCallback(async (e: React.DragEvent, to: TaskStatus) => {
-    e.preventDefault();
-    setDragO(null);
-    if (!drag || drag.from === to) { setDrag(null); return; }
-    if (!TRANSITIONS[drag.from].includes(to)) {
-      toast({ title: 'Переход недоступен', variant: 'destructive' });
+  const onDrop = useCallback(
+    async (
+      e: React.DragEvent,
+      to: TaskStatus,
+    ) => {
+      e.preventDefault();
+      setDragO(null);
+
+      if (!drag || drag.from === to) {
+        setDrag(null);
+        return;
+      }
+
+      if (
+        !DRAG_TRANSITIONS(drag.from).includes(to)
+      ) {
+        toast({
+          title: 'Переход недоступен',
+          variant: 'destructive',
+        });
+
+        setDrag(null);
+        return;
+      }
+
+      const { id, from } = drag;
+
       setDrag(null);
-      return;
-    }
-    const { id, from } = drag;
-    setDrag(null);
-    await moveTo(id, from, to);
-  }, [drag, moveTo, toast]);
+
+      await moveTo(id, from, to);
+    },
+    [drag, moveTo, toast],
+  );
+
+  const undoLastMove = useCallback(async () => {
+  if (!lastMove || undoingMove) return;
+
+  const move = lastMove;
+
+  setUndoingMove(true);
+
+  try {
+    await tasksApi.changeStatus(
+      move.taskId,
+      move.from,
+    );
+
+    setLastMove(null);
+
+    await fetchBoard(true);
+
+    highlightMovedTask(move.taskId);
+
+    setTimeout(() => {
+      revealTask(move.taskId);
+    }, 100);
+
+    toast({
+      title: 'Перенос отменён',
+      description: `${move.number} возвращена в «${ST_LABEL[move.from]}»`,
+    });
+  } catch (e: any) {
+    toast({
+      title: 'Не удалось отменить перенос',
+      description: apiErr(e),
+      variant: 'destructive',
+    });
+  } finally {
+    setUndoingMove(false);
+  }
+}, [
+  lastMove,
+  undoingMove,
+  fetchBoard,
+  highlightMovedTask,
+  revealTask,
+  toast,
+]);
 
   const ql = q.trim().toLowerCase();
   const disp = cols.map((c) => !ql ? c : {
@@ -2421,62 +3051,119 @@ useEffect(() => {
           <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30"><FileText className="w-12 h-12 mb-3 opacity-50" /><p className="text-base font-medium">{mode === 'project' && !selP ? 'Выберите проект' : mode === 'assignee' && !selA ? 'Выберите исполнителя' : mode === 'ticket' && !selT ? 'Выберите заявку' : 'Нет задач'}</p></div>
         ) : (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-  <div
-    ref={boardScrollRef}
-    onScroll={handleBoardScroll}
-    className="flex-1 overflow-x-auto overflow-y-hidden pb-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-  >
-    <div
-      ref={boardInnerRef}
-      className="flex gap-3 h-full w-max min-w-full"
-    >
-      {disp.map((c) => (
-        <KCol
-          key={c.status}
-          col={c}
-          umap={umap}
-          isDO={dragO === c.status}
-          dragId={drag?.id ?? null}
-          ldMore={moreCol === c.status}
-          onDS={onDS}
-          onDE={onDE}
-          onDO={onDO}
-          onDL={onDL}
-          onDrop={onDrop}
-          onAdd={setCreate}
-          onView={setView}
-          onMore={more}
-        />
-      ))}
-    </div>
-  </div>
-</div>
+            <div
+              ref={boardScrollRef}
+              onScroll={handleBoardScroll}
+              className="flex-1 overflow-x-auto overflow-y-hidden pb-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              <div
+                ref={boardInnerRef}
+                className="flex gap-3 h-full w-max min-w-full"
+              >
+                {disp.map((c) => (
+                  <KCol
+                    key={c.status}
+                    col={c}
+                    umap={umap}
+                    isDO={dragO === c.status}
+                    dragId={drag?.id ?? null}
+                    highlightTaskId={highlightTaskId}
+                    ldMore={moreCol === c.status}
+                    onDS={onDS}
+                    onDE={onDE}
+                    onDO={onDO}
+                    onDL={onDL}
+                    onDrop={onDrop}
+                    onAdd={setCreate}
+                    onView={setView}
+                    onMore={more}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
-{viewMode === 'kanban' &&
-  !loading &&
-  cols.length > 0 &&
-  createPortal(
-    <div
-      style={fixedBoardScrollbarStyle}
-      className="px-1"
+      {viewMode === 'kanban' &&
+        !loading &&
+        cols.length > 0 &&
+        createPortal(
+          <div
+            style={fixedBoardScrollbarStyle}
+            className="px-1"
+          >
+            <div
+              ref={bottomBoardScrollRef}
+              onScroll={handleBottomBoardScroll}
+              className="h-2 rounded-xl bg-[var(--bg-card)]/95 border border-[var(--border-color)] shadow-2xl backdrop-blur-md overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/60 scrollbar-track-transparent"
+            >
+              <div
+                style={{
+                  width: Math.max(boardScrollWidth, boardViewportWidth),
+                  height: '100%',
+                }}
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
+
+        <AnimatePresence>
+  {lastMove && !drag && (
+    <motion.div
+      initial={{ y: 40, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 40, opacity: 0 }}
+      className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[120] w-[min(600px,calc(100vw-32px))] bg-[var(--bg-card)] border border-[var(--accent)]/30 rounded-2xl shadow-2xl p-3.5"
     >
-      <div
-        ref={bottomBoardScrollRef}
-        onScroll={handleBottomBoardScroll}
-        className="h-2 rounded-xl bg-[var(--bg-card)]/95 border border-[var(--border-color)] shadow-2xl backdrop-blur-md overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/60 scrollbar-track-transparent"
-      >
-        <div
-          style={{
-            width: Math.max(boardScrollWidth, boardViewportWidth),
-            height: '100%',
-          }}
-        />
+      <div className="flex items-center gap-3">
+        <div className="w-11 h-11 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center shrink-0">
+          <CheckCircle2 className="w-5 h-5 text-[var(--accent)]" />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-bold text-[var(--text-primary)]">
+            Задача перенесена
+          </div>
+
+          <div className="text-xs text-[var(--text-primary)]/60 truncate mt-0.5">
+            #{lastMove.number} — {lastMove.title}
+          </div>
+
+          <div className="text-[11px] text-[var(--text-primary)]/35 mt-1">
+            {ST_LABEL[lastMove.from]}
+            {' → '}
+            {ST_LABEL[lastMove.to]}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={undoLastMove}
+          disabled={undoingMove}
+          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20 text-[var(--accent)] text-sm font-bold hover:bg-[var(--accent)]/20 disabled:opacity-50 shrink-0"
+        >
+          {undoingMove ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <RotateCcw className="w-4 h-4" />
+          )}
+
+          Отменить
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setLastMove(null)}
+          className="p-2 rounded-lg text-[var(--text-primary)]/30 hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)]"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
-    </div>,
-    document.body,
+    </motion.div>
   )}
+</AnimatePresence>
 
       <AnimatePresence>{dragInfo && <DragPanel task={dragInfo} onDrop={onDrop} />}</AnimatePresence>
 

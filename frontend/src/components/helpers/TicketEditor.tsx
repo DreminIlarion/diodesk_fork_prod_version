@@ -332,12 +332,30 @@ export function TicketEditor({ blocks, onChange }: TicketEditorProps) {
 
   // ── HTML для инициализации ────────────────────────────────────────────────
 
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 // ── Исправленный markdownToHtml ──────────────────────────────────────────────
 function markdownToHtml(text: string): string {
-  return text
-    .replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>')
-    .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+  return escapeHtml(text)
+    .replace(
+      /\*\*\*([^*\n]+)\*\*\*/g,
+      '<strong><em>$1</em></strong>',
+    )
+    .replace(
+      /\*\*([^*\n]+)\*\*/g,
+      '<strong>$1</strong>',
+    )
+    .replace(
+      /(^|[^*])\*([^*\n]+)\*/g,
+      '$1<em>$2</em>',
+    )
     .replace(/\n/g, '<br>');
 }
 
