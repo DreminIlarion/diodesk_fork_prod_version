@@ -196,3 +196,17 @@ async def get_counterparty_products(
 ) -> Page[ProductResponse]:
     page = await repository.get_products(counterparty_id, pagination)
     return page.to_response(map_product_to_response)
+
+
+@router.delete(
+    path="/{counterparty_id}/products/{product_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_role(REQUIRED_ROLES))],
+    summary="Отвязка программного продукта от контрагента"
+)
+async def unlink_counterparty_product(
+        counterparty_id: UUID,
+        product_id: UUID,
+        service: CounterpartyServiceDep,
+) -> None:
+    await service.unlink_product(counterparty_id, product_id)   

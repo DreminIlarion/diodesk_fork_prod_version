@@ -163,6 +163,20 @@ class CounterpartyService:
         await self.repository.link_product(counterparty.id, product_id)
         await self.session.commit()
 
+    async def unlink_product(self, counterparty_id: UUID, product_id: UUID) -> None:
+        """
+        Отвязка программного продукта от контрагента
+        """
+        
+        # 1. Получение и проверка на существование контрагента
+        counterparty = await self.repository.read(counterparty_id)
+        if counterparty is None:
+            raise NotFoundError(f"Counterparty with ID {counterparty_id} not found")
+        
+        # 2. Отвязка продукта
+        await self.repository.unlink_product(counterparty.id, product_id)
+        await self.session.commit()
+
     async def delete_contact_person(
             self, counterparty_id: UUID, phone: str, email: str
     ) -> CounterpartyResponse:
