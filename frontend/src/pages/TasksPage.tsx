@@ -2317,10 +2317,9 @@ function DetailModal({
                           color:
                             tag.color ??
                             'var(--text-primary)',
-                          background: `${
-                            tag.color ??
+                          background: `${tag.color ??
                             '#888'
-                          }14`,
+                            }14`,
                         }}
                       >
                         <span
@@ -2342,56 +2341,56 @@ function DetailModal({
               {/* Relations */}
               {(ticketPath ||
                 t.project_id) && (
-                <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
-                  {ticketPath && (
-                    <div className="flex items-center gap-4 px-5 py-4 border-b border-[var(--border-color)] last:border-b-0">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs text-[var(--text-primary)]/40 mb-1">
-                          Заявка
+                  <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+                    {ticketPath && (
+                      <div className="flex items-center gap-4 px-5 py-4 border-b border-[var(--border-color)] last:border-b-0">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs text-[var(--text-primary)]/40 mb-1">
+                            Заявка
+                          </div>
+
+                          <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">
+                            {ticketNo ??
+                              'Открыть заявку'}
+                          </div>
                         </div>
 
-                        <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">
-                          {ticketNo ??
-                            'Открыть заявку'}
-                        </div>
+                        <Link
+                          to={ticketPath}
+                          onClick={onClose}
+                          className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline shrink-0"
+                        >
+                          Открыть
+                          <ArrowUpRight className="w-4 h-4" />
+                        </Link>
                       </div>
+                    )}
 
-                      <Link
-                        to={ticketPath}
-                        onClick={onClose}
-                        className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline shrink-0"
-                      >
-                        Открыть
-                        <ArrowUpRight className="w-4 h-4" />
-                      </Link>
-                    </div>
-                  )}
+                    {t.project_id && (
+                      <div className="flex items-center gap-4 px-5 py-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs text-[var(--text-primary)]/40 mb-1">
+                            Проект
+                          </div>
 
-                  {t.project_id && (
-                    <div className="flex items-center gap-4 px-5 py-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs text-[var(--text-primary)]/40 mb-1">
-                          Проект
+                          <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">
+                            {t.project_name ||
+                              'Открыть проект'}
+                          </div>
                         </div>
 
-                        <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">
-                          {t.project_name ||
-                            'Открыть проект'}
-                        </div>
+                        <Link
+                          to={`/projects/${t.project_id}`}
+                          onClick={onClose}
+                          className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline shrink-0"
+                        >
+                          Открыть
+                          <ArrowUpRight className="w-4 h-4" />
+                        </Link>
                       </div>
-
-                      <Link
-                        to={`/projects/${t.project_id}`}
-                        onClick={onClose}
-                        className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline shrink-0"
-                      >
-                        Открыть
-                        <ArrowUpRight className="w-4 h-4" />
-                      </Link>
-                    </div>
-                  )}
-                </section>
-              )}
+                    )}
+                  </section>
+                )}
             </div>
 
             {/* RIGHT */}
@@ -2466,17 +2465,16 @@ function DetailModal({
                     </span>
 
                     <span
-                      className={`text-sm font-medium ${
-                        t.due_date &&
-                        overdue(t)
+                      className={`text-sm font-medium ${t.due_date &&
+                          overdue(t)
                           ? 'text-red-400'
                           : 'text-[var(--text-primary)]/80'
-                      }`}
+                        }`}
                     >
                       {t.due_date
                         ? fmtDue(
-                            t.due_date,
-                          )
+                          t.due_date,
+                        )
                         : '—'}
                     </span>
                   </div>
@@ -2547,7 +2545,7 @@ function DetailModal({
                     type="button"
                     onClick={() =>
                       allowed.length >
-                        0 &&
+                      0 &&
                       setShowSt(
                         (v) => !v,
                       )
@@ -2574,14 +2572,13 @@ function DetailModal({
 
                     {allowed.length >
                       0 && (
-                      <ChevronDown
-                        className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform ${
-                          showSt
-                            ? 'rotate-180'
-                            : ''
-                        }`}
-                      />
-                    )}
+                        <ChevronDown
+                          className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform ${showSt
+                              ? 'rotate-180'
+                              : ''
+                            }`}
+                        />
+                      )}
                   </button>
 
                   {showSt && (
@@ -2593,39 +2590,26 @@ function DetailModal({
                         }
                       />
 
-                      <div className="absolute left-0 right-0 top-full mt-2 z-20 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-2xl">
-                        <div className="p-1.5">
-                          {allowed.map(
-                            (s) => {
-                              const sm =
-                                CM[s];
+                      <div className="absolute left-0 right-0 bottom-full mb-2 z-20 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-2xl">
+                        <div className="p-1.5 max-h-[320px] overflow-y-auto">
+                          {allowed.map((s) => {
+                            const sm = CM[s];
 
-                              return (
-                                <button
-                                  type="button"
-                                  key={s}
-                                  onClick={() =>
-                                    chSt(
-                                      s,
-                                    )
-                                  }
-                                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] font-medium transition-colors"
-                                >
-                                  <span
-                                    className={`w-2 h-2 rounded-full ${sm.dot}`}
-                                  />
+                            return (
+                              <button
+                                type="button"
+                                key={s}
+                                onClick={() => chSt(s)}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] font-medium transition-colors"
+                              >
+                                <span className={`w-2 h-2 rounded-full ${sm.dot}`} />
 
-                                  <span className="flex-1 text-left">
-                                    {
-                                      ST_LABEL[
-                                        s
-                                      ]
-                                    }
-                                  </span>
-                                </button>
-                              );
-                            },
-                          )}
+                                <span className="flex-1 text-left">
+                                  {ST_LABEL[s]}
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     </>
@@ -2652,11 +2636,10 @@ function DetailModal({
                     </span>
 
                     <ChevronDown
-                      className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform ${
-                        showAssign
+                      className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform ${showAssign
                           ? 'rotate-180'
                           : ''
-                      }`}
+                        }`}
                     />
                   </button>
 
@@ -2694,12 +2677,12 @@ function DetailModal({
                         disabled={
                           !aId ||
                           busy ===
-                            'assign'
+                          'assign'
                         }
                         className="w-full py-2.5 rounded-xl bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-40"
                       >
                         {busy ===
-                        'assign' ? (
+                          'assign' ? (
                           <Loader2 className="w-4 h-4 animate-spin mx-auto" />
                         ) : (
                           'Сохранить'
@@ -2729,11 +2712,10 @@ function DetailModal({
                       </span>
 
                       <ChevronDown
-                        className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform ${
-                          showRR
+                        className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform ${showRR
                             ? 'rotate-180'
                             : ''
-                        }`}
+                          }`}
                       />
                     </button>
 
@@ -2770,12 +2752,12 @@ function DetailModal({
                           disabled={
                             !rvId ||
                             busy ===
-                              'rr'
+                            'rr'
                           }
                           className="w-full py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/25 text-violet-400 text-sm font-medium disabled:opacity-40 hover:bg-violet-500/15 transition-colors"
                         >
                           {busy ===
-                          'rr' ? (
+                            'rr' ? (
                             <Loader2 className="w-4 h-4 animate-spin mx-auto" />
                           ) : (
                             'Отправить'
