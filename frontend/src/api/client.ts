@@ -265,9 +265,9 @@ export const authApi = {
   },
 
   getMyProfile: async (): Promise<User> => {
-  const response = await api.get<User>('/api/v1/users/me');
-  return response.data;
-},
+    const response = await api.get<User>('/api/v1/users/me');
+    return response.data;
+  },
 
 };
 
@@ -374,6 +374,9 @@ export const counterpartiesApi = {
     });
     return res.data;
   },
+
+  unlinkProduct: (counterpartyId: string, productId: string) =>
+    api.delete(`/api/v1/counterparties/${counterpartyId}/products/${productId}`),
 
   linkProduct: async (
     counterpartyId: string,
@@ -682,11 +685,15 @@ export const ticketsApi = {
           reporter_id: filters?.reporter_id || undefined,
         } : undefined,
 
-        
+
       },
-      { params: { page, size, 
-        created_after: filters?.created_after || undefined,
-        created_before: filters?.created_before || undefined,} }
+      {
+        params: {
+          page, size,
+          created_after: filters?.created_after || undefined,
+          created_before: filters?.created_before || undefined,
+        }
+      }
     );
     return response.data;
   },
@@ -1262,11 +1269,11 @@ export const feedbacksApi = {
   },
 
   getMy: async (page = 1, size = 12) => {
-  const response = await api.get(`/api/v1/feedbacks/my`, {
-    params: { page, size },
-  });
-  return response.data;
-},
+    const response = await api.get(`/api/v1/feedbacks/my`, {
+      params: { page, size },
+    });
+    return response.data;
+  },
 
   update: async (id: string, data: FeedbackUpdateInput): Promise<Feedback> => {
     const res = await api.patch(`/api/v1/feedbacks/${id}`, data);

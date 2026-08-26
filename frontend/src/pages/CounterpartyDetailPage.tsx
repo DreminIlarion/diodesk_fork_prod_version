@@ -797,6 +797,9 @@ function ProductsTab({ counterpartyId }: { counterpartyId: string }) {
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
 
+  const [unlinkingProduct, setUnlinkingProduct] = useState<any | null>(null);
+  const [unlinking, setUnlinking] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
@@ -832,6 +835,19 @@ function ProductsTab({ counterpartyId }: { counterpartyId: string }) {
     } catch (err: any) {
       setLinkError(typeof err?.response?.data?.detail === 'string' ? err.response.data.detail : 'Не удалось привязать продукт');
     } finally { setLinking(false); }
+  };
+
+  const handleUnlink = async (product: any) => {
+    setUnlinking(true);
+    try {
+      await counterpartiesApi.unlinkProduct(counterpartyId, product.id);
+      setUnlinkingProduct(null);
+      load();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setUnlinking(false);
+    }
   };
 
   const closeForm = () => { setShowForm(false); setSelectedProduct(null); setFilterQuery(''); setLinkEnv('production'); setLinkPrimary(false); setLinkError(null); };
@@ -977,6 +993,38 @@ function ProductsTab({ counterpartyId }: { counterpartyId: string }) {
                           </div>
                         </div>
                       )}
+
+                      {unlinkingProduct?.id === product.id ? (
+  <div className="px-4 py-3 rounded-xl bg-[var(--accent)]/5 border border-[var(--accent)]/20">
+    <p className="text-sm text-[var(--text-primary)] mb-3">
+      Отвязать <span className="font-semibold">{product.display_name || product.name}</span>?
+    </p>
+    <div className="flex gap-2">
+      <button
+        onClick={() => setUnlinkingProduct(null)}
+        className="flex-1 px-3 py-2 rounded-lg bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-sm font-medium transition-colors"
+      >
+        Отмена
+      </button>
+      <button
+        onClick={() => handleUnlink(product)}
+        disabled={unlinking}
+        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[var(--accent)]/20 hover:bg-[var(--accent)]/30 border border-[var(--accent)]/30 text-[var(--accent)] text-sm font-medium transition-colors disabled:opacity-50"
+      >
+        {unlinking ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+        Отвязать
+      </button>
+    </div>
+  </div>
+) : (
+  <button
+    onClick={() => setUnlinkingProduct(product)}
+    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/20 text-[var(--accent)] text-sm font-medium transition-colors"
+  >
+    <Trash2 size={16} />
+    Отвязать
+  </button>
+)}
                     </div>
                   )}
                 </div>
@@ -1041,25 +1089,25 @@ export default function CounterpartyDetailPage() {
 
   const canAddBranch = counterparty?.counterparty_type === 'Юридическое лицо';
 
-const statusClr = (s: string) => ({
-  'new': 'bg-blue-500/15 text-[var(--info)] border-blue-500/30',
-  'pending_approval': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
-  'open': 'bg-cyan-500/15 text-[var(--info)] border-cyan-500/30',
-  'in_progress': 'bg-yellow-500/15 text-[var(--warning)] border-yellow-500/30',
-  'waiting': 'bg-purple-500/15 text-[var(--info)] border-purple-500/30',
-  'resolved': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  'closed': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
-  'reopened': 'bg-orange-500/15 text-[var(--warning)] border-orange-500/30',
-  'rejected': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
-  'cancelled': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
-}[s] ?? 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15');
+  const statusClr = (s: string) => ({
+    'new': 'bg-blue-500/15 text-[var(--info)] border-blue-500/30',
+    'pending_approval': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
+    'open': 'bg-cyan-500/15 text-[var(--info)] border-cyan-500/30',
+    'in_progress': 'bg-yellow-500/15 text-[var(--warning)] border-yellow-500/30',
+    'waiting': 'bg-purple-500/15 text-[var(--info)] border-purple-500/30',
+    'resolved': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+    'closed': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
+    'reopened': 'bg-orange-500/15 text-[var(--warning)] border-orange-500/30',
+    'rejected': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
+    'cancelled': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
+  }[s] ?? 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15');
 
-const priorityClr = (p: string) => ({
-  'low': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  'medium': 'bg-yellow-500/15 text-[var(--warning)] border-yellow-500/30',
-  'high': 'bg-orange-500/15 text-[var(--warning)] border-orange-500/30',
-  'critical': 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/15',
-}[p] ?? 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15');
+  const priorityClr = (p: string) => ({
+    'low': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+    'medium': 'bg-yellow-500/15 text-[var(--warning)] border-yellow-500/30',
+    'high': 'bg-orange-500/15 text-[var(--warning)] border-orange-500/30',
+    'critical': 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/15',
+  }[p] ?? 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15');
 
   const fmtDate = (d: string) => new Date(d).toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const fmtDateShort = (d: string) => new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -1287,11 +1335,11 @@ const priorityClr = (p: string) => ({
                           <div className="flex items-center gap-2 mb-2 flex-wrap">
                             <span className="text-[var(--accent)] font-mono text-sm bg-[var(--accent-soft)] border border-[var(--accent)]/15 px-2 py-0.5 rounded-lg">#{ticket.number}</span>
                             <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${statusClr(ticket.status)}`}>
-                            {TICKET_STATUS_LABELS[ticket.status] || ticket.status}
-                          </span>
-                          <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${priorityClr(ticket.priority)}`}>
-                            {TICKET_PRIORITY_LABELS[ticket.priority] || ticket.priority}
-                          </span>
+                              {TICKET_STATUS_LABELS[ticket.status] || ticket.status}
+                            </span>
+                            <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${priorityClr(ticket.priority)}`}>
+                              {TICKET_PRIORITY_LABELS[ticket.priority] || ticket.priority}
+                            </span>
                           </div>
                           <p className="text-base font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)] transition-colors">{ticket.title}</p>
                           <p className="text-sm text-[var(--text-primary)]/40 mt-1">{fmtDateShort(ticket.created_at)}</p>
