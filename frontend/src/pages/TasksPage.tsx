@@ -2001,6 +2001,10 @@ function DetailModal({
   const [showSt, setShowSt] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
   const [showRR, setShowRR] = useState(false);
+
+  const assignSectionRef = useRef<HTMLElement | null>(null);
+  const reviewSectionRef = useRef<HTMLElement | null>(null);
+
   const [busy, setBusy] = useState('');
   const [aId, setAId] = useState(t.assignee_id ?? '');
   const [rvId, setRvId] = useState('');
@@ -2036,10 +2040,49 @@ function DetailModal({
 
   const statusAsString = String(t.status);
 
+  const revealExpandedSection = useCallback(
+  (ref: React.RefObject<HTMLElement | null>) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const container = contentScrollRef.current;
+        const el = ref.current;
+
+        if (!container || !el) return;
+
+        const containerRect = container.getBoundingClientRect();
+        const elementRect = el.getBoundingClientRect();
+
+        const padding = 24;
+
+        if (elementRect.bottom > containerRect.bottom - padding) {
+          container.scrollBy({
+            top:
+              elementRect.bottom -
+              containerRect.bottom +
+              padding,
+            behavior: 'smooth',
+          });
+        } else if (elementRect.top < containerRect.top + padding) {
+          container.scrollBy({
+            top:
+              elementRect.top -
+              containerRect.top -
+              padding,
+            behavior: 'smooth',
+          });
+        }
+      });
+    });
+  },
+  [],
+);
+
   const canReview =
     (statusAsString === 'to_review' ||
       statusAsString === 'review') &&
     isStaff;
+
+
 
   const canRR = t.status === 'in_progress';
 
@@ -2165,6 +2208,8 @@ function DetailModal({
     }
   };
 
+  const contentScrollRef = useRef<HTMLDivElement | null>(null);
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 md:p-4">
       <div
@@ -2226,7 +2271,10 @@ function DetailModal({
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-5 md:p-6">
+        <div
+  ref={contentScrollRef}
+  className="flex-1 min-h-0 overflow-y-auto p-5 md:p-6"
+>
           {t.status ===
             'in_progress' &&
             !t.assignee_id && (
@@ -2467,9 +2515,9 @@ function DetailModal({
 
                     <span
                       className={`text-sm font-medium ${t.due_date &&
-                          overdue(t)
-                          ? 'text-red-400'
-                          : 'text-[var(--text-primary)]/80'
+                        overdue(t)
+                        ? 'text-red-400'
+                        : 'text-[var(--text-primary)]/80'
                         }`}
                     >
                       {t.due_date
@@ -2575,8 +2623,8 @@ function DetailModal({
                       0 && (
                         <ChevronDown
                           className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform ${showSt
-                              ? 'rotate-180'
-                              : ''
+                            ? 'rotate-180'
+                            : ''
                             }`}
                         />
                       )}
@@ -2620,14 +2668,24 @@ function DetailModal({
 
               {/* Assignment */}
               {canAssign && (
-                <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+                <section
+                  ref={assignSectionRef}
+                  className="rounded-2xl border border-[var(--border-color)] overflow-hidden"
+                >
                   <button
                     type="button"
-                    onClick={() =>
-                      setShowAssign(
-                        (v) => !v,
-                      )
-                    }
+                    onClick={() => {
+                      const opening = !showAssign;
+
+                      setShowAssign(opening);
+
+                      if (opening) {
+                        // Заодно закрываем другой раскрытый блок,
+                        // чтобы sidebar не разрастался.
+                        setShowRR(false);
+                        revealExpandedSection(assignSectionRef);
+                      }
+                    }}
                     className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/65 hover:bg-[var(--hover-1)] font-medium transition-colors"
                   >
                     <span>
@@ -2638,8 +2696,8 @@ function DetailModal({
 
                     <ChevronDown
                       className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform ${showAssign
-                          ? 'rotate-180'
-                          : ''
+                        ? 'rotate-180'
+                        : ''
                         }`}
                     />
                   </button>
@@ -2697,14 +2755,22 @@ function DetailModal({
               {/* Review request */}
               {canRR &&
                 users.length > 0 && (
-                  <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+                  <section
+                    ref={reviewSectionRef}
+                    className="rounded-2xl border border-[var(--border-color)] overflow-hidden"
+                  >
                     <button
                       type="button"
-                      onClick={() =>
-                        setShowRR(
-                          (v) => !v,
-                        )
-                      }
+                      onClick={() => {
+                        const opening = !showRR;
+
+                        setShowRR(opening);
+
+                        if (opening) {
+                          setShowAssign(false);
+                          revealExpandedSection(reviewSectionRef);
+                        }
+                      }}
                       className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/65 hover:bg-[var(--hover-1)] font-medium transition-colors"
                     >
                       <span>
@@ -2714,8 +2780,8 @@ function DetailModal({
 
                       <ChevronDown
                         className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform ${showRR
-                            ? 'rotate-180'
-                            : ''
+                          ? 'rotate-180'
+                          : ''
                           }`}
                       />
                     </button>
@@ -3425,49 +3491,49 @@ export default function TasksPage() {
 
   const onDS = useCallback((id: string, from: TaskStatus) => setDrag({ id, from }), []);
   const onDE = useCallback(() => { setDrag(null); setDragO(null); }, []);
- const onDO = useCallback((e: React.DragEvent, st: TaskStatus) => {
-  e.preventDefault();
+  const onDO = useCallback((e: React.DragEvent, st: TaskStatus) => {
+    e.preventDefault();
 
-  if (
-    drag &&
-    !TRANSITIONS[drag.from].includes(st)
-  ) {
-    e.dataTransfer.dropEffect = 'none';
-    return;
-  }
+    if (
+      drag &&
+      !TRANSITIONS[drag.from].includes(st)
+    ) {
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
 
-  e.dataTransfer.dropEffect = 'move';
-  setDragO(st);
-}, [drag]);
+    e.dataTransfer.dropEffect = 'move';
+    setDragO(st);
+  }, [drag]);
   const onDL = useCallback(() => setDragO(null), []);
   const onDrop = useCallback(async (
-  e: React.DragEvent,
-  to: TaskStatus,
-) => {
-  e.preventDefault();
-  setDragO(null);
+    e: React.DragEvent,
+    to: TaskStatus,
+  ) => {
+    e.preventDefault();
+    setDragO(null);
 
-  if (!drag || drag.from === to) {
+    if (!drag || drag.from === to) {
+      setDrag(null);
+      return;
+    }
+
+    if (!TRANSITIONS[drag.from].includes(to)) {
+      toast({
+        title: 'Переход недоступен',
+        variant: 'destructive',
+      });
+
+      setDrag(null);
+      return;
+    }
+
+    const { id, from } = drag;
+
     setDrag(null);
-    return;
-  }
 
-  if (!TRANSITIONS[drag.from].includes(to)) {
-    toast({
-      title: 'Переход недоступен',
-      variant: 'destructive',
-    });
-
-    setDrag(null);
-    return;
-  }
-
-  const { id, from } = drag;
-
-  setDrag(null);
-
-  await moveTo(id, from, to);
-}, [drag, moveTo, toast]);
+    await moveTo(id, from, to);
+  }, [drag, moveTo, toast]);
 
   const undoLastMove = useCallback(async () => {
     if (!lastMove || undoingMove) return;
