@@ -241,7 +241,7 @@ class TaskService:
         reviewer = await get_or_raise_404(self.user_repo.read, reviewer_id, User)
 
         permission = await self.task_authz_service.can_review_task(
-            subject=current_subject, task=task
+            subject=current_subject, task=task,
         )
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
