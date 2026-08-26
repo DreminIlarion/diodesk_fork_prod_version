@@ -188,4 +188,52 @@ task_workflow = (
         TaskStatus.DONE, TaskStatus.TO_FIX,
         Task.reopen, Task.start_work,
     )
+    # ===============================
+    # ОБРАТНЫЕ ПЕРЕХОДЫ (возврат назад)
+    # ===============================
+    # IN_PROGRESS → TODO (вернуть из работы в готов к выполнению)
+    .allow(
+        TaskStatus.IN_PROGRESS, TaskStatus.TODO,
+        Task.finish_work,
+    )
+    # IN_PROGRESS → TO_FIX (вернуть из работы в доработку)
+    .allow(
+        TaskStatus.IN_PROGRESS, TaskStatus.TO_FIX,
+        Task.finish_work,
+    )
+    # IN_PROGRESS → TO_TEST (вернуть из работы в тестирование)
+    .allow(
+        TaskStatus.IN_PROGRESS, TaskStatus.TO_TEST,
+        Task.finish_work,
+    )
+    # PAUSED → TODO (вернуть из паузы в готов к выполнению)
+    .allow(
+        TaskStatus.PAUSED, TaskStatus.TODO,
+        Task.finish_work,
+    )
+    # TO_REVIEW → TO_TEST (вернуть из ревью в тестирование)
+    .allow(
+        TaskStatus.TO_REVIEW, TaskStatus.TO_TEST,
+        Task.start_work,
+    )
+    # TO_FIX → DONE (вернуть из доработки в выполнено)
+    .allow(
+        TaskStatus.TO_FIX, TaskStatus.DONE,
+        Task.complete,
+    )
+    # TO_TEST → TO_FIX (вернуть из тестирования в доработку)
+    .allow(
+        TaskStatus.TO_TEST, TaskStatus.TO_FIX,
+        Task.start_work,
+    )
+    # DONE → TO_REVIEW (вернуть из выполнено в ревью)
+    .allow(
+        TaskStatus.DONE, TaskStatus.TO_REVIEW,
+        Task.reopen,
+    )
+    # DONE → TO_TEST (вернуть из выполнено в тестирование)
+    .allow(
+        TaskStatus.DONE, TaskStatus.TO_TEST,
+        Task.reopen, Task.start_work,
+    )
 )
