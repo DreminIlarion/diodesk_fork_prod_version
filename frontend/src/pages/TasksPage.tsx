@@ -905,18 +905,24 @@ function TCard({
       animate={
         highlighted
           ? {
-            scale: [1, 1.025, 1],
-          }
+              scale: [1, 1.035, 1],
+              boxShadow: [
+                '0 0 0 rgba(16,185,129,0)',
+                '0 0 28px rgba(16,185,129,0.30)',
+                '0 0 12px rgba(16,185,129,0.12)',
+              ],
+            }
           : undefined
       }
-      transition={{ duration: 0.35 }}
+      transition={{ duration: 0.7 }}
       className={`group bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer transition-all duration-300 shadow-sm min-h-[140px] flex flex-col relative
         hover:bg-[var(--hover-2)] hover:border-[var(--accent)]/40
 
-        ${highlighted
-          ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/50 bg-[var(--accent)]/10 shadow-xl shadow-[var(--accent)]/10'
-          : ''
-        }
+        ${
+  highlighted
+    ? 'border-emerald-500 ring-2 ring-emerald-500/60 bg-emerald-500/10 shadow-xl shadow-emerald-500/10'
+    : ''
+}
 
         ${dragging
           ? 'opacity-35 rotate-2 scale-[1.02] shadow-xl z-50 ring-2 ring-[var(--accent)]'
@@ -928,11 +934,10 @@ function TCard({
         }`}
     >
       {highlighted && (
-        <div className="absolute -top-2.5 right-3 z-10 px-2.5 py-1 rounded-full bg-[var(--accent)] text-white text-[10px] font-bold shadow-lg">
-          Перенесено сюда
-        </div>
-      )}
-
+  <div className="absolute -top-2.5 right-3 z-10 px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold shadow-lg shadow-emerald-500/20">
+    Перенесено сюда
+  </div>
+)}
       <span className="text-xs font-mono text-[var(--text-primary)]/45 mb-1.5 leading-none">
         #{t.number}
       </span>
@@ -3109,57 +3114,82 @@ export default function TasksPage() {
           document.body,
         )}
 
-        <AnimatePresence>
+<AnimatePresence>
   {lastMove && !drag && (
     <motion.div
-      initial={{ y: 40, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      exit={{ y: 40, opacity: 0 }}
-      className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[120] w-[min(600px,calc(100vw-32px))] bg-[var(--bg-card)] border border-[var(--accent)]/30 rounded-2xl shadow-2xl p-3.5"
+      initial={{ y: 50, opacity: 0, scale: 0.96 }}
+      animate={{ y: 0, opacity: 1, scale: 1 }}
+      exit={{ y: 30, opacity: 0, scale: 0.97 }}
+      transition={{ type: 'spring', damping: 24, stiffness: 320 }}
+      className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[120] w-[min(640px,calc(100vw-32px))]"
     >
-      <div className="flex items-center gap-3">
-        <div className="w-11 h-11 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center shrink-0">
-          <CheckCircle2 className="w-5 h-5 text-[var(--accent)]" />
+      <div className="bg-[var(--bg-card)] border-2 border-emerald-500/60 rounded-2xl shadow-[0_18px_60px_rgba(0,0,0,0.55)] overflow-hidden">
+
+        <div className="h-1 bg-emerald-500" />
+
+        <div className="flex items-center gap-4 p-4">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/20">
+            <CheckCircle2 className="w-5 h-5 text-white" />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold text-[var(--text-primary)]">
+              Задача перенесена
+            </div>
+
+            <div className="text-sm text-[var(--text-primary)]/80 truncate mt-0.5 font-medium">
+              #{lastMove.number} — {lastMove.title}
+            </div>
+
+            <div className="flex items-center gap-2 mt-1.5 text-xs">
+              <span className="text-[var(--text-primary)]/50">
+                {ST_LABEL[lastMove.from]}
+              </span>
+
+              <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500 rotate-45" />
+
+              <span className="text-emerald-500 font-semibold">
+                {ST_LABEL[lastMove.to]}
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={undoLastMove}
+            disabled={undoingMove}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl
+                       bg-[var(--hover-2)]
+                       border border-[var(--border-color)]
+                       text-[var(--text-primary)]
+                       text-sm font-bold
+                       hover:bg-[var(--hover-3)]
+                       hover:border-emerald-500/50
+                       transition-all
+                       disabled:opacity-50
+                       shrink-0"
+          >
+            {undoingMove ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RotateCcw className="w-4 h-4 text-emerald-500" />
+            )}
+
+            {undoingMove ? 'Возвращаем...' : 'Вернуть назад'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setLastMove(null)}
+            title="Скрыть"
+            className="p-2 rounded-lg text-[var(--text-primary)]/50
+                       hover:text-[var(--text-primary)]
+                       hover:bg-[var(--hover-2)]
+                       transition-colors shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-bold text-[var(--text-primary)]">
-            Задача перенесена
-          </div>
-
-          <div className="text-xs text-[var(--text-primary)]/60 truncate mt-0.5">
-            #{lastMove.number} — {lastMove.title}
-          </div>
-
-          <div className="text-[11px] text-[var(--text-primary)]/35 mt-1">
-            {ST_LABEL[lastMove.from]}
-            {' → '}
-            {ST_LABEL[lastMove.to]}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={undoLastMove}
-          disabled={undoingMove}
-          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20 text-[var(--accent)] text-sm font-bold hover:bg-[var(--accent)]/20 disabled:opacity-50 shrink-0"
-        >
-          {undoingMove ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <RotateCcw className="w-4 h-4" />
-          )}
-
-          Отменить
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setLastMove(null)}
-          className="p-2 rounded-lg text-[var(--text-primary)]/30 hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)]"
-        >
-          <X className="w-4 h-4" />
-        </button>
       </div>
     </motion.div>
   )}
