@@ -3011,7 +3011,7 @@ export default function TasksPage() {
 
     undoTimerRef.current = setTimeout(() => {
       setLastMove(null);
-    }, 7000);
+    }, 10000);
   }, []);
 
   const revealTask = useCallback(

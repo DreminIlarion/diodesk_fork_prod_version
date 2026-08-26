@@ -400,7 +400,7 @@ class Task(AggregateRoot):
             )
         )
 
-    def reopen(self) -> None:
+    def reopen(self, *args: Any) -> None:
         """
         Переоткрыть задачу - задача была выполнена и снова вернулась в работу.
         """

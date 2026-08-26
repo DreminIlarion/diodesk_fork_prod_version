@@ -184,4 +184,8 @@ task_workflow = (
         TaskStatus.DONE, TaskStatus.IN_PROGRESS,
         Task.reopen, Task.start_work,
     )
+    .allow(
+        TaskStatus.DONE, TaskStatus.TO_FIX,
+        Task.reopen, Task.start_work,
+    )
 )
