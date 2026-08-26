@@ -1970,14 +1970,28 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
 
 /* ───────────────── detail modal ───────────────── */
 
-function DetailModal({ task: t, umap, onClose, onRefresh, onNeedAssign, onEdit, onNeedComplete }: {
+function DetailModal({
+  task: t,
+  umap,
+  onClose,
+  onRefresh,
+  onNeedAssign,
+  onEdit,
+  onNeedComplete,
+}: {
   task: TaskViewItem;
   umap: Map<string, SimpleUser | CounterpartyCustomer>;
   onClose: () => void;
   onRefresh: () => Promise<void>;
-  onNeedAssign: (t: TaskViewItem, targetStatus: 'todo' | 'in_progress') => void;
+  onNeedAssign: (
+    t: TaskViewItem,
+    targetStatus: 'todo' | 'in_progress',
+  ) => void;
   onEdit: (t: TaskViewItem) => void;
-  onNeedComplete: (t: TaskViewItem, mode: 'status_done' | 'review_done') => void;
+  onNeedComplete: (
+    t: TaskViewItem,
+    mode: 'status_done' | 'review_done',
+  ) => void;
 }) {
   const { toast } = useToast();
   const { user } = useAuthStore();
@@ -1989,74 +2003,162 @@ function DetailModal({ task: t, umap, onClose, onRefresh, onNeedAssign, onEdit, 
   const [busy, setBusy] = useState('');
   const [aId, setAId] = useState(t.assignee_id ?? '');
   const [rvId, setRvId] = useState('');
-  const [previewItem, setPreviewItem] = useState<AttachmentPreviewItem | null>(null);
+  const [previewItem, setPreviewItem] =
+    useState<AttachmentPreviewItem | null>(null);
 
-  const assignee = t.assignee_id ? umap.get(t.assignee_id) : null;
+  const assignee = t.assignee_id
+    ? umap.get(t.assignee_id)
+    : null;
+
   const cm = CM[t.status];
-  const SI = cm.icon;
-  const users = Array.from(umap.values());
-  const uOpts: DDOpt[] = users.map((u) => ({ value: u.id, label: u.full_name || u.username || u.email, sublabel: u.email }));
 
-  const isStaff = user?.roles?.some((r) => ['admin', 'support_manager', 'support_agent', 'executor'].includes(r)) ?? false;
+  const users = Array.from(umap.values());
+
+  const uOpts: DDOpt[] = users.map((u) => ({
+    value: u.id,
+    label:
+      u.full_name ||
+      u.username ||
+      u.email,
+    sublabel: u.email,
+  }));
+
+  const isStaff =
+    user?.roles?.some((r) =>
+      [
+        'admin',
+        'support_manager',
+        'support_agent',
+        'executor',
+      ].includes(r),
+    ) ?? false;
 
   const statusAsString = String(t.status);
-  const canReview = (statusAsString === 'to_review' || statusAsString === 'review') && isStaff;
+
+  const canReview =
+    (statusAsString === 'to_review' ||
+      statusAsString === 'review') &&
+    isStaff;
+
   const canRR = t.status === 'in_progress';
-  const canAssign = ASSIGN_OK.has(t.status) && users.length > 0;
+
+  const canAssign =
+    ASSIGN_OK.has(t.status) &&
+    users.length > 0;
+
   const canEdit = EDIT_OK.has(t.status);
+
   const allowed = TRANSITIONS[t.status];
+
   const ticketPath = getTaskTicketPath(t);
   const ticketNo = getTaskTicketNumber(t);
+
   const tags = getTaskTags(t);
-  const attachments = Array.isArray(t.attachments) ? t.attachments : [];
+
+  const attachments = Array.isArray(
+    t.attachments,
+  )
+    ? t.attachments
+    : [];
 
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const h = (e: KeyboardEvent) => {
+      if (
+        e.key === 'Escape' &&
+        !showArchive
+      ) {
+        onClose();
+      }
+    };
+
     document.addEventListener('keydown', h);
     document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
-  }, [onClose]);
 
-  const act = async (lbl: string, fn: () => Promise<any>, msg?: string) => {
+    return () => {
+      document.removeEventListener(
+        'keydown',
+        h,
+      );
+      document.body.style.overflow = '';
+    };
+  }, [onClose, showArchive]);
+
+  const act = async (
+    lbl: string,
+    fn: () => Promise<any>,
+    msg?: string,
+  ) => {
     setBusy(lbl);
+
     try {
       await fn();
-      if (msg) toast({ title: msg });
+
+      if (msg) {
+        toast({ title: msg });
+      }
+
       await onRefresh();
       onClose();
     } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      toast({
+        title: 'Ошибка',
+        description: apiErr(e),
+        variant: 'destructive',
+      });
     } finally {
       setBusy('');
     }
   };
 
   const chSt = async (s: TaskStatus) => {
-    if (s === 'todo' && t.status === 'backlog' && !t.assignee_id) {
+    if (
+      s === 'todo' &&
+      t.status === 'backlog' &&
+      !t.assignee_id
+    ) {
       setShowSt(false);
       onNeedAssign(t, 'todo');
       return;
     }
-    if (s === 'in_progress' && !t.assignee_id) {
+
+    if (
+      s === 'in_progress' &&
+      !t.assignee_id
+    ) {
       setShowSt(false);
       onNeedAssign(t, 'in_progress');
       return;
     }
+
     if (s === 'done') {
       setShowSt(false);
       onNeedComplete(t, 'status_done');
       return;
     }
+
     setShowSt(false);
     setBusy('st');
+
     try {
-      await tasksApi.changeStatus(t.id, s);
-      toast({ title: `Статус изменён: ${ST_LABEL[s]}` });
+      await tasksApi.changeStatus(
+        t.id,
+        s,
+      );
+
+      toast({
+        title: `Статус изменён: ${ST_LABEL[s]}`,
+      });
+
       await onRefresh();
       onClose();
     } catch (e: any) {
       const m = statusErr(e, t, s);
-      toast({ title: m.title, description: m.description, variant: 'destructive' });
+
+      toast({
+        title: m.title,
+        description: m.description,
+        variant: 'destructive',
+      });
     } finally {
       setBusy('');
     }
@@ -2064,278 +2166,772 @@ function DetailModal({ task: t, umap, onClose, onRefresh, onNeedAssign, onEdit, 
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 md:p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
       <div
         className="relative w-full max-w-7xl h-[94vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) =>
+          e.stopPropagation()
+        }
       >
-        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-5 px-6 py-5 border-b border-[var(--border-color)] shrink-0">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className="font-mono text-xs text-[var(--text-primary)]/60 bg-[var(--hover-2)] border border-[var(--border-color)] px-1.5 py-0.5 rounded-md">{t.number}</span>
-              <PriBadge p={t.priority} />
-              {t.story_points != null && <ComplexityBadge v={t.story_points} />}
-              {t.estimated_hours != null && <HoursBadge label="Трудозатраты" value={t.estimated_hours} title="Плановые трудозатраты" />}
-              {t.actual_hours != null && <HoursBadge label="Факт" value={t.actual_hours} tone="accent" />}
+            <div className="flex items-center gap-2.5 mb-2.5">
+              <span className="font-mono text-xs font-medium text-[var(--text-primary)]/45">
+                {t.number}
+              </span>
+
+              <span className="w-1 h-1 rounded-full bg-[var(--text-primary)]/20" />
+
+              <span
+                className={`inline-flex items-center gap-1.5 text-xs font-medium ${cm.tc}`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${cm.dot}`}
+                />
+                {ST_LABEL[t.status]}
+              </span>
             </div>
-            <h2 className="text-xl md:text-2xl font-bold text-[var(--text-primary)] leading-snug">
+
+            <h2 className="text-xl md:text-2xl font-bold text-[var(--text-primary)] leading-snug tracking-tight">
               {t.title}
             </h2>
           </div>
+
           <div className="flex items-center gap-2 shrink-0">
             {canEdit && (
-              <button onClick={() => onEdit(t)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/75 text-sm font-medium hover:bg-[var(--hover-3)]">
-                <Pencil className="w-4 h-4" />Редактировать
+              <button
+                type="button"
+                onClick={() => onEdit(t)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/75 text-sm font-medium hover:bg-[var(--hover-3)] transition-colors"
+              >
+                <Pencil className="w-4 h-4" />
+                Редактировать
               </button>
             )}
-            <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]">
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)] transition-colors"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
-          {t.status === 'in_progress' && !t.assignee_id && (
-            <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-500 font-medium">
-              ⚠ У задачи нет исполнителя, но она находится в статусе «В работе».
-            </div>
-          )}
+        {/* Content */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-5 md:p-6">
+          {t.status ===
+            'in_progress' &&
+            !t.assignee_id && (
+              <div className="mb-5 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-sm text-amber-500">
+                У задачи нет исполнителя,
+                хотя она находится в статусе
+                «В работе».
+              </div>
+            )}
 
-          <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
-            <div className="px-5 py-4 bg-[var(--hover-1)] border-b border-[var(--border-color)] flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
-              <FileText className="w-4 h-4 text-[var(--accent)]" />
-              Описание
-            </div>
+          <div className="grid xl:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
 
-            <div className="px-5 py-5 min-h-[220px]">
-              {t.description ? (
-                <TicketDescriptionContent
-                  text={t.description}
-                  className="text-[15px] text-[var(--text-primary)]/85 leading-7"
-                />
-              ) : (
-                <div className="min-h-[160px] flex items-center justify-center text-sm text-[var(--text-primary)]/30">
-                  Описание не заполнено
+            {/* LEFT */}
+            <div className="min-w-0 space-y-5">
+              {/* Description */}
+              <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden bg-[var(--bg-card)]">
+                <div className="px-5 py-3.5 border-b border-[var(--border-color)]">
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]/70">
+                    Описание
+                  </h3>
                 </div>
+
+                <div className="px-5 py-5 min-h-[240px]">
+                  {t.description ? (
+                    <TicketDescriptionContent
+                      text={t.description}
+                      className="text-[15px] text-[var(--text-primary)]/85 leading-7"
+                    />
+                  ) : (
+                    <div className="min-h-[190px] flex items-center justify-center text-sm text-[var(--text-primary)]/30">
+                      Описание не заполнено
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Attachments */}
+              {attachments.length > 0 && (
+                <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-color)]">
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]/70">
+                      Вложения
+                    </h3>
+
+                    <span className="text-xs text-[var(--text-primary)]/35">
+                      {attachments.length}
+                    </span>
+                  </div>
+
+                  <div className="p-4 grid md:grid-cols-2 gap-3">
+                    {attachments.map(
+                      (att, i) => (
+                        <TaskAttachmentItem
+                          key={
+                            att.id ??
+                            `${getAttachmentName(
+                              att,
+                            )}-${i}`
+                          }
+                          attachment={att}
+                          onPreview={
+                            setPreviewItem
+                          }
+                        />
+                      ),
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {/* Tags */}
+              {tags.length > 0 && (
+                <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-[var(--border-color)]">
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]/70">
+                      Теги
+                    </h3>
+                  </div>
+
+                  <div className="px-5 py-4 flex flex-wrap gap-2">
+                    {tags.map((tag) => (
+                      <span
+                        key={`${tag.name}-${tag.color ?? 'x'}`}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border"
+                        style={{
+                          borderColor:
+                            tag.color ??
+                            'var(--border-color)',
+                          color:
+                            tag.color ??
+                            'var(--text-primary)',
+                          background: `${
+                            tag.color ??
+                            '#888'
+                          }14`,
+                        }}
+                      >
+                        <span
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{
+                            background:
+                              tag.color ??
+                              '#888',
+                          }}
+                        />
+
+                        {tag.name}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Relations */}
+              {(ticketPath ||
+                t.project_id) && (
+                <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+                  {ticketPath && (
+                    <div className="flex items-center gap-4 px-5 py-4 border-b border-[var(--border-color)] last:border-b-0">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs text-[var(--text-primary)]/40 mb-1">
+                          Заявка
+                        </div>
+
+                        <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">
+                          {ticketNo ??
+                            'Открыть заявку'}
+                        </div>
+                      </div>
+
+                      <Link
+                        to={ticketPath}
+                        onClick={onClose}
+                        className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline shrink-0"
+                      >
+                        Открыть
+                        <ArrowUpRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  )}
+
+                  {t.project_id && (
+                    <div className="flex items-center gap-4 px-5 py-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs text-[var(--text-primary)]/40 mb-1">
+                          Проект
+                        </div>
+
+                        <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">
+                          {t.project_name ||
+                            'Открыть проект'}
+                        </div>
+                      </div>
+
+                      <Link
+                        to={`/projects/${t.project_id}`}
+                        onClick={onClose}
+                        className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline shrink-0"
+                      >
+                        Открыть
+                        <ArrowUpRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  )}
+                </section>
               )}
             </div>
-          </div>
 
-          {attachments.length > 0 && (
-            <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
-              <div className="px-4 py-3 bg-[var(--hover-1)] border-b border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)]">Вложения</div>
-              <div className="px-4 py-4 grid sm:grid-cols-2 gap-3">
-                {attachments.map((att, i) => (
-                  <TaskAttachmentItem key={att.id ?? `${getAttachmentName(att)}-${i}`} attachment={att} onPreview={setPreviewItem} />
-                ))}
-              </div>
-            </div>
-          )}
+            {/* RIGHT */}
+            <aside className="space-y-4 xl:sticky xl:top-0">
+              {/* Details */}
+              <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden bg-[var(--bg-card)]">
+                <div className="px-4 py-3.5 border-b border-[var(--border-color)]">
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                    Детали
+                  </h3>
+                </div>
 
-          {tags.length > 0 && (
-            <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
-              <div className="px-4 py-3 bg-[var(--hover-1)] border-b border-[var(--border-color)] text-sm font-medium text-[var(--text-primary)]">Теги</div>
-              <div className="px-4 py-4 flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <span key={`${tag.name}-${tag.color ?? 'x'}`}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs border"
-                    style={{ borderColor: tag.color ?? 'var(--border-color)', color: tag.color ?? 'var(--text-primary)', background: `${tag.color ?? '#888'}14` }}>
-                    <span className="w-2 h-2 rounded-full" style={{ background: tag.color ?? '#888' }} />
-                    {tag.name}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+                <div className="divide-y divide-[var(--border-color)]">
+                  {/* Priority */}
+                  <div className="flex items-center justify-between gap-4 px-4 py-3">
+                    <span className="text-sm text-[var(--text-primary)]/45">
+                      Приоритет
+                    </span>
 
-          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">Статус</p>
-              <div className="relative">
-                <button onClick={() => allowed.length > 0 && setShowSt((v) => !v)} disabled={busy !== '' || !allowed.length}
-                  className={`flex items-center gap-1.5 text-sm font-semibold ${cm.tc} disabled:opacity-40`}>
-                  {busy === 'st' ? <Loader2 className="w-4 h-4 animate-spin" /> : <SI className="w-4 h-4" />}
-                  {ST_LABEL[t.status]}
-                  {allowed.length > 0 && <ChevronDown className="w-4 h-4 opacity-50" />}
-                </button>
-                {showSt && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setShowSt(false)} />
-                    <div className="absolute left-0 top-full mt-2 z-20 w-56 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-2xl">
-                      <div className="p-1.5">
-                        {allowed.map((s) => {
-                          const sm = CM[s];
-                          const SII = sm.icon;
-                          return (
-                            <button key={s} onClick={() => chSt(s)}
-                              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] font-medium">
-                              <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`} />
-                              <SII className={`w-4 h-4 ${sm.tc}`} />
-                              <span className="flex-1 text-left">{ST_LABEL[s]}</span>
-                            </button>
-                          );
-                        })}
+                    <PriBadge
+                      p={t.priority}
+                    />
+                  </div>
+
+                  {/* Complexity */}
+                  <div className="flex items-center justify-between gap-4 px-4 py-3">
+                    <span className="text-sm text-[var(--text-primary)]/45">
+                      Сложность
+                    </span>
+
+                    <span className="text-sm font-medium text-[var(--text-primary)]/80">
+                      {t.story_points ??
+                        '—'}
+                    </span>
+                  </div>
+
+                  {/* Assignee */}
+                  <div className="px-4 py-3">
+                    <div className="text-sm text-[var(--text-primary)]/45 mb-2">
+                      Исполнитель
+                    </div>
+
+                    {assignee ? (
+                      <div className="flex items-center gap-2">
+                        <Ava
+                          name={
+                            assignee.full_name ||
+                            assignee.username
+                          }
+                          url={
+                            assignee.avatar_url
+                          }
+                          sz="xs"
+                        />
+
+                        <span className="text-sm font-medium text-[var(--text-primary)]/80 truncate">
+                          {assignee.full_name ||
+                            assignee.username}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-[var(--text-primary)]/30">
+                        Не назначен
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Due date */}
+                  <div className="flex items-center justify-between gap-4 px-4 py-3">
+                    <span className="text-sm text-[var(--text-primary)]/45">
+                      Срок
+                    </span>
+
+                    <span
+                      className={`text-sm font-medium ${
+                        t.due_date &&
+                        overdue(t)
+                          ? 'text-red-400'
+                          : 'text-[var(--text-primary)]/80'
+                      }`}
+                    >
+                      {t.due_date
+                        ? fmtDue(
+                            t.due_date,
+                          )
+                        : '—'}
+                    </span>
+                  </div>
+
+                  {/* Hours */}
+                  <div className="px-4 py-3.5">
+                    <div className="text-sm text-[var(--text-primary)]/45 mb-2.5">
+                      Трудозатраты
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-[11px] text-[var(--text-primary)]/35">
+                          План
+                        </div>
+
+                        <div className="mt-0.5 text-sm font-medium text-[var(--text-primary)]/80">
+                          {fmtHours(
+                            t.estimated_hours,
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-[11px] text-[var(--text-primary)]/35">
+                          Факт
+                        </div>
+
+                        <div className="mt-0.5 text-sm font-medium text-[var(--text-primary)]/80">
+                          {fmtHours(
+                            t.actual_hours,
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">Исполнитель</p>
-              <div className="h-[24px] flex items-center">
-                {assignee ? (
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <Ava name={assignee.full_name || assignee.username} url={assignee.avatar_url} sz="xs" />
-                    <span className="text-sm text-[var(--text-primary)]/70 font-medium truncate">{assignee.full_name || assignee.username}</span>
                   </div>
-                ) : <span className="text-sm text-[var(--text-primary)]/30">Не назначен</span>}
-              </div>
-            </div>
 
-            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">Срок</p>
-              <div className="h-[24px] flex items-center">
-                {t.due_date ? (
-                  <span className={`flex items-center gap-1.5 text-sm font-medium ${overdue(t) ? 'text-red-400' : 'text-[var(--text-primary)]/70'}`}>
-                    <Calendar className="w-4 h-4" />{fmtDue(t.due_date)}
-                  </span>
-                ) : <span className="text-sm text-[var(--text-primary)]/30">Не задан</span>}
-              </div>
-            </div>
+                  {/* Created */}
+                  <div className="flex items-center justify-between gap-4 px-4 py-3">
+                    <span className="text-sm text-[var(--text-primary)]/45">
+                      Создана
+                    </span>
 
-            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]" title="Плановые трудозатраты">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">Трудозатраты (ч)</p>
-              <span className="text-sm text-[var(--text-primary)]/70 font-medium h-[24px] flex items-center">{fmtHours(t.estimated_hours)}</span>
-            </div>
+                    <span className="text-sm font-medium text-[var(--text-primary)]/70">
+                      {new Date(
+                        t.created_at,
+                      ).toLocaleDateString(
+                        'ru-RU',
+                        {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        },
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </section>
 
-            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">Факт (ч)</p>
-              <span className="text-sm text-[var(--text-primary)]/70 font-medium h-[24px] flex items-center">{fmtHours(t.actual_hours)}</span>
-            </div>
+              {/* Status */}
+              <section className="rounded-2xl border border-[var(--border-color)] p-3 bg-[var(--bg-card)]">
+                <div className="text-xs text-[var(--text-primary)]/40 mb-2">
+                  Статус
+                </div>
 
-            <div className="bg-[var(--hover-1)] rounded-xl p-3 border border-[var(--border-color)]">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--text-primary)]/40 mb-1.5 font-medium">Создана</p>
-              <span className="text-sm text-[var(--text-primary)]/70 font-medium h-[24px] flex items-center">
-                {new Date(t.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}
-              </span>
-            </div>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      allowed.length >
+                        0 &&
+                      setShowSt(
+                        (v) => !v,
+                      )
+                    }
+                    disabled={
+                      busy !== '' ||
+                      !allowed.length
+                    }
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)] hover:bg-[var(--hover-2)] transition-colors disabled:opacity-50"
+                  >
+                    {busy === 'st' ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-[var(--text-primary)]/40" />
+                    ) : (
+                      <span
+                        className={`w-2 h-2 rounded-full ${cm.dot}`}
+                      />
+                    )}
+
+                    <span className="flex-1 text-left text-sm font-medium text-[var(--text-primary)]">
+                      {ST_LABEL[
+                        t.status
+                      ]}
+                    </span>
+
+                    {allowed.length >
+                      0 && (
+                      <ChevronDown
+                        className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform ${
+                          showSt
+                            ? 'rotate-180'
+                            : ''
+                        }`}
+                      />
+                    )}
+                  </button>
+
+                  {showSt && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() =>
+                          setShowSt(false)
+                        }
+                      />
+
+                      <div className="absolute left-0 right-0 top-full mt-2 z-20 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-2xl">
+                        <div className="p-1.5">
+                          {allowed.map(
+                            (s) => {
+                              const sm =
+                                CM[s];
+
+                              return (
+                                <button
+                                  type="button"
+                                  key={s}
+                                  onClick={() =>
+                                    chSt(
+                                      s,
+                                    )
+                                  }
+                                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] font-medium transition-colors"
+                                >
+                                  <span
+                                    className={`w-2 h-2 rounded-full ${sm.dot}`}
+                                  />
+
+                                  <span className="flex-1 text-left">
+                                    {
+                                      ST_LABEL[
+                                        s
+                                      ]
+                                    }
+                                  </span>
+                                </button>
+                              );
+                            },
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </section>
+
+              {/* Assignment */}
+              {canAssign && (
+                <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowAssign(
+                        (v) => !v,
+                      )
+                    }
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/65 hover:bg-[var(--hover-1)] font-medium transition-colors"
+                  >
+                    <span>
+                      {t.assignee_id
+                        ? 'Сменить исполнителя'
+                        : 'Назначить исполнителя'}
+                    </span>
+
+                    <ChevronDown
+                      className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform ${
+                        showAssign
+                          ? 'rotate-180'
+                          : ''
+                      }`}
+                    />
+                  </button>
+
+                  {showAssign && (
+                    <div className="px-4 pb-4 pt-1 space-y-2.5">
+                      <SelectDD
+                        value={aId}
+                        onChange={
+                          setAId
+                        }
+                        options={uOpts}
+                        placeholder="Выберите исполнителя"
+                        icon={
+                          UserCheck
+                        }
+                        searchable
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          act(
+                            'assign',
+                            () =>
+                              tasksApi.assign(
+                                t.id,
+                                {
+                                  assignee_id:
+                                    aId,
+                                },
+                              ),
+                            'Исполнитель назначен',
+                          )
+                        }
+                        disabled={
+                          !aId ||
+                          busy ===
+                            'assign'
+                        }
+                        className="w-full py-2.5 rounded-xl bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-40"
+                      >
+                        {busy ===
+                        'assign' ? (
+                          <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                        ) : (
+                          'Сохранить'
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {/* Review request */}
+              {canRR &&
+                users.length > 0 && (
+                  <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowRR(
+                          (v) => !v,
+                        )
+                      }
+                      className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm text-[var(--text-primary)]/65 hover:bg-[var(--hover-1)] font-medium transition-colors"
+                    >
+                      <span>
+                        Отправить на
+                        ревью
+                      </span>
+
+                      <ChevronDown
+                        className={`w-4 h-4 text-[var(--text-primary)]/30 transition-transform ${
+                          showRR
+                            ? 'rotate-180'
+                            : ''
+                        }`}
+                      />
+                    </button>
+
+                    {showRR && (
+                      <div className="px-4 pb-4 pt-1 space-y-2.5">
+                        <SelectDD
+                          value={rvId}
+                          onChange={
+                            setRvId
+                          }
+                          options={
+                            uOpts
+                          }
+                          placeholder="Выберите ревьюера"
+                          searchable
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            act(
+                              'rr',
+                              () =>
+                                tasksApi.requestReview(
+                                  t.id,
+                                  {
+                                    reviewer_id:
+                                      rvId,
+                                  },
+                                ),
+                              'Задача отправлена на ревью',
+                            )
+                          }
+                          disabled={
+                            !rvId ||
+                            busy ===
+                              'rr'
+                          }
+                          className="w-full py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/25 text-violet-400 text-sm font-medium disabled:opacity-40 hover:bg-violet-500/15 transition-colors"
+                        >
+                          {busy ===
+                          'rr' ? (
+                            <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                          ) : (
+                            'Отправить'
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </section>
+                )}
+
+              {/* Review */}
+              {canReview && (
+                <section className="rounded-2xl border border-[var(--border-color)] p-3">
+                  <div className="text-xs text-[var(--text-primary)]/40 mb-2.5">
+                    Решение по ревью
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onNeedComplete(
+                          t,
+                          'review_done',
+                        )
+                      }
+                      disabled={
+                        busy === 'rv'
+                      }
+                      className="py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-sm font-medium disabled:opacity-50 hover:bg-emerald-500/15 transition-colors"
+                    >
+                      Принять
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        act(
+                          'rv',
+                          () =>
+                            tasksApi.review(
+                              t.id,
+                              {
+                                decision:
+                                  'to_fix',
+                              },
+                            ),
+                          'Задача возвращена на доработку',
+                        )
+                      }
+                      disabled={
+                        busy === 'rv'
+                      }
+                      className="py-2.5 rounded-xl bg-red-500/10 border border-red-500/25 text-red-400 text-sm font-medium disabled:opacity-50 hover:bg-red-500/15 transition-colors"
+                    >
+                      Вернуть
+                    </button>
+                  </div>
+                </section>
+              )}
+            </aside>
           </div>
-
-          {canAssign && (
-            <div className="rounded-xl border border-[var(--border-color)] overflow-hidden">
-              <button onClick={() => setShowAssign((v) => !v)}
-                className="w-full flex items-center justify-between px-4 py-2.5 bg-[var(--hover-1)] text-sm text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)] font-medium transition-colors">
-                <span className="flex items-center gap-2"><UserCheck className="w-4 h-4" />{t.assignee_id ? 'Сменить исполнителя' : 'Назначить исполнителя'}</span>
-                <ChevronDown className={`w-4 h-4 transition-transform ${showAssign ? 'rotate-180' : ''}`} />
-              </button>
-              {showAssign && (
-                <div className="px-4 py-3 border-t border-[var(--border-color)] space-y-2.5 bg-[var(--bg-card)]">
-                  <SelectDD value={aId} onChange={setAId} options={uOpts} placeholder="Выберите исполнителя" icon={UserCheck} searchable />
-                  <button onClick={() => act('assign', () => tasksApi.assign(t.id, { assignee_id: aId }), 'Исполнитель назначен')}
-                    disabled={!aId || busy === 'assign'} className="w-full py-2.5 rounded-xl bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-40">
-                    {busy === 'assign' ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Сохранить исполнителя'}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {canRR && users.length > 0 && (
-            <div className="rounded-xl border border-violet-500/30 overflow-hidden">
-              <button onClick={() => setShowRR((v) => !v)}
-                className="w-full flex items-center justify-between px-4 py-2.5 bg-violet-500/10 text-sm text-violet-400 font-medium hover:bg-violet-500/15 transition-colors">
-                <span className="flex items-center gap-2"><GitPullRequest className="w-4 h-4" />Отправить на ревью</span>
-                <ChevronDown className={`w-4 h-4 opacity-70 transition-transform ${showRR ? 'rotate-180' : ''}`} />
-              </button>
-              {showRR && (
-                <div className="px-4 py-3 border-t border-violet-500/30 space-y-2.5 bg-violet-500/5">
-                  <SelectDD value={rvId} onChange={setRvId} options={uOpts} placeholder="Выберите ревьюера" searchable />
-                  <button onClick={() => act('rr', () => tasksApi.requestReview(t.id, { reviewer_id: rvId }), 'Задача отправлена на ревью')}
-                    disabled={!rvId || busy === 'rr'} className="w-full py-2.5 rounded-xl bg-violet-500/20 border border-violet-500/40 text-violet-400 text-sm font-medium disabled:opacity-40">
-                    Отправить
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {canReview && (
-            <div className="flex gap-3">
-              <button onClick={() => onNeedComplete(t, 'review_done')} disabled={busy === 'rv'}
-                className="flex-1 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm font-medium disabled:opacity-50 hover:bg-emerald-500/20 transition-colors">
-                <ThumbsUp className="w-4 h-4 inline mr-1.5" />Принять
-              </button>
-              <button onClick={() => act('rv', () => tasksApi.review(t.id, { decision: 'to_fix' }), 'Задача возвращена на доработку')}
-                disabled={busy === 'rv'} className="flex-1 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-medium disabled:opacity-50 hover:bg-red-500/20 transition-colors">
-                <ThumbsDown className="w-4 h-4 inline mr-1.5" />Вернуть
-              </button>
-            </div>
-          )}
-
-          {ticketPath && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
-              <Ticket className="w-4 h-4 text-[var(--text-primary)]/30" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-[var(--text-primary)]/45">Заявка</div>
-                <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">{ticketNo ?? 'Открыть заявку'}</div>
-              </div>
-              <Link to={ticketPath} onClick={onClose} className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline">
-                Открыть<ArrowUpRight className="w-4 h-4" />
-              </Link>
-            </div>
-          )}
-
-          {t.project_id && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)]">
-              <FolderOpen className="w-4 h-4 text-[var(--text-primary)]/30" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-[var(--text-primary)]/45">Проект</div>
-                <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">{t.project_name || 'Открыть проект'}</div>
-              </div>
-              <Link to={`/projects/${t.project_id}`} onClick={onClose} className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline">
-                Открыть<ArrowUpRight className="w-4 h-4" />
-              </Link>
-            </div>
-          )}
         </div>
 
-        <div className="flex items-center justify-between px-5 py-3.5 border-t border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
-          <button onClick={() => setShowArchive(true)} disabled={busy === 'arch'}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-[var(--text-primary)]/40 hover:bg-red-500/10 hover:text-red-400 transition-colors">
-            <Archive className="w-4 h-4" />В архив
+        {/* Footer */}
+        <div className="flex items-center justify-between gap-3 px-6 py-3.5 border-t border-[var(--border-color)] shrink-0">
+          <button
+            type="button"
+            onClick={() =>
+              setShowArchive(true)
+            }
+            disabled={busy === 'arch'}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-[var(--text-primary)]/40 hover:bg-red-500/10 hover:text-red-400 transition-colors disabled:opacity-40"
+          >
+            <Archive className="w-4 h-4" />
+            В архив
           </button>
-          <button onClick={onClose} className="px-5 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 text-sm font-medium hover:bg-[var(--hover-3)]">Закрыть</button>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 text-sm font-medium hover:bg-[var(--hover-3)] transition-colors"
+          >
+            Закрыть
+          </button>
         </div>
       </div>
 
-      {
-        showArchive && (
-          <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/50" onClick={() => setShowArchive(false)} />
-            <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl">
-              <div className="p-6 text-center">
-                <Archive className="w-10 h-10 text-[var(--text-primary)]/20 mx-auto mb-3" />
-                <p className="text-base font-bold text-[var(--text-primary)]">Архивировать задачу?</p>
-                <p className="text-sm text-[var(--text-primary)]/50 mt-1">«{t.title}»</p>
-              </div>
-              <div className="flex border-t border-[var(--border-color)]">
-                <button onClick={() => setShowArchive(false)} className="flex-1 py-3 text-sm text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)] font-medium">Отмена</button>
-                <button onClick={() => { setShowArchive(false); act('arch', () => tasksApi.archive(t.id), 'Задача архивирована'); }}
-                  className="flex-1 py-3 text-sm font-bold text-red-500 hover:bg-red-500/10 border-l border-[var(--border-color)]">Да</button>
-              </div>
+      {/* Archive confirmation */}
+      {showArchive && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() =>
+              setShowArchive(false)
+            }
+          />
+
+          <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl">
+            <div className="p-6 text-center">
+              <Archive className="w-9 h-9 text-[var(--text-primary)]/20 mx-auto mb-3" />
+
+              <p className="text-base font-bold text-[var(--text-primary)]">
+                Архивировать задачу?
+              </p>
+
+              <p className="text-sm text-[var(--text-primary)]/50 mt-1 line-clamp-2">
+                {t.title}
+              </p>
+            </div>
+
+            <div className="flex border-t border-[var(--border-color)]">
+              <button
+                type="button"
+                onClick={() =>
+                  setShowArchive(false)
+                }
+                className="flex-1 py-3 text-sm text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)] font-medium"
+              >
+                Отмена
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowArchive(
+                    false,
+                  );
+
+                  act(
+                    'arch',
+                    () =>
+                      tasksApi.archive(
+                        t.id,
+                      ),
+                    'Задача архивирована',
+                  );
+                }}
+                className="flex-1 py-3 text-sm font-bold text-red-500 hover:bg-red-500/10 border-l border-[var(--border-color)]"
+              >
+                Архивировать
+              </button>
             </div>
           </div>
-        )
-      }
+        </div>
+      )}
 
-      {
-        previewItem && (
-          <AttachmentPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
-        )
-      }
-    </div >
+      {previewItem && (
+        <AttachmentPreviewModal
+          item={previewItem}
+          onClose={() =>
+            setPreviewItem(null)
+          }
+        />
+      )}
+    </div>
   );
 }
 
