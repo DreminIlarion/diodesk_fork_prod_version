@@ -2401,7 +2401,6 @@ export default function TasksPage() {
   const [lastMove, setLastMove] =
     useState<LastMove | null>(null);
 
-  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [undoingMove, setUndoingMove] =
     useState(false);
