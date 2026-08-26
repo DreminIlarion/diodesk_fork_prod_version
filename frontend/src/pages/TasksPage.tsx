@@ -918,8 +918,8 @@ function ListView({ tasks, umap, onView }: {
               <th className="px-4 py-3 font-medium">Приоритет</th>
               <th className="px-4 py-3 font-medium">Исполнитель</th>
               <th className="px-4 py-3 font-medium">Срок</th>
-              <th className="px-4 py-3 font-medium">Трудозатраты</th>
-              <th className="px-4 py-3 font-medium">Факт</th>
+              <th className="px-4 py-3 font-medium">Трудозатраты (План)</th>
+              <th className="px-4 py-3 font-medium">Трудозатраты (Факт)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border-color)]">

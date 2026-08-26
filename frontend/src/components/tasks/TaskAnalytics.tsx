@@ -32,14 +32,14 @@ type AnalyticsTask = TaskKanbanItem & {
   description?: string | null;
 
   estimated_hours?:
-    | number
-    | string
-    | null;
+  | number
+  | string
+  | null;
 
   actual_hours?:
-    | number
-    | string
-    | null;
+  | number
+  | string
+  | null;
 
   due_date?: string | null;
 
@@ -359,10 +359,10 @@ function StatCard({
   sub?: React.ReactNode;
   icon: React.ReactNode;
   tone?:
-    | 'default'
-    | 'success'
-    | 'danger'
-    | 'warning';
+  | 'default'
+  | 'success'
+  | 'danger'
+  | 'warning';
 }) {
   const iconClasses = {
     default:
@@ -532,13 +532,13 @@ export function TaskAnalytics({
           e?.response?.data
             ?.error
             ?.public_message ??
-            e?.response?.data
-              ?.error
-              ?.message ??
-            e?.response?.data
-              ?.detail ??
-            e?.message ??
-            'Не удалось загрузить аналитику',
+          e?.response?.data
+            ?.error
+            ?.message ??
+          e?.response?.data
+            ?.detail ??
+          e?.message ??
+          'Не удалось загрузить аналитику',
         );
       } finally {
         setLoading(false);
@@ -646,86 +646,69 @@ export function TaskAnalytics({
       const variancePercent =
         planned > 0
           ? (variance /
-              planned) *
-            100
+            planned) *
+          100
           : 0;
 
       const completionPercent =
         tasks.length > 0
           ? (done /
-              tasks.length) *
-            100
+            tasks.length) *
+          100
           : 0;
 
       const averageCycleHours =
         cycleTimes.length > 0
           ? cycleTimes.reduce(
-              (sum, value) =>
-                sum + value,
-              0,
-            ) /
-            cycleTimes.length
+            (sum, value) =>
+              sum + value,
+            0,
+          ) /
+          cycleTimes.length
           : null;
 
       const tasksWithVariance =
         tasks
           .filter((task) => {
-            const taskPlanned =
-              toNumber(
-                task.estimated_hours,
-              );
+            const planned = toNumber(
+              task.estimated_hours,
+            );
 
-            const taskActual =
-              toNumber(
-                task.actual_hours,
-              );
+            const actual = toNumber(
+              task.actual_hours,
+            );
 
             return (
-              taskPlanned > 0 &&
-              taskActual > 0
+              planned > 0 &&
+              actual > planned
             );
           })
           .map((task) => {
-            const taskPlanned =
-              toNumber(
-                task.estimated_hours,
-              );
+            const planned = toNumber(
+              task.estimated_hours,
+            );
 
-            const taskActual =
-              toNumber(
-                task.actual_hours,
-              );
+            const actual = toNumber(
+              task.actual_hours,
+            );
 
-            const taskVariance =
-              taskActual -
-              taskPlanned;
+            const variance =
+              actual - planned;
 
             const percent =
-              taskPlanned > 0
-                ? (taskVariance /
-                    taskPlanned) *
-                  100
-                : 0;
+              (variance / planned) * 100;
 
             return {
               task,
-              planned:
-                taskPlanned,
-              actual:
-                taskActual,
-              variance:
-                taskVariance,
+              planned,
+              actual,
+              variance,
               percent,
             };
           })
           .sort(
             (a, b) =>
-              Math.abs(
-                b.variance,
-              ) -
-              Math.abs(
-                a.variance,
-              ),
+              b.variance - a.variance,
           );
 
       return {
@@ -827,11 +810,10 @@ export function TaskAnalytics({
             className="flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] text-sm text-[var(--text-primary)]/55 hover:text-[var(--text-primary)] hover:bg-[var(--hover-1)] disabled:opacity-40 transition-colors"
           >
             <RefreshCw
-              className={`w-4 h-4 ${
-                refreshing
-                  ? 'animate-spin'
-                  : ''
-              }`}
+              className={`w-4 h-4 ${refreshing
+                ? 'animate-spin'
+                : ''
+                }`}
             />
 
             Обновить
@@ -872,7 +854,7 @@ export function TaskAnalytics({
             }
             sub={
               analytics.overdue >
-              0
+                0
                 ? 'Активные задачи за пределами срока'
                 : 'Текущих просрочек нет'
             }
@@ -881,7 +863,7 @@ export function TaskAnalytics({
             }
             tone={
               analytics.overdue >
-              0
+                0
                 ? 'danger'
                 : 'default'
             }
@@ -894,10 +876,10 @@ export function TaskAnalytics({
             )}
             sub={
               analytics.planned >
-              0
+                0
                 ? formatPercent(
-                    analytics.variancePercent,
-                  )
+                  analytics.variancePercent,
+                )
                 : 'Нет плановых часов'
             }
             icon={
@@ -933,7 +915,7 @@ export function TaskAnalytics({
             }
             tone={
               analytics.completedLate >
-              0
+                0
                 ? 'warning'
                 : 'default'
             }
@@ -943,10 +925,10 @@ export function TaskAnalytics({
             title="Среднее время выполнения"
             value={
               analytics.averageCycleHours !=
-              null
+                null
                 ? formatDuration(
-                    analytics.averageCycleHours,
-                  )
+                  analytics.averageCycleHours,
+                )
                 : '—'
             }
             sub="От начала работы до завершения"
@@ -966,7 +948,7 @@ export function TaskAnalytics({
             }
             tone={
               analytics.currentlyWorking >
-              0
+                0
                 ? 'success'
                 : 'default'
             }
@@ -1018,13 +1000,12 @@ export function TaskAnalytics({
               </div>
 
               <div
-                className={`mt-2 text-3xl font-bold ${
-                  variancePositive
-                    ? 'text-red-400'
-                    : varianceNegative
-                      ? 'text-emerald-500'
-                      : 'text-[var(--text-primary)]'
-                }`}
+                className={`mt-2 text-3xl font-bold ${variancePositive
+                  ? 'text-red-400'
+                  : varianceNegative
+                    ? 'text-emerald-500'
+                    : 'text-[var(--text-primary)]'
+                  }`}
               >
                 {formatSignedHours(
                   analytics.variance,
@@ -1033,63 +1014,61 @@ export function TaskAnalytics({
 
               {analytics.planned >
                 0 && (
-                <div
-                  className={`mt-1 text-sm font-medium ${
-                    variancePositive
+                  <div
+                    className={`mt-1 text-sm font-medium ${variancePositive
                       ? 'text-red-400/70'
                       : varianceNegative
                         ? 'text-emerald-500/70'
                         : 'text-[var(--text-primary)]/40'
-                  }`}
-                >
-                  {formatPercent(
-                    analytics.variancePercent,
-                  )}{' '}
-                  от плана
-                </div>
-              )}
+                      }`}
+                  >
+                    {formatPercent(
+                      analytics.variancePercent,
+                    )}{' '}
+                    от плана
+                  </div>
+                )}
             </div>
           </div>
 
           {analytics.planned >
             0 && (
-            <div className="px-5 pb-5">
-              <div className="h-2 rounded-full bg-[var(--hover-2)] overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${
-                    analytics.actual >
-                    analytics.planned
+              <div className="px-5 pb-5">
+                <div className="h-2 rounded-full bg-[var(--hover-2)] overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${analytics.actual >
+                      analytics.planned
                       ? 'bg-red-400'
                       : 'bg-emerald-500'
-                  }`}
-                  style={{
-                    width: `${Math.min(
-                      (analytics.actual /
-                        analytics.planned) *
+                      }`}
+                    style={{
+                      width: `${Math.min(
+                        (analytics.actual /
+                          analytics.planned) *
                         100,
-                      100,
-                    )}%`,
-                  }}
-                />
-              </div>
+                        100,
+                      )}%`,
+                    }}
+                  />
+                </div>
 
-              <div className="mt-2 flex justify-between gap-3 text-[11px] text-[var(--text-primary)]/35">
-                <span>
-                  Факт:{' '}
-                  {formatHours(
-                    analytics.actual,
-                  )}
-                </span>
+                <div className="mt-2 flex justify-between gap-3 text-[11px] text-[var(--text-primary)]/35">
+                  <span>
+                    Факт:{' '}
+                    {formatHours(
+                      analytics.actual,
+                    )}
+                  </span>
 
-                <span>
-                  План:{' '}
-                  {formatHours(
-                    analytics.planned,
-                  )}
-                </span>
+                  <span>
+                    План:{' '}
+                    {formatHours(
+                      analytics.planned,
+                    )}
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
         </section>
 
         <div className="grid xl:grid-cols-[0.8fr_1.2fr] gap-5">
@@ -1108,7 +1087,7 @@ export function TaskAnalytics({
                   const count =
                     analytics
                       .statusCounts[
-                      status
+                    status
                     ];
 
                   if (!count) {
@@ -1118,8 +1097,8 @@ export function TaskAnalytics({
                   const percentage =
                     tasks.length > 0
                       ? (count /
-                          tasks.length) *
-                        100
+                        tasks.length) *
+                      100
                       : 0;
 
                   return (
@@ -1137,7 +1116,7 @@ export function TaskAnalytics({
                           <span className="text-sm text-[var(--text-primary)]/70 truncate">
                             {
                               STATUS_LABEL[
-                                status
+                              status
                               ]
                             }
                           </span>
@@ -1163,10 +1142,10 @@ export function TaskAnalytics({
 
               {tasks.length ===
                 0 && (
-                <div className="py-10 text-center text-sm text-[var(--text-primary)]/35">
-                  Нет задач
-                </div>
-              )}
+                  <div className="py-10 text-center text-sm text-[var(--text-primary)]/35">
+                    Нет задач
+                  </div>
+                )}
             </div>
           </section>
 
@@ -1175,13 +1154,11 @@ export function TaskAnalytics({
           <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] overflow-hidden">
             <div className="px-5 py-4 border-b border-[var(--border-color)]">
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-                План / факт по
-                задачам
+                Превышение трудозатрат
               </h3>
 
               <p className="mt-0.5 text-xs text-[var(--text-primary)]/35">
-                Задачи с наибольшим
-                отклонением
+                Задачи, на которые ушло больше времени, чем планировалось
               </p>
             </div>
 
@@ -1211,11 +1188,10 @@ export function TaskAnalytics({
                               item.task,
                             )
                           }
-                          className={`w-full flex items-center gap-4 px-5 py-3.5 text-left transition-colors ${
-                            onTaskOpen
-                              ? 'hover:bg-[var(--hover-1)] cursor-pointer'
-                              : 'cursor-default'
-                          }`}
+                          className={`w-full flex items-center gap-4 px-5 py-3.5 text-left transition-colors ${onTaskOpen
+                            ? 'hover:bg-[var(--hover-1)] cursor-pointer'
+                            : 'cursor-default'
+                            }`}
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
@@ -1256,14 +1232,13 @@ export function TaskAnalytics({
 
                           <div className="text-right shrink-0">
                             <div
-                              className={`text-sm font-semibold ${
-                                over
-                                  ? 'text-red-400'
-                                  : item.variance <
-                                      0
-                                    ? 'text-emerald-500'
-                                    : 'text-[var(--text-primary)]/60'
-                              }`}
+                              className={`text-sm font-semibold ${over
+                                ? 'text-red-400'
+                                : item.variance <
+                                  0
+                                  ? 'text-emerald-500'
+                                  : 'text-[var(--text-primary)]/60'
+                                }`}
                             >
                               {formatSignedHours(
                                 item.variance,
@@ -1289,11 +1264,9 @@ export function TaskAnalytics({
               <div className="py-14 text-center">
                 <Clock3 className="w-7 h-7 mx-auto text-[var(--text-primary)]/20" />
 
-                <div className="mt-2 text-sm text-[var(--text-primary)]/35">
-                  Пока нет задач с
-                  заполненными планом
-                  и фактом
-                </div>
+               <div className="mt-2 text-sm text-[var(--text-primary)]/35">
+  Нет задач с превышением плановых трудозатрат
+</div>
               </div>
             )}
           </section>
