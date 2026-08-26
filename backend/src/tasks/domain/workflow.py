@@ -63,7 +63,7 @@ task_workflow = (
     # ===================
     .allow(
         TaskStatus.BACKLOG, TaskStatus.TODO,
-        Task.start_work
+        # Убрать Task.start_work — задача не в работе
     )
     .allow(
         TaskStatus.BACKLOG, TaskStatus.CANCELLED,
@@ -78,11 +78,11 @@ task_workflow = (
     )
     .allow(
         TaskStatus.TODO, TaskStatus.IN_PROGRESS,
-        Task.start_work,
+        Task.start_work,  # Вход в работу
     )
     .allow(
         TaskStatus.TODO, TaskStatus.PAUSED,
-        Task.finish_work,
+        # Убрать Task.finish_work — не были в работе
     )
     .allow(
         TaskStatus.TODO, TaskStatus.CANCELLED,
@@ -93,26 +93,27 @@ task_workflow = (
     # ===============================
     .allow(
         TaskStatus.IN_PROGRESS, TaskStatus.TO_REVIEW,
-        Task.finish_work,
+        Task.finish_work,  # Выход из работы
     )
     .allow(
         TaskStatus.IN_PROGRESS, TaskStatus.PAUSED,
-        Task.finish_work,
+        Task.finish_work,  # Выход из работы
     )
     .allow(
         TaskStatus.IN_PROGRESS, TaskStatus.DONE,
-        Task.complete,
+        Task.complete,  # complete() сам посчитает время
     )
     .allow(
         TaskStatus.IN_PROGRESS, TaskStatus.CANCELLED,
-        Task.finish_work, Task.unassign, Task.reset_reviewer,
+        Task.finish_work,  # Выход из работы
+        Task.unassign, Task.reset_reviewer,
     )
     # ===============================
     # Переходы из паузы
     # ===============================
     .allow(
         TaskStatus.PAUSED, TaskStatus.IN_PROGRESS,
-        Task.start_work,
+        Task.start_work,  # Вход в работу
     )
     .allow(
         TaskStatus.PAUSED, TaskStatus.CANCELLED,
@@ -123,11 +124,13 @@ task_workflow = (
     # ===============================
     .allow(
         TaskStatus.TO_REVIEW, TaskStatus.IN_PROGRESS,
-        Task.start_work, Task.reset_reviewer,
+        Task.start_work,  # Вход в работу
+        Task.reset_reviewer,
     )
     .allow(
         TaskStatus.TO_REVIEW, TaskStatus.TO_FIX,
-        Task.start_work, Task.reset_reviewer,
+        # Убрать Task.start_work — не в работе
+        Task.reset_reviewer,
     )
     .allow(
         TaskStatus.TO_REVIEW, TaskStatus.TO_TEST,
@@ -147,11 +150,11 @@ task_workflow = (
     # ===============================
     .allow(
         TaskStatus.TO_FIX, TaskStatus.IN_PROGRESS,
-        Task.start_work,
+        Task.start_work,  # Вход в работу
     )
     .allow(
         TaskStatus.TO_FIX, TaskStatus.TO_REVIEW,
-        Task.finish_work,
+        # Убрать Task.finish_work — не были в работе
     )
     .allow(
         TaskStatus.TO_FIX, TaskStatus.CANCELLED,
@@ -162,17 +165,16 @@ task_workflow = (
     # ===============================
     .allow(
         TaskStatus.TO_TEST, TaskStatus.IN_PROGRESS,
-        Task.start_work,
+        Task.start_work,  # Вход в работу
     )
     .allow(
         TaskStatus.TO_TEST, TaskStatus.TO_REVIEW,
-        Task.start_work,
+        # Убрать Task.start_work — не в работе
     )
     .allow(
         TaskStatus.TO_TEST, TaskStatus.DONE,
         Task.complete,
     )
-
     .allow(
         TaskStatus.TO_TEST, TaskStatus.CANCELLED,
         Task.unassign, Task.reset_reviewer,
@@ -182,11 +184,13 @@ task_workflow = (
     # ===============================
     .allow(
         TaskStatus.DONE, TaskStatus.IN_PROGRESS,
-        Task.reopen, Task.start_work,
+        Task.reopen,  # reopen() сбрасывает completed_at
+        Task.start_work,  # Вход в работу
     )
     .allow(
         TaskStatus.DONE, TaskStatus.TO_FIX,
-        Task.reopen, Task.start_work,
+        Task.reopen,  # reopen() сбрасывает completed_at
+        # Убрать Task.start_work — не в работе
     )
     # ===============================
     # ОБРАТНЫЕ ПЕРЕХОДЫ (возврат назад)
@@ -194,27 +198,27 @@ task_workflow = (
     # IN_PROGRESS → TODO (вернуть из работы в готов к выполнению)
     .allow(
         TaskStatus.IN_PROGRESS, TaskStatus.TODO,
-        Task.finish_work,
+        Task.finish_work,  # Выход из работы
     )
     # IN_PROGRESS → TO_FIX (вернуть из работы в доработку)
     .allow(
         TaskStatus.IN_PROGRESS, TaskStatus.TO_FIX,
-        Task.finish_work,
+        Task.finish_work,  # Выход из работы
     )
     # IN_PROGRESS → TO_TEST (вернуть из работы в тестирование)
     .allow(
         TaskStatus.IN_PROGRESS, TaskStatus.TO_TEST,
-        Task.finish_work,
+        Task.finish_work,  # Выход из работы
     )
     # PAUSED → TODO (вернуть из паузы в готов к выполнению)
     .allow(
         TaskStatus.PAUSED, TaskStatus.TODO,
-        Task.finish_work,
+        # Убрать Task.finish_work — не были в работе
     )
     # TO_REVIEW → TO_TEST (вернуть из ревью в тестирование)
     .allow(
         TaskStatus.TO_REVIEW, TaskStatus.TO_TEST,
-        Task.start_work,
+        # Убрать Task.start_work — не в работе
     )
     # TO_FIX → DONE (вернуть из доработки в выполнено)
     .allow(
@@ -224,7 +228,7 @@ task_workflow = (
     # TO_TEST → TO_FIX (вернуть из тестирования в доработку)
     .allow(
         TaskStatus.TO_TEST, TaskStatus.TO_FIX,
-        Task.start_work,
+        # Убрать Task.start_work — не в работе
     )
     # DONE → TO_REVIEW (вернуть из выполнено в ревью)
     .allow(
@@ -234,6 +238,7 @@ task_workflow = (
     # DONE → TO_TEST (вернуть из выполнено в тестирование)
     .allow(
         TaskStatus.DONE, TaskStatus.TO_TEST,
-        Task.reopen, Task.start_work,
+        Task.reopen,
+        # Убрать Task.start_work — не в работе
     )
 )

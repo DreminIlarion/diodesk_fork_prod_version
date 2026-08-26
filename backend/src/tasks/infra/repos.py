@@ -94,6 +94,9 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
             story_points=None if model.story_points is None else Decimal(model.story_points),
             estimated_hours=None if model.estimated_hours is None else Decimal(model.estimated_hours),
             actual_hours=None if model.actual_hours is None else Decimal(model.actual_hours),
+            started_at=model.started_at,        # ← Добавиl
+            completed_at=model.completed_at,    # ← Добавил
+            working_since=model.working_since,  # ← Добавил
             project_id=model.project_id,
             ticket_id=model.ticket_id,
             attachments=[AttachmentMapper.to_entity(a) for a in model.attachments],
