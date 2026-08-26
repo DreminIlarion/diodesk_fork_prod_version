@@ -7,7 +7,7 @@ import {
   ArrowUpRight, ChevronDown, Flag, AlertCircle, CheckCircle2, Ban, RotateCcw,
   RefreshCw, Archive, FolderOpen, Ticket, Zap, Star, User, Layers, UserCheck,
   GitPullRequest, ThumbsUp, ThumbsDown, Pencil, List, LayoutGrid, Clock3,
-  FileText, File as FileIcon, Download,
+  FileText, File as FileIcon, Download, BarChart3,
 } from 'lucide-react';
 import { tasksApi, projectsApi, ticketsApi, usersApi } from '../api/client';
 import { attachmentsApi } from '../api/attachments';
@@ -18,6 +18,8 @@ import type {
   TaskCreateInput, TaskUpdateInput, TaskKanbanContext,
   SimpleUser, CounterpartyCustomer,
 } from '../types';
+
+import TaskAnalytics from '../components/tasks/TaskAnalytics';
 
 import {
   TicketEditor,
@@ -76,7 +78,10 @@ type TaskViewColumn = Omit<TaskKanbanColumn, 'tasks'> & {
 };
 
 type CtxMode = 'my' | 'internal' | 'project' | 'assignee' | 'ticket';
-type ViewMode = 'kanban' | 'list';
+type ViewMode =
+  | 'kanban'
+  | 'list'
+  | 'analytics';
 
 type CompleteIntent = { task: TaskViewItem; mode: 'status_done' | 'review_done' };
 type AssignIntent = { task: TaskViewItem; targetStatus: 'todo' | 'in_progress' };
@@ -2041,41 +2046,41 @@ function DetailModal({
   const statusAsString = String(t.status);
 
   const revealExpandedSection = useCallback(
-  (ref: React.RefObject<HTMLElement | null>) => {
-    requestAnimationFrame(() => {
+    (ref: React.RefObject<HTMLElement | null>) => {
       requestAnimationFrame(() => {
-        const container = contentScrollRef.current;
-        const el = ref.current;
+        requestAnimationFrame(() => {
+          const container = contentScrollRef.current;
+          const el = ref.current;
 
-        if (!container || !el) return;
+          if (!container || !el) return;
 
-        const containerRect = container.getBoundingClientRect();
-        const elementRect = el.getBoundingClientRect();
+          const containerRect = container.getBoundingClientRect();
+          const elementRect = el.getBoundingClientRect();
 
-        const padding = 24;
+          const padding = 24;
 
-        if (elementRect.bottom > containerRect.bottom - padding) {
-          container.scrollBy({
-            top:
-              elementRect.bottom -
-              containerRect.bottom +
-              padding,
-            behavior: 'smooth',
-          });
-        } else if (elementRect.top < containerRect.top + padding) {
-          container.scrollBy({
-            top:
-              elementRect.top -
-              containerRect.top -
-              padding,
-            behavior: 'smooth',
-          });
-        }
+          if (elementRect.bottom > containerRect.bottom - padding) {
+            container.scrollBy({
+              top:
+                elementRect.bottom -
+                containerRect.bottom +
+                padding,
+              behavior: 'smooth',
+            });
+          } else if (elementRect.top < containerRect.top + padding) {
+            container.scrollBy({
+              top:
+                elementRect.top -
+                containerRect.top -
+                padding,
+              behavior: 'smooth',
+            });
+          }
+        });
       });
-    });
-  },
-  [],
-);
+    },
+    [],
+  );
 
   const canReview =
     (statusAsString === 'to_review' ||
@@ -2272,9 +2277,9 @@ function DetailModal({
 
         {/* Content */}
         <div
-  ref={contentScrollRef}
-  className="flex-1 min-h-0 overflow-y-auto p-5 md:p-6"
->
+          ref={contentScrollRef}
+          className="flex-1 min-h-0 overflow-y-auto p-5 md:p-6"
+        >
           {t.status ===
             'in_progress' &&
             !t.assignee_id && (
@@ -3692,52 +3697,115 @@ export default function TasksPage() {
 
         <div className="flex items-center gap-1 p-1 bg-[var(--hover-1)] rounded-lg border border-[var(--border-color)]">
           <button onClick={() => setViewMode('kanban')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'kanban' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}><LayoutGrid className="w-3.5 h-3.5" />Доска</button>
+
           <button onClick={() => setViewMode('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'list' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}><List className="w-3.5 h-3.5" />Список</button>
+          <button
+            type="button"
+            onClick={() =>
+              setViewMode('analytics')
+            }
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'analytics'
+                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
+              }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            Аналитика
+          </button>
         </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        {loading ? (
-          <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" /></div>
-        ) : viewMode === 'list' ? (
-          <ListView tasks={disp.flatMap((c) => c.tasks.items)} umap={umap} onView={setView} />
-        ) : !cols.length ? (
-          <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30"><FileText className="w-12 h-12 mb-3 opacity-50" /><p className="text-base font-medium">{mode === 'project' && !selP ? 'Выберите проект' : mode === 'assignee' && !selA ? 'Выберите исполнителя' : mode === 'ticket' && !selT ? 'Выберите заявку' : 'Нет задач'}</p></div>
-        ) : (
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div
-              ref={boardScrollRef}
-              onScroll={handleBoardScroll}
-              className="flex-1 overflow-x-auto overflow-y-hidden pb-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            >
-              <div
-                ref={boardInnerRef}
-                className="flex gap-3 h-full w-max min-w-full"
-              >
-                {disp.map((c) => (
-                  <KCol
-                    key={c.status}
-                    col={c}
-                    umap={umap}
-                    isDO={dragO === c.status}
-                    dragId={drag?.id ?? null}
-                    highlightTaskId={highlightTaskId}
-                    ldMore={moreCol === c.status}
-                    onDS={onDS}
-                    onDE={onDE}
-                    onDO={onDO}
-                    onDL={onDL}
-                    onDrop={onDrop}
-                    onAdd={setCreate}
-                    onView={setView}
-                    onMore={more}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+  {viewMode === 'analytics' ? (
+    (
+      (mode === 'project' && !selP) ||
+      (mode === 'assignee' && !selA) ||
+      (mode === 'ticket' && !selT)
+    ) ? (
+      <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30">
+        <BarChart3 className="w-12 h-12 mb-3 opacity-50" />
+
+        <p className="text-base font-medium">
+          {mode === 'project' && !selP
+            ? 'Выберите проект'
+            : mode === 'assignee' && !selA
+              ? 'Выберите исполнителя'
+              : 'Выберите заявку'}
+        </p>
+
+        <p className="text-sm mt-1 text-[var(--text-primary)]/25">
+          После выбора здесь появится аналитика
+        </p>
       </div>
+    ) : (
+      <TaskAnalytics
+        context={ctx()}
+        priorities={fp}
+        overdueOnly={fo}
+        onTaskOpen={(task) => {
+          setView(task as TaskViewItem);
+        }}
+      />
+    )
+  ) : loading ? (
+    <div className="flex items-center justify-center h-full">
+      <Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" />
+    </div>
+  ) : viewMode === 'list' ? (
+    <ListView
+      tasks={disp.flatMap((c) => c.tasks.items)}
+      umap={umap}
+      onView={setView}
+    />
+  ) : !cols.length ? (
+    <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30">
+      <FileText className="w-12 h-12 mb-3 opacity-50" />
+
+      <p className="text-base font-medium">
+        {mode === 'project' && !selP
+          ? 'Выберите проект'
+          : mode === 'assignee' && !selA
+            ? 'Выберите исполнителя'
+            : mode === 'ticket' && !selT
+              ? 'Выберите заявку'
+              : 'Нет задач'}
+      </p>
+    </div>
+  ) : (
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div
+        ref={boardScrollRef}
+        onScroll={handleBoardScroll}
+        className="flex-1 overflow-x-auto overflow-y-hidden pb-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        <div
+          ref={boardInnerRef}
+          className="flex gap-3 h-full w-max min-w-full"
+        >
+          {disp.map((c) => (
+            <KCol
+              key={c.status}
+              col={c}
+              umap={umap}
+              isDO={dragO === c.status}
+              dragId={drag?.id ?? null}
+              highlightTaskId={highlightTaskId}
+              ldMore={moreCol === c.status}
+              onDS={onDS}
+              onDE={onDE}
+              onDO={onDO}
+              onDL={onDL}
+              onDrop={onDrop}
+              onAdd={setCreate}
+              onView={setView}
+              onMore={more}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  )}
+</div>
 
       {viewMode === 'kanban' &&
         !loading &&
