@@ -2620,26 +2620,32 @@ function DetailModal({
                     )}
                   </div>
 
-                  {/* Due date */}
-                  <div className="flex items-center justify-between gap-4 px-4 py-3">
-                    <span className="text-sm text-[var(--text-primary)]/45">
-                      Срок
-                    </span>
+{/* Due date */}
+<div className="flex items-start justify-between gap-4 px-4 py-3">
+  <span className="text-sm text-[var(--text-primary)]/45">
+    Срок
+  </span>
 
-                    <span
-                      className={`text-sm font-medium ${t.due_date &&
-                        overdue(t)
-                        ? 'text-red-400'
-                        : 'text-[var(--text-primary)]/80'
-                        }`}
-                    >
-                      {t.due_date
-                        ? fmtDue(
-                          t.due_date,
-                        )
-                        : '—'}
-                    </span>
-                  </div>
+  <div className="text-right">
+    <div className="text-sm font-medium text-[var(--text-primary)]/80">
+      {t.due_date
+        ? new Date(
+            getDueTimestamp(t.due_date) ?? t.due_date,
+          ).toLocaleDateString('ru-RU', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          })
+        : '—'}
+    </div>
+
+    {t.due_date && overdue(t) && (
+      <div className="mt-0.5 text-[10px] font-medium text-red-400">
+        Срок истёк
+      </div>
+    )}
+  </div>
+</div>
 
                   {/* Hours */}
                   <div className="px-4 py-3.5">
@@ -2715,49 +2721,35 @@ function DetailModal({
       </span>
     </div>
 
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-xs text-[var(--text-primary)]/35">
-        Завершена
-      </span>
+<div className="flex items-start justify-between gap-4">
+  <span className="text-xs text-[var(--text-primary)]/35">
+    Завершена
+  </span>
 
-      <span
-        className={`text-xs font-medium text-right ${
-          t.completed_at && completedLate(t)
-            ? 'text-amber-400'
-            : 'text-[var(--text-primary)]/70'
-        }`}
-      >
-        {t.completed_at
-          ? new Date(t.completed_at).toLocaleString('ru-RU', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          : '—'}
-      </span>
+  <div className="text-right">
+    <div className="text-xs font-medium text-[var(--text-primary)]/70">
+      {t.completed_at
+        ? new Date(t.completed_at).toLocaleString('ru-RU', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : '—'}
     </div>
+
+    {t.completed_at && completedLate(t) && (
+      <div className="mt-0.5 text-[10px] text-amber-400">
+        Позже срока
+      </div>
+    )}
+  </div>
+</div>
   </div>
 </div>
 
-                  {t.working_since && (
-                    <div className="px-4 py-3">
-                      <div className="flex items-center justify-between gap-4">
-                        <span className="text-sm text-[var(--text-primary)]/45">
-                          Текущая работа
-                        </span>
 
-                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-500">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          С {new Date(t.working_since).toLocaleTimeString('ru-RU', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  )}
                   
                 </div>
               </section>
