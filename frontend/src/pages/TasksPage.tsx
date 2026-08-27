@@ -1035,10 +1035,10 @@ function TCard({
         }`}
     >
       {highlighted && (
-  <div className="absolute top-2.5 right-3 px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-[10px] font-semibold">
-    Перенесено
-  </div>
-)}
+        <div className="absolute top-2.5 right-3 px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-[10px] font-semibold">
+          Перенесено
+        </div>
+      )}
       <span className="text-xs font-mono text-[var(--text-primary)]/45 mb-1.5 leading-none">
         #{t.number}
       </span>
@@ -2619,32 +2619,32 @@ function DetailModal({
                     )}
                   </div>
 
-{/* Due date */}
-<div className="flex items-start justify-between gap-4 px-4 py-3">
-  <span className="text-sm text-[var(--text-primary)]/45">
-    Срок
-  </span>
+                  {/* Due date */}
+                  <div className="flex items-start justify-between gap-4 px-4 py-3">
+                    <span className="text-sm text-[var(--text-primary)]/45">
+                      Срок
+                    </span>
 
-  <div className="text-right">
-    <div className="text-sm font-medium text-[var(--text-primary)]/80">
-      {t.due_date
-        ? new Date(
-            getDueTimestamp(t.due_date) ?? t.due_date,
-          ).toLocaleDateString('ru-RU', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-          })
-        : '—'}
-    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium text-[var(--text-primary)]/80">
+                        {t.due_date
+                          ? new Date(
+                            getDueTimestamp(t.due_date) ?? t.due_date,
+                          ).toLocaleDateString('ru-RU', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })
+                          : '—'}
+                      </div>
 
-    {t.due_date && overdue(t) && (
-      <div className="mt-0.5 text-[10px] font-medium text-red-400">
-        Срок истёк
-      </div>
-    )}
-  </div>
-</div>
+                      {t.due_date && overdue(t) && (
+                        <div className="mt-0.5 text-[10px] font-medium text-red-400">
+                          Срок истёк
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   {/* Hours */}
                   <div className="px-4 py-3.5">
@@ -2681,75 +2681,75 @@ function DetailModal({
 
                   {/* Created */}
                   <div className="px-4 py-3.5">
-  <div className="text-sm text-[var(--text-primary)]/45 mb-2.5">
-    Жизненный цикл
-  </div>
+                    <div className="text-sm text-[var(--text-primary)]/45 mb-2.5">
+                      Жизненный цикл
+                    </div>
 
-  <div className="space-y-2">
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-xs text-[var(--text-primary)]/35">
-        Создана
-      </span>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-xs text-[var(--text-primary)]/35">
+                          Создана
+                        </span>
 
-      <span className="text-xs font-medium text-[var(--text-primary)]/70 text-right">
-        {new Date(t.created_at).toLocaleString('ru-RU', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })}
-      </span>
-    </div>
+                        <span className="text-xs font-medium text-[var(--text-primary)]/70 text-right">
+                          {new Date(t.created_at).toLocaleString('ru-RU', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
 
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-xs text-[var(--text-primary)]/35">
-        Начата
-      </span>
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-xs text-[var(--text-primary)]/35">
+                          Начата
+                        </span>
 
-      <span className="text-xs font-medium text-[var(--text-primary)]/70 text-right">
-        {t.started_at
-          ? new Date(t.started_at).toLocaleString('ru-RU', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          : '—'}
-      </span>
-    </div>
+                        <span className="text-xs font-medium text-[var(--text-primary)]/70 text-right">
+                          {t.started_at
+                            ? new Date(t.started_at).toLocaleString('ru-RU', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                            : '—'}
+                        </span>
+                      </div>
 
-<div className="flex items-start justify-between gap-4">
-  <span className="text-xs text-[var(--text-primary)]/35">
-    Завершена
-  </span>
+                      <div className="flex items-start justify-between gap-4">
+                        <span className="text-xs text-[var(--text-primary)]/35">
+                          Завершена
+                        </span>
 
-  <div className="text-right">
-    <div className="text-xs font-medium text-[var(--text-primary)]/70">
-      {t.completed_at
-        ? new Date(t.completed_at).toLocaleString('ru-RU', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-        : '—'}
-    </div>
+                        <div className="text-right">
+                          <div className="text-xs font-medium text-[var(--text-primary)]/70">
+                            {t.completed_at
+                              ? new Date(t.completed_at).toLocaleString('ru-RU', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                              : '—'}
+                          </div>
 
-    {t.completed_at && completedLate(t) && (
-      <div className="mt-0.5 text-[10px] text-amber-400">
-        Позже срока
-      </div>
-    )}
-  </div>
-</div>
-  </div>
-</div>
+                          {t.completed_at && completedLate(t) && (
+                            <div className="mt-0.5 text-[10px] text-amber-400">
+                              Позже срока
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
 
-                  
+
                 </div>
               </section>
 
@@ -3251,7 +3251,7 @@ export default function TasksPage() {
     }, 10000);
   }, []);
 
-   const pauseUndoTimer = useCallback(() => {
+  const pauseUndoTimer = useCallback(() => {
     if (undoTimerRef.current) {
       clearTimeout(undoTimerRef.current);
       undoTimerRef.current = null;
@@ -3349,56 +3349,155 @@ export default function TasksPage() {
 
   const syncBoardScrollbarMetrics = useCallback(() => {
     const board = boardScrollRef.current;
-    const inner = boardInnerRef.current;
 
-    if (!board || !inner) {
-      setFixedBoardScrollbarStyle((prev) => ({
-        ...prev,
+    if (!board) {
+      setFixedBoardScrollbarStyle({
+        position: 'fixed',
+        left: 0,
+        width: 0,
+        bottom: 12,
+        zIndex: 55,
         display: 'none',
-      }));
+      });
+
       return;
     }
 
-    const contentWidth = inner.scrollWidth;
+    /*
+     * ВАЖНО:
+     * берём scrollWidth непосредственно
+     * у настоящего scroll-контейнера.
+     */
+    const contentWidth = board.scrollWidth;
     const viewportWidth = board.clientWidth;
+
     const rect = board.getBoundingClientRect();
-    const hasHorizontalOverflow = contentWidth > viewportWidth + 2;
+
+    const hasHorizontalOverflow =
+      contentWidth - viewportWidth > 2;
 
     setBoardScrollWidth(contentWidth);
     setBoardViewportWidth(viewportWidth);
 
     setFixedBoardScrollbarStyle({
       position: 'fixed',
-      left: rect.left,
-      width: rect.width,
+      left: Math.round(rect.left),
+      width: Math.round(rect.width),
       bottom: 12,
       zIndex: 55,
-      display: hasHorizontalOverflow ? 'block' : 'none',
+      display:
+        hasHorizontalOverflow
+          ? 'block'
+          : 'none',
       pointerEvents: 'auto',
     });
 
-    if (bottomBoardScrollRef.current) {
-      bottomBoardScrollRef.current.scrollLeft = board.scrollLeft;
+    const bottom =
+      bottomBoardScrollRef.current;
+
+    if (bottom) {
+      /*
+       * Не позволяем установить значение
+       * больше максимального scrollLeft.
+       */
+      const maxBottomScroll =
+        Math.max(
+          contentWidth -
+          viewportWidth,
+          0,
+        );
+
+      bottom.scrollLeft =
+        Math.min(
+          board.scrollLeft,
+          maxBottomScroll,
+        );
     }
   }, []);
 
   const handleBoardScroll = useCallback(() => {
-    if (boardScrollSyncRef.current) return;
-    boardScrollSyncRef.current = true;
-    if (bottomBoardScrollRef.current && boardScrollRef.current) {
-      bottomBoardScrollRef.current.scrollLeft = boardScrollRef.current.scrollLeft;
+    if (boardScrollSyncRef.current) {
+      return;
     }
-    requestAnimationFrame(() => boardScrollSyncRef.current = false);
+
+    const board =
+      boardScrollRef.current;
+
+    const bottom =
+      bottomBoardScrollRef.current;
+
+    if (!board || !bottom) {
+      return;
+    }
+
+    boardScrollSyncRef.current = true;
+
+    const boardMax =
+      board.scrollWidth -
+      board.clientWidth;
+
+    const bottomMax =
+      bottom.scrollWidth -
+      bottom.clientWidth;
+
+    const ratio =
+      boardMax > 0
+        ? board.scrollLeft /
+        boardMax
+        : 0;
+
+    bottom.scrollLeft =
+      ratio * bottomMax;
+
+    requestAnimationFrame(() => {
+      boardScrollSyncRef.current =
+        false;
+    });
   }, []);
 
-  const handleBottomBoardScroll = useCallback(() => {
-    if (boardScrollSyncRef.current) return;
-    boardScrollSyncRef.current = true;
-    if (boardScrollRef.current && bottomBoardScrollRef.current) {
-      boardScrollRef.current.scrollLeft = bottomBoardScrollRef.current.scrollLeft;
-    }
-    requestAnimationFrame(() => boardScrollSyncRef.current = false);
-  }, []);
+  const handleBottomBoardScroll =
+    useCallback(() => {
+      if (
+        boardScrollSyncRef.current
+      ) {
+        return;
+      }
+
+      const board =
+        boardScrollRef.current;
+
+      const bottom =
+        bottomBoardScrollRef.current;
+
+      if (!board || !bottom) {
+        return;
+      }
+
+      boardScrollSyncRef.current =
+        true;
+
+      const bottomMax =
+        bottom.scrollWidth -
+        bottom.clientWidth;
+
+      const boardMax =
+        board.scrollWidth -
+        board.clientWidth;
+
+      const ratio =
+        bottomMax > 0
+          ? bottom.scrollLeft /
+          bottomMax
+          : 0;
+
+      board.scrollLeft =
+        ratio * boardMax;
+
+      requestAnimationFrame(() => {
+        boardScrollSyncRef.current =
+          false;
+      });
+    }, []);
 
   useEffect(() => {
     if (viewMode !== 'kanban' || loading || !cols.length) {
@@ -3415,15 +3514,30 @@ export default function TasksPage() {
 
     run();
 
-    const board = boardScrollRef.current;
-    const inner = boardInnerRef.current;
+    const board =
+      boardScrollRef.current;
+
+    const inner =
+      boardInnerRef.current
 
     let ro: ResizeObserver | null = null;
 
-    if (typeof ResizeObserver !== 'undefined' && board && inner) {
-      ro = new ResizeObserver(run);
-      ro.observe(board);
-      ro.observe(inner);
+    if (
+      typeof ResizeObserver !== 'undefined'
+    ) {
+      ro = new ResizeObserver(() => {
+        requestAnimationFrame(
+          syncBoardScrollbarMetrics,
+        );
+      });
+
+      if (board) {
+        ro.observe(board);
+      }
+
+      if (inner) {
+        ro.observe(inner);
+      }
     }
 
     window.addEventListener('resize', run);
@@ -3889,8 +4003,8 @@ export default function TasksPage() {
               setViewMode('analytics')
             }
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'analytics'
-                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-                : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
+              ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+              : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
               }`}
           >
             <BarChart3 className="w-3.5 h-3.5" />
@@ -3900,174 +4014,193 @@ export default function TasksPage() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-  {viewMode === 'analytics' ? (
-    (
-      (mode === 'project' && !selP) ||
-      (mode === 'assignee' && !selA) ||
-      (mode === 'ticket' && !selT)
-    ) ? (
-      <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30">
-        <BarChart3 className="w-12 h-12 mb-3 opacity-50" />
+        {viewMode === 'analytics' ? (
+          (
+            (mode === 'project' && !selP) ||
+            (mode === 'assignee' && !selA) ||
+            (mode === 'ticket' && !selT)
+          ) ? (
+            <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30">
+              <BarChart3 className="w-12 h-12 mb-3 opacity-50" />
 
-        <p className="text-base font-medium">
-          {mode === 'project' && !selP
-            ? 'Выберите проект'
-            : mode === 'assignee' && !selA
-              ? 'Выберите исполнителя'
-              : 'Выберите заявку'}
-        </p>
+              <p className="text-base font-medium">
+                {mode === 'project' && !selP
+                  ? 'Выберите проект'
+                  : mode === 'assignee' && !selA
+                    ? 'Выберите исполнителя'
+                    : 'Выберите заявку'}
+              </p>
 
-        <p className="text-sm mt-1 text-[var(--text-primary)]/25">
-          После выбора здесь появится аналитика
-        </p>
-      </div>
-    ) : (
-      <TaskAnalytics
-        context={ctx()}
-        priorities={fp}
-        overdueOnly={fo}
-        onTaskOpen={(task) => {
-          setView(task as TaskViewItem);
-        }}
-      />
-    )
-  ) : loading ? (
-    <div className="flex items-center justify-center h-full">
-      <Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" />
-    </div>
-  ) : viewMode === 'list' ? (
-    <ListView
-      tasks={disp.flatMap((c) => c.tasks.items)}
-      umap={umap}
-      onView={setView}
-    />
-  ) : !cols.length ? (
-    <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30">
-      <FileText className="w-12 h-12 mb-3 opacity-50" />
-
-      <p className="text-base font-medium">
-        {mode === 'project' && !selP
-          ? 'Выберите проект'
-          : mode === 'assignee' && !selA
-            ? 'Выберите исполнителя'
-            : mode === 'ticket' && !selT
-              ? 'Выберите заявку'
-              : 'Нет задач'}
-      </p>
-    </div>
-  ) : (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      <div
-        ref={boardScrollRef}
-        onScroll={handleBoardScroll}
-        className="flex-1 overflow-x-auto overflow-y-hidden pb-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        <div
-          ref={boardInnerRef}
-          className="flex gap-3 h-full w-max min-w-full"
-        >
-          {disp.map((c) => (
-            <KCol
-              key={c.status}
-              col={c}
-              umap={umap}
-              isDO={dragO === c.status}
-              dragId={drag?.id ?? null}
-              highlightTaskId={highlightTaskId}
-              ldMore={moreCol === c.status}
-              onDS={onDS}
-              onDE={onDE}
-              onDO={onDO}
-              onDL={onDL}
-              onDrop={onDrop}
-              onAdd={setCreate}
-              onView={setView}
-              onMore={more}
+              <p className="text-sm mt-1 text-[var(--text-primary)]/25">
+                После выбора здесь появится аналитика
+              </p>
+            </div>
+          ) : (
+            <TaskAnalytics
+              context={ctx()}
+              priorities={fp}
+              overdueOnly={fo}
+              onTaskOpen={(task) => {
+                setView(task as TaskViewItem);
+              }}
             />
-          ))}
-        </div>
-      </div>
-    </div>
-  )}
-</div>
+          )
+        ) : loading ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" />
+          </div>
+        ) : viewMode === 'list' ? (
+          <ListView
+            tasks={disp.flatMap((c) => c.tasks.items)}
+            umap={umap}
+            onView={setView}
+          />
+        ) : !cols.length ? (
+          <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30">
+            <FileText className="w-12 h-12 mb-3 opacity-50" />
 
-      {viewMode === 'kanban' &&
-        !loading &&
-        cols.length > 0 &&
-        createPortal(
-          <div
-            style={fixedBoardScrollbarStyle}
-            className="px-1"
-          >
+            <p className="text-base font-medium">
+              {mode === 'project' && !selP
+                ? 'Выберите проект'
+                : mode === 'assignee' && !selA
+                  ? 'Выберите исполнителя'
+                  : mode === 'ticket' && !selT
+                    ? 'Выберите заявку'
+                    : 'Нет задач'}
+            </p>
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <div
-              ref={bottomBoardScrollRef}
-              onScroll={handleBottomBoardScroll}
-              className="h-2 rounded-xl bg-[var(--bg-card)]/95 border border-[var(--border-color)] shadow-2xl backdrop-blur-md overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/60 scrollbar-track-transparent"
+              ref={boardScrollRef}
+              onScroll={handleBoardScroll}
+              className="flex-1 overflow-x-auto overflow-y-hidden pb-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               <div
-                style={{
-                  width: Math.max(boardScrollWidth, boardViewportWidth),
-                  height: '100%',
-                }}
-              />
+                ref={boardInnerRef}
+                className="flex gap-3 h-full w-max min-w-full"
+              >
+                {disp.map((c) => (
+                  <KCol
+                    key={c.status}
+                    col={c}
+                    umap={umap}
+                    isDO={dragO === c.status}
+                    dragId={drag?.id ?? null}
+                    highlightTaskId={highlightTaskId}
+                    ldMore={moreCol === c.status}
+                    onDS={onDS}
+                    onDE={onDE}
+                    onDO={onDO}
+                    onDL={onDL}
+                    onDrop={onDrop}
+                    onAdd={setCreate}
+                    onView={setView}
+                    onMore={more}
+                  />
+                ))}
+              </div>
             </div>
-          </div>,
-          document.body,
+          </div>
         )}
+      </div>
+
+{viewMode === 'kanban' &&
+  !loading &&
+  cols.length > 0 &&
+  boardScrollWidth >
+    boardViewportWidth + 2 &&
+  createPortal(
+    <div
+      style={
+        fixedBoardScrollbarStyle
+      }
+      className="px-1"
+    >
+      <div
+        ref={
+          bottomBoardScrollRef
+        }
+        onScroll={
+          handleBottomBoardScroll
+        }
+        className="
+          h-3
+          overflow-x-scroll
+          overflow-y-hidden
+          rounded-lg
+          bg-[var(--bg-card)]
+          border border-[var(--border-color)]
+          shadow-lg
+          scrollbar-thin
+          scrollbar-thumb-[var(--accent)]/60
+          scrollbar-track-transparent
+        "
+      >
+        <div
+          style={{
+            width: `${boardScrollWidth}px`,
+            height: 1,
+          }}
+        />
+      </div>
+    </div>,
+    document.body,
+  )}
 
       <AnimatePresence>
-  {lastMove && !drag && (
-    <motion.div
-      initial={{ y: 16, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      exit={{ y: 10, opacity: 0 }}
-      transition={{ duration: 0.2 }}
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120] w-[min(520px,calc(100vw-24px))]"
-    >
-      <div  onMouseEnter={pauseUndoTimer}
+        {lastMove && !drag && (
+          <motion.div
+            initial={{ y: 16, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 10, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120] w-[min(520px,calc(100vw-24px))]"
+          >
+            <div onMouseEnter={pauseUndoTimer}
               onMouseLeave={resumeUndoTimer}
-      className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-[var(--bg-card)] border border-emerald-500/50 shadow-lg">
-        <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
-          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-        </div>
+              className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-[var(--bg-card)] border border-emerald-500/50 shadow-lg">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="text-xs font-semibold text-[var(--text-primary)]">
-            Задача перенесена
-          </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-[var(--text-primary)]">
+                  Задача перенесена
+                </div>
 
-          <div className="mt-0.5 text-xs text-[var(--text-primary)]/50 truncate">
-            #{lastMove.number} · {ST_LABEL[lastMove.to]}
-          </div>
-        </div>
+                <div className="mt-0.5 text-xs text-[var(--text-primary)]/50 truncate">
+                  #{lastMove.number} · {ST_LABEL[lastMove.to]}
+                </div>
+              </div>
 
-        <button
-          type="button"
-          onClick={undoLastMove}
-          disabled={undoingMove}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-50 shrink-0"
-        >
-          {undoingMove ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <RotateCcw className="w-3.5 h-3.5" />
-          )}
+              <button
+                type="button"
+                onClick={undoLastMove}
+                disabled={undoingMove}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-50 shrink-0"
+              >
+                {undoingMove ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-3.5 h-3.5" />
+                )}
 
-          {undoingMove ? 'Возвращаем...' : 'Вернуть'}
-        </button>
+                {undoingMove ? 'Возвращаем...' : 'Вернуть'}
+              </button>
 
-        <button
-          type="button"
-          onClick={() => setLastMove(null)}
-          title="Скрыть"
-          className="p-1.5 rounded-lg text-[var(--text-primary)]/30 hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)] transition-colors shrink-0"
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    </motion.div>
-  )}
-</AnimatePresence>
+              <button
+                type="button"
+                onClick={() => setLastMove(null)}
+                title="Скрыть"
+                className="p-1.5 rounded-lg text-[var(--text-primary)]/30 hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)] transition-colors shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>{dragInfo && <DragPanel task={dragInfo} onDrop={onDrop} />}</AnimatePresence>
 
