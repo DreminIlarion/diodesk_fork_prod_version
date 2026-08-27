@@ -1046,7 +1046,7 @@ function TicketActions({
             {showAssigneeMenu && (
               <div
                 className="
-                  max-h-[220px]
+                  max-h-[170px]
                   overflow-y-auto
                   overscroll-contain
                   border-t border-[var(--border-color)]
