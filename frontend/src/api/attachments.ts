@@ -83,6 +83,10 @@ export const attachmentsApi = {
     return response.data;
   },
 
+  async deleteAttachment(attachmentId: string): Promise<void> {
+  await api.delete(`/api/v1/attachments/${attachmentId}`);
+},
+
   // Полный процесс скачивания
   async downloadAttachment(attachmentId: string): Promise<void> {
     try {

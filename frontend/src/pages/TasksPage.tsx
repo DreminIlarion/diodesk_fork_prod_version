@@ -7,7 +7,7 @@ import {
   ArrowUpRight, ChevronDown, Flag, AlertCircle, CheckCircle2, Ban, RotateCcw,
   RefreshCw, Archive, FolderOpen, Ticket, Zap, Star, User, Layers, UserCheck,
   GitPullRequest, ThumbsUp, ThumbsDown, Pencil, List, LayoutGrid, Clock3,
-  FileText, File as FileIcon, Download, BarChart3,
+  FileText, File as FileIcon, Download, BarChart3, Trash2,
 } from 'lucide-react';
 import { tasksApi, projectsApi, ticketsApi, usersApi } from '../api/client';
 import { attachmentsApi } from '../api/attachments';
@@ -483,9 +483,11 @@ function AttachmentPreviewModal({ item, onClose }: {
   );
 }
 
-function TaskAttachmentItem({ attachment, onPreview }: {
+function TaskAttachmentItem({ attachment, onPreview, onDelete, deleting = false, }: {
   attachment: TaskAttachment;
   onPreview: (item: AttachmentPreviewItem) => void;
+  onDelete?: (attachment: TaskAttachment) => void;
+  deleting?: boolean;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -562,27 +564,70 @@ function TaskAttachmentItem({ attachment, onPreview }: {
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => onPreview({ name, url, size, mimeType, extension: typeLabel, isImage })}
-      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)] transition-colors text-left group"
-    >
-      {isImage ? (
-        <img src={url} alt={name} className="w-12 h-12 rounded-lg object-cover border border-[var(--border-color)] shrink-0" />
-      ) : (
-        <div className="w-12 h-12 rounded-lg bg-[var(--hover-3)] border border-[var(--border-color)] flex items-center justify-center shrink-0">
-          <FileIcon className="w-5 h-5 text-[var(--text-primary)]/40" />
+    <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)] transition-colors group">
+      <button
+        type="button"
+        onClick={() =>
+          onPreview({
+            name,
+            url,
+            size,
+            mimeType,
+            extension: typeLabel,
+            isImage,
+          })
+        }
+        className="flex items-center gap-3 min-w-0 flex-1 text-left"
+      >
+        {isImage ? (
+          <img
+            src={url}
+            alt={name}
+            className="w-12 h-12 rounded-lg object-cover border border-[var(--border-color)] shrink-0"
+          />
+        ) : (
+          <div className="w-12 h-12 rounded-lg bg-[var(--hover-3)] border border-[var(--border-color)] flex items-center justify-center shrink-0">
+            <FileIcon className="w-5 h-5 text-[var(--text-primary)]/40" />
+          </div>
+        )}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">
+              {name}
+            </p>
+
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[var(--hover-2)] text-[var(--text-primary)]/45 border border-[var(--border-color)] shrink-0">
+              {typeLabel}
+            </span>
+          </div>
+
+          <p className="text-xs text-[var(--text-primary)]/35">
+            {size != null
+              ? formatFileSize(size)
+              : 'Размер неизвестен'}
+          </p>
         </div>
+
+        <Eye className="w-4 h-4 text-[var(--text-primary)]/25 shrink-0" />
+      </button>
+
+      {onDelete && attachment.id && (
+        <button
+          type="button"
+          disabled={deleting}
+          onClick={() => onDelete(attachment)}
+          title="Открепить файл"
+          className="p-2 rounded-lg text-[var(--text-primary)]/30 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40 shrink-0"
+        >
+          {deleting ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Trash2 className="w-4 h-4" />
+          )}
+        </button>
       )}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">{name}</p>
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[var(--hover-2)] text-[var(--text-primary)]/45 border border-[var(--border-color)] shrink-0">{typeLabel}</span>
-        </div>
-        <p className="text-xs text-[var(--text-primary)]/35">{size != null ? formatFileSize(size) : 'Размер неизвестен'}</p>
-      </div>
-      <Eye className="w-4 h-4 text-[var(--text-primary)]/25 shrink-0" />
-    </button>
+    </div>
   );
 }
 
@@ -1435,7 +1480,22 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
   const [isDragOver, setIsDragOver] = useState(false);
 
   const [previewItem, setPreviewItem] = useState<AttachmentPreviewItem | null>(null);
-  const existingAttachments = Array.isArray(task?.attachments) ? task.attachments : [];
+  const [existingAttachments, setExistingAttachments] =
+    useState<TaskAttachment[]>(() =>
+      Array.isArray(task?.attachments)
+        ? task.attachments
+        : [],
+    );
+
+  const [
+    deleteAttachmentIntent,
+    setDeleteAttachmentIntent,
+  ] = useState<TaskAttachment | null>(null);
+
+  const [
+    deletingAttachmentId,
+    setDeletingAttachmentId,
+  ] = useState<string | null>(null);
 
   const firstProjectChange = useRef(true);
 
@@ -1493,6 +1553,78 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const isAttachmentUsedInDescription = useCallback(
+  (attachmentId: string) =>
+    descriptionBlocks.some(
+      (block) =>
+        block.type === 'image' &&
+        block.attachmentId === attachmentId,
+    ),
+  [descriptionBlocks],
+);
+
+const requestDeleteAttachment = (
+  attachment: TaskAttachment,
+) => {
+  if (!attachment.id) return;
+
+  if (
+    isAttachmentUsedInDescription(
+      attachment.id,
+    )
+  ) {
+    toast({
+      title: 'Файл используется в описании',
+      description:
+        'Сначала удалите изображение из описания задачи и сохраните изменения.',
+      variant: 'destructive',
+    });
+
+    return;
+  }
+
+  setDeleteAttachmentIntent(
+    attachment,
+  );
+};
+
+  const deleteExistingAttachment = async () => {
+    const attachment = deleteAttachmentIntent;
+
+    if (!attachment?.id) return;
+
+    setDeletingAttachmentId(attachment.id);
+
+    try {
+      await attachmentsApi.deleteAttachment(
+        attachment.id,
+      );
+
+      setExistingAttachments((prev) =>
+        prev.filter(
+          (item) =>
+            item.id !== attachment.id,
+        ),
+      );
+
+      setDeleteAttachmentIntent(null);
+
+      toast({
+        title: 'Файл откреплён',
+        description:
+          getAttachmentName(attachment),
+      });
+    } catch (e: any) {
+      toast({
+        title: 'Не удалось открепить файл',
+        description: apiErr(e),
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingAttachmentId(null);
+    }
+  };
+
   const loadProjects = useCallback(async (q: string, p: number) => {
     const r = await projectsApi.getAll(p, 20);
     const f = q
@@ -1531,50 +1663,39 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
     };
   }, [projectId]);
 
-  const uploadInlineImages = async (
-    blocks: DescriptionBlock[],
-    taskId: string,
-  ): Promise<DescriptionBlock[]> => {
-    const result: DescriptionBlock[] = [];
+ const uploadInlineImages = async (
+  blocks: DescriptionBlock[],
+  taskId: string,
+): Promise<DescriptionBlock[]> => {
+  const result: DescriptionBlock[] = [];
 
-    for (const block of blocks) {
-      if (
-        block.type === 'image' &&
-        block.localFile &&
-        !block.attachmentId
-      ) {
-        const uploaded: any =
-          await attachmentsApi.uploadAttachment(
-            block.localFile,
-            'task',
-            taskId,
-          );
+  for (const block of blocks) {
+    if (
+      block.type === 'image' &&
+      block.localFile &&
+      !block.attachmentId
+    ) {
+      const uploaded =
+        await attachmentsApi.uploadAttachment(
+          block.localFile,
+          'task',
+          taskId,
+        );
 
-        const attachmentId =
-          uploaded?.id ??
-          uploaded?.attachment_id ??
-          uploaded?.data?.id;
+      result.push({
+        ...block,
+        attachmentId: uploaded.id,
+        localFile: undefined,
+      });
 
-        if (!attachmentId) {
-          throw new Error(
-            `Не удалось получить ID загруженного изображения: ${block.localFile.name}`,
-          );
-        }
-
-        result.push({
-          ...block,
-          attachmentId,
-          localFile: undefined,
-        });
-
-        continue;
-      }
-
-      result.push(block);
+      continue;
     }
 
-    return result;
-  };
+    result.push(block);
+  }
+
+  return result;
+};
 
   const submit = async () => {
     if (!title.trim()) return;
@@ -1869,7 +1990,19 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                     {existingAttachments.length > 0 ? (
                       <div className="space-y-2">
                         {existingAttachments.map((att, i) => (
-                          <TaskAttachmentItem key={att.id ?? `${getAttachmentName(att)}-${i}`} attachment={att} onPreview={setPreviewItem} />
+                          <TaskAttachmentItem
+                            key={
+                              att.id ??
+                              `${getAttachmentName(att)}-${i}`
+                            }
+                            attachment={att}
+                            onPreview={setPreviewItem}
+                            onDelete={requestDeleteAttachment}
+                            deleting={
+                              !!att.id &&
+                              deletingAttachmentId === att.id
+                            }
+                          />
                         ))}
                       </div>
                     ) : (
@@ -3150,6 +3283,72 @@ function DetailModal({
           }
         />
       )}
+
+      {deleteAttachmentIntent && (
+  <div className="fixed inset-0 z-[160] flex items-center justify-center p-4">
+    <div
+      className="absolute inset-0 bg-black/60"
+      onClick={() => {
+        if (!deletingAttachmentId) {
+          setDeleteAttachmentIntent(null);
+        }
+      }}
+    />
+
+    <div
+      className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="p-5">
+        <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center mb-4">
+          <Trash2 className="w-5 h-5 text-red-400" />
+        </div>
+
+        <h3 className="text-base font-bold text-[var(--text-primary)]">
+          Открепить файл?
+        </h3>
+
+        <p className="mt-1.5 text-sm text-[var(--text-primary)]/50">
+          Файл будет удалён из вложений задачи.
+        </p>
+
+        <div className="mt-3 px-3 py-2.5 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)] text-sm text-[var(--text-primary)]/70 break-all">
+          {getAttachmentName(
+            deleteAttachmentIntent,
+          )}
+        </div>
+      </div>
+
+      <div className="flex border-t border-[var(--border-color)]">
+        <button
+          type="button"
+          disabled={!!deletingAttachmentId}
+          onClick={() =>
+            setDeleteAttachmentIntent(null)
+          }
+          className="flex-1 py-3 text-sm font-medium text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)] disabled:opacity-40"
+        >
+          Отмена
+        </button>
+
+        <button
+          type="button"
+          disabled={!!deletingAttachmentId}
+          onClick={deleteExistingAttachment}
+          className="flex-1 flex items-center justify-center gap-2 py-3 border-l border-[var(--border-color)] text-sm font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-40"
+        >
+          {deletingAttachmentId ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Trash2 className="w-4 h-4" />
+          )}
+
+          Открепить
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
@@ -4105,26 +4304,26 @@ export default function TasksPage() {
         )}
       </div>
 
-{viewMode === 'kanban' &&
-  !loading &&
-  cols.length > 0 &&
-  boardScrollWidth >
-    boardViewportWidth + 2 &&
-  createPortal(
-    <div
-      style={
-        fixedBoardScrollbarStyle
-      }
-      className="px-1"
-    >
-      <div
-        ref={
-          bottomBoardScrollRef
-        }
-        onScroll={
-          handleBottomBoardScroll
-        }
-        className="
+      {viewMode === 'kanban' &&
+        !loading &&
+        cols.length > 0 &&
+        boardScrollWidth >
+        boardViewportWidth + 2 &&
+        createPortal(
+          <div
+            style={
+              fixedBoardScrollbarStyle
+            }
+            className="px-1"
+          >
+            <div
+              ref={
+                bottomBoardScrollRef
+              }
+              onScroll={
+                handleBottomBoardScroll
+              }
+              className="
           h-3
           overflow-x-scroll
           overflow-y-hidden
@@ -4136,17 +4335,17 @@ export default function TasksPage() {
           scrollbar-thumb-[var(--accent)]/60
           scrollbar-track-transparent
         "
-      >
-        <div
-          style={{
-            width: `${boardScrollWidth}px`,
-            height: 1,
-          }}
-        />
-      </div>
-    </div>,
-    document.body,
-  )}
+            >
+              <div
+                style={{
+                  width: `${boardScrollWidth}px`,
+                  height: 1,
+                }}
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
 
       <AnimatePresence>
         {lastMove && !drag && (
