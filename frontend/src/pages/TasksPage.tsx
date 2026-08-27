@@ -3347,7 +3347,7 @@ function DetailModal({
         />
       )}
 
-      
+
     </div>
   );
 }
@@ -3367,7 +3367,9 @@ export default function TasksPage() {
   const boardScrollRef = useRef<HTMLDivElement>(null);
   const boardInnerRef = useRef<HTMLDivElement>(null);
   const bottomBoardScrollRef = useRef<HTMLDivElement>(null);
-  const boardScrollSyncRef = useRef(false);
+
+  const syncingFromBoardRef = useRef(false);
+  const syncingFromBottomRef = useRef(false);
   const [boardScrollWidth, setBoardScrollWidth] = useState(0);
   const [boardViewportWidth, setBoardViewportWidth] = useState(0);
 
@@ -3545,167 +3547,221 @@ export default function TasksPage() {
     return { type: 'my' };
   }, [mode, selP, selA, selT]);
 
-const syncBoardScrollbarMetrics = useCallback(() => {
-  const board = boardScrollRef.current;
-  const inner = boardInnerRef.current;
+  const syncBoardScrollbarMetrics = useCallback(() => {
+    const board = boardScrollRef.current;
+    const inner = boardInnerRef.current;
 
-  if (!board || !inner) {
-    setFixedBoardScrollbarStyle((prev) => ({
-      ...prev,
-      display: 'none',
-    }));
-    return;
-  }
+    if (!board || !inner) {
+      setFixedBoardScrollbarStyle((prev) => ({
+        ...prev,
+        display: 'none',
+      }));
+      return;
+    }
 
-  const contentWidth = inner.scrollWidth;
-  const viewportWidth = board.clientWidth;
-  const rect = board.getBoundingClientRect();
-  const hasHorizontalOverflow = contentWidth > viewportWidth + 2;
+    const contentWidth = inner.scrollWidth;
+    const viewportWidth = board.clientWidth;
+    const rect = board.getBoundingClientRect();
 
-  setBoardScrollWidth(contentWidth);
-  setBoardViewportWidth(viewportWidth);
+    const hasHorizontalOverflow =
+      contentWidth > viewportWidth + 2;
 
-  setFixedBoardScrollbarStyle({
-    position: 'fixed',
-    left: rect.left,
-    width: rect.width,
-    bottom: 12,
-    zIndex: 55,
-    display: hasHorizontalOverflow ? 'block' : 'none',
-    pointerEvents: 'auto',
-  });
+    setBoardScrollWidth(contentWidth);
+    setBoardViewportWidth(viewportWidth);
 
-  if (bottomBoardScrollRef.current) {
-    bottomBoardScrollRef.current.scrollLeft = board.scrollLeft;
-  }
-}, []);
+    setFixedBoardScrollbarStyle({
+      position: 'fixed',
+      left: rect.left,
+      width: rect.width,
+      bottom: 12,
+      zIndex: 55,
+      display: hasHorizontalOverflow
+        ? 'block'
+        : 'none',
+      pointerEvents: 'auto',
+    });
 
- const handleBoardScroll = useCallback(() => {
-  if (boardScrollSyncRef.current) return;
+    /*
+     * ВАЖНО:
+     *
+     * Здесь больше НИКОГДА не меняем scrollLeft.
+     * Эта функция отвечает только за размеры
+     * фиксированного scrollbar.
+     */
+  }, []);
 
-  boardScrollSyncRef.current = true;
+  const handleBoardScroll = useCallback(() => {
+    const board = boardScrollRef.current;
+    const bottom = bottomBoardScrollRef.current;
 
-  if (
-    bottomBoardScrollRef.current &&
-    boardScrollRef.current
-  ) {
-    bottomBoardScrollRef.current.scrollLeft =
-      boardScrollRef.current.scrollLeft;
-  }
+    if (!board || !bottom) return;
 
-  requestAnimationFrame(() => {
-    boardScrollSyncRef.current = false;
-  });
-}, []);
+    /*
+     * Этот scroll был вызван нами
+     * из нижнего scrollbar.
+     */
+    if (syncingFromBottomRef.current) {
+      syncingFromBottomRef.current = false;
+      return;
+    }
 
-  const handleBottomBoardScroll =
-    useCallback(() => {
-      if (
-        boardScrollSyncRef.current
-      ) {
-        return;
-      }
+    const boardMax =
+      board.scrollWidth -
+      board.clientWidth;
 
-      const board =
-        boardScrollRef.current;
+    const bottomMax =
+      bottom.scrollWidth -
+      bottom.clientWidth;
 
-      const bottom =
-        bottomBoardScrollRef.current;
+    if (boardMax <= 0 || bottomMax <= 0) {
+      return;
+    }
 
-      if (!board || !bottom) {
-        return;
-      }
+    const ratio =
+      board.scrollLeft / boardMax;
 
-      boardScrollSyncRef.current =
-        true;
+    const target =
+      ratio * bottomMax;
 
-      const bottomMax =
-        bottom.scrollWidth -
-        bottom.clientWidth;
+    /*
+     * Не присваиваем почти то же самое.
+     * Это уменьшает лишние scroll events
+     * из-за дробных пикселей.
+     */
+    if (
+      Math.abs(
+        bottom.scrollLeft - target,
+      ) < 0.5
+    ) {
+      return;
+    }
 
-      const boardMax =
-        board.scrollWidth -
-        board.clientWidth;
+    syncingFromBoardRef.current = true;
 
-      const ratio =
-        bottomMax > 0
-          ? bottom.scrollLeft /
-          bottomMax
-          : 0;
+    bottom.scrollLeft = target;
+  }, []);
 
-      board.scrollLeft =
-        ratio * boardMax;
+  const handleBottomBoardScroll = useCallback(() => {
+    const board = boardScrollRef.current;
+    const bottom = bottomBoardScrollRef.current;
 
-      requestAnimationFrame(() => {
-        boardScrollSyncRef.current =
-          false;
-      });
-    }, []);
+    if (!board || !bottom) return;
 
-useEffect(() => {
-  if (
-    viewMode !== 'kanban' ||
-    loading ||
-    !cols.length
-  ) {
-    setFixedBoardScrollbarStyle((prev) => ({
-      ...prev,
-      display: 'none',
-    }));
-    return;
-  }
+    /*
+     * Этот scroll был вызван нами
+     * из настоящего Kanban.
+     */
+    if (syncingFromBoardRef.current) {
+      syncingFromBoardRef.current = false;
+      return;
+    }
 
-  const run = () => {
-    requestAnimationFrame(
-      syncBoardScrollbarMetrics,
-    );
-  };
+    const boardMax =
+      board.scrollWidth -
+      board.clientWidth;
 
-  run();
+    const bottomMax =
+      bottom.scrollWidth -
+      bottom.clientWidth;
 
-  const board = boardScrollRef.current;
-  const inner = boardInnerRef.current;
+    if (boardMax <= 0 || bottomMax <= 0) {
+      return;
+    }
 
-  let ro: ResizeObserver | null = null;
+    const ratio =
+      bottom.scrollLeft / bottomMax;
 
-  if (
-    typeof ResizeObserver !== 'undefined' &&
-    board &&
-    inner
-  ) {
-    ro = new ResizeObserver(run);
+    const target =
+      ratio * boardMax;
 
-    ro.observe(board);
-    ro.observe(inner);
-  }
+    if (
+      Math.abs(
+        board.scrollLeft - target,
+      ) < 0.5
+    ) {
+      return;
+    }
 
-  window.addEventListener('resize', run);
-  window.addEventListener(
-    'scroll',
-    run,
-    true,
-  );
+    syncingFromBottomRef.current = true;
 
-  return () => {
-    ro?.disconnect();
+    board.scrollLeft = target;
+  }, []);
 
-    window.removeEventListener(
+
+
+  useEffect(() => {
+    if (
+      viewMode !== 'kanban' ||
+      loading ||
+      !cols.length
+    ) {
+      setFixedBoardScrollbarStyle((prev) => ({
+        ...prev,
+        display: 'none',
+      }));
+
+      return;
+    }
+
+    const run = () => {
+      requestAnimationFrame(
+        syncBoardScrollbarMetrics,
+      );
+    };
+
+    run();
+
+    const board = boardScrollRef.current;
+    const inner = boardInnerRef.current;
+
+    let ro: ResizeObserver | null = null;
+
+    if (
+      typeof ResizeObserver !== 'undefined' &&
+      board &&
+      inner
+    ) {
+      ro = new ResizeObserver(run);
+
+      ro.observe(board);
+      ro.observe(inner);
+    }
+
+    window.addEventListener(
       'resize',
       run,
     );
 
-    window.removeEventListener(
+    /*
+     * Здесь специально БЕЗ capture=true.
+     *
+     * Нас интересует перемещение страницы,
+     * но не scroll самого Kanban.
+     */
+    window.addEventListener(
       'scroll',
       run,
-      true,
     );
-  };
-}, [
-  viewMode,
-  loading,
-  cols.length,
-  syncBoardScrollbarMetrics,
-]);
+
+    return () => {
+      ro?.disconnect();
+
+      window.removeEventListener(
+        'resize',
+        run,
+      );
+
+      window.removeEventListener(
+        'scroll',
+        run,
+      );
+    };
+  }, [
+    viewMode,
+    loading,
+    cols.length,
+    syncBoardScrollbarMetrics,
+  ]);
 
   const loadUsersMap = useCallback(async () => {
     const m = new Map<string, SimpleUser | CounterpartyCustomer>();
@@ -4262,32 +4318,31 @@ useEffect(() => {
         )}
       </div>
 
-{viewMode === 'kanban' &&
-  !loading &&
-  cols.length > 0 &&
-  createPortal(
-    <div
-      style={fixedBoardScrollbarStyle}
-      className="px-1"
-    >
-      <div
-        ref={bottomBoardScrollRef}
-        onScroll={handleBottomBoardScroll}
-        className="h-2 rounded-xl bg-[var(--bg-card)]/95 border border-[var(--border-color)] shadow-2xl backdrop-blur-md overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/60 scrollbar-track-transparent"
-      >
-        <div
-          style={{
-            width: Math.max(
-              boardScrollWidth,
-              boardViewportWidth,
-            ),
-            height: '100%',
-          }}
-        />
-      </div>
-    </div>,
-    document.body,
-  )}
+      {viewMode === 'kanban' &&
+        !loading &&
+        cols.length > 0 &&
+        createPortal(
+          <div
+            style={fixedBoardScrollbarStyle}
+          >
+            <div
+              ref={bottomBoardScrollRef}
+              onScroll={handleBottomBoardScroll}
+              className="h-2 rounded-xl bg-[var(--bg-card)]/95 border border-[var(--border-color)] shadow-2xl backdrop-blur-md overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/60 scrollbar-track-transparent"
+            >
+              <div
+                style={{
+                  width: Math.max(
+                    boardScrollWidth,
+                    boardViewportWidth,
+                  ),
+                  height: '100%',
+                }}
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
 
       <AnimatePresence>
         {lastMove && !drag && (
