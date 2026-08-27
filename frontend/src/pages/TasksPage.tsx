@@ -3373,6 +3373,15 @@ export default function TasksPage() {
   const [boardScrollWidth, setBoardScrollWidth] = useState(0);
   const [boardViewportWidth, setBoardViewportWidth] = useState(0);
 
+  const [boardScrollLeft, setBoardScrollLeft] = useState(0);
+
+const bottomTrackRef = useRef<HTMLDivElement>(null);
+
+const scrollbarDragRef = useRef<{
+  startX: number;
+  startScrollLeft: number;
+} | null>(null);
+
   const [fixedBoardScrollbarStyle, setFixedBoardScrollbarStyle] = useState<React.CSSProperties>({
     position: 'fixed',
     left: 0,
@@ -3590,56 +3599,13 @@ export default function TasksPage() {
      */
   }, []);
 
-  const handleBoardScroll = useCallback(() => {
-    const board = boardScrollRef.current;
-    const bottom = bottomBoardScrollRef.current;
+const handleBoardScroll = useCallback(() => {
+  const board = boardScrollRef.current;
 
-    if (!board || !bottom) return;
+  if (!board) return;
 
-    /*
-     * Этот scroll был вызван нами
-     * из нижнего scrollbar.
-     */
-    if (syncingFromBottomRef.current) {
-      syncingFromBottomRef.current = false;
-      return;
-    }
-
-    const boardMax =
-      board.scrollWidth -
-      board.clientWidth;
-
-    const bottomMax =
-      bottom.scrollWidth -
-      bottom.clientWidth;
-
-    if (boardMax <= 0 || bottomMax <= 0) {
-      return;
-    }
-
-    const ratio =
-      board.scrollLeft / boardMax;
-
-    const target =
-      ratio * bottomMax;
-
-    /*
-     * Не присваиваем почти то же самое.
-     * Это уменьшает лишние scroll events
-     * из-за дробных пикселей.
-     */
-    if (
-      Math.abs(
-        bottom.scrollLeft - target,
-      ) < 0.5
-    ) {
-      return;
-    }
-
-    syncingFromBoardRef.current = true;
-
-    bottom.scrollLeft = target;
-  }, []);
+  setBoardScrollLeft(board.scrollLeft);
+}, []);
 
   const handleBottomBoardScroll = useCallback(() => {
     const board = boardScrollRef.current;
@@ -4147,6 +4113,145 @@ export default function TasksPage() {
     return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null;
   })() : null;
 
+
+  const boardMaxScroll = Math.max(
+  boardScrollWidth - boardViewportWidth,
+  0,
+);
+
+const scrollbarThumbRatio =
+  boardScrollWidth > 0
+    ? boardViewportWidth / boardScrollWidth
+    : 1;
+
+const scrollbarThumbPercent = Math.min(
+  Math.max(scrollbarThumbRatio * 100, 8),
+  100,
+);
+
+const scrollbarProgress =
+  boardMaxScroll > 0
+    ? boardScrollLeft / boardMaxScroll
+    : 0;
+    
+  const handleScrollbarPointerDown = useCallback(
+  (e: React.PointerEvent<HTMLDivElement>) => {
+    const board = boardScrollRef.current;
+
+    if (!board) return;
+
+    e.preventDefault();
+
+    scrollbarDragRef.current = {
+      startX: e.clientX,
+      startScrollLeft: board.scrollLeft,
+    };
+
+    e.currentTarget.setPointerCapture(e.pointerId);
+  },
+  [],
+);
+
+const handleScrollbarPointerMove = useCallback(
+  (e: React.PointerEvent<HTMLDivElement>) => {
+    const dragState = scrollbarDragRef.current;
+    const board = boardScrollRef.current;
+    const track = bottomTrackRef.current;
+
+    if (!dragState || !board || !track) {
+      return;
+    }
+
+    const trackWidth = track.clientWidth;
+
+    const thumbWidth =
+      trackWidth *
+      Math.min(
+        scrollbarThumbRatio,
+        1,
+      );
+
+    const thumbTravel = Math.max(
+      trackWidth - thumbWidth,
+      1,
+    );
+
+    const boardMax = Math.max(
+      board.scrollWidth -
+        board.clientWidth,
+      0,
+    );
+
+    const deltaX =
+      e.clientX -
+      dragState.startX;
+
+    const scrollDelta =
+      (deltaX / thumbTravel) *
+      boardMax;
+
+    board.scrollLeft =
+      dragState.startScrollLeft +
+      scrollDelta;
+  },
+  [scrollbarThumbRatio],
+);
+
+const handleScrollbarPointerUp = useCallback(
+  (e: React.PointerEvent<HTMLDivElement>) => {
+    scrollbarDragRef.current = null;
+
+    try {
+      e.currentTarget.releasePointerCapture(
+        e.pointerId,
+      );
+    } catch {
+      // pointer capture уже мог быть снят браузером
+    }
+  },
+  [],
+);
+
+const handleScrollbarTrackClick = useCallback(
+  (e: React.MouseEvent<HTMLDivElement>) => {
+    const board = boardScrollRef.current;
+    const track = bottomTrackRef.current;
+
+    if (!board || !track) return;
+
+    // Если нажали непосредственно на thumb,
+    // его pointer handlers сами всё обработают.
+    if (
+      (e.target as HTMLElement).dataset
+        .scrollThumb === 'true'
+    ) {
+      return;
+    }
+
+    const rect =
+      track.getBoundingClientRect();
+
+    const ratio = Math.min(
+      Math.max(
+        (e.clientX - rect.left) /
+          rect.width,
+        0,
+      ),
+      1,
+    );
+
+    const maxScroll =
+      board.scrollWidth -
+      board.clientWidth;
+
+    board.scrollTo({
+      left: ratio * maxScroll,
+      behavior: 'smooth',
+    });
+  },
+  [],
+);
+
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-500" onDragEnd={onDE}>
       <div className="flex-shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
@@ -4318,31 +4423,66 @@ export default function TasksPage() {
         )}
       </div>
 
-      {viewMode === 'kanban' &&
-        !loading &&
-        cols.length > 0 &&
-        createPortal(
-          <div
-            style={fixedBoardScrollbarStyle}
-          >
-            <div
-              ref={bottomBoardScrollRef}
-              onScroll={handleBottomBoardScroll}
-              className="h-2 rounded-xl bg-[var(--bg-card)]/95 border border-[var(--border-color)] shadow-2xl backdrop-blur-md overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/60 scrollbar-track-transparent"
-            >
-              <div
-                style={{
-                  width: Math.max(
-                    boardScrollWidth,
-                    boardViewportWidth,
-                  ),
-                  height: '100%',
-                }}
-              />
-            </div>
-          </div>,
-          document.body,
-        )}
+{viewMode === 'kanban' &&
+  !loading &&
+  cols.length > 0 &&
+  boardScrollWidth >
+    boardViewportWidth + 2 &&
+  createPortal(
+    <div
+      style={fixedBoardScrollbarStyle}
+      className="px-1"
+    >
+      <div
+        ref={bottomTrackRef}
+        onClick={handleScrollbarTrackClick}
+        className="
+          relative
+          h-3
+          rounded-full
+          bg-[var(--hover-2)]
+          border border-[var(--border-color)]
+          cursor-pointer
+          select-none
+        "
+      >
+        <div
+          data-scroll-thumb="true"
+          onPointerDown={
+            handleScrollbarPointerDown
+          }
+          onPointerMove={
+            handleScrollbarPointerMove
+          }
+          onPointerUp={
+            handleScrollbarPointerUp
+          }
+          onPointerCancel={
+            handleScrollbarPointerUp
+          }
+          className="
+            absolute
+            top-[1px]
+            bottom-[1px]
+            rounded-full
+            bg-[var(--accent)]
+            cursor-grab
+            active:cursor-grabbing
+            touch-none
+          "
+          style={{
+            width: `${scrollbarThumbPercent}%`,
+
+            left: `${
+              scrollbarProgress *
+              (100 - scrollbarThumbPercent)
+            }%`,
+          }}
+        />
+      </div>
+    </div>,
+    document.body,
+  )}
 
       <AnimatePresence>
         {lastMove && !drag && (
