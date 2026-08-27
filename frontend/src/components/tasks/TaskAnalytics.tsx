@@ -808,7 +808,7 @@ export function TaskAnalytics({
 
   return (
     <div className="h-full overflow-y-auto pr-1 pb-8 scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent">
-      <div className="max-w-[1500px] mx-auto space-y-5">
+      <div className=" mx-auto space-y-5">
         {/* HEADER */}
 
         <div className="flex items-center justify-between gap-4">
