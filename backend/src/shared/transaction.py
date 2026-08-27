@@ -6,10 +6,10 @@ from .domain.repos import UnitOfWork
 
 
 async def commit[EntityT: Entity](
-        uow: UnitOfWork,
-        *aggregates: EntityT,
-        event_publisher: EventPublisher,
-        recorder: ActivityLogRecorder | None = None,
+    uow: UnitOfWork,
+    *aggregates: EntityT,
+    event_publisher: EventPublisher,
+    recorder: ActivityLogRecorder | None = None,
 ) -> None:
     events = []
     for aggregate in aggregates:

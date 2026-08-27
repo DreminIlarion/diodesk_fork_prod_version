@@ -79,7 +79,7 @@ class Counterparty(Entity):
             # Пропускаем проверку, если оба поля пустые
             if not contact_person.phone and not contact_person.email:
                 continue
-            
+
             contact_data = (contact_person.phone, contact_person.email)
             if contact_data in seen_contact_data:
                 raise InvariantViolationError(
@@ -100,14 +100,14 @@ class Counterparty(Entity):
         return self.parent_id is not None
 
     def edit(
-            self,
-            *,
-            name: str | None = None,
-            legal_name: str | None = None,
-            okpo: Okpo | None = None,
-            phone: Phone | None = None,
-            email: EmailStr | None = None,
-            address: str | None = None,
+        self,
+        *,
+        name: str | None = None,
+        legal_name: str | None = None,
+        okpo: Okpo | None = None,
+        phone: Phone | None = None,
+        email: EmailStr | None = None,
+        address: str | None = None,
     ) -> None:
         """
         Редактирование основных данных контрагента.
@@ -144,14 +144,14 @@ class Counterparty(Entity):
             self.updated_at = current_datetime()
 
     def create_branch(
-            self,
-            name: str,
-            legal_name: str,
-            kpp: str,
-            phone: str,
-            email: EmailStr,
-            okpo: str | None = None,
-            address: str | None = None,
+        self,
+        name: str,
+        legal_name: str,
+        kpp: str,
+        phone: str,
+        email: EmailStr,
+        okpo: str | None = None,
+        address: str | None = None,
     ) -> "Counterparty":
         """Создание обособленного подразделения с привязкой к контрагенту"""
 
@@ -170,17 +170,17 @@ class Counterparty(Entity):
             phone=Phone(phone),
             email=email,
             address=address,
-            parent_id=self.id
+            parent_id=self.id,
         )
 
     def add_contact_person(
-            self,
-            first_name: str,
-            last_name: str,
-            phone: str,
-            email: str,
-            middle_name: str | None = None,
-            messengers: dict[str, str] | None = None,
+        self,
+        first_name: str,
+        last_name: str,
+        phone: str,
+        email: str,
+        middle_name: str | None = None,
+        messengers: dict[str, str] | None = None,
     ) -> Self:
         """Добавления контактного лица"""
 
@@ -189,18 +189,14 @@ class Counterparty(Entity):
             # Пропускаем проверку, если оба поля пустые
             if not phone and not email:
                 continue
-            
+
             # Проверяем совпадение по телефону
             if phone and contact_person.phone == Phone(phone):
-                raise ValueError(
-                    f"Contact person with phone - '{phone}' already exists"
-                )
-            
+                raise ValueError(f"Contact person with phone - '{phone}' already exists")
+
             # Проверяем совпадение по email
             if email and contact_person.email == email:
-                raise ValueError(
-                    f"Contact person with email - '{email}' already exists"
-                )
+                raise ValueError(f"Contact person with email - '{email}' already exists")
 
         self.contact_persons.append(
             ContactPerson.create(

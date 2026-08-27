@@ -20,7 +20,9 @@ _transition_registry: dict[tuple[TicketStatus, TicketAction], Transition] = {}
 
 
 def register_transition(
-        *from_: TicketStatus, action: TicketAction, to: TicketStatus | None = None,
+    *from_: TicketStatus,
+    action: TicketAction,
+    to: TicketStatus | None = None,
 ) -> None:
     """Регистрация перехода без дополнительной логики."""
 

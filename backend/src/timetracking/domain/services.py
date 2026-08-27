@@ -43,7 +43,7 @@ def submit_worklogs_in_timesheet(timesheet: Timesheet, worklogs: list[Worklog]) 
 
 
 def approve_worklogs_in_timesheet(
-        timesheet: Timesheet, worklogs: list[Worklog], approved_by: UUID
+    timesheet: Timesheet, worklogs: list[Worklog], approved_by: UUID
 ) -> None:
     """Согласовать все часы работ в рамках ЛУРВ"""
 
@@ -58,7 +58,7 @@ def approve_worklogs_in_timesheet(
 
 
 def reject_worklogs_in_timesheet(
-        timesheet: Timesheet, worklogs: list[Worklog], rejected_by: UUID, reason: str
+    timesheet: Timesheet, worklogs: list[Worklog], rejected_by: UUID, reason: str
 ) -> None:
     """Отклонение ЛУРВ и всего журнала работ"""
 

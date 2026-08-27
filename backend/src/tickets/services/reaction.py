@@ -14,11 +14,11 @@ from ..schemas import ReactionResponse
 
 class ReactionService:
     def __init__(
-            self,
-            session: AsyncSession,
-            comment_repo: CommentRepository,
-            reaction_repo: ReactionRepository,
-            event_publisher: EventPublisher,
+        self,
+        session: AsyncSession,
+        comment_repo: CommentRepository,
+        reaction_repo: ReactionRepository,
+        event_publisher: EventPublisher,
     ) -> None:
         self.session = session
         self.comment_repo = comment_repo
@@ -26,10 +26,10 @@ class ReactionService:
         self.event_publisher = event_publisher
 
     async def toggle(
-            self,
-            comment_id: UUID,
-            current_subject: Subject,
-            reaction_type: ReactionType,
+        self,
+        comment_id: UUID,
+        current_subject: Subject,
+        reaction_type: ReactionType,
     ) -> None:
         """Поставить или снять реакцию текущего пользователя"""
 
@@ -68,7 +68,9 @@ class ReactionService:
             await self.event_publisher.publish(event)
 
     async def get_reactions_for_comment(
-            self, comment_id: UUID, current_subject: Subject,
+        self,
+        comment_id: UUID,
+        current_subject: Subject,
     ) -> ReactionResponse:
         """Получение реакции для комментария"""
 

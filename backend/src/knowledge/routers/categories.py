@@ -6,10 +6,7 @@ router = APIRouter(prefix="/categories", tags=["Категории"])
 
 
 @router.post(
-    path="",
-    status_code=status.HTTP_201_CREATED,
-    response_model=...,
-    summary="Создать категорию"
+    path="", status_code=status.HTTP_201_CREATED, response_model=..., summary="Создать категорию"
 )
 async def create_category(): ...
 
@@ -18,7 +15,7 @@ async def create_category(): ...
     path="/{category_id}",
     status_code=status.HTTP_200_OK,
     response_model=...,
-    summary="Редактировать категорию"
+    summary="Редактировать категорию",
 )
 async def edit_category(category_id: UUID): ...
 
@@ -27,7 +24,7 @@ async def edit_category(category_id: UUID): ...
     path="/{category_id}",
     status_code=status.HTTP_200_OK,
     response_model=...,
-    summary="Получение категории"
+    summary="Получение категории",
 )
 async def get_category(category_id: UUID): ...
 
@@ -36,7 +33,7 @@ async def get_category(category_id: UUID): ...
     path="",
     status_code=status.HTTP_200_OK,
     response_model=...,
-    summary="Получение дерева категорий"
+    summary="Получение дерева категорий",
 )
 async def get_categories(): ...
 
@@ -45,6 +42,6 @@ async def get_categories(): ...
     path="/{category_id}",
     status_code=status.HTTP_200_OK,
     response_model=...,
-    summary="Удалить категорию"
+    summary="Удалить категорию",
 )
 async def delete_category(category_id: UUID): ...

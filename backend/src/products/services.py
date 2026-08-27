@@ -17,12 +17,16 @@ class ProductService:
         self.repository = repository
 
     async def create(
-            self, data: ProductCreate, created_by: UUID, created_by_role: UserRole
+        self, data: ProductCreate, created_by: UUID, created_by_role: UserRole
     ) -> ProductResponse:
         """Создание программного продукта"""
 
         # 1. Проверка прав и валидация
-        if created_by_role not in (UserRole.ADMIN.value, UserRole.SUPPORT_AGENT.value, UserRole.SUPPORT_MANAGER.value):
+        if created_by_role not in {
+            UserRole.ADMIN.value,
+            UserRole.SUPPORT_AGENT.value,
+            UserRole.SUPPORT_MANAGER.value,
+        }:
             raise PermissionDeniedError("Only support staff can create products")
 
         if data.status not in {ProductStatus.ACTIVE, ProductStatus.BETA}:

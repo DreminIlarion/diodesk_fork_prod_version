@@ -34,11 +34,11 @@ def map_ticket_to_preview(ticket: Ticket) -> TicketPreview:
 
 
 def map_ticket_to_view_response(
-        ticket: Ticket,
-        reporter: User,
-        assignee: User | None = None,
-        counterparty: Counterparty | None = None,
-        project: Project | None = None,
+    ticket: Ticket,
+    reporter: User,
+    assignee: User | None = None,
+    counterparty: Counterparty | None = None,
+    project: Project | None = None,
 ) -> TicketViewResponse:
     assignee_ref = (
         UserReference(
@@ -47,7 +47,8 @@ def map_ticket_to_view_response(
             email=assignee.email.value if assignee.email else "",
             type=assignee.type,
         )
-        if assignee else None
+        if assignee
+        else None
     )
     counterparty_ref = (
         CounterpartyReference(
@@ -55,7 +56,8 @@ def map_ticket_to_view_response(
             name=counterparty.name,
             email=counterparty.email,
         )
-        if counterparty else None
+        if counterparty
+        else None
     )
     project_ref = (
         ProjectReference(
@@ -63,7 +65,8 @@ def map_ticket_to_view_response(
             key=project.key.value,
             name=project.name,
         )
-        if project else None
+        if project
+        else None
     )
 
     return TicketViewResponse(
@@ -102,10 +105,9 @@ def map_comment_to_response(comment: Comment) -> CommentResponse:
         attachments=[map_attachment_to_response(attachment) for attachment in comment.attachments],
     )
 
+
 def map_comment_with_reactions_to_response(
-        comment: Comment,
-        reaction_counts: dict[ReactionType, int],
-        user_reactions: list[ReactionType]
+    comment: Comment, reaction_counts: dict[ReactionType, int], user_reactions: list[ReactionType]
 ) -> CommentWithReactionsResponse:
     return CommentWithReactionsResponse(
         id=comment.id,
@@ -122,6 +124,8 @@ def map_comment_with_reactions_to_response(
         reaction_counts=reaction_counts,
         user_reactions=user_reactions,
     )
+
+
 def map_ticket_to_response(ticket: Ticket) -> TicketResponse:
     return TicketResponse(
         id=ticket.id,

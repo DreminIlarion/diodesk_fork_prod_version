@@ -20,7 +20,9 @@ def minio_secret_key():
 def minio_container(minio_secret_key):
     minio_container = (
         MinioContainer(
-            image="quay.io/minio/minio", access_key="minioadmin", secret_key=minio_secret_key,
+            image="quay.io/minio/minio",
+            access_key="minioadmin",
+            secret_key=minio_secret_key,
         )
         .waiting_for(PortWaitStrategy(port=9000))
         .with_env("MINIO_ROOT_USER", "minioadmin")

@@ -25,10 +25,10 @@ class FeedbackMapper(ModelMapper[Feedback, FeedbackOrm]):
             deleted_at=model.deleted_at,
             ticket_id=model.ticket_id,
             author_id=model.author_id,
-            rating=FeedbackRating(model.rating), 
+            rating=FeedbackRating(model.rating),
             comment=model.comment,
         )
-    
+
     @staticmethod
     def from_entity(entity: Feedback) -> FeedbackOrm:
         return FeedbackOrm(
@@ -41,7 +41,7 @@ class FeedbackMapper(ModelMapper[Feedback, FeedbackOrm]):
             rating=entity.rating.value,
             comment=entity.comment,
         )
-    
+
 
 class SqlFeedbackRepository(SqlAlchemyRepository[Feedback, FeedbackOrm]):
     """
@@ -56,21 +56,22 @@ class SqlFeedbackRepository(SqlAlchemyRepository[Feedback, FeedbackOrm]):
         Получить активный отзыв по тикету.
         """
 
-
-        stmt = select(self.model).where(
-            self.model.ticket_id == ticket_id,
-            self.model.deleted_at.is_(None),
-        ).order_by(self.model.created_at.desc())
+        stmt = (
+            select(self.model)
+            .where(
+                self.model.ticket_id == ticket_id,
+                self.model.deleted_at.is_(None),
+            )
+            .order_by(self.model.created_at.desc())
+        )
         result = await self.session.execute(stmt)
         models = result.scalars().all()
         return [self.model_mapper.to_entity(m) for m in models]
 
-
-    
     async def paginate(
-            self,
-            pagination: Pagination,
-            filters: FeedbackFilters | None = None,
+        self,
+        pagination: Pagination,
+        filters: FeedbackFilters | None = None,
     ) -> Page[Feedback]:
         """
         Получить страницу активных отзывов с фильтрами.

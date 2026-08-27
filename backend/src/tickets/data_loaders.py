@@ -19,21 +19,21 @@ class References:
 
 class ReferenceLoader:
     def __init__(
-            self,
-            users_loader: Callable[[list[UUID]], Awaitable[list[User]]],
-            counterparties_loader: Callable[[list[UUID]], Awaitable[list[Counterparty]]],
-            projects_loader: Callable[[list[UUID]], Awaitable[list[Project]]],
+        self,
+        users_loader: Callable[[list[UUID]], Awaitable[list[User]]],
+        counterparties_loader: Callable[[list[UUID]], Awaitable[list[Counterparty]]],
+        projects_loader: Callable[[list[UUID]], Awaitable[list[Project]]],
     ) -> None:
         self._users_loader = users_loader
         self._counterparties_loader = counterparties_loader
         self._projects_loader = projects_loader
 
     async def load(
-            self,
-            *,
-            users: Iterable[UUID] = (),
-            counterparties: Iterable[UUID] = (),
-            projects: Iterable[UUID] = (),
+        self,
+        *,
+        users: Iterable[UUID] = (),
+        counterparties: Iterable[UUID] = (),
+        projects: Iterable[UUID] = (),
     ) -> References:
         user_ids = list(set(users))
         counterparty_ids = list(set(counterparties))
@@ -57,8 +57,7 @@ class ReferenceLoader:
         return References(
             users={user.id: user for user in users_task.result()},
             counterparties={
-                counterparty.id: counterparty
-                for counterparty in counterparties_task.result()
+                counterparty.id: counterparty for counterparty in counterparties_task.result()
             },
             projects={project.id: project for project in projects_task.result()},
         )

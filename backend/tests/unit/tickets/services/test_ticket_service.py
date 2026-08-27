@@ -25,13 +25,13 @@ def project_access_service(fake_membership_repo):
 
 @pytest.fixture
 def ticket_service(
-        mock_session,
-        fake_ticket_repo,
-        fake_project_repo,
-        project_access_service,
-        fake_counterparty_repo,
-        fake_user_repo,
-        event_publisher,
+    mock_session,
+    fake_ticket_repo,
+    fake_project_repo,
+    project_access_service,
+    fake_counterparty_repo,
+    fake_user_repo,
+    event_publisher,
 ):
     return TicketService(
         uow=mock_session,
@@ -182,7 +182,7 @@ class TestCreate:
 
     @pytest.mark.asyncio
     async def test_create_without_project_and_counterparty_success(
-            self, ticket_service, current_support_agent, mock_session, fake_ticket_repo
+        self, ticket_service, current_support_agent, mock_session, fake_ticket_repo
     ):
         """
         Успешное создание тикета вне проекта или контрагента
@@ -209,7 +209,7 @@ class TestCreate:
 
     @pytest.mark.asyncio
     async def test_create_with_project_success(
-            self, ticket_service, created_project, current_support_agent, fake_membership_repo
+        self, ticket_service, created_project, current_support_agent, fake_membership_repo
     ):
         """
         Успешное создание тикета внутри проекта
@@ -239,7 +239,7 @@ class TestCreate:
 
     @pytest.mark.asyncio
     async def test_create_with_counterparty_success(
-            self, ticket_service, created_counterparty, current_customer
+        self, ticket_service, created_counterparty, current_customer
     ):
         """
         Успешное создание тикета от контрагента
@@ -260,7 +260,7 @@ class TestCreate:
 
     @pytest.mark.asyncio
     async def test_denied_by_project_access(
-            self, ticket_service, created_project, current_support_agent
+        self, ticket_service, created_project, current_support_agent
     ):
         """
         Запрет на создание тикета при отсутствии членства в проекте
@@ -280,7 +280,7 @@ class TestCreate:
 
     @pytest.mark.asyncio
     async def test_creation_failed_when_project_not_found(
-            self, ticket_service, current_support_agent
+        self, ticket_service, current_support_agent
     ):
         """
         Нельзя создать тикет в проекте, если проект не создан
@@ -300,7 +300,7 @@ class TestCreate:
 
     @pytest.mark.asyncio
     async def test_creation_failed_when_counterparty_not_found(
-            self, ticket_service, current_support_agent
+        self, ticket_service, current_support_agent
     ):
         """
         Нельзя создать тикет на контрагента, когда контрагент не создан
@@ -316,21 +316,20 @@ class TestCreate:
         )
 
         with pytest.raises(
-                NotFoundError, match=f"Counterparty with ID {data.counterparty_id} not found"
+            NotFoundError, match=f"Counterparty with ID {data.counterparty_id} not found"
         ):
             await ticket_service.create(data, current_support_agent)
 
 
 class TestEdit:
-
     @pytest.mark.asyncio
     async def test_edit_success(
-            self,
-            ticket_service,
-            fake_ticket_repo,
-            current_support_agent,
-            created_ticket,
-            mock_session,
+        self,
+        ticket_service,
+        fake_ticket_repo,
+        current_support_agent,
+        created_ticket,
+        mock_session,
     ):
         """
         Успешное редактирование тикета
@@ -352,9 +351,7 @@ class TestEdit:
         assert edited_ticket.title == "New title"
 
     @pytest.mark.asyncio
-    async def test_edit_failure_when_ticket_not_found(
-            self, ticket_service, current_support_agent
-    ):
+    async def test_edit_failure_when_ticket_not_found(self, ticket_service, current_support_agent):
         """
         Нельзя отредактировать несуществующий тикет
         """
@@ -371,15 +368,14 @@ class TestEdit:
 
 
 class TestArchive:
-
     @pytest.mark.asyncio
     async def test_archive_success(
-            self,
-            ticket_service,
-            created_ticket,
-            current_support_agent,
-            fake_ticket_repo,
-            mock_session,
+        self,
+        ticket_service,
+        created_ticket,
+        current_support_agent,
+        fake_ticket_repo,
+        mock_session,
     ):
         """
         Успешная архивация тикета
@@ -409,7 +405,7 @@ class TestArchive:
 
     @pytest.mark.asyncio
     async def test_archive_failure_when_ticket_not_found(
-            self, ticket_service, current_support_agent
+        self, ticket_service, current_support_agent
     ):
         """
         Нельзя архивировать несуществующий тикет
@@ -422,15 +418,14 @@ class TestArchive:
 
 
 class TestAssignTo:
-
     @pytest.mark.asyncio
     async def test_assign_to_success(
-            self,
-            ticket_service,
-            ticket_in_open,
-            fake_ticket_repo,
-            current_support_agent,
-            mock_session,
+        self,
+        ticket_service,
+        ticket_in_open,
+        fake_ticket_repo,
+        current_support_agent,
+        mock_session,
     ):
         """
         Успешное назначение исполнителя на тикет
@@ -451,12 +446,12 @@ class TestAssignTo:
 
     @pytest.mark.asyncio
     async def test_assign_with_project_check(
-            self,
-            ticket_service,
-            opened_ticket_in_project,
-            created_project,
-            current_support_agent,
-            fake_membership_repo,
+        self,
+        ticket_service,
+        opened_ticket_in_project,
+        created_project,
+        current_support_agent,
+        fake_membership_repo,
     ):
         """
         Успешное назначение тикета в проекте
@@ -480,11 +475,11 @@ class TestAssignTo:
 
     @pytest.mark.asyncio
     async def test_assign_denied(
-            self,
-            ticket_service,
-            ticket_in_open,
-            current_customer,
-            current_support_agent,
+        self,
+        ticket_service,
+        ticket_in_open,
+        current_customer,
+        current_support_agent,
     ):
         """
         Нельзя назначить тикет на клиента
@@ -499,13 +494,13 @@ class TestAssignTo:
 
     @pytest.mark.asyncio
     async def test_assign_project_permission_denied(
-            self,
-            ticket_service,
-            opened_ticket_in_project,
-            created_project,
-            current_customer,
-            current_support_agent,
-            fake_membership_repo,
+        self,
+        ticket_service,
+        opened_ticket_in_project,
+        created_project,
+        current_customer,
+        current_support_agent,
+        fake_membership_repo,
     ):
         """
         Тест ошибки авторизации в проекте
@@ -549,7 +544,10 @@ class TestAssignTo:
 
     @pytest.mark.asyncio
     async def test_assign_failure_when_user_not_found(
-            self, ticket_service, current_support_agent, ticket_in_open,
+        self,
+        ticket_service,
+        current_support_agent,
+        ticket_in_open,
     ):
         """
         Нельзя назначить тикет на несуществующего пользователя
@@ -566,15 +564,14 @@ class TestAssignTo:
 
 
 class TestChangeStatus:
-
     @pytest.mark.asyncio
     async def test_change_status_success(
-            self,
-            ticket_service,
-            ticket_in_open,
-            current_support_agent,
-            fake_ticket_repo,
-            mock_session,
+        self,
+        ticket_service,
+        ticket_in_open,
+        current_support_agent,
+        fake_ticket_repo,
+        mock_session,
     ):
         """
         Успешное изменение статуса тикета
@@ -596,12 +593,12 @@ class TestChangeStatus:
 
     @pytest.mark.asyncio
     async def test_change_status_with_project_check(
-            self,
-            ticket_service,
-            opened_ticket_in_project,
-            current_support_agent,
-            created_project,
-            fake_membership_repo,
+        self,
+        ticket_service,
+        opened_ticket_in_project,
+        current_support_agent,
+        created_project,
+        fake_membership_repo,
     ):
         """
         Успешное изменение статуса для тикета внутри проекта
@@ -625,9 +622,7 @@ class TestChangeStatus:
         assert response.status == new_status
 
     @pytest.mark.asyncio
-    async def test_change_status_denied(
-            self, ticket_service, ticket_in_open, current_customer
-    ):
+    async def test_change_status_denied(self, ticket_service, ticket_in_open, current_customer):
         """
         Тест ошибки авторизации при смене статуса
         """
@@ -641,7 +636,7 @@ class TestChangeStatus:
 
     @pytest.mark.asyncio
     async def test_change_status_for_project_ticket_denied(
-            self, ticket_service, opened_ticket_in_project, current_support_agent
+        self, ticket_service, opened_ticket_in_project, current_support_agent
     ):
         """
         Ошибка авторизации при смене статуса в проекте
@@ -656,7 +651,7 @@ class TestChangeStatus:
 
     @pytest.mark.asyncio
     async def test_change_status_failure_when_ticket_not_found(
-            self, ticket_service, current_support_agent
+        self, ticket_service, current_support_agent
     ):
         """
         Нельзя сменить статус для несуществующего тикета

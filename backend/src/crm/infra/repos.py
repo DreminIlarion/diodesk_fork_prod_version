@@ -19,7 +19,6 @@ from .models import CounterpartyOrm, CounterpartyProductOrm
 
 
 class CounterpartyMapper(ModelMapper[Counterparty, CounterpartyOrm]):
-
     @staticmethod
     def to_entity(model: CounterpartyOrm) -> Counterparty:
         return Counterparty(
@@ -84,7 +83,9 @@ class SqlCounterpartyRepository(SqlAlchemyRepository[Counterparty, CounterpartyO
     model_mapper = CounterpartyMapper
 
     def _apply_counterparty_filters(
-            self, stmt: Select[tuple[CounterpartyOrm]], filters: CounterpartyFilters,
+        self,
+        stmt: Select[tuple[CounterpartyOrm]],
+        filters: CounterpartyFilters,
     ) -> Select[tuple[CounterpartyOrm]]:
         conditions = []
 
@@ -112,7 +113,9 @@ class SqlCounterpartyRepository(SqlAlchemyRepository[Counterparty, CounterpartyO
 
     @override
     async def paginate(
-            self, pagination: Pagination, filters: CounterpartyFilters | None = None,
+        self,
+        pagination: Pagination,
+        filters: CounterpartyFilters | None = None,
     ) -> Page[Counterparty]:
         stmt = select(self.model)
 
@@ -122,24 +125,16 @@ class SqlCounterpartyRepository(SqlAlchemyRepository[Counterparty, CounterpartyO
         return await self._paginate(stmt, pagination)
 
     async def get_by_email(self, email: str) -> Counterparty | None:
-        stmt = (
-            select(self.model)
-            .where(
-                (self.model.email == email) &
-                (self.model.parent_id.is_(None))
-            )
+        stmt = select(self.model).where(
+            (self.model.email == email) & (self.model.parent_id.is_(None))
         )
         result = await self.session.execute(stmt)
         model = result.scalar_one_or_none()
         return None if model is None else self.model_mapper.to_entity(model)
 
     async def get_by_inn(self, inn: Inn) -> Counterparty | None:
-        stmt = (
-            select(self.model)
-            .where(
-                (self.model.inn == inn.value) &
-                (self.model.parent_id.is_(None))
-            )
+        stmt = select(self.model).where(
+            (self.model.inn == inn.value) & (self.model.parent_id.is_(None))
         )
         result = await self.session.execute(stmt)
         model = result.scalar_one_or_none()
@@ -194,7 +189,9 @@ class SqlCounterpartyRepository(SqlAlchemyRepository[Counterparty, CounterpartyO
         )
 
     async def get_products(
-            self, counterparty_id: UUID, pagination: Pagination,
+        self,
+        counterparty_id: UUID,
+        pagination: Pagination,
     ) -> Page[SoftwareProduct]:
         # 1. Базовый запрос на получение программный продуктов
         stmt = (

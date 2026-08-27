@@ -20,8 +20,10 @@ from src.iam.routers import router as iam_router
 from src.iam.routers.invitations import broker_router as invitations_broker_router  # Добавить
 from src.media.router import router as media_router
 from src.notifications.infra.handlers import router as notifications_broker_router
+from src.notifications.routers.notifications import (
+    broker_router as notifications_sse_broker_router,  # Добавить
+)
 from src.notifications.routers.notifications import router as notification_router
-from src.notifications.routers.notifications import broker_router as notifications_sse_broker_router  # Добавить
 from src.products.router import router as product_router
 from src.projects.routers import router as project_router
 from src.shared.domain.exceptions import AppError
@@ -64,15 +66,15 @@ app = FastAPI(
 Instrumentator(
     should_group_status_codes=True,
     should_group_untemplated=True,
-    excluded_handlers=["/health", "/metrics"]
+    excluded_handlers=["/health", "/metrics"],
 ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 # Rabbit обработчики (все subscriber'ы)
 broker_router.include_router(notification_router)
 broker_router.include_router(notifications_broker_router)
 broker_router.include_router(task_broker_router)
-broker_router.include_router(invitations_broker_router)          # Добавить
-broker_router.include_router(notifications_sse_broker_router)    # Добавить
+broker_router.include_router(invitations_broker_router)  # Добавить
+broker_router.include_router(notifications_sse_broker_router)  # Добавить
 
 # HTTP роутеры
 router = APIRouter(prefix="/api/v1")
@@ -112,7 +114,7 @@ def value_exception_handler(request: Request, exc: ValueError) -> JSONResponse: 
                 "status": status.HTTP_400_BAD_REQUEST,
                 "details": {},
             }
-        }
+        },
     )
 
 
@@ -128,7 +130,7 @@ def app_exception_handler(request: Request, exc: AppError) -> JSONResponse:  # n
                 "status": exc.status_code,
                 "details": exc.details,
             }
-        }
+        },
     )
 
 

@@ -36,12 +36,14 @@ def sample_counterparty_model(sample_uuid, sample_datetime):
         email="info@romashka.ru",
         address="г. Москва, ул. Ленина, д. 10",
         avatar_url="https://example.com/logo.png",
-        contact_persons=[{
-            "full_name": "Петрова Анна Сергеевна",
-            "phone": "+79991234567",
-            "email": "anna.petrovna@romashka.ru",
-            "messengers": {"telegram": "@anna_p", "whatsapp": "+79991234567"}
-        }],
+        contact_persons=[
+            {
+                "full_name": "Петрова Анна Сергеевна",
+                "phone": "+79991234567",
+                "email": "anna.petrovna@romashka.ru",
+                "messengers": {"telegram": "@anna_p", "whatsapp": "+79991234567"},
+            }
+        ],
         is_active=True,
     )
 
@@ -62,12 +64,14 @@ def sample_counterparty_entity(sample_uuid, sample_datetime):
         email="info@romashka.ru",
         address="г. Москва, ул. Ленина, д. 10",
         avatar_url="https://example.com/logo.png",
-        contact_persons=[ContactPerson(
-            full_name=FullName("Петрова Анна Сергеевна"),
-            phone=Phone("+79991234567"),
-            email="anna.petrovna@romashka.ru",
-            messengers={"telegram": "@anna_p", "whatsapp": "+79991234567"}
-        )],
+        contact_persons=[
+            ContactPerson(
+                full_name=FullName("Петрова Анна Сергеевна"),
+                phone=Phone("+79991234567"),
+                email="anna.petrovna@romashka.ru",
+                messengers={"telegram": "@anna_p", "whatsapp": "+79991234567"},
+            )
+        ],
         is_active=True,
     )
 
@@ -95,14 +99,17 @@ def test_to_entity_full_mapping(sample_counterparty_model):
     # Проверка контактного лица
     assert entity.contact_persons
     assert entity.contact_persons[0].full_name == "Петрова Анна Сергеевна"
-    assert entity.contact_persons[0].phone.value == (
-        sample_counterparty_model.contact_persons[0]["phone"]
+    assert (
+        entity.contact_persons[0].phone.value
+        == (sample_counterparty_model.contact_persons[0]["phone"])
     )
-    assert entity.contact_persons[0].email == (
-        sample_counterparty_model.contact_persons[0]["email"]
+    assert (
+        entity.contact_persons[0].email == (sample_counterparty_model.contact_persons[0]["email"])
     )
-    assert entity.contact_persons[0].messengers == \
-           sample_counterparty_model.contact_persons[0]["messengers"]
+    assert (
+        entity.contact_persons[0].messengers
+        == sample_counterparty_model.contact_persons[0]["messengers"]
+    )
 
 
 def test_to_entity_null_fields(sample_uuid, sample_datetime):
@@ -157,12 +164,15 @@ def test_from_entity_full_mapping(sample_counterparty_entity):
     assert model.contact_persons[0]["full_name"] == (
         sample_counterparty_entity.contact_persons[0].full_name.value
     )
-    assert model.contact_persons[0]["phone"] == \
-           sample_counterparty_entity.contact_persons[0].phone.value
-    assert model.contact_persons[0]["email"] == \
-           sample_counterparty_entity.contact_persons[0].email
-    assert model.contact_persons[0]["messengers"] == \
-        sample_counterparty_entity.contact_persons[0].messengers
+    assert (
+        model.contact_persons[0]["phone"]
+        == sample_counterparty_entity.contact_persons[0].phone.value
+    )
+    assert model.contact_persons[0]["email"] == sample_counterparty_entity.contact_persons[0].email
+    assert (
+        model.contact_persons[0]["messengers"]
+        == sample_counterparty_entity.contact_persons[0].messengers
+    )
 
 
 def test_from_entity_null_contact_person(sample_uuid, sample_datetime):
@@ -208,10 +218,15 @@ def test_round_trip_consistency(sample_counterparty_model):
     assert model_back.avatar_url == sample_counterparty_model.avatar_url
 
     if model_back.contact_persons and sample_counterparty_model.contact_persons:
-        assert model_back.contact_persons[0]["full_name"] == (
-            sample_counterparty_model.contact_persons[0]["full_name"]
+        assert (
+            model_back.contact_persons[0]["full_name"]
+            == (sample_counterparty_model.contact_persons[0]["full_name"])
         )
-        assert model_back.contact_persons[0]["phone"] == \
-               sample_counterparty_model.contact_persons[0]["phone"]
-        assert model_back.contact_persons[0]["email"] == \
-               sample_counterparty_model.contact_persons[0]["email"]
+        assert (
+            model_back.contact_persons[0]["phone"]
+            == sample_counterparty_model.contact_persons[0]["phone"]
+        )
+        assert (
+            model_back.contact_persons[0]["email"]
+            == sample_counterparty_model.contact_persons[0]["email"]
+        )

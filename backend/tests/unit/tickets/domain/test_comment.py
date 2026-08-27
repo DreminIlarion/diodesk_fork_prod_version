@@ -168,7 +168,7 @@ class TestDelete:
         """
 
         with pytest.raises(
-                PermissionDeniedError, match="Only author or support staff can delete comment"
+            PermissionDeniedError, match="Only author or support staff can delete comment"
         ):
             sample_public_comment.delete(deleted_by=uuid4(), deleted_by_role=UserRole.CUSTOMER)
 

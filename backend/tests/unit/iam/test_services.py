@@ -64,7 +64,9 @@ def mock_invitation_for_customer(sample_counterparty_id):
 @pytest.fixture
 def sample_form_data(sample_password):
     return UserCreate(
-        username="customer1", full_name="Иванов Иван Иванович", password=sample_password,
+        username="customer1",
+        full_name="Иванов Иван Иванович",
+        password=sample_password,
     )
 
 
@@ -120,7 +122,9 @@ def make_admin():
 
 def make_account_manager():
     return create_account_manager(
-        email=fake.email(), password_hash=generate_password_hash(), full_name=fake.name(),
+        email=fake.email(),
+        password_hash=generate_password_hash(),
+        full_name=fake.name(),
     )
 
 
@@ -134,9 +138,8 @@ class TestCreateTokensForUser:
     """Тесты для метода create_tokens_for_user"""
 
     @pytest.mark.parametrize(
-        "user", [
-            make_support(), make_admin(), make_customer(), make_account_manager(), make_finance()
-        ]
+        "user",
+        [make_support(), make_admin(), make_customer(), make_account_manager(), make_finance()],
     )
     def test_create_tokens_for_user(self, user):
         # 1. Получение пары токенов
@@ -168,12 +171,12 @@ class TestAuthServiceRegister:
 
     @pytest.mark.asyncio
     async def test_register_success_customer(
-            self,
-            mock_auth_service,
-            fake_invitation_repo,
-            fake_user_repo,
-            mock_invitation_for_customer,
-            sample_form_data,
+        self,
+        mock_auth_service,
+        fake_invitation_repo,
+        fake_user_repo,
+        mock_invitation_for_customer,
+        sample_form_data,
     ):
         # 1. Сохранения приглашения
         invitation = await fake_invitation_repo.create(mock_invitation_for_customer)
@@ -194,11 +197,11 @@ class TestAuthServiceRegister:
 
     @pytest.mark.asyncio
     async def test_register_raises_invitation_expired(
-            self,
-            mock_auth_service,
-            fake_invitation_repo,
-            mock_invitation_for_customer,
-            sample_form_data,
+        self,
+        mock_auth_service,
+        fake_invitation_repo,
+        mock_invitation_for_customer,
+        sample_form_data,
     ):
 
         # 1. Сохранения приглашения
@@ -207,19 +210,19 @@ class TestAuthServiceRegister:
         # 2. Прокрутка времени на 20 дней вперёд, чтобы приглашение истекло
         with (
             freeze_time(current_datetime() + timedelta(days=20)),
-            pytest.raises(InvitationExpiredError)
+            pytest.raises(InvitationExpiredError),
         ):
             await mock_auth_service.register(invitation.token, sample_form_data)
 
     @pytest.mark.asyncio
     async def test_register_user_already_exists(
-            self,
-            mock_auth_service,
-            fake_invitation_repo,
-            fake_user_repo,
-            mock_invitation_for_customer,
-            sample_form_data,
-            sample_counterparty_id,
+        self,
+        mock_auth_service,
+        fake_invitation_repo,
+        fake_user_repo,
+        mock_invitation_for_customer,
+        sample_form_data,
+        sample_counterparty_id,
     ):
 
         # 1. Создание и сохранение пользователя
@@ -244,11 +247,11 @@ class TestAuthServiceAuthenticate:
 
     @pytest.mark.asyncio
     async def test_authenticate_success(
-            self,
-            sample_counterparty_id,
-            sample_password,
-            fake_user_repo,
-            mock_auth_service,
+        self,
+        sample_counterparty_id,
+        sample_password,
+        fake_user_repo,
+        mock_auth_service,
     ):
 
         # 1. Сохранение пользователя на прямую в БД
@@ -266,11 +269,11 @@ class TestAuthServiceAuthenticate:
 
     @pytest.mark.asyncio
     async def test_failed_authenticate_if_password_wrong(
-            self,
-            sample_password,
-            sample_counterparty_id,
-            fake_user_repo,
-            mock_auth_service,
+        self,
+        sample_password,
+        sample_counterparty_id,
+        fake_user_repo,
+        mock_auth_service,
     ):
         # Сохранение пользователя на прямую в БД
         user = create_customer(
@@ -291,7 +294,7 @@ class TestInvitationServiceSendInvitation:
 
     @pytest.mark.asyncio
     async def test_send_invitation_support_new(
-            self, mock_invitation_service, fake_invitation_repo, mock_session, mock_mail_sender
+        self, mock_invitation_service, fake_invitation_repo, mock_session, mock_mail_sender
     ):
         # 1. Создание и отправка приглашения
         invited_by = uuid4()
@@ -323,7 +326,7 @@ class TestInvitationServiceSendInvitation:
 
     @pytest.mark.asyncio
     async def test_send_invitation_customer_new(
-            self, mock_invitation_service, fake_invitation_repo, mock_session, mock_mail_sender
+        self, mock_invitation_service, fake_invitation_repo, mock_session, mock_mail_sender
     ):
         # 1. Создание и отправка приглашения
         invited_by = uuid4()
@@ -360,7 +363,7 @@ class TestInvitationServiceSendInvitation:
 
     @pytest.mark.asyncio
     async def test_send_invitation_already_exists(
-            self, mock_invitation_service, fake_invitation_repo, mock_session, mock_mail_sender
+        self, mock_invitation_service, fake_invitation_repo, mock_session, mock_mail_sender
     ):
         # 1. Создание и сохранение приглашения
         invited_by = uuid4()
@@ -388,9 +391,7 @@ class TestInvitationServiceSendInvitation:
         assert invitation == sent_invitation
 
     @pytest.mark.asyncio
-    async def test_send_invitation_raises_invalid_params(
-            self, mock_invitation_service
-    ):
+    async def test_send_invitation_raises_invalid_params(self, mock_invitation_service):
         invited_by = uuid4()
         email = fake.email()
 
@@ -409,7 +410,7 @@ class TestInvitationServiceRevokeInvitation:
 
     @pytest.mark.asyncio
     async def test_revoke_invitation_success(
-            self, mock_invitation_service, fake_invitation_repo, mock_session
+        self, mock_invitation_service, fake_invitation_repo, mock_session
     ):
         invitation = invite_support(
             invited_by=uuid4(), email=fake.email(), assigned_role=UserRole.SUPPORT_AGENT

@@ -18,11 +18,11 @@ from ..schemas import CommentCreate, CommentResponse, CommentWithReactionsRespon
 
 class CommentService:
     def __init__(
-            self,
-            uow: UnitOfWork,
-            comment_repo: CommentRepository,
-            reaction_repo: ReactionRepository,
-            event_publisher: EventPublisher,
+        self,
+        uow: UnitOfWork,
+        comment_repo: CommentRepository,
+        reaction_repo: ReactionRepository,
+        event_publisher: EventPublisher,
     ) -> None:
         self.uow = uow
         self.comment_repo = comment_repo
@@ -30,7 +30,10 @@ class CommentService:
         self.event_publisher = event_publisher
 
     async def create_comment(
-            self, aggregate_ref: AggregateReference, data: CommentCreate, current_subject: Subject,
+        self,
+        aggregate_ref: AggregateReference,
+        data: CommentCreate,
+        current_subject: Subject,
     ) -> CommentResponse:
         permission = can_create_comment(current_subject, data.visibility)
         if not permission.allowed:
@@ -49,10 +52,10 @@ class CommentService:
         return map_comment_to_response(comment)
 
     async def add_reply(
-            self,
-            comment_id: UUID,
-            data: CommentCreate,
-            current_subject: Subject,
+        self,
+        comment_id: UUID,
+        data: CommentCreate,
+        current_subject: Subject,
     ) -> CommentResponse:
         permission = can_create_comment(current_subject, data.visibility)
         if not permission.allowed:
@@ -71,7 +74,10 @@ class CommentService:
         return map_comment_to_response(reply)
 
     async def edit_comment(
-            self, comment_id: UUID, new_text: str, current_subject: Subject,
+        self,
+        comment_id: UUID,
+        new_text: str,
+        current_subject: Subject,
     ) -> CommentResponse:
         """Отредактировать комментарий."""
 
@@ -108,17 +114,19 @@ class CommentService:
         await finalize(self.uow, comment, event_publisher=self.event_publisher)
 
     async def get_comments(
-            self,
-            aggregate_ref: AggregateReference,
-            pagination: Pagination,
-            current_subject: Subject,
-            visible: set[CommentVisibility],
+        self,
+        aggregate_ref: AggregateReference,
+        pagination: Pagination,
+        current_subject: Subject,
+        visible: set[CommentVisibility],
     ) -> Page[CommentWithReactionsResponse]:
         """Получить список родителей комментариев."""
 
         policy = CommentVisibilityPolicy(viewer_id=current_subject.id, visible=visible)
         page = await self.comment_repo.paginate(
-            pagination, aggregate_ref=aggregate_ref, policy=policy,
+            pagination,
+            aggregate_ref=aggregate_ref,
+            policy=policy,
         )
 
         comment_ids = [comment.id for comment in page.items]
@@ -134,11 +142,11 @@ class CommentService:
         return page.to_response(mapper)
 
     async def get_comment_replies(
-            self,
-            comment_id: UUID,
-            pagination: Pagination,
-            current_subject: Subject,
-            visible: set[CommentVisibility],
+        self,
+        comment_id: UUID,
+        pagination: Pagination,
+        current_subject: Subject,
+        visible: set[CommentVisibility],
     ) -> Page[CommentWithReactionsResponse]:
         """Получить дерево ответов комментария."""
 
@@ -146,7 +154,9 @@ class CommentService:
 
         policy = CommentVisibilityPolicy(viewer_id=current_subject.id, visible=visible)
         page = await self.comment_repo.get_replies(
-            comment_id=parent.id, pagination=pagination, policy=policy,
+            comment_id=parent.id,
+            pagination=pagination,
+            policy=policy,
         )
 
         comment_ids = [comment.id for comment in page.items]

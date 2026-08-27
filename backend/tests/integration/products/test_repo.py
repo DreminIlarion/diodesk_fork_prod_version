@@ -74,7 +74,7 @@ class TestPaginate:
 
     @pytest.mark.asyncio
     async def test_include_filters_by_category_and_status_success(
-            self, product_repo, seed_products
+        self, product_repo, seed_products
     ):
         """
         Успешное применение фильтров по статусу и категории
@@ -107,6 +107,4 @@ class TestPaginate:
             pagination=Pagination(page=1, size=10), search=search_query
         )
 
-        assert all(
-            search_query in item.description.lower() for item in page.items
-        )
+        assert all(search_query in item.description.lower() for item in page.items)

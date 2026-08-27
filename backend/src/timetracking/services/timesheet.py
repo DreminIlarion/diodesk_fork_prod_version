@@ -27,13 +27,13 @@ from ..schemas import TimesheetCreate, TimesheetResponse
 
 class TimesheetService:
     def __init__(
-            self,
-            session: AsyncSession,
-            timesheet_repo: TimesheetRepository,
-            worklog_repo: WorklogRepository,
-            counterparty_repo: CounterpartyRepository,
-            project_repo: ProjectRepository,
-            event_publisher: EventPublisher,
+        self,
+        session: AsyncSession,
+        timesheet_repo: TimesheetRepository,
+        worklog_repo: WorklogRepository,
+        counterparty_repo: CounterpartyRepository,
+        project_repo: ProjectRepository,
+        event_publisher: EventPublisher,
     ) -> None:
         self.session = session
         self.timesheet_repo = timesheet_repo
@@ -43,7 +43,7 @@ class TimesheetService:
         self.event_publisher = event_publisher
 
     async def _resolve_counterparty_id(
-            self, counterparty_id: UUID | None, project_id: UUID | None
+        self, counterparty_id: UUID | None, project_id: UUID | None
     ) -> UUID | None:
         """Определение ID контрагента для создания ЛУРВ"""
 
@@ -186,7 +186,7 @@ class TimesheetService:
         return map_timesheet_to_response(timesheet)
 
     async def reject(
-            self, timesheet_id: UUID, reason: str, current_user: CurrentUser
+        self, timesheet_id: UUID, reason: str, current_user: CurrentUser
     ) -> TimesheetResponse:
         """Отклонение ЛУРВ с указанием причины"""
 

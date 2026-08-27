@@ -5,7 +5,6 @@ from uuid import UUID
 from fastapi import APIRouter, Body, Depends, Path, Query, status
 from pydantic import EmailStr
 
-from src.shared.domain.exceptions import NotFoundError
 from src.iam.dependencies import get_current_user, require_role
 from src.iam.domain.vo import UserRole
 from src.iam.mappers import map_user_to_response
@@ -13,6 +12,7 @@ from src.iam.schemas import UserResponse
 from src.products.mappers import map_product_to_response
 from src.products.schemas import ProductResponse
 from src.shared.dependencies import PaginationDep
+from src.shared.domain.exceptions import NotFoundError
 from src.shared.schemas import Page
 
 from .dependencies import (
@@ -42,7 +42,7 @@ router = APIRouter(prefix="/counterparties", tags=["Контрагенты"])
     summary="Создать контрагента",
 )
 async def create_counterparty(
-        data: CounterpartyCreate, service: CounterpartyServiceDep
+    data: CounterpartyCreate, service: CounterpartyServiceDep
 ) -> CounterpartyResponse:
     return await service.create(data)
 
@@ -55,7 +55,7 @@ async def create_counterparty(
     summary="Получить контрагента",
 )
 async def get_counterparty(
-        counterparty: CounterpartyResponse = Depends(get_counterparty_or_404),
+    counterparty: CounterpartyResponse = Depends(get_counterparty_or_404),
 ) -> CounterpartyResponse:
     return counterparty
 
@@ -68,12 +68,11 @@ async def get_counterparty(
     summary="Добавление обособленного подразделения",
 )
 async def add_branch(
-        counterparty_id: Annotated[
-            UUID,
-            Path(..., description="ID контрагента, к которому нужно привязать нового")
-        ],
-        data: BranchAdd,
-        service: CounterpartyServiceDep
+    counterparty_id: Annotated[
+        UUID, Path(..., description="ID контрагента, к которому нужно привязать нового")
+    ],
+    data: BranchAdd,
+    service: CounterpartyServiceDep,
 ) -> CounterpartyResponse:
     return await service.add_branch(counterparty_id, data)
 
@@ -86,7 +85,7 @@ async def add_branch(
     summary="Отредактировать контрагента",
 )
 async def edit_counterparty(
-        counterparty_id: UUID, data: CounterpartyEdit, service: CounterpartyServiceDep
+    counterparty_id: UUID, data: CounterpartyEdit, service: CounterpartyServiceDep
 ) -> CounterpartyResponse:
     return await service.edit(counterparty_id, data)
 
@@ -99,7 +98,7 @@ async def edit_counterparty(
     summary="Получение списка контрагентов",
 )
 async def get_counterparties(
-        counterparties: Page[CounterpartyResponse] = Depends(paginate_counterparties),
+    counterparties: Page[CounterpartyResponse] = Depends(paginate_counterparties),
 ) -> Page[CounterpartyResponse]:
     return counterparties
 
@@ -109,7 +108,7 @@ async def get_counterparties(
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_role(REQUIRED_ROLES))],
     summary="Удаление контрагента",
-    description="Soft-delete метод, делает контрагента не активным не удаляя фактически"
+    description="Soft-delete метод, делает контрагента не активным не удаляя фактически",
 )
 async def delete_counterparty(counterparty_id: UUID, repository: CounterpartyRepoDep) -> None:
     counterparty = await repository.read(counterparty_id)
@@ -124,10 +123,10 @@ async def delete_counterparty(counterparty_id: UUID, repository: CounterpartyRep
     status_code=status.HTTP_201_CREATED,
     response_model=CounterpartyResponse,
     dependencies=[Depends(require_role(REQUIRED_ROLES))],
-    summary="Добавление контактного лица контрагента"
+    summary="Добавление контактного лица контрагента",
 )
 async def add_contact_person(
-        counterparty_id: UUID, data: ContactPersonIn, service: CounterpartyServiceDep
+    counterparty_id: UUID, data: ContactPersonIn, service: CounterpartyServiceDep
 ) -> CounterpartyResponse:
     return await service.add_contact_person(counterparty_id, data)
 
@@ -137,15 +136,13 @@ async def add_contact_person(
     status_code=status.HTTP_200_OK,
     response_model=CounterpartyResponse,
     dependencies=[Depends(require_role(REQUIRED_ROLES))],
-    summary="Удаление контактного лица"
+    summary="Удаление контактного лица",
 )
 async def delete_contact_person(
-        counterparty_id: UUID,
-        phone: Annotated[str, Query(..., description="Номер телефона")],
-        
-        service: CounterpartyServiceDep,
-        email: EmailStr | None = Query(None, description="Email адрес"),
-
+    counterparty_id: UUID,
+    phone: Annotated[str, Query(..., description="Номер телефона")],
+    service: CounterpartyServiceDep,
+    email: EmailStr | None = Query(None, description="Email адрес"),
 ) -> CounterpartyResponse:
     return await service.delete_contact_person(counterparty_id, phone, email)
 
@@ -159,7 +156,7 @@ async def delete_contact_person(
     description="Доступно с ролью `customer_admin` и выше",
 )
 async def get_counterparty_customers(
-        counterparty_id: UUID, params: PaginationDep, repository: CounterpartyRepoDep
+    counterparty_id: UUID, params: PaginationDep, repository: CounterpartyRepoDep
 ) -> Page[dict[str, Any]]:
     page = await repository.get_customers(counterparty_id, params)
     return page.to_response(map_user_to_response)
@@ -169,14 +166,12 @@ async def get_counterparty_customers(
     path="/{counterparty_id}/products",
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_role(REQUIRED_ROLES))],
-    summary="Привязка программного продукта к контрагенту"
+    summary="Привязка программного продукта к контрагенту",
 )
 async def link_counterparty_product(
-        counterparty_id: UUID,
-        product_id: Annotated[
-            UUID, Body(..., embed=True, description="ID продукта из справочника")
-        ],
-        service: CounterpartyServiceDep,
+    counterparty_id: UUID,
+    product_id: Annotated[UUID, Body(..., embed=True, description="ID продукта из справочника")],
+    service: CounterpartyServiceDep,
 ) -> dict[str, str]:
     await service.link_product(counterparty_id, product_id)
     return {"message": "Software product linked successfully"}
@@ -187,12 +182,10 @@ async def link_counterparty_product(
     status_code=status.HTTP_200_OK,
     response_model=Page[ProductResponse],
     dependencies=[Depends(get_current_user)],
-    summary="Получение программных продуктов контрагента"
+    summary="Получение программных продуктов контрагента",
 )
 async def get_counterparty_products(
-        counterparty_id: UUID,
-        pagination: PaginationDep,
-        repository: CounterpartyRepoDep
+    counterparty_id: UUID, pagination: PaginationDep, repository: CounterpartyRepoDep
 ) -> Page[ProductResponse]:
     page = await repository.get_products(counterparty_id, pagination)
     return page.to_response(map_product_to_response)

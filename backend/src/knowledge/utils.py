@@ -1,5 +1,3 @@
-
-
 def estimate_reading_time(text: str, wpm: int = 200) -> int:
     """
     Рассчитывает примерное время прочтения текста в минутах

@@ -10,6 +10,7 @@ from faststream.rabbit.fastapi import RabbitRouter
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 from src.core.settings import settings
+
 from ...iam.dependencies import CurrentUserDep
 from ...shared.dependencies import PaginationDep, sse_manager
 from ...shared.schemas import Page, Pagination
@@ -33,12 +34,10 @@ broker_router = RabbitRouter(settings.rabbit.url)
     summary="Получение моих уведомлений",
 )
 async def get_my_notifications(
-        current_user: CurrentUserDep,
-        repository: NotificationRepoDep,
-        pagination: PaginationDep,
-        unread_only: Annotated[
-            bool, Query(..., description="Учитывать только непрочитанные")
-        ] = False,
+    current_user: CurrentUserDep,
+    repository: NotificationRepoDep,
+    pagination: PaginationDep,
+    unread_only: Annotated[bool, Query(..., description="Учитывать только непрочитанные")] = False,
 ) -> Page[NotificationResponse]:
     page = await repository.get_by_user(current_user.id, pagination, unread_only)
     return page.to_response(map_notification_to_response)
@@ -51,7 +50,7 @@ async def get_my_notifications(
     summary="Получение количества непрочитанных уведомлений",
 )
 async def get_unread_count(
-        current_user: CurrentUserDep, repository: NotificationRepoDep
+    current_user: CurrentUserDep, repository: NotificationRepoDep
 ) -> UnreadCountOut:
     return {"unread_count": await repository.get_unread_count(current_user.id)}
 
@@ -63,16 +62,16 @@ async def get_unread_count(
     summary="Пометить уведомление как прочитанное",
 )
 async def mark_as_read(
-        notification_id: UUID,
-        current_user: CurrentUserDep,
-        service: NotificationServiceDep,
+    notification_id: UUID,
+    current_user: CurrentUserDep,
+    service: NotificationServiceDep,
 ) -> NotificationResponse:
     return await service.mark_as_read(notification_id, read_by=current_user.id)
 
 
 @broker_router.subscriber(
     queue=RabbitQueue("notifications.sse", durable=True, exclusive=False),
-    description="Отправка уведомления в локальную очередь"
+    description="Отправка уведомления в локальную очередь",
 )
 async def handle_notification(notification: NotificationResponse) -> None:
     await sse_manager.send_to_user(notification.user_id, notification)
@@ -84,7 +83,7 @@ async def handle_notification(notification: NotificationResponse) -> None:
     summary="Соединение для отправки уведомлений",
 )
 async def notification_stream(
-        request: Request, current_user: CurrentUserDep, repository: NotificationRepoDep
+    request: Request, current_user: CurrentUserDep, repository: NotificationRepoDep
 ):
     # Инициализация подключения
     queue: asyncio.Queue[NotificationResponse] = asyncio.Queue(maxsize=10)
@@ -102,9 +101,9 @@ async def notification_stream(
             for notification in unread_notifications.items:
                 payload = {
                     "type": "notification",
-                    "notification": map_notification_to_response(
-                        notification
-                    ).model_dump(mode="json"),
+                    "notification": map_notification_to_response(notification).model_dump(
+                        mode="json"
+                    ),
                 }
                 yield ServerSentEvent(data=payload)
 
@@ -119,7 +118,7 @@ async def notification_stream(
                     message = await asyncio.wait_for(queue.get(), timeout=25.0)
                     payload = {
                         "type": "notification",
-                        "notification": message.model_dump(mode="json")
+                        "notification": message.model_dump(mode="json"),
                     }
                     yield ServerSentEvent(data=payload)
                 except TimeoutError:

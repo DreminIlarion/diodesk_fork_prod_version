@@ -17,10 +17,11 @@ async def suggest_ticket_fields(data: TicketPredict) -> PredictionResponse:
     agent = create_agent(
         model=model,
         system_prompt=prompt["system"],
-        response_format=ToolStrategy(PredictionResponse)
+        response_format=ToolStrategy(PredictionResponse),
     )
     human_message = (
-        "human", prompt["user_template"].format(title=data.title, description=data.description)
+        "human",
+        prompt["user_template"].format(title=data.title, description=data.description),
     )
     result = await agent.ainvoke({"messages": [human_message]})
     return result["structured_response"]

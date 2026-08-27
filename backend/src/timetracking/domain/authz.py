@@ -8,10 +8,10 @@ from .entities import Timesheet, Worklog
 
 
 def can_log_time(
-        ticket: Ticket | None,
-        task: Task | None,
-        user_id: UUID,
-        user_role: UserRole,
+    ticket: Ticket | None,
+    task: Task | None,
+    user_id: UUID,
+    user_role: UserRole,
 ) -> PermissionResult:
     """Может ли пользователь логгировать потраченное время"""
 
@@ -56,7 +56,7 @@ def can_create_timesheet(user_role: UserRole) -> PermissionResult:
 
 
 def can_submit_timesheet(
-        timesheet: Timesheet, user_id: UUID, user_role: UserRole
+    timesheet: Timesheet, user_id: UUID, user_role: UserRole
 ) -> PermissionResult:
     """Может ли пользователь отправить на согласование ЛУРВ"""
 
@@ -70,7 +70,7 @@ def can_submit_timesheet(
 
 
 def can_approve_or_reject_timesheet(
-        timesheet: Timesheet, user_id: UUID, user_role: UserRole
+    timesheet: Timesheet, user_id: UUID, user_role: UserRole
 ) -> PermissionResult:
     """Может ли пользователь согласовывать/отклонять ЛУРВ"""
 

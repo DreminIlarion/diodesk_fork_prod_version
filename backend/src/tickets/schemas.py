@@ -68,7 +68,8 @@ class TicketBase(BaseModel):
     description: str = Field(..., description="Описание проблемы")
     type: TicketType = Field(..., description="Вид тикета")
     priority: Priority = Field(
-        ..., description="Приоритет выполнения (чем выше приоритет, тем быстрее время реакции)",
+        ...,
+        description="Приоритет выполнения (чем выше приоритет, тем быстрее время реакции)",
     )
     project_id: UUID | None = Field(
         None, description="ID проекта, к которому нужно привязать тикет"
@@ -113,7 +114,8 @@ class TicketViewResponse(BaseModel):
 
     counterparty: CounterpartyReference | None = Field(None, description="Контрагент заявки")
     project: ProjectReference | None = Field(
-        None, description="Проект, которому принадлежит заявка",
+        None,
+        description="Проект, которому принадлежит заявка",
     )
 
     number: str = Field(..., description="Номер тикета", examples=["РОМ-26-00012456"])
@@ -165,7 +167,7 @@ class TicketCreate(TicketBase):
 
     priority: Priority = Field(
         Priority.MEDIUM,
-        description="Приоритет выполнения (чем выше приоритет, тем быстрее время реакции)"
+        description="Приоритет выполнения (чем выше приоритет, тем быстрее время реакции)",
     )
 
 

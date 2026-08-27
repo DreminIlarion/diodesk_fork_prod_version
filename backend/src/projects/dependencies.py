@@ -29,10 +29,10 @@ ProjectMemberRepoDep = Annotated[ProjectMemberRepository, Depends(get_project_me
 
 
 def get_project_service(
-        session: SessionDep,
-        project_repo: ProjectRepoDep,
-        membership_repo: ProjectMemberRepoDep,
-        event_publisher: EventPublisherDep,
+    session: SessionDep,
+    project_repo: ProjectRepoDep,
+    membership_repo: ProjectMemberRepoDep,
+    event_publisher: EventPublisherDep,
 ) -> ProjectService:
     return ProjectService(
         uow=session,
@@ -43,11 +43,11 @@ def get_project_service(
 
 
 def get_project_member_service(
-        session: SessionDep,
-        project_repo: ProjectRepoDep,
-        user_repo: UserRepoDep,
-        member_repo: ProjectMemberRepoDep,
-        event_publisher: EventPublisherDep,
+    session: SessionDep,
+    project_repo: ProjectRepoDep,
+    user_repo: UserRepoDep,
+    member_repo: ProjectMemberRepoDep,
+    event_publisher: EventPublisherDep,
 ) -> ProjectMemberService:
     return ProjectMemberService(
         uow=session,
@@ -71,19 +71,17 @@ async def get_project_or_404(project_id: UUID, project_repo: ProjectRepoDep) -> 
 
 
 async def get_projects_page(
-        pagination: PaginationDep, project_repo: ProjectRepoDep
+    pagination: PaginationDep, project_repo: ProjectRepoDep
 ) -> Page[ProjectResponse]:
     page = await project_repo.paginate(pagination)
     return page.to_response(map_project_to_response)
 
 
 async def get_my_projects(
-        current_subject: CurrentSubjectDep,
-        pagination: PaginationDep,
-        project_repo: ProjectRepoDep,
-        owner_only: Annotated[
-            bool, Query(description="Только те, где пользователь владелец")
-        ] = False,
+    current_subject: CurrentSubjectDep,
+    pagination: PaginationDep,
+    project_repo: ProjectRepoDep,
+    owner_only: Annotated[bool, Query(description="Только те, где пользователь владелец")] = False,
 ) -> Page[ProjectResponse]:
     page = await project_repo.get_by_user_membership(
         user_id=current_subject.id,

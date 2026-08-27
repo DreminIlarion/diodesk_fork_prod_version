@@ -13,7 +13,7 @@ from src.iam.domain.vo import Username
         ("support-lead_42", "support-lead_42"),
         ("  User.Name-2025  ", "user.name-2025"),
         ("ИванПетров", "иванпетров"),
-    ]
+    ],
 )
 def test_valid_usernames_are_normalized(valid_input: str, expected_normalized: str):
     """Тестирование нормализации введённого username"""
@@ -36,7 +36,7 @@ def test_valid_usernames_are_normalized(valid_input: str, expected_normalized: s
         ("user-name-", "can only contains"),
         ("123456", "cannot contains only digits"),
         ("admin support", "can only contains"),
-    ]
+    ],
 )
 def test_invalid_usernames_raise_error(invalid_input: str, error_substring: str):
     """Тест для неверно введённого имени"""

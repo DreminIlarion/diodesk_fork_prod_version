@@ -45,6 +45,7 @@ def valid_contact_person():
 
 # ====================== Успешное создание ======================
 
+
 def test_create_legal_entity_success(valid_inn_legal, valid_kpp, valid_phone):
     counterparty = Counterparty(
         counterparty_type=CounterpartyType.LEGAL_ENTITY,
@@ -79,6 +80,7 @@ def test_create_individual_entrepreneur_success(valid_inn_ip, valid_phone):
 
 
 # ====================== Редактирование контрагента ======================
+
 
 def test_edit_counterparty_success(valid_inn_legal, valid_kpp, valid_phone):
     counterparty = Counterparty(
@@ -131,6 +133,7 @@ def test_edit_same_data_do_nothing(valid_inn_legal, valid_kpp, valid_phone):
 
 # ====================== Создание филиала через фабричный метод ======================
 
+
 def test_create_branch(valid_inn_legal, valid_kpp, valid_phone):
     counterparty = Counterparty(
         counterparty_type=CounterpartyType.LEGAL_ENTITY,
@@ -170,7 +173,7 @@ def test_create_branch_invalid_counterparty_type(valid_inn_ip, valid_phone):
     )
 
     with pytest.raises(
-            InvariantViolationError, match="impossible to assign a branch to a non-legal entity"
+        InvariantViolationError, match="impossible to assign a branch to a non-legal entity"
     ):
         counterparty.create_branch(
             name="Филиал",
@@ -182,6 +185,7 @@ def test_create_branch_invalid_counterparty_type(valid_inn_ip, valid_phone):
 
 
 # ====================== Ошибки инвариантов при прямом создании ======================
+
 
 def test_legal_entity_without_kpp_raises_error(valid_inn_legal, valid_phone):
     with pytest.raises(InvariantViolationError, match="KPP required"):
@@ -281,6 +285,7 @@ def test_non_unique_contact_data_raises_error(valid_inn_legal, valid_kpp, valid_
 
 # ====================== Свойства ======================
 
+
 def test_is_head_and_is_branch_properties():
     counterparty = Counterparty(
         counterparty_type=CounterpartyType.LEGAL_ENTITY,
@@ -312,6 +317,7 @@ def test_is_head_and_is_branch_properties():
 
 # ====================== Добавление контактного лица ======================
 
+
 def test_add_contact_person_success():
     counterparty = Counterparty(
         counterparty_type=CounterpartyType.LEGAL_ENTITY,
@@ -328,7 +334,7 @@ def test_add_contact_person_success():
         middle_name="Иванович",
         phone="88005553535",
         email="ivanov.ivan@mail.ru",
-        messengers={"vk": "12345"}
+        messengers={"vk": "12345"},
     )
 
     assert counterparty.contact_persons != []
@@ -367,6 +373,7 @@ def test_add_already_exists_contact_person_failed():
 
 
 # ====================== Удаление контактного лица ======================
+
 
 def test_remove_contact_person_success():
     counterparty = Counterparty(

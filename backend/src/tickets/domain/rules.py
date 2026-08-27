@@ -16,10 +16,10 @@ class SameCounterpartyRule:
         self.counterparty_id = counterparty_id
 
     def check(self) -> PermissionResult:
-        if (
-                self.subject.has_any_role([UserRole.CUSTOMER.value, UserRole.CUSTOMER_ADMIN.value])
-                and str(self.subject.counterparty_id) != str(self.counterparty_id)
-        ):
+        if self.subject.has_any_role([
+            UserRole.CUSTOMER.value,
+            UserRole.CUSTOMER_ADMIN.value,
+        ]) and str(self.subject.counterparty_id) != str(self.counterparty_id):
             return PermissionResult(False, "Customers can only work in their counterparty")
 
         return PermissionResult(True)

@@ -55,7 +55,7 @@ class BaseAttributes(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
         str_strip_whitespace=True,
-        json_schema_extra={"additionalProperties": False}
+        json_schema_extra={"additionalProperties": False},
     )
 
 
@@ -106,7 +106,7 @@ class WebAttributes(BaseAttributes):
     cms_or_platform: str | None = Field(
         None,
         description="CMS или базовая платформа",
-        examples=["WordPress", "Strapi", "Next.js", "Bitrix"]
+        examples=["WordPress", "Strapi", "Next.js", "Bitrix"],
     )
 
 
@@ -124,12 +124,12 @@ class MobileAttributes(BaseAttributes):
     sdk_framework: str | None = Field(
         None,
         description="Фреймворк/SDK",
-        examples=["Flutter", "React Native", "Swift", "Kotlin", "Expo"]
+        examples=["Flutter", "React Native", "Swift", "Kotlin", "Expo"],
     )
     push_provider: str | None = Field(
         None,
         description="Провайдер пуш-уведомлений (FCM, APNs, Firebase)",
-        examples=["FCM", "APNs", "Firebase"]
+        examples=["FCM", "APNs", "Firebase"],
     )
     backend_api_version: str | None = Field(
         None, description="Версия backend API, с которой совместима сборка"
@@ -152,9 +152,7 @@ class ApiAttributes(BaseAttributes):
     )
     webhook_endpoints: list[str] | None = Field(None, description="URL для webhook-уведомлений")
     health_check_url: str | None = Field(
-        None,
-        description="URL эндпоинта проверки здоровья",
-        examples=["/health", "/ping"]
+        None, description="URL эндпоинта проверки здоровья", examples=["/health", "/ping"]
     )
     data_format: Literal["JSON", "XML", "gRPC", "GraphQL", "CSV"] = Field(
         default="JSON", description="Формат обмена данными"
@@ -167,7 +165,7 @@ class DesktopAttributes(BaseAttributes):
     os_compatibility: list[str] | None = Field(
         None,
         description="Поддерживаемые ОС",
-        examples=["Windows 10/11", "macOS 12+", "Ubuntu 22.04"]
+        examples=["Windows 10/11", "macOS 12+", "Ubuntu 22.04"],
     )
     architecture: Literal["x86_64", "ARM64", "Universal"] | None = Field(
         None, description="Архитектура сборки"
@@ -176,14 +174,12 @@ class DesktopAttributes(BaseAttributes):
     runtime_dependencies: list[str] | None = Field(
         None,
         description="Зависимости",
-        examples=[[".NET 8", "Java 17", "Electron 28", "MSVC Redist"]]
+        examples=[[".NET 8", "Java 17", "Electron 28", "MSVC Redist"]],
     )
-    auto_update_enabled: bool = Field(
-        False, description="Включено ли автоматическое обновление"
-    )
-    distribution_method: Literal[
-                             "MSI", "EXE", "DMG", "PKG", "AppImage", "Winget", "Manual"
-                         ] | None = None
+    auto_update_enabled: bool = Field(False, description="Включено ли автоматическое обновление")
+    distribution_method: (
+        Literal["MSI", "EXE", "DMG", "PKG", "AppImage", "Winget", "Manual"] | None
+    ) = None
     license_type: Literal["perpetual", "subscription", "trial", "freeware"] | None = None
 
 

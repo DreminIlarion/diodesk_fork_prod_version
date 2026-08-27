@@ -24,7 +24,7 @@ class TaskAuthZService:
         self.project_membership_repo = project_membership_repo
 
     async def can_create_task(
-            self, subject: Subject, project_id: UUID | None = None
+        self, subject: Subject, project_id: UUID | None = None
     ) -> PermissionResult:
         rules = [IsStaffRule(subject)]
 
@@ -42,8 +42,7 @@ class TaskAuthZService:
             project_member = await self.project_membership_repo.find(task.project_id, subject.id)
             rules.extend([
                 AllOf(
-                    IsMemberExistsRule(project_member),
-                    IsProjectOwnerOrManagerRule(project_member)
+                    IsMemberExistsRule(project_member), IsProjectOwnerOrManagerRule(project_member)
                 ),
             ])
 
@@ -51,7 +50,7 @@ class TaskAuthZService:
         return auth_policy.check()
 
     async def can_change_status(
-            self, subject: Subject, task: Task, new_status: TaskStatus
+        self, subject: Subject, task: Task, new_status: TaskStatus
     ) -> PermissionResult:
         rules = [IsAdminRule(subject), IsTaskCreator(subject, task)]
 
@@ -68,7 +67,7 @@ class TaskAuthZService:
                         IsProjectStaffRule(project_member),
                     ),
                     TaskAssigneeStatusRule(subject, task, new_status),  # ← ДОБАВИl
-                    TaskReviewerStatusRule(subject, task, new_status),   # ← ДОБАВИl    
+                    TaskReviewerStatusRule(subject, task, new_status),  # ← ДОБАВИl
                 )
             )
 
@@ -79,17 +78,22 @@ class TaskAuthZService:
             IsStaffRule(subject),
             AnyOf(
                 TaskAssigneeStatusRule(subject, task, new_status),
-                TaskReviewerStatusRule(subject, task, new_status)
-            )
+                TaskReviewerStatusRule(subject, task, new_status),
+            ),
         ))
 
         auth_policy = AnyOf(*rules)
         return auth_policy.check()
 
     async def can_assign_task(
-            self, subject: Subject, task: Task, assignee: User
+        self, subject: Subject, task: Task, assignee: User
     ) -> PermissionResult:
-        rules = [IsAdminRule(subject), IsTaskCreator(subject, task), IsStaffRule(subject), IsStaffRule(assignee)]
+        rules = [
+            IsAdminRule(subject),
+            IsTaskCreator(subject, task),
+            IsStaffRule(subject),
+            IsStaffRule(assignee),
+        ]
 
         if task.project_id is not None:
             current_member = await self.project_membership_repo.find(task.project_id, subject.id)
@@ -108,10 +112,10 @@ class TaskAuthZService:
         return auth_policy.check()
 
     async def can_request_review(
-            self,
-            subject: Subject,
-            task: Task,
-            reviewer: User,
+        self,
+        subject: Subject,
+        task: Task,
+        reviewer: User,
     ) -> PermissionResult:
 
         allowed_reviewer_roles = {
@@ -154,9 +158,7 @@ class TaskAuthZService:
             )
 
             if not requester_allowed and current_member is not None:
-                requester_allowed = IsProjectOwnerOrManagerRule(
-                    current_member
-                ).check().allowed
+                requester_allowed = IsProjectOwnerOrManagerRule(current_member).check().allowed
 
             reviewer_permission = AllOf(
                 IsMemberExistsRule(reviewer_member),
@@ -191,6 +193,7 @@ class TaskAuthZService:
 
         auth_policy = AnyOf(*rules)
         return auth_policy.check()
+
     async def can_archive_task(self, subject: Subject, task: Task) -> PermissionResult:
         rules = [IsAdminRule(subject), IsTaskCreator(subject, task), IsStaffRule(subject)]
 
@@ -207,7 +210,7 @@ class TaskAuthZService:
         return auth_policy.check()
 
     async def can_view_task(
-            self, subject: Subject, project_id: UUID | None = None
+        self, subject: Subject, project_id: UUID | None = None
     ) -> PermissionResult:
         if project_id is not None:
             project_member = await self.project_membership_repo.find(project_id, subject.id)

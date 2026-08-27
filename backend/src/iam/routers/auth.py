@@ -13,12 +13,12 @@ router = APIRouter(prefix="/auth", tags=["Авторизация"])
     path="/register/{token}",
     status_code=status.HTTP_201_CREATED,
     response_model=Tokens,
-    summary="Регистрация пользователя по приглашению"
+    summary="Регистрация пользователя по приглашению",
 )
 async def register(
-        token: Annotated[str, Path(..., description="Токен из пригласительного письма")],
-        data: UserCreate,
-        service: AuthServiceDep,
+    token: Annotated[str, Path(..., description="Токен из пригласительного письма")],
+    data: UserCreate,
+    service: AuthServiceDep,
 ) -> Tokens:
     return await service.register(token, data)  # ✅ Исправлено!
 
@@ -27,11 +27,11 @@ async def register(
     path="/login",
     status_code=status.HTTP_200_OK,
     response_model=Tokens,
-    summary="Войти в учётную запись"
+    summary="Войти в учётную запись",
 )
 async def login(
-        form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-        service: AuthServiceDep,
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    service: AuthServiceDep,
 ) -> Tokens:
     return await service.authenticate(form_data.username, form_data.password)
 
@@ -40,7 +40,7 @@ async def login(
     path="/refresh",
     status_code=status.HTTP_200_OK,
     response_model=Tokens,
-    summary="Обновить пару токенов"
+    summary="Обновить пару токенов",
 )
 async def refresh(refresh_token: RefreshToken, service: AuthServiceDep) -> Tokens:
     return await service.refresh_tokens(refresh_token)
@@ -50,12 +50,12 @@ async def refresh(refresh_token: RefreshToken, service: AuthServiceDep) -> Token
     path="/logout",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Выйти из аккаунта",
-    description="Добавляет токены в черный список."
+    description="Добавляет токены в черный список.",
 )
 async def logout(
-        access_token: Annotated[str, Depends(oauth2_scheme)],
-        data: LogoutRequest,
-        service: AuthServiceDep
+    access_token: Annotated[str, Depends(oauth2_scheme)],
+    data: LogoutRequest,
+    service: AuthServiceDep,
 ) -> None:
     return await service.logout(access_token, data.refresh_token)
 
@@ -65,7 +65,7 @@ async def logout(
     response_model=CurrentUser,
     status_code=status.HTTP_200_OK,
     summary="Получить информацию о текущем пользователе",
-    description="Информация берётся из payload токена (не запроса к БД)."
+    description="Информация берётся из payload токена (не запроса к БД).",
 )
 async def get_userinfo(current_user: CurrentUserDep) -> CurrentUser:
     return current_user

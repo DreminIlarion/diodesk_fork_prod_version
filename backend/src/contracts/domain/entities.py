@@ -80,12 +80,12 @@ class ServiceContract(AggregateRoot):
             raise InvariantViolationError("End date cannot be before planned_start date")
 
     def add_package(
-            self,
-            package_type: HoursPackageType,
-            hours: Decimal,
-            start_date: date,
-            added_by: UUID,
-            end_date: date | None = None,
+        self,
+        package_type: HoursPackageType,
+        hours: Decimal,
+        start_date: date,
+        added_by: UUID,
+        end_date: date | None = None,
     ) -> None:
         """Добавление нового пакета часов"""
 

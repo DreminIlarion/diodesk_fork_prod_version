@@ -15,7 +15,9 @@ from .vo import MemberRole
 
 class IsProjectStaffRule:
     ALLOWED_PROJECT_ROLES: ClassVar[set[MemberRole]] = {
-        MemberRole.CONTRIBUTOR, MemberRole.MANAGER, MemberRole.OWNER
+        MemberRole.CONTRIBUTOR,
+        MemberRole.MANAGER,
+        MemberRole.OWNER,
     }
 
     def __init__(self, membership: ProjectMember | None = None) -> None:
@@ -37,7 +39,6 @@ class IsProjectStaffRule:
 
 
 class IsMemberExistsRule:
-
     def __init__(self, member: ProjectMember | None) -> None:
         self.member = member
 
@@ -98,35 +99,34 @@ class GrantProjectRoleRule:
             )
 
         allowed_roles = set()
-        
+
         # 🔥 Проверяем системные роли пользователя
         for invitee_role in self.invitee.roles:
             # Если роль — строка
             if isinstance(invitee_role, str):
                 # Проверяем, является ли роль системной (admin, support_agent, etc.)
                 # Для админа и сотрудников поддержки разрешаем все роли
-                if invitee_role in ['admin', 'support_agent', 'support_manager', 'executor']:
+                if invitee_role in {"admin", "support_agent", "support_manager", "executor"}:
                     # Все роли (и staff, и customer)
                     allowed_roles.update(MemberRole.staff_roles() | MemberRole.customer_roles())
-                elif invitee_role in ['customer', 'customer_admin']:
+                elif invitee_role in {"customer", "customer_admin"}:
                     # Только клиентские роли
                     allowed_roles.update(MemberRole.customer_roles())
                 else:
                     # По умолчанию — staff роли
                     allowed_roles.update(MemberRole.staff_roles())
+            # Если уже объект MemberRole
+            elif invitee_role.is_customer:
+                allowed_roles.update(MemberRole.customer_roles())
             else:
-                # Если уже объект MemberRole
-                if invitee_role.is_customer:
-                    allowed_roles.update(MemberRole.customer_roles())
-                else:
-                    allowed_roles.update(MemberRole.staff_roles() | MemberRole.customer_roles())
+                allowed_roles.update(MemberRole.staff_roles() | MemberRole.customer_roles())
 
         # Если allowed_roles пуст — ошибка
         if not allowed_roles:
             return PermissionResult(
                 False,
                 f"User with roles: {', '.join(self.invitee.roles)}, "
-                "has no permissions to assign any project roles"
+                "has no permissions to assign any project roles",
             )
 
         for target_role in self.target_roles:
@@ -138,6 +138,8 @@ class GrantProjectRoleRule:
                 )
 
         return PermissionResult(True)
+
+
 class TargetRoleAssignmentRule:
     ASSIGNMENT_MATRIX: ClassVar[Mapping[MemberRole, set[MemberRole]]] = {
         MemberRole.CONTRIBUTOR: {
@@ -145,9 +147,7 @@ class TargetRoleAssignmentRule:
             MemberRole.CUSTOMER,
             MemberRole.CONTRIBUTOR,
         },
-        MemberRole.CUSTOMER_MANAGER: {
-            MemberRole.CUSTOMER, MemberRole.CUSTOMER_MANAGER
-        },
+        MemberRole.CUSTOMER_MANAGER: {MemberRole.CUSTOMER, MemberRole.CUSTOMER_MANAGER},
         MemberRole.MANAGER: set(MemberRole) - {MemberRole.OWNER},
         MemberRole.OWNER: set(MemberRole) - {MemberRole.OWNER},
         MemberRole.CUSTOMER: set(),

@@ -18,6 +18,6 @@ router = APIRouter(prefix="/activity-logs", tags=["История действи
     summary="Получить историю действий",
 )
 async def get_activity_logs(
-        activity_logs: Page[ActivityLogResponse] = Depends(paginate_activity_logs)
+    activity_logs: Page[ActivityLogResponse] = Depends(paginate_activity_logs),
 ) -> Page[ActivityLogResponse]:
     return activity_logs

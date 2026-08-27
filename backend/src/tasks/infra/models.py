@@ -46,8 +46,7 @@ class TaskOrm(Base):
 
     attachments: Mapped[list["AttachmentOrm"]] = relationship(
         primaryjoin=(
-            "and_(AttachmentOrm.owner_type=='task', "
-            "foreign(AttachmentOrm.owner_id)==TaskOrm.id)"
+            "and_(AttachmentOrm.owner_type=='task', foreign(AttachmentOrm.owner_id)==TaskOrm.id)"
         ),
         lazy="selectin",
         viewonly=True,

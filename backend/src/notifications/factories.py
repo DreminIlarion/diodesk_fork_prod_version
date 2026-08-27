@@ -60,9 +60,11 @@ class NotificationFactory:
         ]
 
     @staticmethod
-    def from_ticket_status_changed(event: TicketStatusChanged, targets: list[UUID]) -> list[Notification]:
+    def from_ticket_status_changed(
+        event: TicketStatusChanged, targets: list[UUID]
+    ) -> list[Notification]:
         status_label = event.new_status.value.replace("_", " ").capitalize()
-        
+
         return [
             Notification(
                 user_id=target,

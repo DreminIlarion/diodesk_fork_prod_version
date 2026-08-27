@@ -56,7 +56,7 @@ def map_task_view_to_response(task: TaskView) -> TaskViewResponse:
         reviewer_id=task.reviewer_id,
         due_date=task.due_date,
         story_points=task.story_points,
-        estimated_hours=float(task.estimated_hours) if task.estimated_hours else None,  
+        estimated_hours=float(task.estimated_hours) if task.estimated_hours else None,
         actual_hours=float(task.actual_hours) if task.actual_hours else None,
         started_at=task.started_at,
         completed_at=task.completed_at,

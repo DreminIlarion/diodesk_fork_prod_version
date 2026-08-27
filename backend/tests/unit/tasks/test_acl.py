@@ -1,8 +1,6 @@
 from uuid import uuid4
 
 import pytest
-
-from src.iam.domain.vo import UserRole
 from src.tasks.domain.acl import (
     can_archive_task,
     can_assign_task,
@@ -12,16 +10,17 @@ from src.tasks.domain.acl import (
     can_request_review,
     can_review_task,
 )
+
+from src.iam.domain.vo import UserRole
 from src.tasks.domain.vo import TaskStatus
 
 from .helpers import make_task
 
 
 class TestCanCreateTask:
-
     @pytest.mark.parametrize(
         "user_role",
-        [UserRole.DEVELOPER, UserRole.SUPPORT_AGENT, UserRole.SUPPORT_MANAGER, UserRole.ADMIN]
+        [UserRole.DEVELOPER, UserRole.SUPPORT_AGENT, UserRole.SUPPORT_MANAGER, UserRole.ADMIN],
     )
     def test_internal_user_can_create_task(self, user_role):
         """
@@ -33,12 +32,8 @@ class TestCanCreateTask:
         assert permission.allowed is True
 
     @pytest.mark.parametrize(
-        "user_role", [
-            UserRole.CUSTOMER,
-            UserRole.CUSTOMER_ADMIN,
-            UserRole.FINANCE,
-            UserRole.ACCOUNT_MANAGER
-        ]
+        "user_role",
+        [UserRole.CUSTOMER, UserRole.CUSTOMER_ADMIN, UserRole.FINANCE, UserRole.ACCOUNT_MANAGER],
     )
     def test_forbidden_user_cannot_create_task(self, user_role):
         """
@@ -53,7 +48,6 @@ class TestCanCreateTask:
 
 
 class TestCanEditTask:
-
     @pytest.mark.parametrize(
         "user_role",
         [UserRole.DEVELOPER, UserRole.SUPPORT_AGENT, UserRole.SUPPORT_MANAGER, UserRole.ADMIN],
@@ -66,9 +60,7 @@ class TestCanEditTask:
         user_id = uuid4()
         task = make_task(created_by=user_id)
 
-        permission = can_edit_task(
-            task=task, user_id=user_id, user_role=user_role
-        )
+        permission = can_edit_task(task=task, user_id=user_id, user_role=user_role)
 
         assert permission.allowed is True
 
@@ -141,7 +133,6 @@ class TestCanEditTask:
 
 
 class TestCanMoveStatus:
-
     # Тест кейсы для администратора
 
     @pytest.mark.parametrize("new_status", list(TaskStatus))
@@ -178,9 +169,14 @@ class TestCanMoveStatus:
 
         assert permission.allowed is True
 
-    @pytest.mark.parametrize("new_status", [
-        status for status in TaskStatus if status not in {TaskStatus.DONE, TaskStatus.IN_PROGRESS}
-    ])
+    @pytest.mark.parametrize(
+        "new_status",
+        [
+            status
+            for status in TaskStatus
+            if status not in {TaskStatus.DONE, TaskStatus.IN_PROGRESS}
+        ],
+    )
     def test_reviewer_cannot_move_to_other_statuses(self, new_status):
         """
         Проверяющий не может устанавливать любой статус задачи, кроме
@@ -214,12 +210,11 @@ class TestCanMoveStatus:
     # Тестовые сценарии для исполнителя
 
     @pytest.mark.parametrize(
-        "user_role",
-        [UserRole.DEVELOPER, UserRole.SUPPORT_AGENT, UserRole.SUPPORT_MANAGER]
+        "user_role", [UserRole.DEVELOPER, UserRole.SUPPORT_AGENT, UserRole.SUPPORT_MANAGER]
     )
     @pytest.mark.parametrize(
         "new_status",
-        [TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED, TaskStatus.TO_REVIEW, TaskStatus.DONE]
+        [TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED, TaskStatus.TO_REVIEW, TaskStatus.DONE],
     )
     def test_assignee_can_move_to_work_statuses(self, user_role, new_status):
         """
@@ -236,8 +231,7 @@ class TestCanMoveStatus:
         assert permission.allowed is True
 
     @pytest.mark.parametrize(
-        "user_role",
-        [UserRole.DEVELOPER, UserRole.SUPPORT_AGENT, UserRole.SUPPORT_MANAGER]
+        "user_role", [UserRole.DEVELOPER, UserRole.SUPPORT_AGENT, UserRole.SUPPORT_MANAGER]
     )
     @pytest.mark.parametrize("new_status", [TaskStatus.BACKLOG, TaskStatus.TODO])
     def test_assignee_cannot_move_to_todo_or_backlog(self, user_role, new_status):
@@ -256,8 +250,7 @@ class TestCanMoveStatus:
         assert f"role {user_role} cannot move this task to {new_status}" in permission.reason
 
     @pytest.mark.parametrize(
-        "user_role",
-        [UserRole.DEVELOPER, UserRole.SUPPORT_AGENT, UserRole.SUPPORT_MANAGER]
+        "user_role", [UserRole.DEVELOPER, UserRole.SUPPORT_AGENT, UserRole.SUPPORT_MANAGER]
     )
     def test_non_assignee_cannot_move_status(self, user_role):
         """
@@ -275,7 +268,6 @@ class TestCanMoveStatus:
 
 
 class TestCanAssignTask:
-
     def test_admin_can_assign_any(self):
         """
         Администратор может назначать и переназначать любые задачи
@@ -309,12 +301,13 @@ class TestCanAssignTask:
         "user_role", [UserRole.DEVELOPER, UserRole.SUPPORT_AGENT, UserRole.SUPPORT_MANAGER]
     )
     @pytest.mark.parametrize(
-        "assignee_role", [
+        "assignee_role",
+        [
             UserRole.DEVELOPER,
             UserRole.SUPPORT_AGENT,
             UserRole.SUPPORT_MANAGER,
             UserRole.ADMIN,
-        ]
+        ],
     )
     def test_reassign_own_task(self, user_role, assignee_role):
         """
@@ -368,12 +361,13 @@ class TestCanAssignTask:
         assert "can only be assigned to internal staff" in permission.reason
 
     @pytest.mark.parametrize(
-        "user_role", [
+        "user_role",
+        [
             UserRole.CUSTOMER,
             UserRole.CUSTOMER_ADMIN,
             UserRole.FINANCE,
             UserRole.ACCOUNT_MANAGER,
-        ]
+        ],
     )
     def test_forbidden_role_cannot_assign(self, user_role):
         """
@@ -394,7 +388,6 @@ class TestCanAssignTask:
 
 
 class TestCanRequestReview:
-
     @pytest.mark.parametrize("user_role", [UserRole.SUPPORT_MANAGER, UserRole.ADMIN])
     def test_admin_or_support_manager_can_request(self, user_role):
         """
@@ -437,7 +430,7 @@ class TestCanRequestReview:
             task=task,
             user_id=uuid4(),
             reviewer_role=UserRole.DEVELOPER,
-            user_role=UserRole.DEVELOPER
+            user_role=UserRole.DEVELOPER,
         )
 
         assert permission.allowed is False
@@ -467,7 +460,6 @@ class TestCanRequestReview:
 
 
 class TestCanReviewTask:
-
     @pytest.mark.parametrize("user_role", [UserRole.SUPPORT_MANAGER, UserRole.ADMIN])
     def test_admin_or_support_manager_can_review(self, user_role):
         """
@@ -517,7 +509,6 @@ class TestCanReviewTask:
 
 
 class TestCanArchiveTask:
-
     def test_admin_can_archive_success(self):
         """
         Админ может переносить задачу в архив

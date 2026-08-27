@@ -1,16 +1,17 @@
 from typing import override
 
-from sqlalchemy import Select, cast, select
-from sqlalchemy.dialects.postgresql import JSONB, array, ARRAY, VARCHAR
+from uuid import UUID
+
+from sqlalchemy import Select, cast, literal, select, type_coerce
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, VARCHAR
+
 from src.shared.infra.repos import ModelMapper, SqlAlchemyRepository
 from src.shared.schemas import Page, Pagination
-from sqlalchemy import type_coerce, literal
 
 from ..domain.entities import Invitation, User
 from ..domain.repos import UserFilters
 from ..domain.vo import Email, FullName, PasswordHash, Username, UserRole
 from .models import InvitationOrm, UserOrm
-from uuid import UUID
 
 
 class UserMapper(ModelMapper[User, UserOrm]):
@@ -52,12 +53,12 @@ class SqlUserRepository(SqlAlchemyRepository[User, UserOrm]):
     model_mapper = UserMapper
 
     def _apply_user_filters(
-            self, stmt: Select[tuple[UserOrm]], filters: UserFilters
+        self, stmt: Select[tuple[UserOrm]], filters: UserFilters
     ) -> Select[tuple[UserOrm]]:
         if filters.roles is not None and filters.roles:
             roles_as_strings: list[str] = [role.value for role in filters.roles]
             stmt = stmt.where(
-                type_coerce(self.model.roles, JSONB).op('?|')(
+                type_coerce(self.model.roles, JSONB).op("?|")(
                     cast(literal(roles_as_strings), ARRAY(VARCHAR))
                 )
             )
@@ -69,7 +70,7 @@ class SqlUserRepository(SqlAlchemyRepository[User, UserOrm]):
 
     @override
     async def paginate(
-            self, pagination: Pagination, filters: UserFilters | None = None
+        self, pagination: Pagination, filters: UserFilters | None = None
     ) -> Page[User]:
         stmt = select(self.model)
 
@@ -83,11 +84,11 @@ class SqlUserRepository(SqlAlchemyRepository[User, UserOrm]):
         result = await self.session.execute(stmt)
         model = result.scalar_one_or_none()
         return None if model is None else self.model_mapper.to_entity(model)
-    
+
     async def get_customer_admins(self, counterparty_id: UUID) -> list[User]:
         stmt = select(self.model).where(
             self.model.counterparty_id == counterparty_id,
-            type_coerce(self.model.roles, JSONB).op('?|')(
+            type_coerce(self.model.roles, JSONB).op("?|")(
                 cast(literal([UserRole.CUSTOMER_ADMIN.value]), ARRAY(VARCHAR))
             ),
         )
@@ -144,9 +145,9 @@ class SqlInvitationRepository(SqlAlchemyRepository[Invitation, InvitationOrm]):
         stmt = (
             select(self.model)
             .where(
-                (self.model.email == email.value) &
-                (self.model.granted_roles.contains(list(roles))) &
-                (self.model.is_used.is_(False))
+                (self.model.email == email.value)
+                & (self.model.granted_roles.contains(list(roles)))
+                & (self.model.is_used.is_(False))
             )
             .limit(1)
         )

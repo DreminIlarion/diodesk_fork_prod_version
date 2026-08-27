@@ -22,13 +22,15 @@ def legal_entity_data():
         phone="88005553535",
         email="parent@example.com",
         address="Москва, ул. Ленина, д.1",
-        contact_persons=[ContactPersonIn(
-            first_name="Иван",
-            last_name="Иванов",
-            middle_name="Иванович",
-            phone="88005553535",
-            email="ivanov@example.com",
-        )],
+        contact_persons=[
+            ContactPersonIn(
+                first_name="Иван",
+                last_name="Иванов",
+                middle_name="Иванович",
+                phone="88005553535",
+                email="ivanov@example.com",
+            )
+        ],
     )
 
 
@@ -69,9 +71,7 @@ async def test_create_counterparty_success(legal_entity_data, fake_counterparty_
 @pytest.mark.asyncio
 async def test_edit_counterparty_success(created_counterparty, counterparty_service):
     data = CounterpartyEdit(
-        name="Новая компания",
-        legal_name="ООО Новая компания",
-        phone="85003004546"
+        name="Новая компания", legal_name="ООО Новая компания", phone="85003004546"
     )
     response = await counterparty_service.edit(created_counterparty.id, data)
 
@@ -89,7 +89,7 @@ async def test_edit_failure_when_counterparty_not_found(counterparty_service):
 
 @pytest.mark.asyncio
 async def test_add_branch_to_exists_counterparty(
-        legal_entity_data, branch_data, fake_counterparty_repo
+    legal_entity_data, branch_data, fake_counterparty_repo
 ):
     service = CounterpartyService(session=AsyncMock(), repository=fake_counterparty_repo)
 
@@ -100,9 +100,7 @@ async def test_add_branch_to_exists_counterparty(
 
 
 @pytest.mark.asyncio
-async def test_add_contact_person_to_exists_counterparty(
-        legal_entity_data, counterparty_service
-):
+async def test_add_contact_person_to_exists_counterparty(legal_entity_data, counterparty_service):
     created_response = await counterparty_service.create(legal_entity_data)
 
     data = ContactPersonIn(

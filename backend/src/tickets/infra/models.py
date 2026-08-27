@@ -6,12 +6,12 @@ if TYPE_CHECKING:
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import TEXT, Computed, DateTime, Enum, ForeignKey, Index, String
+from sqlalchemy import TEXT, Computed, DateTime, Enum, Index, String
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.core.database import Base
 from src.comments.infra.models import CommentOrm  # Добавить импорт
+from src.core.database import Base
 from src.shared.domain.vo import Priority
 
 from ..domain.vo import TicketStatus, TicketType  # Убрать CommentType, ReactionType
@@ -62,6 +62,4 @@ class TicketOrm(Base):
         ),
         nullable=True,
     )
-    __table_args__ = (
-        Index("ix_tickets_search_vector", "search_vector", postgresql_using="gin"),
-    )
+    __table_args__ = (Index("ix_tickets_search_vector", "search_vector", postgresql_using="gin"),)

@@ -17,20 +17,22 @@ class FeedbackAuthZService:
     Собирает атомарные правила в политики доступа для конкретных действий.
     """
 
+    @staticmethod
     def can_create_feedback(
-            self,
-            subject: Subject,
-            ticket: Ticket,
+        subject: Subject,
+        ticket: Ticket,
     ) -> PermissionResult:
         """
         Проверяет, может ли субъект оставить отзыв по тикету.
         """
 
         policy = AllOf(
+            IsCustomerRule(subject),
+            IsTicketReporterRule(subject, ticket),
             IsTicketClosedRule(ticket),
         )
         return policy.check()
-    
+
     @staticmethod
     def can_view_feedback(
         subject: Subject,
@@ -49,10 +51,10 @@ class FeedbackAuthZService:
         )
 
         return policy.check()
-    
+
     @staticmethod
     def can_update_feedback(
-        subject: Subject, 
+        subject: Subject,
         feedback: Feedback,
     ) -> PermissionResult:
         """
@@ -81,4 +83,3 @@ class FeedbackAuthZService:
         )
 
         return policy.check()
-

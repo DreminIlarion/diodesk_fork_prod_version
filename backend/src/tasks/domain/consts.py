@@ -1,20 +1,15 @@
 from .vo import ReviewDecision, TaskStatus
 
 # Возможные переходы между статусами задачи
-ALLOWED_STATUS_TRANSITIONS: dict[TaskStatus: set[TaskStatus]] = {
-    TaskStatus.BACKLOG: {
-        TaskStatus.TODO,
-        TaskStatus.CANCELLED
-    },
-
+ALLOWED_STATUS_TRANSITIONS: dict[TaskStatus : set[TaskStatus]] = {
+    TaskStatus.BACKLOG: {TaskStatus.TODO, TaskStatus.CANCELLED},
     TaskStatus.TODO: {
         TaskStatus.BACKLOG,
         TaskStatus.IN_PROGRESS,
         TaskStatus.BLOCKED,
         TaskStatus.PAUSED,
-        TaskStatus.CANCELLED
+        TaskStatus.CANCELLED,
     },
-
     TaskStatus.IN_PROGRESS: {
         TaskStatus.BACKLOG,
         TaskStatus.TODO,
@@ -26,13 +21,11 @@ ALLOWED_STATUS_TRANSITIONS: dict[TaskStatus: set[TaskStatus]] = {
         TaskStatus.DONE,
         TaskStatus.CANCELLED,
     },
-
     TaskStatus.PAUSED: {
         TaskStatus.IN_PROGRESS,
         TaskStatus.BLOCKED,
         TaskStatus.CANCELLED,
     },
-
     TaskStatus.BLOCKED: {
         TaskStatus.BACKLOG,
         TaskStatus.TODO,
@@ -40,7 +33,6 @@ ALLOWED_STATUS_TRANSITIONS: dict[TaskStatus: set[TaskStatus]] = {
         TaskStatus.PAUSED,
         TaskStatus.CANCELLED,
     },
-
     TaskStatus.TO_REVIEW: {
         TaskStatus.IN_PROGRESS,
         TaskStatus.TO_FIX,
@@ -48,25 +40,22 @@ ALLOWED_STATUS_TRANSITIONS: dict[TaskStatus: set[TaskStatus]] = {
         TaskStatus.DONE,
         TaskStatus.CANCELLED,
     },
-
     TaskStatus.TO_FIX: {
         TaskStatus.IN_PROGRESS,
         TaskStatus.TO_REVIEW,
         TaskStatus.CANCELLED,
     },
-
     TaskStatus.TO_TEST: {
         TaskStatus.IN_PROGRESS,
         TaskStatus.TO_REVIEW,
         TaskStatus.DONE,
         TaskStatus.CANCELLED,
     },
-
     TaskStatus.DONE: {
         TaskStatus.CANCELLED,
         TaskStatus.TO_REVIEW,
         TaskStatus.TO_FIX,
-        TaskStatus.IN_PROGRESS
+        TaskStatus.IN_PROGRESS,
     },
     TaskStatus.CANCELLED: {TaskStatus.BACKLOG, TaskStatus.TODO},
 }
@@ -80,7 +69,7 @@ ALLOWED_EDIT_STATUSES: set[TaskStatus] = {
     TaskStatus.BLOCKED,
     TaskStatus.TO_FIX,
     TaskStatus.TO_TEST,
-    TaskStatus.TO_REVIEW, 
+    TaskStatus.TO_REVIEW,
 }
 
 # Разрешённые статусы для назначения задачи
@@ -98,8 +87,8 @@ TASK_STATUS_LABEL_MAP: dict[TaskStatus, str] = {
     TaskStatus.TODO: "Готово к выполнению",
     TaskStatus.IN_PROGRESS: "В работе",
     TaskStatus.TO_REVIEW: "На проверке",
-    TaskStatus.TO_FIX: "На доработку",        # добавить
-    TaskStatus.TO_TEST: "На тестировании",     # добавить
+    TaskStatus.TO_FIX: "На доработку",  # добавить
+    TaskStatus.TO_TEST: "На тестировании",  # добавить
     TaskStatus.PAUSED: "На паузе",
     TaskStatus.BLOCKED: "Приостановлено",
     TaskStatus.DONE: "Выполнено",

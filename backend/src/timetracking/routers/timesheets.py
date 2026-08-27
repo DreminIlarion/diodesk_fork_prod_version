@@ -9,6 +9,6 @@ router = APIRouter(
     path="/my",
     status_code=status.HTTP_200_OK,
     response_model=...,
-    summary="Учёт рабочего времени пользователя"
+    summary="Учёт рабочего времени пользователя",
 )
 async def get_my_timesheets(): ...

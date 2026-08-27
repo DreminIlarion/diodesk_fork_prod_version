@@ -17,9 +17,9 @@ EventT = TypeVar("EventT", bound=Event)
 class EventBus:
     def __init__(self, max_queue_size: int = 1000) -> None:
         self._queue: asyncio.Queue[Event] = asyncio.Queue(maxsize=max_queue_size)
-        self._handlers: dict[
-            type[Event], list[Callable[[Event], Awaitable[None] | None]]
-        ] = defaultdict(list)
+        self._handlers: dict[type[Event], list[Callable[[Event], Awaitable[None] | None]]] = (
+            defaultdict(list)
+        )
         self._task: asyncio.Task | None = None
         self._is_running = False
 
@@ -102,9 +102,7 @@ class EventBus:
 
 
 class FastStreamEventPublisher:
-    def __init__(
-            self, broker: RabbitBroker, event_topic_map: dict[type[Event], str]
-    ) -> None:
+    def __init__(self, broker: RabbitBroker, event_topic_map: dict[type[Event], str]) -> None:
         self.broker = broker
         self.event_topic_map = event_topic_map
 
@@ -113,7 +111,7 @@ class FastStreamEventPublisher:
         if topic is None:
             logger.warning(
                 "Domain event `%s` was not handled! No such topic registered.",
-                type(event).__name__
+                type(event).__name__,
             )
             return
         await self.broker.publish(event, queue=topic)

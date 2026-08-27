@@ -7,7 +7,6 @@ from uuid import UUID
 from typing_extensions import Doc
 
 from src.iam.domain.vo import UserRole
-
 from src.media.domain.entities import Attachment
 from src.shared.domain.entities import AggregateRoot
 from src.shared.domain.exceptions import InvalidStateError
@@ -38,7 +37,7 @@ from ..vo import (
 )
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True)  # noqa: PLR0904
 class Ticket(AggregateRoot):
     """
     Заявка - запрос на услугу от пользователя.
@@ -115,7 +114,6 @@ class Ticket(AggregateRoot):
         number: TicketNumber,
         reporter_id: UUID,
         created_by: UUID,
-        
         title: str,
         description: str | None = None,
         ticket_type: TicketType = TicketType.SERVICE_REQUEST,
@@ -124,11 +122,14 @@ class Ticket(AggregateRoot):
         counterparty_id: UUID | None = None,
         product_id: UUID | None = None,
         created_by_role: UserRole | None = None,
-
         tags: list[Tag] | None = None,
     ) -> Self:
         # Определяем статус в зависимости от роли создателя
-        status = TicketStatus.PENDING_APPROVAL if created_by_role in (UserRole.CUSTOMER, UserRole.CUSTOMER_ADMIN) else TicketStatus.NEW
+        status = (
+            TicketStatus.PENDING_APPROVAL
+            if created_by_role in {UserRole.CUSTOMER, UserRole.CUSTOMER_ADMIN}
+            else TicketStatus.NEW
+        )
 
         ticket = cls(
             created_by=created_by,
@@ -355,6 +356,10 @@ class Ticket(AggregateRoot):
         """
 
         self._perform(TicketAction.CLOSE, closed_by)
+
+    def wait(self, changed_by: UUID) -> None:
+        """Перевести тикет в ожидание ответа клиента."""
+        self._perform(TicketAction.WAIT, changed_by)
 
     # ====================== Внутренние мутации ======================
 

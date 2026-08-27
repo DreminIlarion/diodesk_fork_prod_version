@@ -14,10 +14,10 @@ logger = logging.getLogger(__name__)
 
 class NotificationService:
     def __init__(
-            self,
-            session: AsyncSession,
-            repository: NotificationRepository,
-            channel_resolver: ChannelResolver
+        self,
+        session: AsyncSession,
+        repository: NotificationRepository,
+        channel_resolver: ChannelResolver,
     ) -> None:
         self.session = session
         self.repository = repository

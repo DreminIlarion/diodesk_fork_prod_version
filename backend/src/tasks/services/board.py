@@ -12,24 +12,21 @@ from ..schemas import (
 
 
 class TaskBoardService:
-    def __init__(
-            self, task_repo: TaskRepository
-    ) -> None:
+    def __init__(self, task_repo: TaskRepository) -> None:
         self.task_repo = task_repo
 
     async def get_kanban_board(
-            self,
-            pagination: Pagination,
-            context: KanbanContextType,
-            filters: KanbanFilters,
-            current_user: CurrentUser,
+        self,
+        pagination: Pagination,
+        context: KanbanContextType,
+        filters: KanbanFilters,
+        current_user: CurrentUser,
     ) -> KanbanBoard:
         """Получение канбан доски с задачами"""
 
         # 2. Определение контекста задач
         kwargs = {}
         if context.type == "project":
-
             kwargs = {"project_id": context.project_id}
 
         elif context.type == "ticket":
@@ -44,7 +41,6 @@ class TaskBoardService:
                 "assignee_id": current_user.id,
                 "reviewer_id": current_user.id,
             }
-            
 
         kwargs.update({"priorities": filters.priorities, "overdue_only": filters.overdue_only})
 
