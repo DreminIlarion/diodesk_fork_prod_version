@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef,useMemo  } from 'react';
 import React, { memo } from 'react';
 
 import { Link, useSearchParams } from 'react-router-dom';
@@ -3703,7 +3703,7 @@ export default function TasksPage() {
         });
         const mapped: TaskViewColumn[] = COL_ORDER.map((s) =>
           d.columns.find((c: TaskViewColumn) => c.status === s),
-        ).filter((c): c is TaskViewColumn => !c);
+        ).filter((c): c is TaskViewColumn => !!c);
         setCols(mapped);
         setTotal(d.total_tasks ?? 0);
       } catch (e: any) {
