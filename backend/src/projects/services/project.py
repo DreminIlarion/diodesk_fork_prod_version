@@ -33,11 +33,11 @@ from ..schemas import (
 
 class ProjectService:
     def __init__(
-            self,
-            uow: UnitOfWork,
-            project_repo: ProjectRepository,
-            member_repo: ProjectMemberRepository,
-            event_publisher: EventPublisher,
+        self,
+        uow: UnitOfWork,
+        project_repo: ProjectRepository,
+        member_repo: ProjectMemberRepository,
+        event_publisher: EventPublisher,
     ) -> None:
         self.uow = uow
         self.project_repo = project_repo
@@ -46,7 +46,7 @@ class ProjectService:
         self.event_publisher = event_publisher
 
     async def generate_key_suggestions(
-            self, original_key: str, max_attempts: int = 5, min_key_length: int = 3
+        self, original_key: str, max_attempts: int = 5, min_key_length: int = 3
     ) -> list[str]:
         """
         Генерация списка альтернативных ключей проекта в стиле Jira.
@@ -73,7 +73,10 @@ class ProjectService:
         return KeyCheckResult(available=False, suggestions=suggestions)
 
     async def create(
-            self, data: ProjectCreate, current_subject: Subject, max_attempts: int = 5,
+        self,
+        data: ProjectCreate,
+        current_subject: Subject,
+        max_attempts: int = 5,
     ) -> ProjectDetailedResponse:
         """
         Создать проект с уникальным ключом.
@@ -111,9 +114,13 @@ class ProjectService:
 
                 members = [owner]
                 return map_project_to_detailed_response(
-                    project, members=Page.create(
-                        members, total_items=len(members), page=1, size=1,
-                    )
+                    project,
+                    members=Page.create(
+                        members,
+                        total_items=len(members),
+                        page=1,
+                        size=1,
+                    ),
                 )
 
         raise AlreadyExistsError(
@@ -143,7 +150,7 @@ class ProjectService:
         return map_project_to_response(project)
 
     async def add_stage(
-            self, project_id: UUID, data: ProjectStageCreate, current_subject: Subject
+        self, project_id: UUID, data: ProjectStageCreate, current_subject: Subject
     ) -> ProjectResponse:
         """
         Добавить новый этап в проект.
@@ -171,7 +178,7 @@ class ProjectService:
         return map_project_to_response(project)
 
     async def reorder_stages(
-            self, project_id: UUID, new_order: list[list[UUID]], current_subject: Subject
+        self, project_id: UUID, new_order: list[list[UUID]], current_subject: Subject
     ) -> ProjectResponse:
         """
         Изменить порядок проведения этапов.
@@ -193,7 +200,7 @@ class ProjectService:
         return map_project_to_response(project)
 
     async def start_stage(
-            self, project_id: UUID, stage_id: UUID, current_subject: Subject
+        self, project_id: UUID, stage_id: UUID, current_subject: Subject
     ) -> ProjectResponse:
         """
         Начать новую стадию проекта.
@@ -215,7 +222,7 @@ class ProjectService:
         return map_project_to_response(project)
 
     async def complete_stage(
-            self, project_id: UUID, stage_id: UUID, current_subject: Subject
+        self, project_id: UUID, stage_id: UUID, current_subject: Subject
     ) -> ProjectResponse:
         """
         Успешно завершает стадию проекта.
@@ -237,7 +244,7 @@ class ProjectService:
         return map_project_to_response(project)
 
     async def skip_stage(
-            self, project_id: UUID, stage_id: UUID, current_subject: Subject
+        self, project_id: UUID, stage_id: UUID, current_subject: Subject
     ) -> ProjectResponse:
         """
         Пропустить этап проекта.
@@ -259,7 +266,7 @@ class ProjectService:
         return map_project_to_response(project)
 
     async def remove_stage(
-            self, project_id: UUID, stage_id: UUID, current_subject: Subject
+        self, project_id: UUID, stage_id: UUID, current_subject: Subject
     ) -> ProjectResponse:
         """
         Удалить этап проекта.
@@ -281,11 +288,11 @@ class ProjectService:
         return map_project_to_response(project)
 
     async def edit_stage(
-            self,
-            project_id: UUID,
-            stage_id: UUID,
-            data: ProjectStageUpdate,
-            current_subject: Subject,
+        self,
+        project_id: UUID,
+        stage_id: UUID,
+        data: ProjectStageUpdate,
+        current_subject: Subject,
     ) -> ProjectStageResponse:
         """
         Отредактировать содержание этапа
@@ -316,11 +323,11 @@ class ProjectService:
         return map_project_stage_to_response(stage)
 
     async def schedule_stage(
-            self,
-            project_id: UUID,
-            stage_id: UUID,
-            data: ProjectStagePlan,
-            current_subject: Subject,
+        self,
+        project_id: UUID,
+        stage_id: UUID,
+        data: ProjectStagePlan,
+        current_subject: Subject,
     ) -> ProjectStageResponse:
         """
         Планирование расписания этапа проекта

@@ -1,5 +1,6 @@
 from typing import Protocol
 
+import logging
 from uuid import UUID
 
 from ..iam.domain.constants import SUPPORT_TEAM
@@ -10,9 +11,8 @@ from ..shared.domain.events import Event
 from ..shared.utils.helpers import iterate_batches
 from ..tickets.domain.events import TicketAssigned, TicketCreated
 
-import logging
-
 logger = logging.getLogger(__name__)
+
 
 class NotificationPolicy[EventT: Event](Protocol):
     """
@@ -28,7 +28,7 @@ class NotificationPolicy[EventT: Event](Protocol):
 
 class TicketCreatedPolicy:
     def __init__(
-            self, project_membership_repo: ProjectMemberRepository, user_repo: UserRepository
+        self, project_membership_repo: ProjectMemberRepository, user_repo: UserRepository
     ) -> None:
         self.project_membership_repo = project_membership_repo
         self.user_repo = user_repo
@@ -51,25 +51,34 @@ class TicketCreatedPolicy:
         # 3. Если есть проект - уведомления для поддержки проекта
         if event.project_id is not None:
             async for members in iterate_batches(
-                    self.project_membership_repo,
-                    project_id=event.project_id,
-                    include_project_roles=[
-                        MemberRole.OWNER, MemberRole.MANAGER, MemberRole.CONTRIBUTOR
-                    ]
+                self.project_membership_repo,
+                project_id=event.project_id,
+                include_project_roles=[
+                    MemberRole.OWNER,
+                    MemberRole.MANAGER,
+                    MemberRole.CONTRIBUTOR,
+                ],
             ):
                 targets.update({member.user_id for member in members})
 
         # 4. Иначе - уведомляем всех сотрудников поддержки
         else:
-            async for supports in iterate_batches(self.user_repo, filters=UserFilters(roles=set(SUPPORT_TEAM))):
-                logger.warning(f"Got {len(supports)} support users: {[s.email.value for s in supports]}")
+            async for supports in iterate_batches(
+                self.user_repo, filters=UserFilters(roles=set(SUPPORT_TEAM))
+            ):
+                logger.warning(
+                    "Got %d support users: %s",
+                    len(supports),
+                    [support.email.value for support in supports],
+                )
                 targets.update({support.id for support in supports})
 
         return list(targets)
 
 
 class TicketAssignedPolicy:
-    async def get_targets(self, event: TicketAssigned) -> list[UUID]:
+    @staticmethod
+    async def get_targets(event: TicketAssigned) -> list[UUID]:
         """
         Определяем получателей уведомления о назначении тикета.
         """

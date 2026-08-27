@@ -8,10 +8,10 @@ from pydantic import SecretStr
 from src.iam.domain.entities import User
 from src.iam.domain.vo import FullName, Username, UserRole
 from src.notifications.policies import TicketCreatedPolicy
-from src.projects.domain.entities import ProjectMember, Project
+from src.projects.domain.entities import Project, ProjectMember
 from src.projects.domain.vo import MemberRole, ProjectStatus
 from src.tickets.domain.events import TicketCreated
-from src.tickets.domain.vo import ProjectKey, Priority
+from src.tickets.domain.vo import Priority, ProjectKey
 
 fake = Faker("ru_RU")
 
@@ -38,6 +38,7 @@ def sample_ticket_created_event():
 
 
 # ====================== Вспомогательные фабрики ======================
+
 
 def fake_user(**kwargs):
     return User(
@@ -75,6 +76,7 @@ def fake_project(project_id: UUID):
 
 # ====================== Тесты ======================
 
+
 class TestTicketCreatedPolicy:
     """
     Тестирование политики уведомлений для события созданного тикета
@@ -82,7 +84,7 @@ class TestTicketCreatedPolicy:
 
     @pytest.mark.asyncio
     async def test_reporter_always_receives_notification(
-            self, policy, sample_ticket_created_event
+        self, policy, sample_ticket_created_event
     ):
         """
         Инициатор тикета должен всегда получать уведомление
@@ -93,7 +95,7 @@ class TestTicketCreatedPolicy:
 
     @pytest.mark.asyncio
     async def test_customer_admin_receives_notification(
-            self, policy, sample_ticket_created_event, fake_user_repo
+        self, policy, sample_ticket_created_event, fake_user_repo
     ):
         """
         Администратор контрагента всегда должен получать уведомление
@@ -121,7 +123,7 @@ class TestTicketCreatedPolicy:
 
     @pytest.mark.asyncio
     async def test_project_support_members_receive_notification(
-            self, sample_ticket_created_event, policy, fake_project_repo, fake_membership_repo
+        self, sample_ticket_created_event, policy, fake_project_repo, fake_membership_repo
     ):
         """
         Участники проекта с поддерживаемыми ролями должны получать уведомление
@@ -140,12 +142,10 @@ class TestTicketCreatedPolicy:
             fake_membership(
                 project_id=project.id,
                 user_id=project_member_id,
-                project_role=MemberRole.CONTRIBUTOR
+                project_role=MemberRole.CONTRIBUTOR,
             ),
             fake_membership(
-                project_id=project.id,
-                user_id=customer_id,
-                project_role=MemberRole.CUSTOMER
+                project_id=project.id, user_id=customer_id, project_role=MemberRole.CUSTOMER
             ),
         ]
         await fake_project_repo.create(project)
@@ -170,7 +170,7 @@ class TestTicketCreatedPolicy:
 
     @pytest.mark.asyncio
     async def test_fallback_to_all_supports(
-            self, policy, sample_ticket_created_event, fake_user_repo
+        self, policy, sample_ticket_created_event, fake_user_repo
     ):
         """
         Если не указан проект, то уведомить всех сотрудников поддержки
@@ -192,7 +192,7 @@ class TestTicketCreatedPolicy:
 
     @pytest.mark.asyncio
     async def test_all_required_users_receive_notification(
-            self, policy, sample_ticket_created_event, fake_user_repo
+        self, policy, sample_ticket_created_event, fake_user_repo
     ):
         """
         Все необходимые пользователи должны получить уведомление (проект не указан)
@@ -230,12 +230,12 @@ class TestTicketCreatedPolicy:
 
     @pytest.mark.asyncio
     async def test_all_required_memberships_receive_notification(
-            self,
-            policy,
-            sample_ticket_created_event,
-            fake_user_repo,
-            fake_project_repo,
-            fake_membership_repo,
+        self,
+        policy,
+        sample_ticket_created_event,
+        fake_user_repo,
+        fake_project_repo,
+        fake_membership_repo,
     ):
         """
         Все необходимые участники проекта получат уведомление
@@ -267,7 +267,7 @@ class TestTicketCreatedPolicy:
             fake_membership(
                 project_id=project.id,
                 user_id=customer_admin.id,
-                project_role=MemberRole.CUSTOMER_MANAGER
+                project_role=MemberRole.CUSTOMER_MANAGER,
             ),
         ]
         await fake_project_repo.create(project)

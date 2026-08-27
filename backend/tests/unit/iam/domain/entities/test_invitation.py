@@ -30,7 +30,7 @@ def counterparty_id():
 
 
 def test_can_create_customer_invitation(
-        admin_id: uuid.UUID, counterparty_id: uuid.UUID, future_expires_at: datetime
+    admin_id: uuid.UUID, counterparty_id: uuid.UUID, future_expires_at: datetime
 ):
     invitation = Invitation(
         email="client@example.com",
@@ -49,7 +49,7 @@ def test_can_create_customer_invitation(
 
 
 def test_can_create_support_invitation_without_counterparty(
-        admin_id: uuid.UUID, future_expires_at: datetime
+    admin_id: uuid.UUID, future_expires_at: datetime
 ):
     invitation = Invitation(
         email="agent@example.com",
@@ -64,7 +64,7 @@ def test_can_create_support_invitation_without_counterparty(
 
 
 def test_customer_invitation_without_counterparty_raises_error(
-        admin_id: uuid.UUID, future_expires_at: datetime
+    admin_id: uuid.UUID, future_expires_at: datetime
 ):
     with pytest.raises(InvariantViolationError) as exc:
         Invitation(
@@ -78,7 +78,7 @@ def test_customer_invitation_without_counterparty_raises_error(
 
 
 def test_customer_admin_invitation_without_counterparty_raises_error(
-        admin_id: uuid.UUID, future_expires_at: datetime
+    admin_id: uuid.UUID, future_expires_at: datetime
 ):
     with pytest.raises(InvariantViolationError):
         Invitation(
@@ -91,7 +91,7 @@ def test_customer_admin_invitation_without_counterparty_raises_error(
 
 
 def test_support_invitation_with_counterparty_raises_error(
-        admin_id: uuid.UUID, counterparty_id: uuid.UUID, future_expires_at: datetime
+    admin_id: uuid.UUID, counterparty_id: uuid.UUID, future_expires_at: datetime
 ):
     with pytest.raises(InvariantViolationError) as exc:
         Invitation(
@@ -105,7 +105,7 @@ def test_support_invitation_with_counterparty_raises_error(
 
 
 def test_is_valid_true_when_not_used_and_not_expired(
-        admin_id: uuid.UUID, future_expires_at: datetime
+    admin_id: uuid.UUID, future_expires_at: datetime
 ):
     invitation = Invitation(
         email="test@example.com",
@@ -189,7 +189,7 @@ def test_token_generated_by_default_factory(admin_id: uuid.UUID, future_expires_
 
 @pytest.mark.parametrize("role", [UserRole.ADMIN, UserRole.SUPPORT_MANAGER])
 def test_admin_and_manager_can_have_no_counterparty(
-        role: UserRole, admin_id: uuid.UUID, future_expires_at: datetime
+    role: UserRole, admin_id: uuid.UUID, future_expires_at: datetime
 ):
     invitation = Invitation(
         email="test@example.com",

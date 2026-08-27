@@ -58,7 +58,8 @@ def map_project_to_response(project: Project) -> ProjectResponse:
 
 
 def map_project_to_detailed_response(
-        project: Project, members: Page[ProjectMember],
+    project: Project,
+    members: Page[ProjectMember],
 ) -> ProjectDetailedResponse:
     return ProjectDetailedResponse(
         id=project.id,

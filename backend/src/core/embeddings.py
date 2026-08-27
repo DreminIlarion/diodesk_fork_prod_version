@@ -8,7 +8,7 @@ client = AsyncOpenAI(base_url=settings.embeddings.base_url)
 
 
 async def embed(
-        inputs: list[str], modality: Literal["text", "image", "audio"]
+    inputs: list[str], modality: Literal["text", "image", "audio"]
 ) -> list[list[float]]:
     """Создаёт векторное представление текста"""
 
@@ -17,7 +17,7 @@ async def embed(
         input=inputs,
         dimensions=settings.embeddings.dimensions,
         encoding_format="base64",
-        extra_body={"modality": modality}
+        extra_body={"modality": modality},
     )
 
     # Сохранение порядка как при передаче текста

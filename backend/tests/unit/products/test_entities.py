@@ -85,7 +85,7 @@ def test_cannot_activate_archived_product():
     )
 
     with pytest.raises(
-            InvariantViolationError, match="Cannot reactivate archived product directly"
+        InvariantViolationError, match="Cannot reactivate archived product directly"
     ):
         product.change_status(ProductStatus.ACTIVE)
 
@@ -146,7 +146,7 @@ def test_not_required_role_try_archive_product_failure(sample_product, user_role
     """
 
     with pytest.raises(
-            PermissionDeniedError, match="Only support manager or admin can archive product"
+        PermissionDeniedError, match="Only support manager or admin can archive product"
     ):
         sample_product.archive(archived_by=uuid4(), archived_by_role=user_role)
 

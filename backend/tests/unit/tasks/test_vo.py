@@ -6,7 +6,6 @@ from src.tickets.domain.vo import TicketNumber
 
 
 class TestTaskNumber:
-
     def test_create_with_project_key(self):
         """
         Создание номера по ключу проекта

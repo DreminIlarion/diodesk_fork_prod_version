@@ -2,10 +2,10 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
+from src.tasks.domain.constants import ALLOWED_EDIT_STATUSES
 
 from src.shared.domain.exceptions import InvalidStateError, InvariantViolationError
 from src.shared.utils.time import current_datetime
-from src.tasks.domain.constants import ALLOWED_EDIT_STATUSES
 from src.tasks.domain.entities import Task
 from src.tasks.domain.vo import StoryPoints, TaskNumber, TaskStatus
 from src.tickets.domain.vo import Priority
@@ -60,7 +60,7 @@ class TestTaskInvariants:
         """
 
         with pytest.raises(
-                InvariantViolationError, match="Task in 'DONE' status must have completed_at"
+            InvariantViolationError, match="Task in 'DONE' status must have completed_at"
         ):
             Task(
                 number=task_number,
@@ -73,7 +73,6 @@ class TestTaskInvariants:
 
 
 class TestTaskCreate:
-
     def test_create_defaults(self, task_number):
         """
         При создании задачи по умолчанию статус - BACKLOG
@@ -83,7 +82,7 @@ class TestTaskCreate:
             number=task_number,
             title="Test task  ",
             description=" Test task description   ",
-            created_by=uuid4()
+            created_by=uuid4(),
         )
 
         assert task.number == task_number
@@ -208,7 +207,6 @@ class TestTaskMoveTo:
 
 
 class TestTaskAssignTo:
-
     def test_assign_fist_time(self):
         """
         Первичное назначение исполнителя
@@ -262,7 +260,6 @@ class TestTaskAssignTo:
 
 
 class TestTaskEdit:
-
     @pytest.mark.parametrize("status", list(ALLOWED_EDIT_STATUSES))
     def test_edit_success_in_allowed_status(self, status):
         """
@@ -335,7 +332,6 @@ class TestTaskEdit:
 
 
 class TestTaskIncrementActualHours:
-
     def test_add_actual_hours_success(self):
         """
         Успешное добавление факта часов
@@ -374,7 +370,6 @@ class TestTaskIncrementActualHours:
 
 
 class TestTaskRequestReview:
-
     def test_request_review_success(self):
         """
         Успешный запрос на ревью задачи
@@ -412,7 +407,6 @@ class TestTaskRequestReview:
 
 
 class TestApproveOrRejectReview:
-
     def test_approve_review_moves_to_done(self):
         """
         Одобренное ревью должно изменить статус задачи на выполненный
@@ -436,7 +430,6 @@ class TestApproveOrRejectReview:
 
 
 class TestTaskArchive:
-
     def test_archive_success(self):
         """
         Успешное архивирование задачи

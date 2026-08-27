@@ -125,7 +125,7 @@ class CounterpartyService:
         return map_counterparty_to_response(branch)
 
     async def add_contact_person(
-            self, counterparty_id: UUID, data: ContactPersonIn
+        self, counterparty_id: UUID, data: ContactPersonIn
     ) -> CounterpartyResponse:
         """Добавление контактного лица"""
 
@@ -178,7 +178,7 @@ class CounterpartyService:
         await self.session.commit()
 
     async def delete_contact_person(
-            self, counterparty_id: UUID, phone: str, email: str
+        self, counterparty_id: UUID, phone: str, email: str
     ) -> CounterpartyResponse:
         """Удаление контактного лица контрагента"""
 

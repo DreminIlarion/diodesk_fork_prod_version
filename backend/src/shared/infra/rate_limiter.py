@@ -91,7 +91,7 @@ class RateLimiter:
         self._script = self.redis.register_script(SLIDING_WINDOW_LUA_SCRIPT)
 
     async def check_limit(
-            self, client_id: str, endpoint: str, max_requests, window_seconds: int
+        self, client_id: str, endpoint: str, max_requests, window_seconds: int
     ) -> RateLimitResult:
         # 1. Формирование уникального ключа запроса
         key = f"{self.prefix}:{endpoint}:{client_id}"
@@ -125,7 +125,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     _registry: ClassVar[dict[tuple[str, str], RateLimitConfig]] = {}
 
     def __init__(
-            self, app: ASGIApp, redis: Redis, fallback_identifier: IdentifierFunc = ip_identifier
+        self, app: ASGIApp, redis: Redis, fallback_identifier: IdentifierFunc = ip_identifier
     ) -> None:
         super().__init__(app)
         self.limiter = RateLimiter(redis)
@@ -157,7 +157,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             client_id=client_id,
             endpoint=path,
             max_requests=config.max_requests,
-            window_seconds=config.window_seconds
+            window_seconds=config.window_seconds,
         )
 
         if not result.allowed:

@@ -8,10 +8,10 @@ from .entities import Project, ProjectMember
 from .repos import ProjectMemberRepository
 from .rules import (
     GrantProjectRoleRule,
+    IsMemberExistsRule,
     IsProjectManagerRule,
     IsProjectOwnerOrManagerRule,
     IsProjectOwnerRule,
-    IsMemberExistsRule,
     TargetRoleAssignmentRule,
 )
 from .vo import MemberRole
@@ -48,18 +48,18 @@ class ProjectAuthZService:
                 AnyOf(
                     IsProjectManagerRule(member),
                     IsProjectOwnerRule(member),
-                )
+                ),
             )
         )
 
         return AnyOf(*rules).check()
 
     async def can_add_member(
-            self,
-            subject: Subject,
-            project: Project,
-            invitee: User,
-            target_roles: set[MemberRole],
+        self,
+        subject: Subject,
+        project: Project,
+        invitee: User,
+        target_roles: set[MemberRole],
     ) -> PermissionResult:
         member = await self.member_repo.find(project.id, subject.id)
         actor_policy = AnyOf(
@@ -67,13 +67,13 @@ class ProjectAuthZService:
             AllOf(
                 IsMemberExistsRule(member),
                 TargetRoleAssignmentRule(member, target_roles),
-            )
+            ),
         )
         invitee_policy = GrantProjectRoleRule(invitee, target_roles)
         return AllOf(actor_policy, invitee_policy).check()
 
     async def can_remove_member(
-            self, subject: Subject, project_id: UUID, member_to_remove: ProjectMember
+        self, subject: Subject, project_id: UUID, member_to_remove: ProjectMember
     ) -> PermissionResult:
         rules = [IsAdminRule(subject)]
 

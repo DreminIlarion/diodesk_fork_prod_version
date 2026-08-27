@@ -2,7 +2,7 @@ from typing import Annotated
 
 from uuid import UUID
 
-from fastapi import Depends, Query
+from fastapi import Depends
 
 from src.shared.dependencies import EventPublisherDep, SessionDep
 from src.shared.domain.repos import get_or_raise_404
@@ -38,10 +38,10 @@ ReactionRepoDep = Annotated[ReactionRepository, Depends(get_reaction_repo)]
 
 
 def get_comment_service(
-        uow: SessionDep,
-        comment_repo: CommentRepoDep,
-        reaction_repo: ReactionRepoDep,
-        event_publisher: EventPublisherDep,
+    uow: SessionDep,
+    comment_repo: CommentRepoDep,
+    reaction_repo: ReactionRepoDep,
+    event_publisher: EventPublisherDep,
 ) -> CommentService:
     return CommentService(
         uow=uow,
@@ -52,10 +52,10 @@ def get_comment_service(
 
 
 def get_reaction_service(
-        uow: SessionDep,
-        comment_repo: CommentRepoDep,
-        reaction_repo: ReactionRepoDep,
-        event_publisher: EventPublisherDep,
+    uow: SessionDep,
+    comment_repo: CommentRepoDep,
+    reaction_repo: ReactionRepoDep,
+    event_publisher: EventPublisherDep,
 ) -> ReactionService:
     return ReactionService(
         uow=uow,

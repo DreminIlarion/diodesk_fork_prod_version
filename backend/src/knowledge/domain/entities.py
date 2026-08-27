@@ -23,16 +23,17 @@ class Category(Entity):
 
     def __post_init__(self) -> None:
         # Наименование и описание не может быть пустым
-        if not self.name.strip() or \
-                (self.description is not None and not self.description.strip()):
+        if not self.name.strip() or (
+            self.description is not None and not self.description.strip()
+        ):
             raise ValueError("Category name or description cannot be empty")
 
     @classmethod
     def create(
-            cls,
-            name: str,
-            description: str | None = None,
-            parent_category_id: UUID | None = None,
+        cls,
+        name: str,
+        description: str | None = None,
+        parent_category_id: UUID | None = None,
     ) -> "Category":
         """Создание категории базы знаний"""
 
@@ -98,11 +99,10 @@ class Article(Entity):
 
     @classmethod
     def create(
-            cls,
-            title: str,
-            content: str,
-            created_by: UUID,
-            visibility: ArticleVisibility = ArticleVisibility.INTERNAL,
-            tags: list[str] | None = None,
-    ) -> "Article":
-        ...
+        cls,
+        title: str,
+        content: str,
+        created_by: UUID,
+        visibility: ArticleVisibility = ArticleVisibility.INTERNAL,
+        tags: list[str] | None = None,
+    ) -> "Article": ...

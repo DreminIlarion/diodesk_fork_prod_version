@@ -3,7 +3,7 @@ from uuid import UUID
 from src.iam.domain.authz import Subject
 from src.iam.domain.exceptions import PermissionDeniedError
 from src.shared.domain.events import EventPublisher
-from src.shared.domain.exceptions import AlreadyExistsError, NotFoundError
+from src.shared.domain.exceptions import NotFoundError
 from src.shared.domain.repos import UnitOfWork, finalize, get_or_raise_404
 from src.shared.schemas import Page, Pagination
 from src.tickets.domain.entities import Ticket
@@ -22,12 +22,12 @@ class FeedbackService:
     """
 
     def __init__(
-            self,
-            uow: UnitOfWork,
-            feedback_repo: FeedbackRepository,
-            ticket_repo: TicketRepository,
-            authz_service: FeedbackAuthZService,
-            event_publisher: EventPublisher,
+        self,
+        uow: UnitOfWork,
+        feedback_repo: FeedbackRepository,
+        ticket_repo: TicketRepository,
+        authz_service: FeedbackAuthZService,
+        event_publisher: EventPublisher,
     ) -> None:
         self.uow = uow
         self.feedback_repo = feedback_repo
@@ -36,9 +36,9 @@ class FeedbackService:
         self.event_publisher = event_publisher
 
     async def create_feedback(
-            self,
-            data: FeedbackCreate,
-            current_subject: Subject,
+        self,
+        data: FeedbackCreate,
+        current_subject: Subject,
     ) -> FeedbackResponse:
         """
         Создать отзыв по закрытому тикету.
@@ -54,9 +54,7 @@ class FeedbackService:
         )
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
-        
-        
-        
+
         feedback = Feedback.create(
             ticket_id=ticket_id,
             author_id=current_subject.id,
@@ -70,11 +68,10 @@ class FeedbackService:
         return map_feedback_to_response(feedback)
 
     async def get_by_ticket(
-            self,
-            ticket_id: UUID,
-            current_subject: Subject,
+        self,
+        ticket_id: UUID,
+        current_subject: Subject,
     ) -> list[FeedbackResponse]:
-
         """
         Получить активный отзыв по тикету.
         """
@@ -85,21 +82,19 @@ class FeedbackService:
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
         return [map_feedback_to_response(f) for f in feedbacks]
-    
-    
-    
+
     async def get_feedbacks(
-            self,
-            pagination: Pagination,
-            filters: FeedbackFilters,
-            current_subject: Subject,
+        self,
+        pagination: Pagination,
+        filters: FeedbackFilters,
+        current_subject: Subject,
     ) -> Page[FeedbackResponse]:
         """
         Получить список активных отзывов.
         """
 
         # Клиенты видят только свои отзывы
-        if current_subject.has_any_role(['customer', 'customer_admin']):
+        if current_subject.has_any_role(["customer", "customer_admin"]):
             filters = FeedbackFilters(
                 rating=filters.rating if filters else None,
                 ticket_id=filters.ticket_id if filters else None,
@@ -109,15 +104,15 @@ class FeedbackService:
             permission = self.authz_service.can_view_feedback(current_subject)
             if not permission.allowed:
                 raise PermissionDeniedError(permission.reason)
-        
+
         page = await self.feedback_repo.paginate(pagination=pagination, filters=filters)
         return page.to_response(map_feedback_to_response)
-    
+
     async def update(
-            self,
-            feedback_id: UUID,
-            data: FeedbackUpdate,
-            current_subject: Subject,
+        self,
+        feedback_id: UUID,
+        data: FeedbackUpdate,
+        current_subject: Subject,
     ) -> FeedbackResponse:
         """
         Обновить оценку или комментарий отзыва.
@@ -133,7 +128,7 @@ class FeedbackService:
         )
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
-        
+
         feedback.edit(
             rating=data.rating,
             comment=data.comment,
@@ -143,11 +138,11 @@ class FeedbackService:
         await finalize(self.uow, feedback, event_publisher=self.event_publisher)
 
         return map_feedback_to_response(feedback)
-    
+
     async def archive(
-            self,
-            feedback_id: UUID,
-            current_subject: Subject,
+        self,
+        feedback_id: UUID,
+        current_subject: Subject,
     ) -> FeedbackResponse:
         """
         Архивировать отзыв через soft-delete.
@@ -163,14 +158,14 @@ class FeedbackService:
         )
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
-        
+
         feedback.archive()
 
         await self.feedback_repo.update(feedback)
         await finalize(self.uow, feedback, event_publisher=self.event_publisher)
 
         return map_feedback_to_response(feedback)
-    
+
     async def get_my_feedbacks(
         self,
         pagination: Pagination,

@@ -55,7 +55,7 @@ class SqlNotificationRepository(SqlAlchemyRepository[Notification, NotificationO
         return await self.session.scalar(count_stmt)
 
     async def get_by_user(
-            self, user_id: UUID, pagination: Pagination, unread_only: bool = False
+        self, user_id: UUID, pagination: Pagination, unread_only: bool = False
     ) -> Page[Notification]:
         stmt = select(self.model).where(self.model.user_id == user_id)
 
@@ -98,7 +98,7 @@ class SqlUserPreferenceRepository(SqlAlchemyRepository[UserPreference, UserPrefe
     model_mapper = UserPreferenceMapper
 
     async def get_for_notification(
-            self, user_id: UUID, notification_type: NotificationType
+        self, user_id: UUID, notification_type: NotificationType
     ) -> UserPreference | None:
         stmt = select(self.model).where(
             (self.model.user_id == user_id) & (self.model.notification_type == notification_type)

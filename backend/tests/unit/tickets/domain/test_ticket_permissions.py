@@ -2,8 +2,6 @@ from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
 import pytest
-
-from src.iam.domain.vo import UserRole
 from src.tickets.domain.services import (
     can_access_ticket,
     can_archive_ticket,
@@ -12,6 +10,8 @@ from src.tickets.domain.services import (
     can_comment_ticket,
     can_create_ticket,
 )
+
+from src.iam.domain.vo import UserRole
 from src.tickets.domain.vo import TicketStatus
 
 
@@ -67,7 +67,7 @@ class TestCanAccessTicket:
             ticket=ticket,
             user_id=user_id,
             user_role=UserRole.CUSTOMER,
-            user_counterparty_id=counterparty_id
+            user_counterparty_id=counterparty_id,
         )
 
         assert permission.allowed is True
@@ -133,16 +133,16 @@ class TestCanAccessTicket:
 
 
 class TestCanCreateTicket:
-
     @pytest.mark.parametrize(
-        "user_role", [
+        "user_role",
+        [
             UserRole.ADMIN,
             UserRole.SUPPORT_MANAGER,
             UserRole.SUPPORT_AGENT,
             UserRole.DEVELOPER,
             UserRole.ACCOUNT_MANAGER,
             UserRole.FINANCE,
-        ]
+        ],
     )
     def test_any_internal_user_can_create_ticket(self, user_role):
         """
@@ -185,7 +185,6 @@ class TestCanCreateTicket:
 
 
 class TestCanAssignTo:
-
     @pytest.mark.parametrize(
         "user_role", [UserRole.SUPPORT_AGENT, UserRole.SUPPORT_MANAGER, UserRole.ADMIN]
     )
@@ -244,13 +243,14 @@ class TestCanAssignTo:
         assert permission.allowed is True
 
     @pytest.mark.parametrize(
-        "user_role", [
+        "user_role",
+        [
             UserRole.CUSTOMER,
             UserRole.CUSTOMER_ADMIN,
             UserRole.DEVELOPER,
             UserRole.ACCOUNT_MANAGER,
             UserRole.FINANCE,
-        ]
+        ],
     )
     def test_non_support_cannot_assign(self, user_role):
         """
@@ -317,7 +317,6 @@ class TestCanAssignTo:
 
 
 class TestCanChangeStatus:
-
     @pytest.mark.parametrize("user_role", [UserRole.SUPPORT_MANAGER, UserRole.ADMIN])
     def test_admin_and_support_manager_can_change_any_status(self, user_role):
         """
@@ -527,7 +526,6 @@ class TestCanChangeStatus:
 
 
 class TestCanArchiveTicket:
-
     @pytest.mark.parametrize("user_role", [UserRole.ADMIN, UserRole.SUPPORT_MANAGER])
     def test_admin_or_support_manager_can_archive(self, user_role):
         """

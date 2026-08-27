@@ -50,7 +50,7 @@ class TestInvariants:
                 user_id=uuid4(),
                 hours_spent=Decimal("0.5"),
                 entry_date=current_datetime().date(),
-                status=WorklogStatus.DRAFT
+                status=WorklogStatus.DRAFT,
             )
 
 
@@ -67,7 +67,6 @@ def test_log_time_should_set_status_to_draft():
 
 
 class TestSubmit:
-
     def test_submit_success(self, worklog_factory):
         worklog = worklog_factory()
         worklog.submit()
@@ -85,7 +84,6 @@ class TestSubmit:
 
 
 class TestApprove:
-
     def test_approve_success(self, worklog_factory):
         worklog = worklog_factory(status=WorklogStatus.SUBMITTED)
         approved_by = uuid4()
@@ -111,7 +109,6 @@ class TestApprove:
 
 
 class TestReject:
-
     def test_reject_success(self, worklog_factory):
         worklog = worklog_factory(status=WorklogStatus.SUBMITTED)
         old_updated_at = worklog.updated_at
@@ -134,7 +131,6 @@ class TestReject:
 
 
 class TestEdit:
-
     def test_edit_all_possible_fields(self, worklog_factory):
         worklog = worklog_factory(
             status=WorklogStatus.DRAFT,
@@ -196,7 +192,6 @@ class TestEdit:
 
 
 class TestAssignToTimesheet:
-
     def test_assign_to_timesheet_success(self, worklog_factory):
         worklog = worklog_factory()
         old_updated_at = worklog.updated_at
@@ -214,7 +209,6 @@ class TestAssignToTimesheet:
 
 
 class TestRemove:
-
     @pytest.mark.parametrize("status", [WorklogStatus.DRAFT, WorklogStatus.REJECTED])
     def test_remove_success(self, status, worklog_factory):
         worklog = worklog_factory(status=status)

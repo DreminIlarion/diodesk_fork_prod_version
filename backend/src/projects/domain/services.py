@@ -7,7 +7,7 @@ from src.iam.domain.authz import Subject
 from src.shared.utils.text import get_latin_slug
 
 from .entities import Project, ProjectMember
-from .vo import ProjectKey, MemberRole
+from .vo import MemberRole, ProjectKey
 
 WORDS_COUNT = 2
 MIN_KEY_LENGTH = 2
@@ -60,10 +60,7 @@ def generate_project_key(name: str, default: str = "PRJ") -> str:
 
 
 def generate_key_suggestions(
-        original_key: str,
-        *,
-        max_attempts: int = 5,
-        min_key_length: int = 3
+    original_key: str, *, max_attempts: int = 5, min_key_length: int = 3
 ) -> list[str]:
     """
     Генерирует альтернативные ключи проекта на основе заданного ключа.
@@ -98,12 +95,12 @@ def generate_key_suggestions(
 
 
 def create_project(
-        *,
-        name: str,
-        key: ProjectKey,
-        description: str | None,
-        counterparty_id: UUID,
-        creator: Subject,
+    *,
+    name: str,
+    key: ProjectKey,
+    description: str | None,
+    counterparty_id: UUID,
+    creator: Subject,
 ) -> tuple[Project, ProjectMember]:
     """
     Создаёт новый проект вместе с владельцем.
@@ -114,12 +111,10 @@ def create_project(
         key=key,
         description=description,
         counterparty_id=counterparty_id,
-        created_by=creator.id
+        created_by=creator.id,
     )
     owner = project.create_member(
-        user_id=creator.id,
-        roles=[MemberRole.OWNER],
-        created_by=creator.id
+        user_id=creator.id, roles=[MemberRole.OWNER], created_by=creator.id
     )
 
     return project, owner

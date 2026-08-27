@@ -132,7 +132,7 @@ class Not:
         if permission.allowed:
             return PermissionResult(
                 False,
-                f"Condition must be false: {permission.reason or 'all sub-rules returned true'}"
+                f"Condition must be false: {permission.reason or 'all sub-rules returned true'}",
             )
 
         return PermissionResult(True)

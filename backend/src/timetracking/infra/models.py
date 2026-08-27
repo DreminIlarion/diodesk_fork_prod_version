@@ -32,9 +32,7 @@ class WorklogOrm(Base):
     rejection_reason: Mapped[str | None] = mapped_column(TEXT, nullable=True)
 
     __table_args__ = (
-        Index(
-            "ix_worklogs_user_entry_date", "author_id", "entry_date", postgresql_using="btree"
-        ),
+        Index("ix_worklogs_user_entry_date", "author_id", "entry_date", postgresql_using="btree"),
         Index("ix_worklogs_user_status", "author_id", "status"),
     )
 
@@ -65,7 +63,9 @@ class TimesheetOrm(Base):
 
     __table_args__ = (
         # Уникальный ID листа учёта рабочего времени
-        UniqueConstraint("author_id", "period_start", "period_end", name="uq_timesheet_user_period"),
+        UniqueConstraint(
+            "author_id", "period_start", "period_end", name="uq_timesheet_user_period"
+        ),
         # Индексы
         Index("ix_timesheet_user_period", "author_id", "period_start", "period_end"),
         Index("ix_timesheets_status", "status"),

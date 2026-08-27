@@ -27,10 +27,10 @@ class TicketAuthZService:
         self.member_repo = member_repo
 
     async def can_create_ticket(
-            self,
-            subject: Subject,
-            counterparty_id: UUID | None = None,
-            project_id: UUID | None = None,
+        self,
+        subject: Subject,
+        counterparty_id: UUID | None = None,
+        project_id: UUID | None = None,
     ) -> PermissionResult:
         rules = [IsAdminRule(subject), SameCounterpartyRule(subject, counterparty_id)]
 
@@ -48,7 +48,7 @@ class TicketAuthZService:
         ]
         customer_admin_rule = AllOf(
             HasAnyUserRoleRule(subject, required_roles=[UserRole.CUSTOMER_ADMIN]),
-            SameCounterpartyRule(subject, ticket.counterparty_id)
+            SameCounterpartyRule(subject, ticket.counterparty_id),
         )
         rules.append(customer_admin_rule)
 
@@ -59,23 +59,24 @@ class TicketAuthZService:
         return AnyOf(*rules).check()
 
     async def can_assign_ticket(
-            self, subject: Subject, ticket: Ticket, assignee: User,
+        self,
+        subject: Subject,
+        ticket: Ticket,
+        assignee: User,
     ) -> PermissionResult:
-        users_rule = AllOf(
-            *[AnyOf(IsAdminRule(user), IsSupportRule(user)) for user in (subject, assignee)]
-        )
+        users_rule = AllOf(*[
+            AnyOf(IsAdminRule(user), IsSupportRule(user)) for user in (subject, assignee)
+        ])
         rules = [users_rule]
 
         if ticket.project_id:
             assigner_member = await self.member_repo.find(ticket.project_id, subject.id)
             assignee_member = await self.member_repo.find(ticket.project_id, assignee.id)
 
-            members_rule = AllOf(
-                *[
-                    AllOf(IsMemberExistsRule(member), IsProjectStaffRule(member))
-                    for member in (assigner_member, assignee_member)
-                  ]
-            )
+            members_rule = AllOf(*[
+                AllOf(IsMemberExistsRule(member), IsProjectStaffRule(member))
+                for member in (assigner_member, assignee_member)
+            ])
             rules.append(members_rule)
 
         return AnyOf(*rules).check()
@@ -83,14 +84,14 @@ class TicketAuthZService:
     async def can_archive_ticket(self, subject: Subject, ticket: Ticket) -> PermissionResult:
         rules = [
             IsAdminRule(subject),
-            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT])
+            HasAnyUserRoleRule(
+                subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT]
+            ),
         ]
 
         if ticket.project_id:
             member = await self.member_repo.find(ticket.project_id, subject.id)
-            rules.append(
-                AllOf(IsMemberExistsRule(member), IsProjectOwnerOrManagerRule(member))
-            )
+            rules.append(AllOf(IsMemberExistsRule(member), IsProjectOwnerOrManagerRule(member)))
 
         return AnyOf(*rules).check()
 
@@ -100,13 +101,17 @@ class TicketAuthZService:
             IsAdminRule(subject),
             IsTicketReporterRule(subject, ticket),
             IsTicketCreatorRule(subject, ticket),
-            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT]),
+            HasAnyUserRoleRule(
+                subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT]
+            ),
             AllOf(
-                HasAnyUserRoleRule(subject, required_roles=[UserRole.CUSTOMER_ADMIN, UserRole.CUSTOMER]),
-                SameCounterpartyRule(subject, ticket.counterparty_id)
+                HasAnyUserRoleRule(
+                    subject, required_roles=[UserRole.CUSTOMER_ADMIN, UserRole.CUSTOMER]
+                ),
+                SameCounterpartyRule(subject, ticket.counterparty_id),
             ),
         ]
-        return AnyOf(*rules).check()    
+        return AnyOf(*rules).check()
 
     async def can_track_ticket(self, subject: Subject, ticket: Ticket) -> PermissionResult:
         """
@@ -117,17 +122,17 @@ class TicketAuthZService:
         """
 
         rules = [
-        IsAdminRule(subject),
-        IsTicketAssigneeRule(subject, ticket),
-        HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT]),  # ← добавил сюда
+            IsAdminRule(subject),
+            IsTicketAssigneeRule(subject, ticket),
+            HasAnyUserRoleRule(
+                subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT]
+            ),  # ← добавил сюда
         ]
 
         if ticket.project_id:
             member = await self.member_repo.find(ticket.project_id, subject.id)
             rules.append(
-                HasAnyMemberRoleRule(
-                    member, required_roles=[MemberRole.OWNER, MemberRole.MANAGER]
-                )
+                HasAnyMemberRoleRule(member, required_roles=[MemberRole.OWNER, MemberRole.MANAGER])
             )
 
         return AnyOf(*rules).check()
@@ -143,10 +148,17 @@ class TicketAuthZService:
                 ),
                 AllOf(
                     HasAnyMemberRoleRule(member, required_roles=[MemberRole.CUSTOMER_MANAGER]),
-                    SameCounterpartyRule(subject, ticket.counterparty_id)
+                    SameCounterpartyRule(subject, ticket.counterparty_id),
                 ),
                 IsProjectStaffRule(member),
-                HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.ADMIN, UserRole.SUPPORT_AGENT]),
+                HasAnyUserRoleRule(
+                    subject,
+                    required_roles=[
+                        UserRole.SUPPORT_MANAGER,
+                        UserRole.ADMIN,
+                        UserRole.SUPPORT_AGENT,
+                    ],
+                ),
             ]
 
             return AnyOf(*project_rules).check()
@@ -164,7 +176,10 @@ class TicketAuthZService:
                 HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_AGENT]),
                 IsTicketAssigneeRule(subject, ticket),
             ),
-            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.ADMIN, UserRole.SUPPORT_AGENT]),
+            HasAnyUserRoleRule(
+                subject,
+                required_roles=[UserRole.SUPPORT_MANAGER, UserRole.ADMIN, UserRole.SUPPORT_AGENT],
+            ),
         ]
 
         return AnyOf(*rules).check()
@@ -173,7 +188,10 @@ class TicketAuthZService:
         rules = [
             IsTicketCreatorRule(subject, ticket),
             IsTicketReporterRule(subject, ticket),
-            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.ADMIN, UserRole.SUPPORT_AGENT]),
+            HasAnyUserRoleRule(
+                subject,
+                required_roles=[UserRole.SUPPORT_MANAGER, UserRole.ADMIN, UserRole.SUPPORT_AGENT],
+            ),
         ]
 
         if ticket.project_id:
@@ -185,14 +203,15 @@ class TicketAuthZService:
     async def can_resolve_ticket(self, subject: Subject, ticket: Ticket) -> PermissionResult:
         rules = [
             IsTicketAssigneeRule(subject, ticket),
-            HasAnyUserRoleRule(subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT]), 
-            ]
+            HasAnyUserRoleRule(
+                subject, required_roles=[UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT]
+            ),
+        ]
 
         if ticket.project_id:
             member = await self.member_repo.find(ticket.project_id, subject.id)
             rules.append(
                 HasAnyMemberRoleRule(member, required_roles=[MemberRole.OWNER, MemberRole.MANAGER])
             )
-        
 
         return AnyOf(*rules).check()

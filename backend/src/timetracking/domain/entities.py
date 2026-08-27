@@ -53,13 +53,13 @@ class Worklog(Entity):
 
     @classmethod
     def log_time(
-            cls,
-            user_id: UUID,
-            hours_spent: Decimal,
-            entry_date: date,
-            description: str | None = None,
-            ticket_id: UUID | None = None,
-            task_id: UUID | None = None,
+        cls,
+        user_id: UUID,
+        hours_spent: Decimal,
+        entry_date: date,
+        description: str | None = None,
+        ticket_id: UUID | None = None,
+        task_id: UUID | None = None,
     ) -> "Worklog":
         """Создание новой записи о потраченном времени (в статусе DRAFT)"""
 
@@ -153,11 +153,11 @@ class Worklog(Entity):
         )
 
     def edit(
-            self,
-            *,
-            hours_spent: Decimal | None = None,
-            entry_date: date | None = None,
-            description: str | None = None,
+        self,
+        *,
+        hours_spent: Decimal | None = None,
+        entry_date: date | None = None,
+        description: str | None = None,
     ) -> None:
         """Редактирование записи"""
 
@@ -248,7 +248,9 @@ class Timesheet(AggregateRoot):
 
         # Начало периода не может быть больше его конца
         if self.period_start > self.period_end:
-            raise InvariantViolationError("Period planned_start cannot be after period planned_end")
+            raise InvariantViolationError(
+                "Period planned_start cannot be after period planned_end"
+            )
 
         # Количество часов не может быть отрицательным
         if self.total_hours < 0 or self.approved_hours < 0 or self.pending_hours < 0:
@@ -293,13 +295,13 @@ class Timesheet(AggregateRoot):
 
     @classmethod
     def create(
-            cls,
-            user_id: UUID,
-            period_start: date,
-            period_end: date,
-            name: str,
-            counterparty_id: UUID | None = None,
-            project_id: UUID | None = None,
+        cls,
+        user_id: UUID,
+        period_start: date,
+        period_end: date,
+        name: str,
+        counterparty_id: UUID | None = None,
+        project_id: UUID | None = None,
     ) -> "Timesheet":
         """Создание листа учёта рабочего времени за определённый период"""
 
@@ -313,12 +315,12 @@ class Timesheet(AggregateRoot):
         )
 
     def add_worklog(
-            self,
-            worklog_id: UUID,
-            hours_spent: Decimal,
-            entry_date: date,
-            worklog_status: WorklogStatus,
-            worklog_user_id: UUID
+        self,
+        worklog_id: UUID,
+        hours_spent: Decimal,
+        entry_date: date,
+        worklog_status: WorklogStatus,
+        worklog_user_id: UUID,
     ) -> None:
         """Добавление факта потраченных часов в ЛУРВ"""
 
@@ -353,7 +355,7 @@ class Timesheet(AggregateRoot):
         self.updated_at = current_datetime()
 
     def remove_worklog(
-            self, worklog_id: UUID, hours_spent: Decimal, worklog_status: WorklogStatus
+        self, worklog_id: UUID, hours_spent: Decimal, worklog_status: WorklogStatus
     ) -> None:
         """Удаление записи о потраченных часах из ЛУРВ"""
 
@@ -380,7 +382,9 @@ class Timesheet(AggregateRoot):
         """Отправить ЛУРВ на согласование"""
 
         if self.status not in {
-            TimesheetStatus.DRAFT, TimesheetStatus.REJECTED, TimesheetStatus.PARTIALLY_APPROVED
+            TimesheetStatus.DRAFT,
+            TimesheetStatus.REJECTED,
+            TimesheetStatus.PARTIALLY_APPROVED,
         }:
             raise InvalidStateError("Only DRAFT or REJECTED timesheet can be submitted")
 

@@ -15,10 +15,10 @@ router = APIRouter(
     path="",
     status_code=status.HTTP_201_CREATED,
     response_model=WorklogResponse,
-    summary="Записать потраченное время в журнал"
+    summary="Записать потраченное время в журнал",
 )
 async def create_worklog(
-        data: WorklogCreate, current_user: CurrentUserDep, service: WorklogServiceDep
+    data: WorklogCreate, current_user: CurrentUserDep, service: WorklogServiceDep
 ) -> WorklogResponse:
     return await service.log_time(data=data, current_user=current_user)
 
@@ -30,10 +30,7 @@ async def create_worklog(
     summary="Редактировать лог",
 )
 async def update_worklog(
-        worklog_id: UUID,
-        data: WorklogEdit,
-        current_user: CurrentUserDep,
-        service: WorklogServiceDep
+    worklog_id: UUID, data: WorklogEdit, current_user: CurrentUserDep, service: WorklogServiceDep
 ) -> WorklogResponse:
     return await service.edit(worklog_id=worklog_id, data=data, current_user=current_user)
 
@@ -42,6 +39,6 @@ async def update_worklog(
     path="/{worklog_id}",
     status_code=status.HTTP_200_OK,
     response_model=...,
-    summary="Получить запись о потраченном времени"
+    summary="Получить запись о потраченном времени",
 )
 async def get_worklog(): ...

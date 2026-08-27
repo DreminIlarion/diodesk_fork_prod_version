@@ -24,15 +24,15 @@ from ..schemas import ReviewDecision, TaskCreate, TaskResponse, TaskUpdate
 
 class TaskService:
     def __init__(
-            self,
-            uow: UnitOfWork,
-            task_repo: TaskRepository,
-            ticket_repo: TicketRepository,
-            user_repo: UserRepository,
-            project_repo: ProjectRepository,
-            task_authz_service: TaskAuthZService,
-            activity_log_recorder: ActivityLogRecorder,
-            event_publisher: EventPublisher,
+        self,
+        uow: UnitOfWork,
+        task_repo: TaskRepository,
+        ticket_repo: TicketRepository,
+        user_repo: UserRepository,
+        project_repo: ProjectRepository,
+        task_authz_service: TaskAuthZService,
+        activity_log_recorder: ActivityLogRecorder,
+        event_publisher: EventPublisher,
     ) -> None:
         self.uow = uow
         self.task_repo = task_repo
@@ -44,9 +44,7 @@ class TaskService:
         self.event_publisher = event_publisher
 
     @staticmethod
-    def _resolve_project_id(
-            data: TaskCreate, ticket: Ticket | None = None
-    ) -> UUID | None:
+    def _resolve_project_id(data: TaskCreate, ticket: Ticket | None = None) -> UUID | None:
         """
         Определение правильного ID проекта для привязи к задаче.
         """
@@ -55,7 +53,6 @@ class TaskService:
 
         # Если указан тикет - проверка на его существование + подтягивание проекта
         if ticket is not None and ticket.project_id is not None:
-
             # Указанный проект и проект тикета должны совпадать
             if project_id is not None and project_id != ticket.project_id:
                 raise InvalidStateError("Project mismatch with ticket")
@@ -115,7 +112,7 @@ class TaskService:
             project_id=project_id,
             ticket_id=data.ticket_id,
             created_by=current_subject.id,
-            tags=[Tag(name=tag.name, color=tag.color) for tag in data.tags]
+            tags=[Tag(name=tag.name, color=tag.color) for tag in data.tags],
         )
         if data.mark_as_todo:
             task.change_status(new_status=TaskStatus.TODO, changed_by=current_subject.id)
@@ -132,21 +129,25 @@ class TaskService:
         await self.task_repo.create(task)
 
         await finalize(
-            self.uow, task,
+            self.uow,
+            task,
             event_publisher=self.event_publisher,
-            activity_recorder=self.activity_log_recorder
+            activity_recorder=self.activity_log_recorder,
         )
 
         return map_task_to_response(task)
 
     async def change_status(
-            self, task_id: UUID, new_status: TaskStatus, current_subject: Subject
+        self, task_id: UUID, new_status: TaskStatus, current_subject: Subject
     ) -> TaskResponse:
         """
         Изменение статуса задачи.
         """
 
         task = await get_or_raise_404(self.task_repo.read, task_id, Task)
+
+        if new_status == TaskStatus.TO_REVIEW:
+            raise InvalidStateError("Use the request-review endpoint to move a task to review")
 
         permission = await self.task_authz_service.can_change_status(
             subject=current_subject, task=task, new_status=new_status
@@ -158,15 +159,16 @@ class TaskService:
         await self.task_repo.update(task)
 
         await finalize(
-            self.uow, task,
+            self.uow,
+            task,
             event_publisher=self.event_publisher,
-            activity_recorder=self.activity_log_recorder
+            activity_recorder=self.activity_log_recorder,
         )
 
         return map_task_to_response(task)
 
     async def edit(
-            self, task_id: UUID, data: TaskUpdate, current_subject: Subject
+        self, task_id: UUID, data: TaskUpdate, current_subject: Subject
     ) -> TaskResponse:
         """
         Редактировать содержание задачи.
@@ -194,17 +196,17 @@ class TaskService:
 
         await self.task_repo.update(task)
 
-
         await finalize(
-            self.uow, task,
+            self.uow,
+            task,
             event_publisher=self.event_publisher,
-            activity_recorder=self.activity_log_recorder
+            activity_recorder=self.activity_log_recorder,
         )
 
         return map_task_to_response(task)
 
     async def assign_to(
-            self, task_id: UUID, assignee_id: UUID, current_subject: Subject
+        self, task_id: UUID, assignee_id: UUID, current_subject: Subject
     ) -> TaskResponse:
         """
         Назначить исполнителя на задачу.
@@ -223,15 +225,16 @@ class TaskService:
         await self.task_repo.update(task)
 
         await finalize(
-            self.uow, task,
+            self.uow,
+            task,
             event_publisher=self.event_publisher,
-            activity_recorder=self.activity_log_recorder
+            activity_recorder=self.activity_log_recorder,
         )
 
         return map_task_to_response(task)
 
     async def request_review(
-            self, task_id: UUID, reviewer_id: UUID, current_subject: Subject
+        self, task_id: UUID, reviewer_id: UUID, current_subject: Subject
     ) -> TaskResponse:
         """
         Запросить ревью на задачу у пользователя.
@@ -240,8 +243,8 @@ class TaskService:
         task = await get_or_raise_404(self.task_repo.read, task_id, Task)
         reviewer = await get_or_raise_404(self.user_repo.read, reviewer_id, User)
 
-        permission = await self.task_authz_service.can_review_task(
-            subject=current_subject, task=task,
+        permission = await self.task_authz_service.can_request_review(
+            subject=current_subject, task=task, reviewer=reviewer
         )
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
@@ -250,15 +253,16 @@ class TaskService:
         await self.task_repo.update(task)
 
         await finalize(
-            self.uow, task,
+            self.uow,
+            task,
             event_publisher=self.event_publisher,
-            activity_recorder=self.activity_log_recorder
+            activity_recorder=self.activity_log_recorder,
         )
 
         return map_task_to_response(task)
 
     async def review(
-            self, task_id: UUID, decision: ReviewDecision, current_subject: Subject
+        self, task_id: UUID, decision: ReviewDecision, current_subject: Subject
     ) -> TaskResponse:
         """
         Провести ревью задачи.
@@ -276,9 +280,10 @@ class TaskService:
         await self.task_repo.update(task)
 
         await finalize(
-            self.uow, task,
+            self.uow,
+            task,
             event_publisher=self.event_publisher,
-            activity_recorder=self.activity_log_recorder
+            activity_recorder=self.activity_log_recorder,
         )
 
         return map_task_to_response(task)
@@ -300,9 +305,10 @@ class TaskService:
         await self.task_repo.update(task)
 
         await finalize(
-            self.uow, task,
+            self.uow,
+            task,
             event_publisher=self.event_publisher,
-            activity_recorder=self.activity_log_recorder
+            activity_recorder=self.activity_log_recorder,
         )
 
         return map_task_to_response(task)
@@ -318,7 +324,8 @@ class TaskService:
         await self.task_repo.update(task)
 
         await finalize(
-            self.uow, task,
+            self.uow,
+            task,
             event_publisher=self.event_publisher,
-            activity_recorder=self.activity_log_recorder
+            activity_recorder=self.activity_log_recorder,
         )

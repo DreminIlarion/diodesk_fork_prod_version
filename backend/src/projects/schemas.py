@@ -12,7 +12,7 @@ from .domain.vo import MemberRole, ProjectStageStatus, ProjectStatus
 
 NewProjectStagesOrder = Annotated[
     list[list[UUID]],
-    Body(..., embed=True, description="Новый порядок проведения этапов с разделением на группы")
+    Body(..., embed=True, description="Новый порядок проведения этапов с разделением на группы"),
 ]
 
 
@@ -68,7 +68,7 @@ class ProjectStageCreate(BaseModel):
         description="""\
         Порядковый номер этапа (все этапы должны выполняться по порядку).
         Если передан null - порядок этапа определиться автоматически.
-        """
+        """,
     )
     planned_start: date | None = Field(None, description="Запланированная дата начала этапа")
     planned_end: date | None = Field(None, description="Запланированная дата завершения этапа")

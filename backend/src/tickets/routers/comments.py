@@ -16,14 +16,14 @@ router = APIRouter(prefix="/tickets", tags=["Комментарии заявки
     path="/{ticket_id}/comments",
     status_code=status.HTTP_200_OK,
     response_model=Page[CommentWithReactionsResponse],
-    summary="Получить комментарии заявки"
+    summary="Получить комментарии заявки",
 )
 async def get_ticket_comments(
-        ticket_id: UUID,
-        pagination: PaginationDep,
-        current_subject: CurrentSubjectDep,
-        service: CommentServiceDep,
-        visible: VisibleParam,
+    ticket_id: UUID,
+    pagination: PaginationDep,
+    current_subject: CurrentSubjectDep,
+    service: CommentServiceDep,
+    visible: VisibleParam,
 ) -> Page[CommentWithReactionsResponse]:
     return await service.get_comments(
         aggregate_ref=AggregateReference(id=ticket_id, type=AggregateType.TICKET),
@@ -40,10 +40,10 @@ async def get_ticket_comments(
     summary="Оставить комментарий к заявке",
 )
 async def create_ticket_comment(
-        ticket_id: UUID,
-        data: CommentCreate,
-        current_subject: CurrentSubjectDep,
-        service: CommentServiceDep,
+    ticket_id: UUID,
+    data: CommentCreate,
+    current_subject: CurrentSubjectDep,
+    service: CommentServiceDep,
 ) -> CommentResponse:
     return await service.create_comment(
         aggregate_ref=AggregateReference(id=ticket_id, type=AggregateType.TICKET),

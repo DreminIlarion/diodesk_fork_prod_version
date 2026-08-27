@@ -31,9 +31,7 @@ class UserCreate(BaseModel):
     Форма для создания/регистрации пользователя.
     """
 
-    username: str | None = Field(
-        None, description="Никнейм пользователя", examples=["i.i.ivanov"]
-    )
+    username: str | None = Field(None, description="Никнейм пользователя", examples=["i.i.ivanov"])
     full_name: str | None = Field(
         None, max_length=150, description="ФИО", examples=["Иванов Иван Иванович"]
     )

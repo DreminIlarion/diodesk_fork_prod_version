@@ -47,10 +47,7 @@ class TestCreateForCounterparty:
 
     @pytest.mark.parametrize(
         ("russian_name", "excepted_number"),
-        [
-            ("Яндекс Такси", "IANDEKSTAK-26-00000006"),
-            ("Ромашка", "ROMASHKA-26-00000006")
-        ],
+        [("Яндекс Такси", "IANDEKSTAK-26-00000006"), ("Ромашка", "ROMASHKA-26-00000006")],
     )
     def test_create_with_russian_name(self, russian_name, excepted_number):
         total_tickets = 5
@@ -92,9 +89,7 @@ class TestCreateForCounterparty:
 
     def test_create_with_umlauts(self):
         total_tickets = 0
-        number = TicketNumber.create(
-            total_tickets, counterparty_name="Müller & Söhne"
-        )
+        number = TicketNumber.create(total_tickets, counterparty_name="Müller & Söhne")
 
         assert number.prefix.isalnum()
         assert "MULLER" in number.prefix or "MULLERS" in number.prefix
@@ -154,8 +149,7 @@ class TestFormatValidation:
 
 def test_create_with_project_and_counterparty_raises_error(valid_project_key):
     with pytest.raises(
-            ValueError,
-            match="Only one of the project key or counterparty name must be specified"
+        ValueError, match="Only one of the project key or counterparty name must be specified"
     ):
         TicketNumber.create(123, project_key=valid_project_key, counterparty_name="Ромашка")
 
@@ -180,8 +174,8 @@ def test_cannot_be_empty():
         "WEB-25_12345678",  # Неправильный разделитель
         "РОМАШКА-26-00000001",  # Русские символы
         "ROMASHKAROMASHKA-26-12345678",  # Длинный префикс
-        "WEB-FG-123Gj678"  # Буквы в номере
-    ]
+        "WEB-FG-123Gj678",  # Буквы в номере
+    ],
 )
 def test_invalid_number_format(wrong_number):
     with pytest.raises(ValueError, match="Invalid ticket number format"):

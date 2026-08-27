@@ -59,6 +59,7 @@ class WorklogRemoved(Event):
     worklog_id: UUID
     deleted_by: UUID
 
+
 # =================================== События для ЛУРВ ===================================
 
 

@@ -6,9 +6,10 @@ from uuid import UUID
 from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import selectinload
 
+from src.comments.domain.vo import CommentVisibility
+from src.comments.infra.models import CommentOrm, ReactionOrm
 from src.shared.infra.repos import SqlAlchemyRepository
 from src.shared.schemas import Page, Pagination
-from src.comments.domain.vo import CommentVisibility
 
 from ..domain.dtos import ActorsFilters
 from ..domain.entities import Comment, Reaction, Ticket
@@ -16,7 +17,6 @@ from ..domain.repos import ReactionStats, TicketFilters
 from ..domain.vo import ReactionType
 from .mappers import CommentMapper, ReactionMapper, TicketMapper
 from .models import TicketOrm
-from src.comments.infra.models import CommentOrm, ReactionOrm
 
 
 class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
@@ -36,7 +36,9 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
         return None if model is None else self.model_mapper.to_entity(model)
 
     def _apply_actors_filters(
-            self, stmt: Select[tuple[TicketOrm]], filters: ActorsFilters,
+        self,
+        stmt: Select[tuple[TicketOrm]],
+        filters: ActorsFilters,
     ) -> Select[tuple[TicketOrm]]:
         if filters.assignee_id:
             stmt = stmt.where(self.model.assignee_id == filters.assignee_id)
@@ -50,7 +52,9 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
         return stmt
 
     def _apply_ticket_filters(
-            self, stmt: Select[tuple[TicketOrm]], filters: TicketFilters,
+        self,
+        stmt: Select[tuple[TicketOrm]],
+        filters: TicketFilters,
     ) -> Select[tuple[TicketOrm]]:
         if filters.statuses:
             stmt = stmt.where(self.model.status.in_(filters.statuses))
@@ -77,7 +81,6 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
             stmt = stmt.where(
                 self.model.search_vector.op("@@")(
                     func.plainto_tsquery("russian", filters.search_query)
-                    
                 )
             )
 
@@ -91,7 +94,9 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
 
     @override
     async def paginate(
-            self, pagination: Pagination, filters: TicketFilters | None = None,
+        self,
+        pagination: Pagination,
+        filters: TicketFilters | None = None,
     ) -> Page[Ticket]:
         stmt = select(self.model)
 
@@ -101,7 +106,7 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
         return await self._paginate(stmt, pagination, model_mapper=self.model_mapper.to_light)
 
     async def get_total(
-            self, project_id: UUID | None = None, counterparty_id: UUID | None = None
+        self, project_id: UUID | None = None, counterparty_id: UUID | None = None
     ) -> int:
         conditions = []
 
@@ -113,12 +118,13 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
         elif counterparty_id is not None and project_id is None:
             conditions.extend((
                 self.model.counterparty_id == counterparty_id,
-                self.model.project_id.is_(None)
+                self.model.project_id.is_(None),
             ))
 
         else:
             conditions.extend((
-                self.model.project_id.is_(None), self.model.counterparty_id.is_(None),
+                self.model.project_id.is_(None),
+                self.model.counterparty_id.is_(None),
             ))
 
         stmt = select(func.count()).select_from(self.model).where(and_(*conditions))
@@ -135,13 +141,13 @@ class SqlCommentRepository(SqlAlchemyRepository[Comment, CommentOrm]):
     model_mapper = CommentMapper
 
     async def get_by_ticket(
-            self,
-            ticket_id: UUID,
-            pagination: Pagination,
-            *,
-            user_id: UUID | None = None,
-            include_notes: bool = False,
-            include_internal: bool = False,
+        self,
+        ticket_id: UUID,
+        pagination: Pagination,
+        *,
+        user_id: UUID | None = None,
+        include_notes: bool = False,
+        include_internal: bool = False,
     ) -> Page[Comment]:
         if user_id is None and include_notes:
             raise ValueError("User ID required for received NOTE comments")
@@ -155,34 +161,32 @@ class SqlCommentRepository(SqlAlchemyRepository[Comment, CommentOrm]):
 
         if include_notes:
             type_conditions.append(
-                (self.model.visibility == CommentVisibility.INTERNAL) &
-                (self.model.author_id == user_id)
+                (self.model.visibility == CommentVisibility.INTERNAL)
+                & (self.model.author_id == user_id)
             )
         if include_internal:
             type_conditions.append(self.model.visibility == CommentVisibility.INTERNAL)
 
-        stmt = select(self.model).where(
-            and_(*base_conditions), or_(*type_conditions)
-        )
+        stmt = select(self.model).where(and_(*base_conditions), or_(*type_conditions))
 
         return await self._paginate(stmt, pagination)
 
     async def get_replies(
-            self,
-            parent_comment_id: UUID,
-            pagination: Pagination,
-            *,
-            user_id: UUID | None = None,
-            include_notes: bool = False,
-            include_internal: bool = False,
+        self,
+        parent_comment_id: UUID,
+        pagination: Pagination,
+        *,
+        user_id: UUID | None = None,
+        include_notes: bool = False,
+        include_internal: bool = False,
     ) -> Page[Comment]:
         type_conditions = [self.model.visibility == CommentVisibility.PUBLIC]
         if include_internal:
             type_conditions.append(self.model.visibility == CommentVisibility.INTERNAL)
         if include_notes:
             type_conditions.append(
-                (self.model.visibility == CommentVisibility.INTERNAL) &
-                (self.model.author_id == user_id)
+                (self.model.visibility == CommentVisibility.INTERNAL)
+                & (self.model.author_id == user_id)
             )
 
         stmt = select(self.model).where(
@@ -199,15 +203,12 @@ class SqlReactionRepository(SqlAlchemyRepository[Reaction, ReactionOrm]):
     model_mapper = ReactionMapper
 
     async def find(
-            self, comment_id: UUID, author_id: UUID, reaction_type: ReactionType
+        self, comment_id: UUID, author_id: UUID, reaction_type: ReactionType
     ) -> Reaction | None:
-        stmt = (
-            select(self.model)
-            .where(
-                (self.model.comment_id == comment_id) &
-                (self.model.author_id == author_id) &
-                (self.model.emoji == reaction_type)
-            )
+        stmt = select(self.model).where(
+            (self.model.comment_id == comment_id)
+            & (self.model.author_id == author_id)
+            & (self.model.emoji == reaction_type)
         )
         result = await self.session.execute(stmt)
         model = result.scalar_one_or_none()
@@ -219,14 +220,12 @@ class SqlReactionRepository(SqlAlchemyRepository[Reaction, ReactionOrm]):
                 self.model.comment_id,
                 self.model.emoji,
                 func.count(self.model.id).label("cnt"),
-                func.count(self.model.id)
+                func
+                .count(self.model.id)
                 .filter(self.model.author_id == user_id)
-                .label("user_has_type")
+                .label("user_has_type"),
             )
-            .where(
-                (self.model.comment_id.in_(comment_ids)) &
-                (self.model.deleted_at.is_(None))
-            )
+            .where((self.model.comment_id.in_(comment_ids)) & (self.model.deleted_at.is_(None)))
             .group_by(self.model.comment_id, self.model.emoji)
         )
 

@@ -77,12 +77,12 @@ class Comment(AggregateRoot):
 
     @classmethod
     def create(
-            cls,
-            aggregate_type: AggregateType,
-            aggregate_id: UUID,
-            author_id: UUID,
-            text: str,
-            visibility: CommentVisibility = CommentVisibility.PUBLIC,
+        cls,
+        aggregate_type: AggregateType,
+        aggregate_id: UUID,
+        author_id: UUID,
+        text: str,
+        visibility: CommentVisibility = CommentVisibility.PUBLIC,
     ) -> Self:
         if not text.strip():
             raise ValueError("Comment text cannot be empty")
@@ -107,10 +107,10 @@ class Comment(AggregateRoot):
         return comment
 
     def create_reply(
-            self,
-            author_id: UUID,
-            text: str,
-            visibility: CommentVisibility = CommentVisibility.PUBLIC,
+        self,
+        author_id: UUID,
+        text: str,
+        visibility: CommentVisibility = CommentVisibility.PUBLIC,
     ) -> Self:
         """Ответить на комментарий."""
 

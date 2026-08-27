@@ -42,10 +42,8 @@ class SoftwareProductOrm(Base):
     __table_args__ = (
         # 1. GIN индекс для полнотекстового поиска (@@ оператор)
         Index("ix_software_products_search", "search_vector", postgresql_using="gin"),
-
         # 2. GIN индекс для структурного поиска по JSONB (@>, ?, ?| операторы)
         Index("ix_software_products_attributes", "attributes", postgresql_using="gin"),
-
         # 3. Частичный индекс: только активные продукты (ускоряет 90% запросов)
         Index(
             "ix_software_products_active",

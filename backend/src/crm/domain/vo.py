@@ -142,9 +142,7 @@ class Phone:
     value: str = field(compare=True, hash=True, repr=False)
 
     # Российские мобильные и городские номера
-    PATTERN: ClassVar[re.Pattern[str]] = re.compile(
-        r"^\+?7\d{10}$|^8\d{10}$|^9\d{9}$|^7\d{10}$"
-    )
+    PATTERN: ClassVar[re.Pattern[str]] = re.compile(r"^\+?7\d{10}$|^8\d{10}$|^9\d{9}$|^7\d{10}$")
     # Длина после нормализации (+7 + 10 символов)
     NORMALIZED_LENGTH: ClassVar[int] = 12
     # Возможные длины
@@ -169,8 +167,7 @@ class Phone:
 
         if not self.PATTERN.match(normalized):
             raise ValueError(
-                "Invalid phone number. "
-                "Excepted russian number: +7XXXXXXXXXX or 8XXXXXXXXXX"
+                "Invalid phone number. Excepted russian number: +7XXXXXXXXXX or 8XXXXXXXXXX"
             )
 
         if len(normalized) != self.NORMALIZED_LENGTH:
@@ -194,7 +191,12 @@ class ContactPerson(ValueObject):
     """
 
     AVAILABLE_MESSENGERS: ClassVar[frozenset[str]] = frozenset({
-        "telegram", "whatsapp", "vk", "max", "signal", "skype",
+        "telegram",
+        "whatsapp",
+        "vk",
+        "max",
+        "signal",
+        "skype",
     })
 
     full_name: FullName
@@ -225,13 +227,13 @@ class ContactPerson(ValueObject):
 
     @classmethod
     def create(
-            cls,
-            first_name: str,
-            last_name: str | None,
-            middle_name: str | None,
-            phone: str | None,
-            email: str | None,
-            messengers: dict[str, str],
+        cls,
+        first_name: str,
+        last_name: str | None,
+        middle_name: str | None,
+        phone: str | None,
+        email: str | None,
+        messengers: dict[str, str],
     ) -> "ContactPerson":
         return cls(
             full_name=FullName(

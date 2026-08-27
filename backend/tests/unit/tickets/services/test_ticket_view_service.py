@@ -20,13 +20,12 @@ def ticket_view_service(fake_ticket_repo, ticket_scope_service, ticket_data_load
 
 @pytest.mark.asyncio
 class TestGetTickets:
-
     async def test_get_tickets_success(
-            self,
-            ticket_view_service,
-            user_factory,
-            counterparty_factory,
-            ticket_factory,
+        self,
+        ticket_view_service,
+        user_factory,
+        counterparty_factory,
+        ticket_factory,
     ):
         """Успешное получение тикетов с пагинацией"""
 

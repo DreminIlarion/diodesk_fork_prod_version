@@ -25,11 +25,11 @@ TimesheetRepoDep = Annotated[TimesheetRepository, Depends(get_timesheet_repo)]
 
 
 def get_worklog_service(
-        session: SessionDep,
-        worklog_repo: WorklogRepoDep,
-        task_repo: TaskRepoDep,
-        ticket_repo: TicketRepoDep,
-        event_publisher: EventPublisherDep,
+    session: SessionDep,
+    worklog_repo: WorklogRepoDep,
+    task_repo: TaskRepoDep,
+    ticket_repo: TicketRepoDep,
+    event_publisher: EventPublisherDep,
 ) -> WorklogService:
     return WorklogService(
         session=session,
@@ -41,12 +41,12 @@ def get_worklog_service(
 
 
 def get_timesheet_service(
-        session: SessionDep,
-        timesheet_repo: TimesheetRepoDep,
-        worklog_repo: WorklogRepoDep,
-        counterparty_repo: CounterpartyRepoDep,
-        project_repo: ProjectRepoDep,
-        event_publisher: EventPublisherDep,
+    session: SessionDep,
+    timesheet_repo: TimesheetRepoDep,
+    worklog_repo: WorklogRepoDep,
+    counterparty_repo: CounterpartyRepoDep,
+    project_repo: ProjectRepoDep,
+    event_publisher: EventPublisherDep,
 ) -> TimesheetService:
     return TimesheetService(
         session=session,

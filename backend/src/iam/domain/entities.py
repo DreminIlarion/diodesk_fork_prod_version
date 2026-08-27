@@ -161,11 +161,11 @@ class Invitation(Entity):
 
     @classmethod
     def create(
-            cls,
-            email: Email,
-            invited_by: UUID,
-            granted_roles: set[UserRole],
-            counterparty_id: UUID | None = None,
+        cls,
+        email: Email,
+        invited_by: UUID,
+        granted_roles: set[UserRole],
+        counterparty_id: UUID | None = None,
     ) -> Self:
         expires_at = get_expiration_time(expires_in=timedelta(days=INVITATION_EXPIRES_IN_DAYS))
         invitation = cls(

@@ -72,7 +72,7 @@ class ProjectStage(Entity):
     name: str
     execution_order: Annotated[
         int,
-        Doc("Группа/волна выполнения. Этапы с одинаковым execution_order могут идти параллельно")
+        Doc("Группа/волна выполнения. Этапы с одинаковым execution_order могут идти параллельно"),
     ]
 
     status: ProjectStageStatus
@@ -98,15 +98,21 @@ class ProjectStage(Entity):
             )
 
         # Плановая дата начала не может быть больше плановой даты завершения
-        if self.planned_start is not None and self.planned_end is not None \
-                and self.planned_start > self.planned_end:
+        if (
+            self.planned_start is not None
+            and self.planned_end is not None
+            and self.planned_start > self.planned_end
+        ):
             raise InvariantViolationError(
                 "Planned planned_start date cannot be greater than planned planned_end date"
             )
 
         # Проект не может завершиться раньше, чам он начнётся
-        if self.started_at is not None and self.completed_at is not None \
-                and self.started_at > self.completed_at:
+        if (
+            self.started_at is not None
+            and self.completed_at is not None
+            and self.started_at > self.completed_at
+        ):
             raise InvariantViolationError("The project cannot be completed before it starts")
 
     @property
@@ -146,12 +152,12 @@ class ProjectStage(Entity):
         self.updated_at = current_datetime()
 
     def edit(
-            self,
-            *,
-            name: str | None = None,
-            description: str | None = None,
-            responsible_id: UUID | None = None,
-            completion_criteria: list[str] | None = None,
+        self,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        responsible_id: UUID | None = None,
+        completion_criteria: list[str] | None = None,
     ) -> None:
         """
         Обновить справочную информацию этапа.
@@ -163,8 +169,11 @@ class ProjectStage(Entity):
             self.name = name.strip()
             changed = True
 
-        if description is not None and description.strip() \
-                and description.strip() != self.description:
+        if (
+            description is not None
+            and description.strip()
+            and description.strip() != self.description
+        ):
             self.description = description.strip()
             changed = True
 
@@ -234,12 +243,12 @@ class Project(AggregateRoot):
 
     @classmethod
     def create(
-            cls,
-            name: str,
-            key: ProjectKey,
-            created_by: UUID,
-            description: str | None = None,
-            counterparty_id: UUID | None = None,
+        cls,
+        name: str,
+        key: ProjectKey,
+        created_by: UUID,
+        description: str | None = None,
+        counterparty_id: UUID | None = None,
     ) -> Self:
         stripped_name = name.strip()
         project = cls(
@@ -263,7 +272,7 @@ class Project(AggregateRoot):
         return project
 
     def create_member(
-            self, user_id: UUID, roles: list[MemberRole], created_by: UUID
+        self, user_id: UUID, roles: list[MemberRole], created_by: UUID
     ) -> ProjectMember:
         """
         Создание участника в проекте (фабричный метод).
@@ -305,9 +314,7 @@ class Project(AggregateRoot):
         self.status = ProjectStatus.ARCHIVED
         self.deleted_at = current_datetime()
 
-        self.register_event(
-            ProjectArchived(project_id=self.id, archived_by=archived_by)
-        )
+        self.register_event(ProjectArchived(project_id=self.id, archived_by=archived_by))
 
     @property
     def active_stages(self) -> list[ProjectStage]:
@@ -364,8 +371,9 @@ class Project(AggregateRoot):
             if any(stage.status == ProjectStageStatus.ACTIVE for stage in group_stage):
                 return None
 
-            if not self.is_execution_order_completed(order) and \
-                    all(self.is_execution_order_completed(prev) for prev in range(1, order)):
+            if not self.is_execution_order_completed(order) and all(
+                self.is_execution_order_completed(prev) for prev in range(1, order)
+            ):
                 return order
 
         return None
@@ -397,7 +405,7 @@ class Project(AggregateRoot):
             raise ValueError(f"Project stage with this name - {name} already exists")
 
         stage = ProjectStage(
-            id=uuid4(), 
+            id=uuid4(),
             project_id=self.id,
             name=name.strip(),
             description=description.strip(),

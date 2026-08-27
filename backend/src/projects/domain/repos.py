@@ -6,11 +6,10 @@ from src.shared.domain.repos import Repository
 from src.shared.schemas import Page, Pagination
 
 from .entities import Project, ProjectMember
-from .vo import ProjectKey, MemberRole
+from .vo import MemberRole, ProjectKey
 
 
 class ProjectRepository(Repository[Project]):
-
     async def get_by_key(self, key: ProjectKey) -> Project | None:
         """Получение проекта по его уникальному ключу"""
 
@@ -21,10 +20,10 @@ class ProjectRepository(Repository[Project]):
         """
 
     async def get_by_user_membership(
-            self,
-            user_id: UUID,
-            pagination: Pagination,
-            owner_only: bool = False,
+        self,
+        user_id: UUID,
+        pagination: Pagination,
+        owner_only: bool = False,
     ) -> Page[Project]:
         """
         Получение проектов в которых состоит пользователь
@@ -32,13 +31,12 @@ class ProjectRepository(Repository[Project]):
 
 
 class ProjectMemberRepository(Repository[ProjectMember]):
-
     @override
     async def paginate(
-            self,
-            pagination: Pagination,
-            project_id: UUID | None = None,
-            include_project_roles: list[MemberRole] | None = None,
+        self,
+        pagination: Pagination,
+        project_id: UUID | None = None,
+        include_project_roles: list[MemberRole] | None = None,
     ) -> Page[ProjectMember]: ...
 
     async def find(self, project_id: UUID, user_id: UUID) -> ProjectMember | None:
@@ -49,6 +47,7 @@ class ProjectMemberRepository(Repository[ProjectMember]):
         Возвращает все членства пользователя во всех проектах.
         Используется для получения полного списка проектов пользователя
         (например, для построения селектора проектов или персональной панели).
-        """ 
+        """
+
     async def list_by_project(self, project_id: UUID) -> list[ProjectMember]:
         """Получить всех участников проекта."""

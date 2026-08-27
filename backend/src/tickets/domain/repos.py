@@ -14,11 +14,13 @@ from .vo import ReactionType
 class TicketRepository(Repository[Ticket]):
     @override
     async def paginate(
-            self, pagination: Pagination, filters: TicketFilters | None = None,
+        self,
+        pagination: Pagination,
+        filters: TicketFilters | None = None,
     ) -> Page[Ticket]: ...
 
     async def get_total(
-            self, project_id: UUID | None = None, counterparty_id: UUID | None = None
+        self, project_id: UUID | None = None, counterparty_id: UUID | None = None
     ) -> int:
         """
         Получение общего числа тикетов.
@@ -32,15 +34,14 @@ class TicketRepository(Repository[Ticket]):
 
 
 class CommentRepository(Repository[Comment]):
-
     async def get_by_ticket(
-            self,
-            ticket_id: UUID,
-            pagination: Pagination,
-            *,
-            user_id: UUID | None = None,
-            include_notes: bool = False,
-            include_internal: bool = False,
+        self,
+        ticket_id: UUID,
+        pagination: Pagination,
+        *,
+        user_id: UUID | None = None,
+        include_notes: bool = False,
+        include_internal: bool = False,
     ) -> Page[Comment]:
         """
         Получение списка комментариев с учётом фильтров и прав пользователя
@@ -71,9 +72,8 @@ class ReactionStats:
 
 
 class ReactionRepository(Repository[Reaction]):
-
     async def find(
-            self, comment_id: UUID, author_id: UUID, reaction_type: ReactionType
+        self, comment_id: UUID, author_id: UUID, reaction_type: ReactionType
     ) -> Reaction | None: ...
 
     async def get_reaction_stats(self, comment_ids: list[UUID], user_id: UUID) -> ReactionStats:
@@ -89,7 +89,7 @@ class ReactionRepository(Repository[Reaction]):
         """
 
     async def get_user_reactions(
-            self, comments_ids: list[UUID], author_id: UUID
+        self, comments_ids: list[UUID], author_id: UUID
     ) -> dict[UUID, set[ReactionType]]:
         """
         Получение реакций пользователя на комментарии.

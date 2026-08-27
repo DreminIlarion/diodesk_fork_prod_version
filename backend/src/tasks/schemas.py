@@ -14,16 +14,13 @@ from src.shared.schemas import Page
 
 from .domain.vo import ReviewDecision, TaskStatus
 
-NewStatus = Annotated[
-    TaskStatus, Body(..., embed=True, description="Новый статус задачи")
-]
+NewStatus = Annotated[TaskStatus, Body(..., embed=True, description="Новый статус задачи")]
 AssigneeId = Annotated[
     UUID,
-    Body(..., embed=True, description="ID пользователя, которого нужна назначить исполнителем")
+    Body(..., embed=True, description="ID пользователя, которого нужна назначить исполнителем"),
 ]
 ReviewerId = Annotated[
-    UUID,
-    Body(..., embed=True, description="ID пользователя, который должен проверить задачу")
+    UUID, Body(..., embed=True, description="ID пользователя, который должен проверить задачу")
 ]
 ReviewDecision = Annotated[
     ReviewDecision, Body(..., embed=True, description="Принятое решение на ревью")
@@ -40,7 +37,7 @@ class TaskBase(BaseModel):
         None,
         ge=1,
         le=21,
-        description="Оценка сложности задачи, где 1 очень легко, а 21 максимально сложно"
+        description="Оценка сложности задачи, где 1 очень легко, а 21 максимально сложно",
     )
     assignee_id: UUID | None = Field(None, description="Исполнитель задачи")
     reviewer_id: UUID | None = Field(None, description="Ответственный за задачу")
@@ -69,9 +66,7 @@ class TaskResponse(TaskBase):
     updated_at: datetime = Field(..., description="Дата обновления задачи")
     is_archived: bool = Field(..., description="Перенесена ли задача в архив")
     number: str = Field(
-        ...,
-        description="Уникальный номер задачи",
-        examples=["PRJ-26-00000001-001", "TASK-001"]
+        ..., description="Уникальный номер задачи", examples=["PRJ-26-00000001-001", "TASK-001"]
     )
     status: TaskStatus = Field(..., description="Текущий cтатус задачи")
     actual_hours: Decimal = Field(..., description="Потрачено часов (факт)")
@@ -95,15 +90,14 @@ class TaskUpdate(BaseModel):
     description: str | None = Field(None, description="Формулировка задачи")
     priority: Priority | None = Field(None, description="")
     story_points: int | None = Field(
-        None,
-        ge=1,
-        le=21,
-        description="Story points для оценки сложности задачи"
+        None, ge=1, le=21, description="Story points для оценки сложности задачи"
     )
     estimated_hours: NonNegativeFloat | None = Field(
         None, description="Предварительное время выполнения"
     )
-    actual_hours: NonNegativeFloat | None = Field(None, description="Фактические трудозатраты (часы)")
+    actual_hours: NonNegativeFloat | None = Field(
+        None, description="Фактические трудозатраты (часы)"
+    )
     due_date: date | None = Field(None, description="Срок выполнения (deadline)")
 
 
@@ -120,7 +114,7 @@ class TaskViewResponse(BaseModel):
         ..., description="Уникальный номер задачи", examples=["PRJ-26-00000001-001", "TASK-001"]
     )
     title: str = Field(..., description="Тема задачи")
-    description: str | None = Field(None, description="Описание задачи") 
+    description: str | None = Field(None, description="Описание задачи")
     priority: Priority = Field(..., description="Приоритет задачи")
     story_points: int | None = Field(
         None,
@@ -128,7 +122,9 @@ class TaskViewResponse(BaseModel):
         le=21,
         description="Оценка сложности задачи, где 1 очень легко, а 21 максимально сложно",
     )
-    estimated_hours: Decimal | None = Field(None, description="Предварительные трудозатраты (часы)")  
+    estimated_hours: Decimal | None = Field(
+        None, description="Предварительные трудозатраты (часы)"
+    )
     actual_hours: Decimal | None = Field(None, description="Факт потраченных часов")
 
     started_at: datetime | None = Field(None, description="Дата начала выполнения")
@@ -136,6 +132,10 @@ class TaskViewResponse(BaseModel):
     working_since: datetime | None = Field(None, description="Время начала текущей рабочей сессии")
 
     assignee_id: UUID | None = Field(None, description="Исполнитель задачи")
+    reviewer_id: UUID | None = Field(
+        None,
+        description="Проверяющий задачу",
+    )
     status: TaskStatus = Field(..., description="Текущий cтатус задачи")
     due_date: date | None = Field(None, description="Срок выполнения (deadline)")
 
@@ -184,11 +184,11 @@ class MyTasksKanbanContext(KanbanContext):
 
 
 KanbanContextType = (
-        ProjectKanbanContext
-        | TicketKanbanContext
-        | InternalKanbanContext
-        | AssigneeKanbanContext
-        | MyTasksKanbanContext
+    ProjectKanbanContext
+    | TicketKanbanContext
+    | InternalKanbanContext
+    | AssigneeKanbanContext
+    | MyTasksKanbanContext
 )
 
 

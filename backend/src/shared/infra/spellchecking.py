@@ -27,7 +27,6 @@ class TextCheckResult(BaseModel):
 
 
 class SpellChecker(Protocol):
-
     def check(self, text: str) -> TextCheckResult:
         """Проверка орфографии и пунктуации в тексте"""
 
@@ -56,7 +55,7 @@ class LanguageToolSpellChecker:
         for match in matches:
             issue = TextIssue(
                 category=match.category,
-                original=match.context[match.offset: match.offset + match.error_length],
+                original=match.context[match.offset : match.offset + match.error_length],
                 suggestion=match.replacements[0] if match.replacements else "",
                 start=match.offset,
                 end=match.offset + match.error_length,
@@ -69,7 +68,7 @@ class LanguageToolSpellChecker:
                 corrected_text = (
                     corrected_text[: match.offset]
                     + match.replacements[0]
-                    + corrected_text[match.offset + match.error_length:]
+                    + corrected_text[match.offset + match.error_length :]
                 )
 
         return TextCheckResult(

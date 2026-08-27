@@ -6,18 +6,17 @@ from .vo import ArticleChunk, ArticleVisibility
 
 
 class ArticleRepository(Repository[Article]):
-
     async def search(
-            self,
-            query: str,
-            category_id: UUID | None = None,
-            product_id: UUID | None = None,
-            tags: list[str] | None = None,
-            visibility: ArticleVisibility | None = None,
-            *,
-            top_k: int = 10,
-            semantic_weight: float = 0.7,
-            bm25_weight: float = 0.3,
+        self,
+        query: str,
+        category_id: UUID | None = None,
+        product_id: UUID | None = None,
+        tags: list[str] | None = None,
+        visibility: ArticleVisibility | None = None,
+        *,
+        top_k: int = 10,
+        semantic_weight: float = 0.7,
+        bm25_weight: float = 0.3,
     ) -> list[tuple[Article, float]]:
         """
         Гибридный поиск по тексту запроса.
@@ -25,11 +24,11 @@ class ArticleRepository(Repository[Article]):
         """
 
     async def search_by_image(
-            self,
-            image_embedding: list[float],
-            visibility: ArticleVisibility | None = None,
-            *,
-            top_k: int = 10,
+        self,
+        image_embedding: list[float],
+        visibility: ArticleVisibility | None = None,
+        *,
+        top_k: int = 10,
     ) -> list[tuple[Article, float]]:
         """
         Поиск статей по релевантности изображения.
@@ -38,6 +37,5 @@ class ArticleRepository(Repository[Article]):
 
 
 class ArticleVersionRepository(Repository[ArticleVersion]):
-
     async def add_chunks(self, chunks: list[ArticleChunk]) -> None:
         """Сохранение проиндексированных чанков статей"""

@@ -55,7 +55,7 @@ def active_project(created_by, counterparty_id):
 
 
 def make_membership(
-        project_id: UUID, user_id: UUID, project_role: MemberRole, is_deleted: bool = False
+    project_id: UUID, user_id: UUID, project_role: MemberRole, is_deleted: bool = False
 ):
     return ProjectMember(
         project_id=project_id,
@@ -73,7 +73,7 @@ class TestCanCreateProject:
 
     @pytest.mark.parametrize("user_role", [UserRole.SUPPORT_MANAGER, UserRole.ADMIN])
     def test_admin_or_support_manager_can_create_without_counterparty(
-            self, access_service, user_role
+        self, access_service, user_role
     ):
         permission = access_service.can_create_project(user_role)
 
@@ -91,13 +91,14 @@ class TestCanCreateProject:
         assert "counterparty" in permission.reason.lower()
 
     @pytest.mark.parametrize(
-        "user_role", [
+        "user_role",
+        [
             UserRole.CUSTOMER,
             UserRole.CUSTOMER_ADMIN,
             UserRole.SUPPORT_AGENT,
             UserRole.FINANCE,
             UserRole.DEVELOPER,
-        ]
+        ],
     )
     def test_other_roles_cannot_create(self, access_service, user_role):
         permission = access_service.can_create_project(user_role)
@@ -113,7 +114,7 @@ class TestCanAddMembers:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("target_user_role", list(UserRole))
     async def test_owner_role_cannot_be_assigned(
-            self, access_service, active_project, target_user_role
+        self, access_service, active_project, target_user_role
     ):
         """
         Нельзя назначить роль владельца проекта через добавление участника
@@ -133,7 +134,7 @@ class TestCanAddMembers:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("target_user_role", [UserRole.CUSTOMER, UserRole.CUSTOMER_ADMIN])
     async def test_customer_cannot_get_internal_role(
-            self, access_service, active_project, target_user_role
+        self, access_service, active_project, target_user_role
     ):
         """
         Клиенту нельзя назначить внутреннею роль в проекте
@@ -156,7 +157,7 @@ class TestCanAddMembers:
         "target_user_role", [user_role for user_role in UserRole if user_role.is_staff()]
     )
     async def test_internal_user_cannot_get_customer_role(
-            self, access_service, active_project, target_user_role
+        self, access_service, active_project, target_user_role
     ):
         """
         Внутреннему сотруднику нельзя назначить клиентскую роль в проекте
@@ -177,7 +178,7 @@ class TestCanAddMembers:
     @pytest.mark.asyncio
     @pytest.mark.parametrize(("target_user_role", "target_project_role"), VALID_ROLES_SET)
     async def test_creator_or_owner_can_add_any_valid_member(
-            self, access_service, active_project, target_user_role, target_project_role
+        self, access_service, active_project, target_user_role, target_project_role
     ):
         """
         Создатель или владелец проекта может добавлять участников с правильной ролью
@@ -197,7 +198,7 @@ class TestCanAddMembers:
     @pytest.mark.asyncio
     @pytest.mark.parametrize(("target_user_role", "target_project_role"), VALID_ROLES_SET)
     async def test_admin_can_add_any_valid_member(
-            self, access_service, active_project, target_user_role, target_project_role
+        self, access_service, active_project, target_user_role, target_project_role
     ):
         """
         Администратор может добавлять любых участников с валидной ролью
@@ -233,12 +234,12 @@ class TestCanAddMembers:
     @pytest.mark.asyncio
     @pytest.mark.parametrize(("target_user_role", "target_project_role"), VALID_ROLES_SET)
     async def test_project_manager_can_add_any_valid_member(
-            self,
-            access_service,
-            active_project,
-            fake_membership_repo,
-            target_user_role,
-            target_project_role,
+        self,
+        access_service,
+        active_project,
+        fake_membership_repo,
+        target_user_role,
+        target_project_role,
     ):
         """
         Менеджер проекта может добавлять любых участников
@@ -271,15 +272,15 @@ class TestCanAddMembers:
             (UserRole.SUPPORT_AGENT, {MemberRole.VIEWER, MemberRole.CONTRIBUTOR}),
             (UserRole.DEVELOPER, {MemberRole.VIEWER, MemberRole.CONTRIBUTOR}),
             (UserRole.SUPPORT_MANAGER, {MemberRole.VIEWER, MemberRole.CONTRIBUTOR}),
-        ]
+        ],
     )
     async def test_contributor_can_add_limited_roles(
-            self,
-            access_service,
-            active_project,
-            fake_membership_repo,
-            target_user_role,
-            target_project_roles
+        self,
+        access_service,
+        active_project,
+        fake_membership_repo,
+        target_user_role,
+        target_project_roles,
     ):
         """
         CONTRIBUTOR проекта может добавлять участников с ограниченным набором ролей
@@ -306,7 +307,7 @@ class TestCanAddMembers:
 
     @pytest.mark.asyncio
     async def test_contributor_cannot_add_manager(
-            self, access_service, active_project, fake_membership_repo
+        self, access_service, active_project, fake_membership_repo
     ):
         """
         CONTRIBUTOR не может добавить менеджера проекта
@@ -336,7 +337,7 @@ class TestCanAddMembers:
         "target_project_role", [MemberRole.CUSTOMER, MemberRole.CUSTOMER_MANAGER]
     )
     async def test_customer_manager_can_add_customers(
-            self, access_service, active_project, fake_membership_repo, target_project_role
+        self, access_service, active_project, fake_membership_repo, target_project_role
     ):
         """
         Менеджер клиентов может добавлять только клиентов в проект
@@ -361,11 +362,9 @@ class TestCanAddMembers:
         assert permission.allowed is True
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "target_project_role", [MemberRole.CONTRIBUTOR, MemberRole.MANAGER]
-    )
+    @pytest.mark.parametrize("target_project_role", [MemberRole.CONTRIBUTOR, MemberRole.MANAGER])
     async def test_customer_manager_cannot_add_internal_roles(
-            self, access_service, active_project, fake_membership_repo, target_project_role
+        self, access_service, active_project, fake_membership_repo, target_project_role
     ):
         """
         Менеджер клиентов не может добавлять участников с внутренними проектными ролями
@@ -392,7 +391,7 @@ class TestCanAddMembers:
 
     @pytest.mark.asyncio
     async def test_deleted_member_cannot_add(
-            self, access_service, active_project, fake_membership_repo
+        self, access_service, active_project, fake_membership_repo
     ):
         """
         Удалённый участник не может добавлять новых участников
@@ -403,7 +402,7 @@ class TestCanAddMembers:
             project_id=active_project.id,
             user_id=user_id,
             project_role=MemberRole.CONTRIBUTOR,
-            is_deleted=True
+            is_deleted=True,
         )
         await fake_membership_repo.create(membership)
 
@@ -441,12 +440,15 @@ class TestCanArchiveProject:
 
         for user_id in [active_project.created_by, active_project.owner_id]:
             permission = access_service.can_archive_project(
-                project=active_project, user_id=user_id, user_role=UserRole.SUPPORT_AGENT,
+                project=active_project,
+                user_id=user_id,
+                user_role=UserRole.SUPPORT_AGENT,
             )
             assert permission.allowed is True
 
     @pytest.mark.parametrize(
-        "user_role", [
+        "user_role",
+        [
             UserRole.SUPPORT_MANAGER,
             UserRole.SUPPORT_AGENT,
             UserRole.DEVELOPER,
@@ -454,7 +456,7 @@ class TestCanArchiveProject:
             UserRole.FINANCE,
             UserRole.CUSTOMER,
             UserRole.CUSTOMER_ADMIN,
-        ]
+        ],
     )
     def test_other_user_cannot_archive(self, access_service, active_project, user_role):
         """
