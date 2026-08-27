@@ -1,4 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import React, { memo } from 'react';
+
 import { Link, useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -1027,15 +1029,8 @@ function ListView({ tasks, umap, onView }: {
 
 /* ───────────────── task card ───────────────── */
 
-function TCard({
-  task: t,
-  umap,
-  dragging,
-  highlighted,
-  onDS,
-  onDE,
-  onView,
-}: {
+
+interface TCardProps {
   task: TaskViewItem;
   umap: Map<string, SimpleUser | CounterpartyCustomer>;
   dragging: boolean;
@@ -1043,7 +1038,17 @@ function TCard({
   onDS: (id: string, f: TaskStatus) => void;
   onDE: () => void;
   onView: (t: TaskViewItem) => void;
-}) {
+}
+
+export const TCard = memo(function TCard({
+  task: t,
+  umap,
+  dragging,
+  highlighted,
+  onDS,
+  onDE,
+  onView,
+}: TCardProps) {
   const od = overdue(t);
   const a = t.assignee_id ? umap.get(t.assignee_id) : null;
   const assigneeSurname = a
@@ -1051,8 +1056,7 @@ function TCard({
     : null;
 
   return (
-    <motion.div
-      layout
+    <div
       data-task-id={t.id}
       draggable
       onDragStart={(e) => {
@@ -1061,8 +1065,8 @@ function TCard({
       }}
       onDragEnd={onDE}
       onClick={() => onView(t)}
-
-      className={`group bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer transition-all duration-300 shadow-sm min-h-[140px] flex flex-col relative
+      className={`group bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer shadow-sm min-h-[140px] flex flex-col relative
+        transition-[border-color,background-color,box-shadow,opacity] duration-200
         hover:bg-[var(--hover-2)] hover:border-[var(--accent)]/40
 
         ${highlighted
@@ -1136,12 +1140,27 @@ function TCard({
           )}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
-}
+});
 /* ───────────────── kanban column ───────────────── */
 
-function KCol({ col, umap, isDO, dragId, highlightTaskId, ldMore, onDS, onDE, onDO, onDL, onDrop, onAdd, onView, onMore }: {
+function KCol({
+  col,
+  umap,
+  isDO,
+  dragId,
+  highlightTaskId,
+  ldMore,
+  onDS,
+  onDE,
+  onDO,
+  onDL,
+  onDrop,
+  onAdd,
+  onView,
+  onMore,
+}: {
   col: TaskViewColumn;
   umap: Map<string, SimpleUser | CounterpartyCustomer>;
   isDO: boolean;
@@ -1165,18 +1184,28 @@ function KCol({ col, umap, isDO, dragId, highlightTaskId, ldMore, onDS, onDE, on
       onDragOver={(e) => onDO(e, col.status)}
       onDragLeave={onDL}
       onDrop={(e) => onDrop(e, col.status)}
-      className={`bg-[var(--hover-1)] rounded-xl flex flex-col w-[320px] shrink-0 border transition-colors h-full ${isDO ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--border-color)]'}`}
+      className={`bg-[var(--hover-1)] rounded-xl flex flex-col w-[320px] shrink-0 border transition-colors h-full ${
+        isDO ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--border-color)]'
+      }`}
     >
       <div className="px-3 py-3 flex items-center justify-between border-b border-[var(--border-color)] shrink-0 bg-[var(--bg-card)] rounded-t-xl">
         <div className="flex items-center gap-2 min-w-0">
           <I className={`w-4 h-4 shrink-0 ${m.tc}`} />
-          <span className="text-sm font-bold text-[var(--text-primary)] truncate">{ST_LABEL[col.status]}</span>
-          <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--hover-2)] text-[var(--text-primary)]/50 shrink-0">{col.tasks.total_items}</span>
+          <span className="text-sm font-bold text-[var(--text-primary)] truncate">
+            {ST_LABEL[col.status]}
+          </span>
+          <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--hover-2)] text-[var(--text-primary)]/50 shrink-0">
+            {col.tasks.total_items}
+          </span>
         </div>
-        <button onClick={() => onAdd(col.status)} className="p-1.5 rounded-lg hover:bg-[var(--hover-3)] text-[var(--text-primary)]/40 hover:text-[var(--accent)] transition-colors">
+        <button
+          onClick={() => onAdd(col.status)}
+          className="p-1.5 rounded-lg hover:bg-[var(--hover-3)] text-[var(--text-primary)]/40 hover:text-[var(--accent)] transition-colors"
+        >
           <Plus className="w-4 h-4" />
         </button>
       </div>
+
       <div className="p-2.5 flex-1 space-y-2.5 overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent">
         {col.tasks.items.length === 0 && !isDO ? (
           <div className="h-24 flex flex-col items-center justify-center text-[var(--text-primary)]/30 border border-dashed border-[var(--border-color)] rounded-xl">
@@ -1184,30 +1213,39 @@ function KCol({ col, umap, isDO, dragId, highlightTaskId, ldMore, onDS, onDE, on
             <span className="text-xs">{m.empty}</span>
           </div>
         ) : (
-          <AnimatePresence mode="popLayout">
-            {col.tasks.items.map((t) => (
-              <TCard
-                key={t.id}
-                task={t}
-                umap={umap}
-                dragging={dragId === t.id}
-                highlighted={highlightTaskId === t.id}
-                onDS={onDS}
-                onDE={onDE}
-                onView={onView}
-              />
-            ))}
-          </AnimatePresence>
+          col.tasks.items.map((t) => (
+            <TCard
+              key={t.id}
+              task={t}
+              umap={umap}
+              dragging={dragId === t.id}
+              highlighted={highlightTaskId === t.id}
+              onDS={onDS}
+              onDE={onDE}
+              onView={onView}
+            />
+          ))
         )}
+
         {isDO && col.tasks.items.length === 0 && (
           <div className="h-24 flex items-center justify-center border-2 border-dashed border-[var(--accent)]/50 rounded-xl bg-[var(--accent)]/10">
-            <span className="text-sm font-medium text-[var(--accent)]">Отпустите задачу</span>
+            <span className="text-sm font-medium text-[var(--accent)]">
+              Отпустите задачу
+            </span>
           </div>
         )}
+
         {col.tasks.has_next && (
-          <button onClick={() => onMore(col.status)} disabled={ldMore}
-            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[var(--text-primary)]/40 hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] text-xs font-medium transition-colors disabled:opacity-40">
-            {ldMore ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronDown className="w-4 h-4" />}
+          <button
+            onClick={() => onMore(col.status)}
+            disabled={ldMore}
+            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[var(--text-primary)]/40 hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] text-xs font-medium transition-colors disabled:opacity-40"
+          >
+            {ldMore ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
             Ещё ({Math.max(col.tasks.total_items - col.tasks.items.length, 0)})
           </button>
         )}
@@ -3354,6 +3392,9 @@ function DetailModal({
 
 /* ───────────────── main page ───────────────── */
 
+
+/* ───────────────── main page ───────────────── */
+
 export default function TasksPage() {
   const [sp] = useSearchParams();
   const { user } = useAuthStore();
@@ -3366,21 +3407,19 @@ export default function TasksPage() {
 
   const boardScrollRef = useRef<HTMLDivElement>(null);
   const boardInnerRef = useRef<HTMLDivElement>(null);
-  const bottomBoardScrollRef = useRef<HTMLDivElement>(null);
+  const bottomTrackRef = useRef<HTMLDivElement>(null);
 
-  const syncingFromBoardRef = useRef(false);
-  const syncingFromBottomRef = useRef(false);
+  // Метрики и анимация скролла
+  const scrollbarThumbPercentRef = useRef(20);
+  const scrollRafRef = useRef<number | null>(null);
+
   const [boardScrollWidth, setBoardScrollWidth] = useState(0);
   const [boardViewportWidth, setBoardViewportWidth] = useState(0);
 
-  const [boardScrollLeft, setBoardScrollLeft] = useState(0);
-
-const bottomTrackRef = useRef<HTMLDivElement>(null);
-
-const scrollbarDragRef = useRef<{
-  startX: number;
-  startScrollLeft: number;
-} | null>(null);
+  const scrollbarDragRef = useRef<{
+    startX: number;
+    startScrollLeft: number;
+  } | null>(null);
 
   const [fixedBoardScrollbarStyle, setFixedBoardScrollbarStyle] = useState<React.CSSProperties>({
     position: 'fixed',
@@ -3391,7 +3430,9 @@ const scrollbarDragRef = useRef<{
     display: 'none',
   });
 
-  const staff = (user?.roles ?? []).some((r) => ['admin', 'support_manager', 'support_agent', 'executor'].includes(r));
+  const staff = (user?.roles ?? []).some((r) =>
+    ['admin', 'support_manager', 'support_agent', 'executor'].includes(r),
+  );
 
   const [mode, setMode] = useState<CtxMode>(() => {
     if (up) return 'project';
@@ -3416,45 +3457,24 @@ const scrollbarDragRef = useRef<{
   const [drag, setDrag] = useState<{ id: string; from: TaskStatus } | null>(null);
   const [dragO, setDragO] = useState<TaskStatus | null>(null);
 
-  const [highlightTaskId, setHighlightTaskId] =
-    useState<string | null>(null);
+  const [highlightTaskId, setHighlightTaskId] = useState<string | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const highlightTimerRef =
-    useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const [lastMove, setLastMove] =
-    useState<LastMove | null>(null);
-
-
-  const [undoingMove, setUndoingMove] =
-    useState(false);
-
+  const [lastMove, setLastMove] = useState<LastMove | null>(null);
+  const [undoingMove, setUndoingMove] = useState(false);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const highlightMovedTask = useCallback(
-    (id: string) => {
-      setHighlightTaskId(id);
-
-      if (highlightTimerRef.current) {
-        clearTimeout(highlightTimerRef.current);
-      }
-
-      highlightTimerRef.current = setTimeout(() => {
-        setHighlightTaskId(null);
-      }, 4000);
-    },
-    [],
-  );
-
-
+  const highlightMovedTask = useCallback((id: string) => {
+    setHighlightTaskId(id);
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    highlightTimerRef.current = setTimeout(() => {
+      setHighlightTaskId(null);
+    }, 4000);
+  }, []);
 
   const showUndoMove = useCallback((move: LastMove) => {
     setLastMove(move);
-
-    if (undoTimerRef.current) {
-      clearTimeout(undoTimerRef.current);
-    }
-
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     undoTimerRef.current = setTimeout(() => {
       setLastMove(null);
     }, 10000);
@@ -3469,50 +3489,31 @@ const scrollbarDragRef = useRef<{
 
   const resumeUndoTimer = useCallback(() => {
     if (!lastMove) return;
-
-    if (undoTimerRef.current) {
-      clearTimeout(undoTimerRef.current);
-    }
-
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     undoTimerRef.current = setTimeout(() => {
       setLastMove(null);
-    }, 4000); // Если убрал мышку, даём ещё 4 секунды
+    }, 4000);
   }, [lastMove]);
 
-  const revealTask = useCallback(
-    (id: string) => {
+  const revealTask = useCallback((id: string) => {
+    requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const elements =
-            document.querySelectorAll<HTMLElement>(
-              '[data-task-id]',
-            );
-
-          const element = Array.from(elements).find(
-            (el) =>
-              el.getAttribute('data-task-id') === id,
-          );
-
-          element?.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center',
-            inline: 'center',
-          });
+        const elements = document.querySelectorAll<HTMLElement>('[data-task-id]');
+        const element = Array.from(elements).find((el) => el.getAttribute('data-task-id') === id);
+        element?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'center',
         });
       });
-    },
-    [],
-  );
+    });
+  }, []);
 
   useEffect(() => {
     return () => {
-      if (highlightTimerRef.current) {
-        clearTimeout(highlightTimerRef.current);
-      }
-
-      if (undoTimerRef.current) {
-        clearTimeout(undoTimerRef.current);
-      }
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+      if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
     };
   }, []);
 
@@ -3556,15 +3557,45 @@ const scrollbarDragRef = useRef<{
     return { type: 'my' };
   }, [mode, selP, selA, selT]);
 
+  // Прямое обновление позиции thumb без перерисовки React
+  const updateThumbPosition = useCallback(() => {
+    const board = boardScrollRef.current;
+    const track = bottomTrackRef.current;
+    const thumb = track?.querySelector<HTMLElement>('[data-scroll-thumb="true"]');
+
+    if (!board || !track || !thumb) return;
+
+    const boardMax = board.scrollWidth - board.clientWidth;
+    if (boardMax <= 0) {
+      thumb.style.transform = 'translateX(0px)';
+      return;
+    }
+
+    const progress = Math.min(Math.max(board.scrollLeft / boardMax, 0), 1);
+    const trackWidth = track.clientWidth;
+    const thumbWidth = thumb.offsetWidth;
+    const maxTravel = Math.max(trackWidth - thumbWidth, 0);
+
+    thumb.style.transform = `translateX(${progress * maxTravel}px)`;
+  }, []);
+
+  const handleBoardScroll = useCallback(() => {
+    if (scrollRafRef.current !== null) return;
+
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      updateThumbPosition();
+    });
+  }, [updateThumbPosition]);
+
   const syncBoardScrollbarMetrics = useCallback(() => {
     const board = boardScrollRef.current;
     const inner = boardInnerRef.current;
+    const track = bottomTrackRef.current;
+    const thumb = track?.querySelector<HTMLElement>('[data-scroll-thumb="true"]');
 
     if (!board || !inner) {
-      setFixedBoardScrollbarStyle((prev) => ({
-        ...prev,
-        display: 'none',
-      }));
+      setFixedBoardScrollbarStyle((prev) => (prev.display === 'none' ? prev : { ...prev, display: 'none' }));
       return;
     }
 
@@ -3572,107 +3603,54 @@ const scrollbarDragRef = useRef<{
     const viewportWidth = board.clientWidth;
     const rect = board.getBoundingClientRect();
 
-    const hasHorizontalOverflow =
-      contentWidth > viewportWidth + 2;
+    const hasHorizontalOverflow = contentWidth > viewportWidth + 2;
 
-    setBoardScrollWidth(contentWidth);
-    setBoardViewportWidth(viewportWidth);
+    const thumbPercent = Math.min(Math.max((viewportWidth / contentWidth) * 100, 8), 100);
+    scrollbarThumbPercentRef.current = thumbPercent;
 
-    setFixedBoardScrollbarStyle({
-      position: 'fixed',
-      left: rect.left,
-      width: rect.width,
-      bottom: 12,
-      zIndex: 55,
-      display: hasHorizontalOverflow
-        ? 'block'
-        : 'none',
-      pointerEvents: 'auto',
+    if (thumb) {
+      thumb.style.width = `${thumbPercent}%`;
+    }
+
+    setBoardScrollWidth((prev) => (prev === contentWidth ? prev : contentWidth));
+    setBoardViewportWidth((prev) => (prev === viewportWidth ? prev : viewportWidth));
+
+    setFixedBoardScrollbarStyle((prev) => {
+      const newStyle: React.CSSProperties = {
+        position: 'fixed',
+        left: rect.left,
+        width: rect.width,
+        bottom: 12,
+        zIndex: 55,
+        display: hasHorizontalOverflow ? 'block' : 'none',
+        pointerEvents: 'auto',
+      };
+
+      if (
+        prev.display === newStyle.display &&
+        prev.left === newStyle.left &&
+        prev.width === newStyle.width &&
+        prev.bottom === newStyle.bottom
+      ) {
+        return prev;
+      }
+      return newStyle;
     });
 
-    /*
-     * ВАЖНО:
-     *
-     * Здесь больше НИКОГДА не меняем scrollLeft.
-     * Эта функция отвечает только за размеры
-     * фиксированного scrollbar.
-     */
-  }, []);
-
-const handleBoardScroll = useCallback(() => {
-  const board = boardScrollRef.current;
-
-  if (!board) return;
-
-  setBoardScrollLeft(board.scrollLeft);
-}, []);
-
-  const handleBottomBoardScroll = useCallback(() => {
-    const board = boardScrollRef.current;
-    const bottom = bottomBoardScrollRef.current;
-
-    if (!board || !bottom) return;
-
-    /*
-     * Этот scroll был вызван нами
-     * из настоящего Kanban.
-     */
-    if (syncingFromBoardRef.current) {
-      syncingFromBoardRef.current = false;
-      return;
-    }
-
-    const boardMax =
-      board.scrollWidth -
-      board.clientWidth;
-
-    const bottomMax =
-      bottom.scrollWidth -
-      bottom.clientWidth;
-
-    if (boardMax <= 0 || bottomMax <= 0) {
-      return;
-    }
-
-    const ratio =
-      bottom.scrollLeft / bottomMax;
-
-    const target =
-      ratio * boardMax;
-
-    if (
-      Math.abs(
-        board.scrollLeft - target,
-      ) < 0.5
-    ) {
-      return;
-    }
-
-    syncingFromBottomRef.current = true;
-
-    board.scrollLeft = target;
-  }, []);
-
-
+    updateThumbPosition();
+  }, [updateThumbPosition]);
 
   useEffect(() => {
-    if (
-      viewMode !== 'kanban' ||
-      loading ||
-      !cols.length
-    ) {
+    if (viewMode !== 'kanban' || loading || !cols.length) {
       setFixedBoardScrollbarStyle((prev) => ({
         ...prev,
         display: 'none',
       }));
-
       return;
     }
 
     const run = () => {
-      requestAnimationFrame(
-        syncBoardScrollbarMetrics,
-      );
+      requestAnimationFrame(syncBoardScrollbarMetrics);
     };
 
     run();
@@ -3681,223 +3659,170 @@ const handleBoardScroll = useCallback(() => {
     const inner = boardInnerRef.current;
 
     let ro: ResizeObserver | null = null;
-
-    if (
-      typeof ResizeObserver !== 'undefined' &&
-      board &&
-      inner
-    ) {
+    if (typeof ResizeObserver !== 'undefined' && board && inner) {
       ro = new ResizeObserver(run);
-
       ro.observe(board);
       ro.observe(inner);
     }
 
-    window.addEventListener(
-      'resize',
-      run,
-    );
-
-    /*
-     * Здесь специально БЕЗ capture=true.
-     *
-     * Нас интересует перемещение страницы,
-     * но не scroll самого Kanban.
-     */
-    window.addEventListener(
-      'scroll',
-      run,
-    );
+    window.addEventListener('resize', run);
+    window.addEventListener('scroll', run);
 
     return () => {
       ro?.disconnect();
-
-      window.removeEventListener(
-        'resize',
-        run,
-      );
-
-      window.removeEventListener(
-        'scroll',
-        run,
-      );
+      window.removeEventListener('resize', run);
+      window.removeEventListener('scroll', run);
     };
-  }, [
-    viewMode,
-    loading,
-    cols.length,
-    syncBoardScrollbarMetrics,
-  ]);
+  }, [viewMode, loading, cols.length, syncBoardScrollbarMetrics]);
 
   const loadUsersMap = useCallback(async () => {
     const m = new Map<string, SimpleUser | CounterpartyCustomer>();
     try {
       (await usersApi.getAllUsers(1, 100)).items.forEach((u) => m.set(u.id, u));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setUmap(m);
   }, []);
 
-  const fetchBoard = useCallback(async (silent = false) => {
-    if ((mode === 'project' && !selP) || (mode === 'ticket' && !selT) || (mode === 'assignee' && !selA)) {
-      setCols([]);
-      setTotal(0);
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
-    silent ? setRefreshing(true) : setLoading(true);
-    try {
-      const d: any = await tasksApi.getKanban(ctx(), {
-        size: 20,
-        priorities: fpR.current.length ? fpR.current : undefined,
-        overdue_only: foR.current || undefined,
-      });
-      const mapped: TaskViewColumn[] = COL_ORDER.map((s) => d.columns.find((c: TaskViewColumn) => c.status === s)).filter((c): c is TaskViewColumn => !!c);
-      setCols(mapped);
-      setTotal(d.total_tasks ?? 0);
-    } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [ctx, toast, mode, selP, selT, selA]);
-
-  useEffect(() => { loadUsersMap(); }, [loadUsersMap]);
-  useEffect(() => { fetchBoard(); }, [fetchBoard]);
-  useEffect(() => { fetchBoard(true); }, [fp, fo, fetchBoard]);
-
-  const more = useCallback(async (st: TaskStatus) => {
-    const c = cols.find((x) => x.status === st);
-    if (!c?.tasks.has_next) return;
-    setMoreCol(st);
-    try {
-      const d: any = await tasksApi.getKanban(ctx(), {
-        page: c.tasks.page + 1,
-        size: c.tasks.size,
-        priorities: fpR.current.length ? fpR.current : undefined,
-        overdue_only: foR.current || undefined,
-      });
-      const nc = d.columns.find((x: TaskViewColumn) => x.status === st);
-      if (nc) {
-        setCols((prev) => prev.map((x) => x.status === st ? { ...x, tasks: { ...nc.tasks, items: [...x.tasks.items, ...nc.tasks.items] } } : x));
+  const fetchBoard = useCallback(
+    async (silent = false) => {
+      if ((mode === 'project' && !selP) || (mode === 'ticket' && !selT) || (mode === 'assignee' && !selA)) {
+        setCols([]);
+        setTotal(0);
+        setLoading(false);
+        setRefreshing(false);
+        return;
       }
-    } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
-    } finally {
-      setMoreCol(null);
-    }
-  }, [cols, ctx, toast]);
+      silent ? setRefreshing(true) : setLoading(true);
+      try {
+        const d: any = await tasksApi.getKanban(ctx(), {
+          size: 20,
+          priorities: fpR.current.length ? fpR.current : undefined,
+          overdue_only: foR.current || undefined,
+        });
+        const mapped: TaskViewColumn[] = COL_ORDER.map((s) =>
+          d.columns.find((c: TaskViewColumn) => c.status === s),
+        ).filter((c): c is TaskViewColumn => !c);
+        setCols(mapped);
+        setTotal(d.total_tasks ?? 0);
+      } catch (e: any) {
+        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [ctx, toast, mode, selP, selT, selA],
+  );
+
+  useEffect(() => {
+    loadUsersMap();
+  }, [loadUsersMap]);
+
+  useEffect(() => {
+    fetchBoard();
+  }, [fetchBoard]);
+
+  useEffect(() => {
+    fetchBoard(true);
+  }, [fp, fo, fetchBoard]);
+
+  const more = useCallback(
+    async (st: TaskStatus) => {
+      const c = cols.find((x) => x.status === st);
+      if (!c?.tasks.has_next) return;
+      setMoreCol(st);
+      try {
+        const d: any = await tasksApi.getKanban(ctx(), {
+          page: c.tasks.page + 1,
+          size: c.tasks.size,
+          priorities: fpR.current.length ? fpR.current : undefined,
+          overdue_only: foR.current || undefined,
+        });
+        const nc = d.columns.find((x: TaskViewColumn) => x.status === st);
+        if (nc) {
+          setCols((prev) =>
+            prev.map((x) =>
+              x.status === st
+                ? { ...x, tasks: { ...nc.tasks, items: [...x.tasks.items, ...nc.tasks.items] } }
+                : x,
+            ),
+          );
+        }
+      } catch (e: any) {
+        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      } finally {
+        setMoreCol(null);
+      }
+    },
+    [cols, ctx, toast],
+  );
 
   const moveTo = useCallback(
-    async (
-      id: string,
-      from: TaskStatus,
-      to: TaskStatus,
-    ) => {
-      const src = cols.find(
-        (c) => c.status === from,
-      );
-
-      const task = src?.tasks.items.find(
-        (x) => x.id === id,
-      );
-
+    async (id: string, from: TaskStatus, to: TaskStatus) => {
+      const src = cols.find((c) => c.status === from);
+      const task = src?.tasks.items.find((x) => x.id === id);
       if (!task) return;
 
-      if (
-        to === 'todo' &&
-        from === 'backlog' &&
-        !task.assignee_id
-      ) {
-        setAssignIntent({
-          task,
-          targetStatus: 'todo',
-        });
+      if (to === 'todo' && from === 'backlog' && !task.assignee_id) {
+        setAssignIntent({ task, targetStatus: 'todo' });
         return;
       }
 
-      if (
-        to === 'in_progress' &&
-        !task.assignee_id
-      ) {
-        setAssignIntent({
-          task,
-          targetStatus: 'in_progress',
-        });
+      if (to === 'in_progress' && !task.assignee_id) {
+        setAssignIntent({ task, targetStatus: 'in_progress' });
         return;
       }
 
       if (to === 'done') {
-        setCompleteIntent({
-          task,
-          mode: 'status_done',
-        });
+        setCompleteIntent({ task, mode: 'status_done' });
         return;
       }
 
       const snap = snapCols(cols);
-
       let moved: TaskViewItem | undefined;
 
       setCols((prev) => {
         const next = prev.map((c) => {
           if (c.status !== from) return c;
-
-          const items = c.tasks.items.filter(
-            (x) => {
-              if (x.id === id) {
-                moved = x;
-                return false;
-              }
-
-              return true;
-            },
-          );
-
+          const items = c.tasks.items.filter((x) => {
+            if (x.id === id) {
+              moved = x;
+              return false;
+            }
+            return true;
+          });
           return {
             ...c,
             tasks: {
               ...c.tasks,
               items,
-              total_items: Math.max(
-                c.tasks.total_items - 1,
-                0,
-              ),
+              total_items: Math.max(c.tasks.total_items - 1, 0),
             },
           };
         });
 
         if (!moved) return prev;
 
-        const updated: TaskViewItem = {
-          ...moved,
-          status: to,
-        };
+        const updated: TaskViewItem = { ...moved, status: to };
 
         return next.map((c) =>
           c.status === to
             ? {
-              ...c,
-              tasks: {
-                ...c.tasks,
-                items: [
-                  updated,
-                  ...c.tasks.items.filter(
-                    (x) => x.id !== id,
-                  ),
-                ],
-                total_items:
-                  c.tasks.total_items + 1,
-              },
-            }
+                ...c,
+                tasks: {
+                  ...c.tasks,
+                  items: [updated, ...c.tasks.items.filter((x) => x.id !== id)],
+                  total_items: c.tasks.total_items + 1,
+                },
+              }
             : c,
         );
       });
 
       try {
         await tasksApi.changeStatus(id, to);
-
         showUndoMove({
           taskId: id,
           number: task.number,
@@ -3905,19 +3830,15 @@ const handleBoardScroll = useCallback(() => {
           from,
           to,
         });
-
         highlightMovedTask(id);
         revealTask(id);
-
         toast({
           title: `Задача перенесена в «${ST_LABEL[to]}»`,
           description: `${task.number} — ${task.title}`,
         });
       } catch (e: any) {
         setCols(snap);
-
         const message = statusErr(e, task, to);
-
         toast({
           title: message.title,
           description: message.description,
@@ -3925,121 +3846,109 @@ const handleBoardScroll = useCallback(() => {
         });
       }
     },
-    [
-      cols,
-      toast,
-      highlightMovedTask,
-      revealTask,
-      showUndoMove,
-    ],
+    [cols, toast, highlightMovedTask, revealTask, showUndoMove],
   );
 
-  const handleAssignAndMove = useCallback(async (aid: string) => {
-    if (!assignIntent) return;
-    setAssignLd(true);
-    try {
-      await tasksApi.assign(assignIntent.task.id, { assignee_id: aid });
-      await tasksApi.changeStatus(assignIntent.task.id, assignIntent.targetStatus);
-      toast({ title: `Задача переведена в «${ST_LABEL[assignIntent.targetStatus]}»` });
-      setAssignIntent(null);
-      await fetchBoard(true);
-    } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
-    } finally {
-      setAssignLd(false);
-    }
-  }, [assignIntent, fetchBoard, toast]);
-
-  const handleComplete = useCallback(async (actualHours: number) => {
-    if (!completeIntent) return;
-    setCompleteLd(true);
-    try {
-      await tasksApi.update(completeIntent.task.id, { actual_hours: actualHours } as any);
-      if (completeIntent.mode === 'review_done') {
-        await tasksApi.review(completeIntent.task.id, { decision: 'done' });
-        toast({ title: 'Задача принята' });
-      } else {
-        await tasksApi.changeStatus(completeIntent.task.id, 'done');
-        toast({ title: 'Задача выполнена' });
+  const handleAssignAndMove = useCallback(
+    async (aid: string) => {
+      if (!assignIntent) return;
+      setAssignLd(true);
+      try {
+        await tasksApi.assign(assignIntent.task.id, { assignee_id: aid });
+        await tasksApi.changeStatus(assignIntent.task.id, assignIntent.targetStatus);
+        toast({ title: `Задача переведена в «${ST_LABEL[assignIntent.targetStatus]}»` });
+        setAssignIntent(null);
+        await fetchBoard(true);
+      } catch (e: any) {
+        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      } finally {
+        setAssignLd(false);
       }
-      setCompleteIntent(null);
-      await fetchBoard(true);
-    } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
-    } finally {
-      setCompleteLd(false);
-    }
-  }, [completeIntent, fetchBoard, toast]);
+    },
+    [assignIntent, fetchBoard, toast],
+  );
+
+  const handleComplete = useCallback(
+    async (actualHours: number) => {
+      if (!completeIntent) return;
+      setCompleteLd(true);
+      try {
+        await tasksApi.update(completeIntent.task.id, { actual_hours: actualHours } as any);
+        if (completeIntent.mode === 'review_done') {
+          await tasksApi.review(completeIntent.task.id, { decision: 'done' });
+          toast({ title: 'Задача принята' });
+        } else {
+          await tasksApi.changeStatus(completeIntent.task.id, 'done');
+          toast({ title: 'Задача выполнена' });
+        }
+        setCompleteIntent(null);
+        await fetchBoard(true);
+      } catch (e: any) {
+        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      } finally {
+        setCompleteLd(false);
+      }
+    },
+    [completeIntent, fetchBoard, toast],
+  );
 
   const onDS = useCallback((id: string, from: TaskStatus) => setDrag({ id, from }), []);
-  const onDE = useCallback(() => { setDrag(null); setDragO(null); }, []);
-  const onDO = useCallback((e: React.DragEvent, st: TaskStatus) => {
-    e.preventDefault();
-
-    if (
-      drag &&
-      !TRANSITIONS[drag.from].includes(st)
-    ) {
-      e.dataTransfer.dropEffect = 'none';
-      return;
-    }
-
-    e.dataTransfer.dropEffect = 'move';
-    setDragO(st);
-  }, [drag]);
-  const onDL = useCallback(() => setDragO(null), []);
-  const onDrop = useCallback(async (
-    e: React.DragEvent,
-    to: TaskStatus,
-  ) => {
-    e.preventDefault();
-    setDragO(null);
-
-    if (!drag || drag.from === to) {
-      setDrag(null);
-      return;
-    }
-
-    if (!TRANSITIONS[drag.from].includes(to)) {
-      toast({
-        title: 'Переход недоступен',
-        variant: 'destructive',
-      });
-
-      setDrag(null);
-      return;
-    }
-
-    const { id, from } = drag;
-
+  const onDE = useCallback(() => {
     setDrag(null);
+    setDragO(null);
+  }, []);
 
-    await moveTo(id, from, to);
-  }, [drag, moveTo, toast]);
+  const onDO = useCallback(
+    (e: React.DragEvent, st: TaskStatus) => {
+      e.preventDefault();
+      if (drag && !TRANSITIONS[drag.from].includes(st)) {
+        e.dataTransfer.dropEffect = 'none';
+        return;
+      }
+      e.dataTransfer.dropEffect = 'move';
+      setDragO(st);
+    },
+    [drag],
+  );
+
+  const onDL = useCallback(() => setDragO(null), []);
+
+  const onDrop = useCallback(
+    async (e: React.DragEvent, to: TaskStatus) => {
+      e.preventDefault();
+      setDragO(null);
+
+      if (!drag || drag.from === to) {
+        setDrag(null);
+        return;
+      }
+
+      if (!TRANSITIONS[drag.from].includes(to)) {
+        toast({ title: 'Переход недоступен', variant: 'destructive' });
+        setDrag(null);
+        return;
+      }
+
+      const { id, from } = drag;
+      setDrag(null);
+      await moveTo(id, from, to);
+    },
+    [drag, moveTo, toast],
+  );
 
   const undoLastMove = useCallback(async () => {
     if (!lastMove || undoingMove) return;
-
     const move = lastMove;
-
     setUndoingMove(true);
 
     try {
-      await tasksApi.changeStatus(
-        move.taskId,
-        move.from,
-      );
-
+      await tasksApi.changeStatus(move.taskId, move.from);
       setLastMove(null);
-
       await fetchBoard(true);
-
       highlightMovedTask(move.taskId);
-
       setTimeout(() => {
         revealTask(move.taskId);
       }, 100);
-
       toast({
         title: 'Перенос отменён',
         description: `${move.number} возвращена в «${ST_LABEL[move.from]}»`,
@@ -4053,27 +3962,27 @@ const handleBoardScroll = useCallback(() => {
     } finally {
       setUndoingMove(false);
     }
-  }, [
-    lastMove,
-    undoingMove,
-    fetchBoard,
-    highlightMovedTask,
-    revealTask,
-    toast,
-  ]);
+  }, [lastMove, undoingMove, fetchBoard, highlightMovedTask, revealTask, toast]);
 
   const ql = q.trim().toLowerCase();
-  const disp = cols.map((c) => !ql ? c : {
+const disp = useMemo(() => {
+  if (!ql) return cols;
+  return cols.map((c) => ({
     ...c,
     tasks: {
       ...c.tasks,
       items: c.tasks.items.filter((t) => {
         const ticketNo = getTaskTicketNumber(t) ?? '';
-        return t.title.toLowerCase().includes(ql) || t.number.toLowerCase().includes(ql) ||
-          String(t.description ?? '').toLowerCase().includes(ql) || ticketNo.toLowerCase().includes(ql);
+        return (
+          t.title.toLowerCase().includes(ql) ||
+          t.number.toLowerCase().includes(ql) ||
+          String(t.description ?? '').toLowerCase().includes(ql) ||
+          ticketNo.toLowerCase().includes(ql)
+        );
       }),
     },
-  });
+  }));
+}, [cols, ql]);
 
   const hf = fp.length > 0 || fo;
   const done = cols.find((c) => c.status === 'done')?.tasks.total_items ?? 0;
@@ -4086,214 +3995,255 @@ const handleBoardScroll = useCallback(() => {
     ...(staff ? [{ id: 'ticket' as CtxMode, label: 'Заявка', icon: Ticket }] : []),
   ];
 
-  const ldTicketsAsync = useCallback(async (search: string, p: number) => {
-    const r = await ticketsApi.getAll(p, 20, { project_ids: selP ? [selP] : undefined, query: search || undefined });
-    const items = r.items.map((t: any) => {
-      const label = `${t.number} — ${t.title}`;
-      ticketLabelsRef.current[t.id] = label;
-      return { value: t.id, label };
-    });
-    return { items, hasNext: r.items.length === 20 };
-  }, [selP]);
+  const ldTicketsAsync = useCallback(
+    async (search: string, p: number) => {
+      const r = await ticketsApi.getAll(p, 20, {
+        project_ids: selP ? [selP] : undefined,
+        query: search || undefined,
+      });
+      const items = r.items.map((t: any) => {
+        const label = `${t.number} — ${t.title}`;
+        ticketLabelsRef.current[t.id] = label;
+        return { value: t.id, label };
+      });
+      return { items, hasNext: r.items.length === 20 };
+    },
+    [selP],
+  );
 
   const ldProjAsync = useCallback(async (search: string, p: number) => {
     const r = await projectsApi.getAll(p, 20);
-    const f = search ? r.items.filter(x => x.name.toLowerCase().includes(search.toLowerCase()) || x.key.toLowerCase().includes(search.toLowerCase())) : r.items;
-    return { items: f.map(x => ({ value: x.id, label: x.name, sublabel: x.key, icon: <FolderOpen className="w-4 h-4 text-amber-500" /> })), hasNext: r.items.length === 20 };
+    const f = search
+      ? r.items.filter(
+          (x) =>
+            x.name.toLowerCase().includes(search.toLowerCase()) ||
+            x.key.toLowerCase().includes(search.toLowerCase()),
+        )
+      : r.items;
+    return {
+      items: f.map((x) => ({
+        value: x.id,
+        label: x.name,
+        sublabel: x.key,
+        icon: <FolderOpen className="w-4 h-4 text-amber-500" />,
+      })),
+      hasNext: r.items.length === 20,
+    };
   }, []);
 
   const ldAssAsync = useCallback(async (search: string, p: number) => {
-    let items = []; try { items = (await usersApi.getAllUsers(p, 20)).items; } catch { items = []; }
-    const f = search ? items.filter(u => (u.full_name || '').toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())) : items;
-    return { items: f.map(u => ({ value: u.id, label: u.full_name || u.username || u.email, sublabel: u.email })), hasNext: items.length === 20 };
+    let items = [];
+    try {
+      items = (await usersApi.getAllUsers(p, 20)).items;
+    } catch {
+      items = [];
+    }
+    const f = search
+      ? items.filter(
+          (u) =>
+            (u.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
+            u.email.toLowerCase().includes(search.toLowerCase()),
+        )
+      : items;
+    return {
+      items: f.map((u) => ({
+        value: u.id,
+        label: u.full_name || u.username || u.email,
+        sublabel: u.email,
+      })),
+      hasNext: items.length === 20,
+    };
   }, []);
 
-  const dragInfo = drag ? (() => {
-    const t = cols.flatMap(c => c.tasks.items).find(x => x.id === drag.id);
-    return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null;
-  })() : null;
+  const dragInfo = drag
+    ? (() => {
+        const t = cols.flatMap((c) => c.tasks.items).find((x) => x.id === drag.id);
+        return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null;
+      })()
+    : null;
 
-
-  const boardMaxScroll = Math.max(
-  boardScrollWidth - boardViewportWidth,
-  0,
-);
-
-const scrollbarThumbRatio =
-  boardScrollWidth > 0
-    ? boardViewportWidth / boardScrollWidth
-    : 1;
-
-const scrollbarThumbPercent = Math.min(
-  Math.max(scrollbarThumbRatio * 100, 8),
-  100,
-);
-
-const scrollbarProgress =
-  boardMaxScroll > 0
-    ? boardScrollLeft / boardMaxScroll
-    : 0;
-    
-  const handleScrollbarPointerDown = useCallback(
-  (e: React.PointerEvent<HTMLDivElement>) => {
+  const handleScrollbarPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const board = boardScrollRef.current;
-
     if (!board) return;
 
     e.preventDefault();
-
     scrollbarDragRef.current = {
       startX: e.clientX,
       startScrollLeft: board.scrollLeft,
     };
 
     e.currentTarget.setPointerCapture(e.pointerId);
-  },
-  [],
-);
+  }, []);
 
-const handleScrollbarPointerMove = useCallback(
-  (e: React.PointerEvent<HTMLDivElement>) => {
+  const handleScrollbarPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const dragState = scrollbarDragRef.current;
     const board = boardScrollRef.current;
     const track = bottomTrackRef.current;
 
-    if (!dragState || !board || !track) {
-      return;
-    }
+    if (!dragState || !board || !track) return;
 
     const trackWidth = track.clientWidth;
+    const thumbPercent = scrollbarThumbPercentRef.current;
+    const thumbWidth = trackWidth * (thumbPercent / 100);
+    const thumbTravel = Math.max(trackWidth - thumbWidth, 1);
+    const boardMax = Math.max(board.scrollWidth - board.clientWidth, 0);
 
-    const thumbWidth =
-      trackWidth *
-      Math.min(
-        scrollbarThumbRatio,
-        1,
-      );
+    const deltaX = e.clientX - dragState.startX;
+    const scrollDelta = (deltaX / thumbTravel) * boardMax;
 
-    const thumbTravel = Math.max(
-      trackWidth - thumbWidth,
-      1,
-    );
+    board.scrollLeft = dragState.startScrollLeft + scrollDelta;
+  }, []);
 
-    const boardMax = Math.max(
-      board.scrollWidth -
-        board.clientWidth,
-      0,
-    );
-
-    const deltaX =
-      e.clientX -
-      dragState.startX;
-
-    const scrollDelta =
-      (deltaX / thumbTravel) *
-      boardMax;
-
-    board.scrollLeft =
-      dragState.startScrollLeft +
-      scrollDelta;
-  },
-  [scrollbarThumbRatio],
-);
-
-const handleScrollbarPointerUp = useCallback(
-  (e: React.PointerEvent<HTMLDivElement>) => {
+  const handleScrollbarPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     scrollbarDragRef.current = null;
-
     try {
-      e.currentTarget.releasePointerCapture(
-        e.pointerId,
-      );
+      e.currentTarget.releasePointerCapture(e.pointerId);
     } catch {
-      // pointer capture уже мог быть снят браузером
+      // Игнорируем
     }
-  },
-  [],
-);
+  }, []);
 
-const handleScrollbarTrackClick = useCallback(
-  (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleScrollbarTrackClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const board = boardScrollRef.current;
     const track = bottomTrackRef.current;
 
     if (!board || !track) return;
+    if ((e.target as HTMLElement).dataset.scrollThumb === 'true') return;
 
-    // Если нажали непосредственно на thumb,
-    // его pointer handlers сами всё обработают.
-    if (
-      (e.target as HTMLElement).dataset
-        .scrollThumb === 'true'
-    ) {
-      return;
-    }
-
-    const rect =
-      track.getBoundingClientRect();
-
-    const ratio = Math.min(
-      Math.max(
-        (e.clientX - rect.left) /
-          rect.width,
-        0,
-      ),
-      1,
-    );
-
-    const maxScroll =
-      board.scrollWidth -
-      board.clientWidth;
+    const rect = track.getBoundingClientRect();
+    const ratio = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+    const maxScroll = board.scrollWidth - board.clientWidth;
 
     board.scrollTo({
       left: ratio * maxScroll,
       behavior: 'smooth',
     });
-  },
-  [],
-);
+  }, []);
 
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-500" onDragEnd={onDE}>
       <div className="flex-shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">Задачи</h1>
-          {!loading && <span className="px-2 py-0.5 rounded bg-[var(--hover-2)] text-xs text-[var(--text-primary)]/50">{Math.max(total - done, 0)} активных · {done} завершено</span>}
+          {!loading && (
+            <span className="px-2 py-0.5 rounded bg-[var(--hover-2)] text-xs text-[var(--text-primary)]/50">
+              {Math.max(total - done, 0)} активных · {done} завершено
+            </span>
+          )}
           {refreshing && <Loader2 className="w-4 h-4 animate-spin text-[var(--accent)]" />}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-primary)]/30" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск..." className="w-72 pl-9 pr-8 py-2 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:border-[var(--accent)]/40 focus:ring-1 focus:ring-[var(--accent-ring)]" />
-            {q && <button onClick={() => setQ('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/30 hover:text-[var(--text-primary)]"><X className="w-3.5 h-3.5" /></button>}
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Поиск..."
+              className="w-72 pl-9 pr-8 py-2 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-sm focus:outline-none focus:border-[var(--accent)]/40 focus:ring-1 focus:ring-[var(--accent-ring)]"
+            />
+            {q && (
+              <button
+                onClick={() => setQ('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/30 hover:text-[var(--text-primary)]"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           <div className="relative">
-            <button onClick={() => setSf((v) => !v)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${hf ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--accent)]' : 'bg-[var(--hover-2)] border-[var(--border-color)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-3)]'}`}><Filter className="w-4 h-4" />Фильтры{hf && <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />}</button>
+            <button
+              onClick={() => setSf((v) => !v)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${
+                hf
+                  ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--accent)]'
+                  : 'bg-[var(--hover-2)] border-[var(--border-color)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-3)]'
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              Фильтры
+              {hf && <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />}
+            </button>
             {sf && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setSf(false)} />
                 <div className="absolute right-0 top-full mt-2 z-20 w-56 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl p-3 space-y-3">
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest text-[var(--text-primary)]/30 mb-2 font-medium">Приоритет</p>
+                    <p className="text-[10px] uppercase tracking-widest text-[var(--text-primary)]/30 mb-2 font-medium">
+                      Приоритет
+                    </p>
                     <div className="flex flex-wrap gap-1.5">
                       {PRI_LIST.map((p) => {
                         const m = PM[p.value];
-                        return <button key={p.value} onClick={() => setFp((v) => v.includes(p.value) ? v.filter((x) => x !== p.value) : [...v, p.value])} className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-all ${fp.includes(p.value) ? `${m.bg} ${m.c} ${m.brd}` : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'}`}><span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />{p.label}</button>;
+                        return (
+                          <button
+                            key={p.value}
+                            onClick={() =>
+                              setFp((v) => (v.includes(p.value) ? v.filter((x) => x !== p.value) : [...v, p.value]))
+                            }
+                            className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-all ${
+                              fp.includes(p.value)
+                                ? `${m.bg} ${m.c} ${m.brd}`
+                                : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                            }`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
+                            {p.label}
+                          </button>
+                        );
                       })}
                     </div>
                   </div>
                   <div className="border-t border-[var(--border-color)] pt-2">
-                    <button onClick={() => setFo((v) => !v)} className={`w-full flex items-center gap-2 py-1.5 px-2 rounded font-medium text-sm transition-colors ${fo ? 'text-[var(--accent)] bg-[var(--accent)]/5' : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'}`}><div className={`w-4 h-4 rounded border flex items-center justify-center ${fo ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'}`}>{fo && <Check className="w-3 h-3 text-white" />}</div>Просроченные</button>
+                    <button
+                      onClick={() => setFo((v) => !v)}
+                      className={`w-full flex items-center gap-2 py-1.5 px-2 rounded font-medium text-sm transition-colors ${
+                        fo ? 'text-[var(--accent)] bg-[var(--accent)]/5' : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'
+                      }`}
+                    >
+                      <div
+                        className={`w-4 h-4 rounded border flex items-center justify-center ${
+                          fo ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'
+                        }`}
+                      >
+                        {fo && <Check className="w-3 h-3 text-white" />}
+                      </div>
+                      Просроченные
+                    </button>
                   </div>
-                  {hf && <div className="border-t border-[var(--border-color)] pt-2"><button onClick={() => { setFp([]); setFo(false); }} className="w-full text-center text-sm font-medium text-[var(--accent)] hover:underline">Сбросить</button></div>}
+                  {hf && (
+                    <div className="border-t border-[var(--border-color)] pt-2">
+                      <button
+                        onClick={() => {
+                          setFp([]);
+                          setFo(false);
+                        }}
+                        className="w-full text-center text-sm font-medium text-[var(--accent)] hover:underline"
+                      >
+                        Сбросить
+                      </button>
+                    </div>
+                  )}
                 </div>
               </>
             )}
           </div>
 
-          <button onClick={() => fetchBoard(true)} disabled={refreshing || loading} className="p-2 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)] hover:bg-[var(--hover-3)] disabled:opacity-40"><RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /></button>
-          <button onClick={() => setCreate('backlog')} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-sm font-medium hover:bg-[var(--accent)]/90 transition-colors shadow-sm"><Plus className="w-4 h-4" />Новая задача</button>
+          <button
+            onClick={() => fetchBoard(true)}
+            disabled={refreshing || loading}
+            className="p-2 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)] hover:bg-[var(--hover-3)] disabled:opacity-40"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={() => setCreate('backlog')}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-sm font-medium hover:bg-[var(--accent)]/90 transition-colors shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Новая задача
+          </button>
         </div>
       </div>
 
@@ -4302,28 +4252,95 @@ const handleScrollbarTrackClick = useCallback(
           <div className="flex items-center gap-1 p-1 bg-[var(--hover-1)] rounded-lg border border-[var(--border-color)]">
             {ctxTabs.map((t) => {
               const I = t.icon;
-              return <button key={t.id} onClick={() => setMode(t.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${mode === t.id ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'}`}><I className="w-3.5 h-3.5" />{t.label}</button>;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setMode(t.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    mode === t.id
+                      ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                      : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'
+                  }`}
+                >
+                  <I className="w-3.5 h-3.5" />
+                  {t.label}
+                </button>
+              );
             })}
           </div>
 
-          {mode === 'project' && <div className="w-72"><AsyncDD value={selP} onChange={setSelP} loadFn={ldProjAsync} placeholder="Выберите проект" icon={FolderOpen} /></div>}
-          {mode === 'ticket' && <div className="w-80"><AsyncDD value={selT} onChange={(v) => { setSelT(v); setSelTLabel(v ? ticketLabelsRef.current[v] ?? '' : ''); }} loadFn={ldTicketsAsync} placeholder="Выберите заявку" icon={Ticket} wide /></div>}
-          {mode === 'assignee' && <div className="w-72"><AsyncDD value={selA} onChange={setSelA} loadFn={ldAssAsync} placeholder="Выберите исполнителя" icon={UserCheck} /></div>}
+          {mode === 'project' && (
+            <div className="w-72">
+              <AsyncDD
+                value={selP}
+                onChange={setSelP}
+                loadFn={ldProjAsync}
+                placeholder="Выберите проект"
+                icon={FolderOpen}
+              />
+            </div>
+          )}
+          {mode === 'ticket' && (
+            <div className="w-80">
+              <AsyncDD
+                value={selT}
+                onChange={(v) => {
+                  setSelT(v);
+                  setSelTLabel(v ? ticketLabelsRef.current[v] ?? '' : '');
+                }}
+                loadFn={ldTicketsAsync}
+                placeholder="Выберите заявку"
+                icon={Ticket}
+                wide
+              />
+            </div>
+          )}
+          {mode === 'assignee' && (
+            <div className="w-72">
+              <AsyncDD
+                value={selA}
+                onChange={setSelA}
+                loadFn={ldAssAsync}
+                placeholder="Выберите исполнителя"
+                icon={UserCheck}
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-1 p-1 bg-[var(--hover-1)] rounded-lg border border-[var(--border-color)]">
-          <button onClick={() => setViewMode('kanban')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'kanban' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}><LayoutGrid className="w-3.5 h-3.5" />Доска</button>
+          <button
+            onClick={() => setViewMode('kanban')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              viewMode === 'kanban'
+                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
+            }`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            Доска
+          </button>
 
-          <button onClick={() => setViewMode('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'list' ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}><List className="w-3.5 h-3.5" />Список</button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              viewMode === 'list'
+                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
+            }`}
+          >
+            <List className="w-3.5 h-3.5" />
+            Список
+          </button>
+
           <button
             type="button"
-            onClick={() =>
-              setViewMode('analytics')
-            }
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'analytics'
-              ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-              : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
-              }`}
+            onClick={() => setViewMode('analytics')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              viewMode === 'analytics'
+                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
+            }`}
           >
             <BarChart3 className="w-3.5 h-3.5" />
             Аналитика
@@ -4333,22 +4350,16 @@ const handleScrollbarTrackClick = useCallback(
 
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {viewMode === 'analytics' ? (
-          (
-            (mode === 'project' && !selP) ||
-            (mode === 'assignee' && !selA) ||
-            (mode === 'ticket' && !selT)
-          ) ? (
+          (mode === 'project' && !selP) || (mode === 'assignee' && !selA) || (mode === 'ticket' && !selT) ? (
             <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30">
               <BarChart3 className="w-12 h-12 mb-3 opacity-50" />
-
               <p className="text-base font-medium">
                 {mode === 'project' && !selP
                   ? 'Выберите проект'
                   : mode === 'assignee' && !selA
-                    ? 'Выберите исполнителя'
-                    : 'Выберите заявку'}
+                  ? 'Выберите исполнителя'
+                  : 'Выберите заявку'}
               </p>
-
               <p className="text-sm mt-1 text-[var(--text-primary)]/25">
                 После выбора здесь появится аналитика
               </p>
@@ -4368,23 +4379,18 @@ const handleScrollbarTrackClick = useCallback(
             <Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" />
           </div>
         ) : viewMode === 'list' ? (
-          <ListView
-            tasks={disp.flatMap((c) => c.tasks.items)}
-            umap={umap}
-            onView={setView}
-          />
+          <ListView tasks={disp.flatMap((c) => c.tasks.items)} umap={umap} onView={setView} />
         ) : !cols.length ? (
           <div className="flex flex-col items-center justify-center h-full text-[var(--text-primary)]/30">
             <FileText className="w-12 h-12 mb-3 opacity-50" />
-
             <p className="text-base font-medium">
               {mode === 'project' && !selP
                 ? 'Выберите проект'
                 : mode === 'assignee' && !selA
-                  ? 'Выберите исполнителя'
-                  : mode === 'ticket' && !selT
-                    ? 'Выберите заявку'
-                    : 'Нет задач'}
+                ? 'Выберите исполнителя'
+                : mode === 'ticket' && !selT
+                ? 'Выберите заявку'
+                : 'Нет задач'}
             </p>
           </div>
         ) : (
@@ -4394,10 +4400,7 @@ const handleScrollbarTrackClick = useCallback(
               onScroll={handleBoardScroll}
               className="flex-1 overflow-x-auto overflow-y-hidden pb-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-              <div
-                ref={boardInnerRef}
-                className="flex gap-3 h-full w-max min-w-full"
-              >
+              <div ref={boardInnerRef} className="flex gap-3 h-full w-max min-w-full">
                 {disp.map((c) => (
                   <KCol
                     key={c.status}
@@ -4423,66 +4426,33 @@ const handleScrollbarTrackClick = useCallback(
         )}
       </div>
 
-{viewMode === 'kanban' &&
-  !loading &&
-  cols.length > 0 &&
-  boardScrollWidth >
-    boardViewportWidth + 2 &&
-  createPortal(
-    <div
-      style={fixedBoardScrollbarStyle}
-      className="px-1"
-    >
-      <div
-        ref={bottomTrackRef}
-        onClick={handleScrollbarTrackClick}
-        className="
-          relative
-          h-3
-          rounded-full
-          bg-[var(--hover-2)]
-          border border-[var(--border-color)]
-          cursor-pointer
-          select-none
-        "
-      >
-        <div
-          data-scroll-thumb="true"
-          onPointerDown={
-            handleScrollbarPointerDown
-          }
-          onPointerMove={
-            handleScrollbarPointerMove
-          }
-          onPointerUp={
-            handleScrollbarPointerUp
-          }
-          onPointerCancel={
-            handleScrollbarPointerUp
-          }
-          className="
-            absolute
-            top-[1px]
-            bottom-[1px]
-            rounded-full
-            bg-[var(--accent)]
-            cursor-grab
-            active:cursor-grabbing
-            touch-none
-          "
-          style={{
-            width: `${scrollbarThumbPercent}%`,
-
-            left: `${
-              scrollbarProgress *
-              (100 - scrollbarThumbPercent)
-            }%`,
-          }}
-        />
-      </div>
-    </div>,
-    document.body,
-  )}
+      {viewMode === 'kanban' &&
+        !loading &&
+        cols.length > 0 &&
+        boardScrollWidth > boardViewportWidth + 2 &&
+        createPortal(
+          <div style={fixedBoardScrollbarStyle} className="px-1">
+            <div
+              ref={bottomTrackRef}
+              onClick={handleScrollbarTrackClick}
+              className="relative h-3 rounded-full bg-[var(--hover-2)] border border-[var(--border-color)] cursor-pointer select-none"
+            >
+              <div
+                data-scroll-thumb="true"
+                onPointerDown={handleScrollbarPointerDown}
+                onPointerMove={handleScrollbarPointerMove}
+                onPointerUp={handleScrollbarPointerUp}
+                onPointerCancel={handleScrollbarPointerUp}
+                className="absolute top-[1px] bottom-[1px] left-0 rounded-full bg-[var(--bg-card)]/95 cursor-grab active:cursor-grabbing touch-none will-change-transform"
+                style={{
+                  width: `${scrollbarThumbPercentRef.current}%`,
+                  transform: 'translateX(0px)',
+                }}
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
 
       <AnimatePresence>
         {lastMove && !drag && (
@@ -4493,18 +4463,17 @@ const handleScrollbarTrackClick = useCallback(
             transition={{ duration: 0.2 }}
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120] w-[min(520px,calc(100vw-24px))]"
           >
-            <div onMouseEnter={pauseUndoTimer}
+            <div
+              onMouseEnter={pauseUndoTimer}
               onMouseLeave={resumeUndoTimer}
-              className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-[var(--bg-card)] border border-emerald-500/50 shadow-lg">
+              className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-[var(--bg-card)] border border-emerald-500/50 shadow-lg"
+            >
               <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
               </div>
 
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-[var(--text-primary)]">
-                  Задача перенесена
-                </div>
-
+                <div className="text-xs font-semibold text-[var(--text-primary)]">Задача перенесена</div>
                 <div className="mt-0.5 text-xs text-[var(--text-primary)]/50 truncate">
                   #{lastMove.number} · {ST_LABEL[lastMove.to]}
                 </div>
@@ -4516,12 +4485,7 @@ const handleScrollbarTrackClick = useCallback(
                 disabled={undoingMove}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-50 shrink-0"
               >
-                {undoingMove ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <RotateCcw className="w-3.5 h-3.5" />
-                )}
-
+                {undoingMove ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
                 {undoingMove ? 'Возвращаем...' : 'Вернуть'}
               </button>
 
@@ -4546,9 +4510,18 @@ const handleScrollbarTrackClick = useCallback(
           umap={umap}
           onClose={() => setView(null)}
           onRefresh={() => fetchBoard(true)}
-          onNeedAssign={(t, targetStatus) => { setView(null); setAssignIntent({ task: t, targetStatus }); }}
-          onEdit={(t) => { setView(null); setEditTask(t); }}
-          onNeedComplete={(t, mode) => { setView(null); setCompleteIntent({ task: t, mode }); }}
+          onNeedAssign={(t, targetStatus) => {
+            setView(null);
+            setAssignIntent({ task: t, targetStatus });
+          }}
+          onEdit={(t) => {
+            setView(null);
+            setEditTask(t);
+          }}
+          onNeedComplete={(t, mode) => {
+            setView(null);
+            setCompleteIntent({ task: t, mode });
+          }}
         />
       )}
 
@@ -4559,7 +4532,10 @@ const handleScrollbarTrackClick = useCallback(
           context={ctx()}
           ticketLabel={mode === 'ticket' && selT ? selTLabel : undefined}
           onClose={() => setCreate(null)}
-          onSaved={async () => { setCreate(null); await fetchBoard(true); }}
+          onSaved={async () => {
+            setCreate(null);
+            await fetchBoard(true);
+          }}
         />
       )}
 
@@ -4569,7 +4545,10 @@ const handleScrollbarTrackClick = useCallback(
           task={editTask}
           context={ctx()}
           onClose={() => setEditTask(null)}
-          onSaved={async () => { setEditTask(null); await fetchBoard(true); }}
+          onSaved={async () => {
+            setEditTask(null);
+            await fetchBoard(true);
+          }}
         />
       )}
 
@@ -4579,7 +4558,9 @@ const handleScrollbarTrackClick = useCallback(
           targetStatus={assignIntent.targetStatus}
           umap={umap}
           loading={assignLd}
-          onClose={() => { if (!assignLd) setAssignIntent(null); }}
+          onClose={() => {
+            if (!assignLd) setAssignIntent(null);
+          }}
           onOk={handleAssignAndMove}
         />
       )}
@@ -4588,7 +4569,9 @@ const handleScrollbarTrackClick = useCallback(
         <CompleteModal
           task={completeIntent.task}
           loading={completeLd}
-          onClose={() => { if (!completeLd) setCompleteIntent(null); }}
+          onClose={() => {
+            if (!completeLd) setCompleteIntent(null);
+          }}
           onOk={handleComplete}
         />
       )}
