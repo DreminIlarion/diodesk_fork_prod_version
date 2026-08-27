@@ -1452,6 +1452,12 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
 }) {
   const { toast } = useToast();
 
+  const [deleteAttachmentIntent, setDeleteAttachmentIntent] =
+    useState<TaskAttachment | null>(null);
+
+  const [deletingAttachmentId, setDeletingAttachmentId] =
+    useState<string | null>(null);
+
   const [title, setTitle] = useState(task?.title ?? '');
   const [descriptionBlocks, setDescriptionBlocks] =
     useState<DescriptionBlock[]>(() =>
@@ -1487,15 +1493,7 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
         : [],
     );
 
-  const [
-    deleteAttachmentIntent,
-    setDeleteAttachmentIntent,
-  ] = useState<TaskAttachment | null>(null);
 
-  const [
-    deletingAttachmentId,
-    setDeletingAttachmentId,
-  ] = useState<string | null>(null);
 
   const firstProjectChange = useRef(true);
 
@@ -1554,39 +1552,39 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
   };
 
   const isAttachmentUsedInDescription = useCallback(
-  (attachmentId: string) =>
-    descriptionBlocks.some(
-      (block) =>
-        block.type === 'image' &&
-        block.attachmentId === attachmentId,
-    ),
-  [descriptionBlocks],
-);
-
-const requestDeleteAttachment = (
-  attachment: TaskAttachment,
-) => {
-  if (!attachment.id) return;
-
-  if (
-    isAttachmentUsedInDescription(
-      attachment.id,
-    )
-  ) {
-    toast({
-      title: 'Файл используется в описании',
-      description:
-        'Сначала удалите изображение из описания задачи и сохраните изменения.',
-      variant: 'destructive',
-    });
-
-    return;
-  }
-
-  setDeleteAttachmentIntent(
-    attachment,
+    (attachmentId: string) =>
+      descriptionBlocks.some(
+        (block) =>
+          block.type === 'image' &&
+          block.attachmentId === attachmentId,
+      ),
+    [descriptionBlocks],
   );
-};
+
+  const requestDeleteAttachment = (
+    attachment: TaskAttachment,
+  ) => {
+    if (!attachment.id) return;
+
+    if (
+      isAttachmentUsedInDescription(
+        attachment.id,
+      )
+    ) {
+      toast({
+        title: 'Файл используется в описании',
+        description:
+          'Сначала удалите изображение из описания задачи и сохраните изменения.',
+        variant: 'destructive',
+      });
+
+      return;
+    }
+
+    setDeleteAttachmentIntent(
+      attachment,
+    );
+  };
 
   const deleteExistingAttachment = async () => {
     const attachment = deleteAttachmentIntent;
@@ -1663,39 +1661,39 @@ const requestDeleteAttachment = (
     };
   }, [projectId]);
 
- const uploadInlineImages = async (
-  blocks: DescriptionBlock[],
-  taskId: string,
-): Promise<DescriptionBlock[]> => {
-  const result: DescriptionBlock[] = [];
+  const uploadInlineImages = async (
+    blocks: DescriptionBlock[],
+    taskId: string,
+  ): Promise<DescriptionBlock[]> => {
+    const result: DescriptionBlock[] = [];
 
-  for (const block of blocks) {
-    if (
-      block.type === 'image' &&
-      block.localFile &&
-      !block.attachmentId
-    ) {
-      const uploaded =
-        await attachmentsApi.uploadAttachment(
-          block.localFile,
-          'task',
-          taskId,
-        );
+    for (const block of blocks) {
+      if (
+        block.type === 'image' &&
+        block.localFile &&
+        !block.attachmentId
+      ) {
+        const uploaded =
+          await attachmentsApi.uploadAttachment(
+            block.localFile,
+            'task',
+            taskId,
+          );
 
-      result.push({
-        ...block,
-        attachmentId: uploaded.id,
-        localFile: undefined,
-      });
+        result.push({
+          ...block,
+          attachmentId: uploaded.id,
+          localFile: undefined,
+        });
 
-      continue;
+        continue;
+      }
+
+      result.push(block);
     }
 
-    result.push(block);
-  }
-
-  return result;
-};
+    return result;
+  };
 
   const submit = async () => {
     if (!title.trim()) return;
@@ -2210,6 +2208,71 @@ const requestDeleteAttachment = (
           <AttachmentPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
         )
       }
+      {deleteAttachmentIntent && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => {
+              if (!deletingAttachmentId) {
+                setDeleteAttachmentIntent(null);
+              }
+            }}
+          />
+
+          <div
+            className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center mb-4">
+                <Trash2 className="w-5 h-5 text-red-400" />
+              </div>
+
+              <h3 className="text-base font-bold text-[var(--text-primary)]">
+                Открепить файл?
+              </h3>
+
+              <p className="mt-1.5 text-sm text-[var(--text-primary)]/50">
+                Файл будет удалён из вложений задачи.
+              </p>
+
+              <div className="mt-3 px-3 py-2.5 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)] text-sm text-[var(--text-primary)]/70 break-all">
+                {getAttachmentName(
+                  deleteAttachmentIntent,
+                )}
+              </div>
+            </div>
+
+            <div className="flex border-t border-[var(--border-color)]">
+              <button
+                type="button"
+                disabled={!!deletingAttachmentId}
+                onClick={() =>
+                  setDeleteAttachmentIntent(null)
+                }
+                className="flex-1 py-3 text-sm font-medium text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)] disabled:opacity-40"
+              >
+                Отмена
+              </button>
+
+              <button
+                type="button"
+                disabled={!!deletingAttachmentId}
+                onClick={deleteExistingAttachment}
+                className="flex-1 flex items-center justify-center gap-2 py-3 border-l border-[var(--border-color)] text-sm font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-40"
+              >
+                {deletingAttachmentId ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+
+                Открепить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div >
   );
 }
@@ -3284,71 +3347,7 @@ function DetailModal({
         />
       )}
 
-      {deleteAttachmentIntent && (
-  <div className="fixed inset-0 z-[160] flex items-center justify-center p-4">
-    <div
-      className="absolute inset-0 bg-black/60"
-      onClick={() => {
-        if (!deletingAttachmentId) {
-          setDeleteAttachmentIntent(null);
-        }
-      }}
-    />
-
-    <div
-      className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="p-5">
-        <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center mb-4">
-          <Trash2 className="w-5 h-5 text-red-400" />
-        </div>
-
-        <h3 className="text-base font-bold text-[var(--text-primary)]">
-          Открепить файл?
-        </h3>
-
-        <p className="mt-1.5 text-sm text-[var(--text-primary)]/50">
-          Файл будет удалён из вложений задачи.
-        </p>
-
-        <div className="mt-3 px-3 py-2.5 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)] text-sm text-[var(--text-primary)]/70 break-all">
-          {getAttachmentName(
-            deleteAttachmentIntent,
-          )}
-        </div>
-      </div>
-
-      <div className="flex border-t border-[var(--border-color)]">
-        <button
-          type="button"
-          disabled={!!deletingAttachmentId}
-          onClick={() =>
-            setDeleteAttachmentIntent(null)
-          }
-          className="flex-1 py-3 text-sm font-medium text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)] disabled:opacity-40"
-        >
-          Отмена
-        </button>
-
-        <button
-          type="button"
-          disabled={!!deletingAttachmentId}
-          onClick={deleteExistingAttachment}
-          className="flex-1 flex items-center justify-center gap-2 py-3 border-l border-[var(--border-color)] text-sm font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-40"
-        >
-          {deletingAttachmentId ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Trash2 className="w-4 h-4" />
-          )}
-
-          Открепить
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      
     </div>
   );
 }
@@ -3546,113 +3545,58 @@ export default function TasksPage() {
     return { type: 'my' };
   }, [mode, selP, selA, selT]);
 
-  const syncBoardScrollbarMetrics = useCallback(() => {
-    const board = boardScrollRef.current;
+const syncBoardScrollbarMetrics = useCallback(() => {
+  const board = boardScrollRef.current;
+  const inner = boardInnerRef.current;
 
-    if (!board) {
-      setFixedBoardScrollbarStyle({
-        position: 'fixed',
-        left: 0,
-        width: 0,
-        bottom: 12,
-        zIndex: 55,
-        display: 'none',
-      });
+  if (!board || !inner) {
+    setFixedBoardScrollbarStyle((prev) => ({
+      ...prev,
+      display: 'none',
+    }));
+    return;
+  }
 
-      return;
-    }
+  const contentWidth = inner.scrollWidth;
+  const viewportWidth = board.clientWidth;
+  const rect = board.getBoundingClientRect();
+  const hasHorizontalOverflow = contentWidth > viewportWidth + 2;
 
-    /*
-     * ВАЖНО:
-     * берём scrollWidth непосредственно
-     * у настоящего scroll-контейнера.
-     */
-    const contentWidth = board.scrollWidth;
-    const viewportWidth = board.clientWidth;
+  setBoardScrollWidth(contentWidth);
+  setBoardViewportWidth(viewportWidth);
 
-    const rect = board.getBoundingClientRect();
+  setFixedBoardScrollbarStyle({
+    position: 'fixed',
+    left: rect.left,
+    width: rect.width,
+    bottom: 12,
+    zIndex: 55,
+    display: hasHorizontalOverflow ? 'block' : 'none',
+    pointerEvents: 'auto',
+  });
 
-    const hasHorizontalOverflow =
-      contentWidth - viewportWidth > 2;
+  if (bottomBoardScrollRef.current) {
+    bottomBoardScrollRef.current.scrollLeft = board.scrollLeft;
+  }
+}, []);
 
-    setBoardScrollWidth(contentWidth);
-    setBoardViewportWidth(viewportWidth);
+ const handleBoardScroll = useCallback(() => {
+  if (boardScrollSyncRef.current) return;
 
-    setFixedBoardScrollbarStyle({
-      position: 'fixed',
-      left: Math.round(rect.left),
-      width: Math.round(rect.width),
-      bottom: 12,
-      zIndex: 55,
-      display:
-        hasHorizontalOverflow
-          ? 'block'
-          : 'none',
-      pointerEvents: 'auto',
-    });
+  boardScrollSyncRef.current = true;
 
-    const bottom =
-      bottomBoardScrollRef.current;
+  if (
+    bottomBoardScrollRef.current &&
+    boardScrollRef.current
+  ) {
+    bottomBoardScrollRef.current.scrollLeft =
+      boardScrollRef.current.scrollLeft;
+  }
 
-    if (bottom) {
-      /*
-       * Не позволяем установить значение
-       * больше максимального scrollLeft.
-       */
-      const maxBottomScroll =
-        Math.max(
-          contentWidth -
-          viewportWidth,
-          0,
-        );
-
-      bottom.scrollLeft =
-        Math.min(
-          board.scrollLeft,
-          maxBottomScroll,
-        );
-    }
-  }, []);
-
-  const handleBoardScroll = useCallback(() => {
-    if (boardScrollSyncRef.current) {
-      return;
-    }
-
-    const board =
-      boardScrollRef.current;
-
-    const bottom =
-      bottomBoardScrollRef.current;
-
-    if (!board || !bottom) {
-      return;
-    }
-
-    boardScrollSyncRef.current = true;
-
-    const boardMax =
-      board.scrollWidth -
-      board.clientWidth;
-
-    const bottomMax =
-      bottom.scrollWidth -
-      bottom.clientWidth;
-
-    const ratio =
-      boardMax > 0
-        ? board.scrollLeft /
-        boardMax
-        : 0;
-
-    bottom.scrollLeft =
-      ratio * bottomMax;
-
-    requestAnimationFrame(() => {
-      boardScrollSyncRef.current =
-        false;
-    });
-  }, []);
+  requestAnimationFrame(() => {
+    boardScrollSyncRef.current = false;
+  });
+}, []);
 
   const handleBottomBoardScroll =
     useCallback(() => {
@@ -3698,56 +3642,70 @@ export default function TasksPage() {
       });
     }, []);
 
-  useEffect(() => {
-    if (viewMode !== 'kanban' || loading || !cols.length) {
-      setFixedBoardScrollbarStyle((prev) => ({
-        ...prev,
-        display: 'none',
-      }));
-      return;
-    }
+useEffect(() => {
+  if (
+    viewMode !== 'kanban' ||
+    loading ||
+    !cols.length
+  ) {
+    setFixedBoardScrollbarStyle((prev) => ({
+      ...prev,
+      display: 'none',
+    }));
+    return;
+  }
 
-    const run = () => {
-      requestAnimationFrame(syncBoardScrollbarMetrics);
-    };
+  const run = () => {
+    requestAnimationFrame(
+      syncBoardScrollbarMetrics,
+    );
+  };
 
-    run();
+  run();
 
-    const board =
-      boardScrollRef.current;
+  const board = boardScrollRef.current;
+  const inner = boardInnerRef.current;
 
-    const inner =
-      boardInnerRef.current
+  let ro: ResizeObserver | null = null;
 
-    let ro: ResizeObserver | null = null;
+  if (
+    typeof ResizeObserver !== 'undefined' &&
+    board &&
+    inner
+  ) {
+    ro = new ResizeObserver(run);
 
-    if (
-      typeof ResizeObserver !== 'undefined'
-    ) {
-      ro = new ResizeObserver(() => {
-        requestAnimationFrame(
-          syncBoardScrollbarMetrics,
-        );
-      });
+    ro.observe(board);
+    ro.observe(inner);
+  }
 
-      if (board) {
-        ro.observe(board);
-      }
+  window.addEventListener('resize', run);
+  window.addEventListener(
+    'scroll',
+    run,
+    true,
+  );
 
-      if (inner) {
-        ro.observe(inner);
-      }
-    }
+  return () => {
+    ro?.disconnect();
 
-    window.addEventListener('resize', run);
-    window.addEventListener('scroll', run, true);
+    window.removeEventListener(
+      'resize',
+      run,
+    );
 
-    return () => {
-      ro?.disconnect();
-      window.removeEventListener('resize', run);
-      window.removeEventListener('scroll', run, true);
-    };
-  }, [viewMode, loading, cols.length, syncBoardScrollbarMetrics]);
+    window.removeEventListener(
+      'scroll',
+      run,
+      true,
+    );
+  };
+}, [
+  viewMode,
+  loading,
+  cols.length,
+  syncBoardScrollbarMetrics,
+]);
 
   const loadUsersMap = useCallback(async () => {
     const m = new Map<string, SimpleUser | CounterpartyCustomer>();
@@ -4304,48 +4262,32 @@ export default function TasksPage() {
         )}
       </div>
 
-      {viewMode === 'kanban' &&
-        !loading &&
-        cols.length > 0 &&
-        boardScrollWidth >
-        boardViewportWidth + 2 &&
-        createPortal(
-          <div
-            style={
-              fixedBoardScrollbarStyle
-            }
-            className="px-1"
-          >
-            <div
-              ref={
-                bottomBoardScrollRef
-              }
-              onScroll={
-                handleBottomBoardScroll
-              }
-              className="
-          h-3
-          overflow-x-scroll
-          overflow-y-hidden
-          rounded-lg
-          bg-[var(--bg-card)]
-          border border-[var(--border-color)]
-          shadow-lg
-          scrollbar-thin
-          scrollbar-thumb-[var(--accent)]/60
-          scrollbar-track-transparent
-        "
-            >
-              <div
-                style={{
-                  width: `${boardScrollWidth}px`,
-                  height: 1,
-                }}
-              />
-            </div>
-          </div>,
-          document.body,
-        )}
+{viewMode === 'kanban' &&
+  !loading &&
+  cols.length > 0 &&
+  createPortal(
+    <div
+      style={fixedBoardScrollbarStyle}
+      className="px-1"
+    >
+      <div
+        ref={bottomBoardScrollRef}
+        onScroll={handleBottomBoardScroll}
+        className="h-2 rounded-xl bg-[var(--bg-card)]/95 border border-[var(--border-color)] shadow-2xl backdrop-blur-md overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--accent)]/60 scrollbar-track-transparent"
+      >
+        <div
+          style={{
+            width: Math.max(
+              boardScrollWidth,
+              boardViewportWidth,
+            ),
+            height: '100%',
+          }}
+        />
+      </div>
+    </div>,
+    document.body,
+  )}
 
       <AnimatePresence>
         {lastMove && !drag && (
