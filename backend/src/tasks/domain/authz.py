@@ -130,7 +130,7 @@ class TaskAuthZService:
                 "Reviewer must be a developer or support staff member",
             )
 
-        if str(reviewer.id) == str(task.assignee_id):
+        if reviewer.id == task.assignee_id:
             return PermissionResult(
                 False,
                 "Reviewer cannot be the same as assignee",
@@ -139,8 +139,8 @@ class TaskAuthZService:
         requester_allowed = (
             subject.has_role(UserRole.ADMIN)
             or subject.has_role(UserRole.SUPPORT_MANAGER)
-            or str(subject.id) == str(task.created_by)
-            or str(subject.id) == str(task.assignee_id)
+            or subject.id == task.created_by
+            or subject.id == task.assignee_id
         )
 
         if task.project_id is not None:
