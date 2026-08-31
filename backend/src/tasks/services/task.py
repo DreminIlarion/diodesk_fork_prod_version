@@ -10,7 +10,7 @@ from src.projects.domain.repos import ProjectRepository
 from src.shared.domain.events import EventPublisher
 from src.shared.domain.exceptions import InvalidStateError, NotFoundError
 from src.shared.domain.repos import UnitOfWork, finalize, get_or_raise_404
-from src.shared.domain.vo import Tag
+from src.shared.domain.vo import Priority, Tag
 from src.tickets.domain.entities import Ticket
 from src.tickets.domain.repos import TicketRepository
 
@@ -64,6 +64,16 @@ class TaskService:
 
         return project_id
 
+    @staticmethod
+    def _resolve_priority(
+        data: TaskCreate,
+        ticket: Ticket | None = None,
+    ) -> Priority:
+        if ticket is not None:
+            return ticket.priority
+
+        return data.priority
+
     async def create(self, data: TaskCreate, current_subject: Subject) -> TaskResponse:
         """
         Создание новой задачи.
@@ -104,11 +114,13 @@ class TaskService:
             sequence=sequence,
         )
 
+        priority = self._resolve_priority(data, ticket)
+
         task = Task.create(
             number=task_number,
             title=data.title,
             description=data.description,
-            priority=data.priority,
+            priority=priority,
             due_date=data.due_date,
             estimated_hours=data.estimated_hours,
             story_points=data.story_points,  # ← добавить
