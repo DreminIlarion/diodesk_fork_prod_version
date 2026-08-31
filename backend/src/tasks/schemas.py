@@ -8,6 +8,9 @@ from uuid import UUID
 from fastapi import Body
 from pydantic import BaseModel, Field, NonNegativeFloat, NonNegativeInt
 
+from src.iam.schemas import UserReference
+from src.projects.schemas import ProjectReference
+from src.tickets.schemas import TicketPreview
 from src.media.schemas import AttachmentResponse
 from src.shared.domain.vo import Priority, Tag
 from src.shared.schemas import Page
@@ -84,6 +87,18 @@ class TaskResponse(TaskBase):
     attachments: list[AttachmentResponse] = Field(
         default_factory=list, description="Медиа контент приложенный к задаче"
     )
+    source_ticket: TicketPreview | None = Field(
+        None,
+        description="Заявка, на основании которой создана задача",
+    )
+    source_ticket_reporter: UserReference | None = Field(
+        None,
+        description="Инициатор заявки, на основании которой создана задача",
+    )
+    project: ProjectReference | None = Field(
+        None,
+        description="Проект задачи",
+    )
 
 
 class TaskUpdate(BaseModel):
@@ -147,6 +162,19 @@ class TaskViewResponse(BaseModel):
     attachments: list[AttachmentResponse] = Field(default_factory=list, description="Вложения")
     project_id: UUID | None = Field(None, description="Проект в рамках которого создана задача")
     tag: list[Tag] = Field(default_factory=list, description="Теги для маркировки и поиска")
+
+    source_ticket: TicketPreview | None = Field(
+        None,
+        description="Заявка, на основании которой создана задача",
+    )
+    source_ticket_reporter: UserReference | None = Field(
+        None,
+        description="Инициатор заявки, на основании которой создана задача",
+    )
+    project: ProjectReference | None = Field(
+        None,
+        description="Проект задачи",
+    )
 
 
 # ==============================

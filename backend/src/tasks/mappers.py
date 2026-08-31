@@ -1,12 +1,23 @@
-from src.media.mappers import map_attachment_to_response
-from src.tickets.schemas import Tag
-
 from .domain.entities import Task
 from .domain.repos import TaskView
 from .schemas import TaskResponse, TaskViewResponse
+from src.iam.domain.entities import User
+from src.iam.schemas import UserReference
+from src.media.mappers import map_attachment_to_response
+from src.projects.domain.entities import Project
+from src.projects.schemas import ProjectReference
+from src.tickets.domain.entities import Ticket
+from src.tickets.mappers import map_ticket_to_preview
+from src.tickets.schemas import Tag
 
 
-def map_task_to_response(task: Task) -> TaskResponse:
+def map_task_to_response(
+        task: Task,
+        *,
+        ticket: Ticket | None = None,
+        reporter: User | None = None,
+        project: Project | None = None,
+) -> TaskResponse:
     story_points = None if task.story_points is None else task.story_points.value
     estimated_hours = None if task.estimated_hours is None else float(task.estimated_hours)
     tags = [Tag(name=tag.name, color=tag.color) for tag in task.tags]
@@ -36,10 +47,23 @@ def map_task_to_response(task: Task) -> TaskResponse:
         created_by=task.created_by,
         tags=tags,
         attachments=attachments,
+        source_ticket=(
+            map_ticket_to_preview(ticket)
+            if ticket is not None
+            else None
+        ),
+        source_ticket_reporter=map_task_reporter_to_reference(reporter),
+        project=map_task_project_to_reference(project),
     )
 
 
-def map_task_view_to_response(task: TaskView) -> TaskViewResponse:
+def map_task_view_to_response(
+        task: TaskView,
+        *,
+        ticket: Ticket | None = None,
+        reporter: User | None = None,
+        project: Project | None = None,
+) -> TaskViewResponse:
     tags = [Tag(name=tag.name, color=tag.color) for tag in task.tags]
     attachments = [map_attachment_to_response(a) for a in task.attachments]
 
@@ -65,4 +89,39 @@ def map_task_view_to_response(task: TaskView) -> TaskViewResponse:
         ticket_id=task.ticket_id,
         attachments=attachments,
         tags=tags,
+        source_ticket=(
+            map_ticket_to_preview(ticket)
+            if ticket is not None
+            else None
+        ),
+        source_ticket_reporter=map_task_reporter_to_reference(reporter),
+        project=map_task_project_to_reference(project),
     )
+
+
+def map_task_reporter_to_reference(
+        reporter: User | None,
+) -> UserReference | None:
+    if reporter is None:
+        return None
+
+    return UserReference(
+        id=reporter.id,
+        full_name=reporter.full_name.value if reporter.full_name else "",
+        email=reporter.email.value,
+        type=reporter.type,
+    )
+
+
+def map_task_project_to_reference(
+        project: Project | None,
+) -> ProjectReference | None:
+    if project is None:
+        return None
+
+    return ProjectReference(
+        id=project.id,
+        key=project.key.value,
+        name=project.name,
+    )
+
