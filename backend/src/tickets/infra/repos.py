@@ -129,6 +129,21 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
 
         return await self._paginate(stmt, pagination)
 
+    @override
+    async def get_by_ids(self, ids: list[UUID]) -> list[Ticket]:
+        if not ids:
+            return []
+
+        stmt = select(self.model).where(
+            self.model.id.in_(ids)
+        )
+        result = await self.session.execute(stmt)
+
+        return [
+            self.model_mapper.to_light(model)
+            for model in result.scalars().all()
+        ]
+
 
 class SqlCommentRepository(SqlAlchemyRepository[Comment, CommentOrm]):
     model = CommentOrm
