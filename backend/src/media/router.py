@@ -70,15 +70,18 @@ async def get_attachment(attachment_id: UUID, repository: AttachmentRepoDep) -> 
     return map_attachment_to_response(attachment)
 
 
-"""@router.delete(
+@router.delete(
     path="/{attachment_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Удалить файл (Soft-delete)"
 )
-async def delete_attachment(attachment_id: UUID, project_repo: AttachmentRepoDep) -> None:
-    ...
+async def delete_attachment(
+    attachment_id: UUID,
+    service: AttachmentServiceDep,
+) -> None:
+    await service.delete_attachment(attachment_id)
 
-
+"""
 @router.get(
     path="/owner/{owner_type}/{owner_id}",
     status_code=status.HTTP_200_OK,

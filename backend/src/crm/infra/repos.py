@@ -2,7 +2,7 @@ from typing import override
 
 from uuid import UUID
 
-from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy import Select, and_, func, or_, select, delete
 
 from src.iam.domain.entities import User
 from src.iam.domain.vo import FullName
@@ -192,6 +192,14 @@ class SqlCounterpartyRepository(SqlAlchemyRepository[Counterparty, CounterpartyO
         self.session.add(
             CounterpartyProductOrm(counterparty_id=counterparty_id, product_id=product_id)
         )
+    async def unlink_product(self, counterparty_id: UUID, product_id: UUID) -> None:
+        """Отвязка программного продукта от контрагента"""
+        
+        stmt = delete(CounterpartyProductOrm).where(
+            CounterpartyProductOrm.counterparty_id == counterparty_id,
+            CounterpartyProductOrm.product_id == product_id,
+        )
+        await self.session.execute(stmt)
 
     async def get_products(
             self, counterparty_id: UUID, pagination: Pagination,

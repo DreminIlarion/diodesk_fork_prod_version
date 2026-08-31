@@ -499,15 +499,41 @@ function TicketActions({
   useEffect(() => {
     if (!open) return;
 
-    const handleScroll = () => {
+    const handleScroll = (event: Event) => {
+      const target = event.target;
+
+      /*
+       * Если скролл произошёл внутри самого меню
+       * (например, пользователь листает исполнителей),
+       * ничего не закрываем.
+       */
+      if (
+        target instanceof Node &&
+        menuRef.current?.contains(target)
+      ) {
+        return;
+      }
+
+      /*
+       * Скролл произошёл снаружи:
+       * например, прокручивается страница.
+       */
       setOpen(false);
       setShowAssigneeMenu(false);
     };
 
-    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener(
+      'scroll',
+      handleScroll,
+      true,
+    );
 
     return () => {
-      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener(
+        'scroll',
+        handleScroll,
+        true,
+      );
     };
   }, [open]);
 
@@ -805,10 +831,9 @@ function TicketActions({
               bg-[var(--bg-card)]
               shadow-2xl
 
-              ${
-                openUp
-                  ? 'bottom-full mb-2'
-                  : 'top-full mt-2'
+              ${openUp
+                ? 'bottom-full mb-2'
+                : 'top-full mt-2'
               }
             `}
             onClick={(event) => {
@@ -911,33 +936,56 @@ function TicketActions({
 
                       handleStatusChange(status);
                     }}
-                    className={`
-                      flex w-full items-center gap-3
-                      rounded-lg px-3 py-2.5
-                      text-left text-sm
-                      transition-colors
-                      disabled:opacity-50
-                      ${
-                        STATUS_MAP[status]?.color ||
-                        'status-closed'
-                      }
-                    `}
+                    className="
+    group/status
+    flex w-full items-center gap-3
+    rounded-lg px-3 py-2.5
+    border border-transparent
+    text-left text-sm
+    text-[var(--text-primary)]/75
+    cursor-pointer
+    transition-all duration-150
+
+    hover:bg-[var(--hover-2)]
+    hover:border-[var(--border-color)]
+    hover:text-[var(--text-primary)]
+
+    focus-visible:outline-none
+    focus-visible:bg-[var(--hover-2)]
+    focus-visible:border-[var(--accent)]/40
+
+    disabled:opacity-50
+    disabled:cursor-not-allowed
+  "
                   >
+                    <span
+                      className={`
+      w-2 h-2 rounded-full shrink-0
+      ${STATUS_MAP[status]?.color || 'status-closed'}
+    `}
+                    />
+
+                    <span className="flex-1 font-medium">
+                      {STATUS_MAP[status]?.label || status}
+                    </span>
+
                     {updatingStatus ? (
                       <Loader2
                         size={14}
-                        className="shrink-0 animate-spin"
+                        className="animate-spin shrink-0"
                       />
                     ) : (
                       <ChevronRight
                         size={14}
-                        className="shrink-0 opacity-50"
+                        className="
+        shrink-0
+        opacity-20
+        transition-all duration-150
+        group-hover/status:opacity-70
+        group-hover/status:translate-x-0.5
+      "
                       />
                     )}
-
-                    <span className="font-medium">
-                      {STATUS_MAP[status]?.label || status}
-                    </span>
                   </button>
                 ))
               )}
@@ -987,10 +1035,9 @@ function TicketActions({
                   text-[var(--text-primary)]/40
                   transition-transform
 
-                  ${
-                    showAssigneeMenu
-                      ? 'rotate-180'
-                      : ''
+                  ${showAssigneeMenu
+                    ? 'rotate-180'
+                    : ''
                   }
                 `}
               />
@@ -999,8 +1046,9 @@ function TicketActions({
             {showAssigneeMenu && (
               <div
                 className="
-                  max-h-[180px]
+                  max-h-[170px]
                   overflow-y-auto
+                  overscroll-contain
                   border-t border-[var(--border-color)]
                   bg-[var(--hover-1)]/50
                   py-1
@@ -1244,11 +1292,11 @@ function TicketActions({
 
 /* ═══ TICKET ROW ═══ */
 
-function TicketRow({ ticket, showAssignee, showReporter,onTicketUpdated  }: {
+function TicketRow({ ticket, showAssignee, showReporter, onTicketUpdated }: {
   ticket: TicketListItem;
   showAssignee: boolean;
   showReporter: boolean;
-   onTicketUpdated?: () => void;
+  onTicketUpdated?: () => void;
 }) {
   const statusLabel = STATUS_MAP[ticket.status]?.label || ticket.status;
   const statusColor = STATUS_MAP[ticket.status]?.color || 'status-closed';
@@ -1339,7 +1387,7 @@ function TicketRow({ ticket, showAssignee, showReporter,onTicketUpdated  }: {
       </div>
 
       <div className="self-center flex items-center justify-end gap-1">
-        <TicketActions ticket={ticket} onTicketUpdated={onTicketUpdated}  />
+        <TicketActions ticket={ticket} onTicketUpdated={onTicketUpdated} />
         <ChevronRight size={18}
           className="text-[var(--text-primary)]/20 group-hover:text-[var(--accent-light)]
                      group-hover:translate-x-0.5 transition-all shrink-0" />

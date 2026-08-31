@@ -102,3 +102,18 @@ class AttachmentService:
             storage_key=attachment.storage_key,
             expires_in=PRESIGNED_URL_EXPIRES_IN,
         )
+    
+    async def delete_attachment(self, attachment_id: UUID) -> None:
+        """Удаление вложения (soft-delete)"""
+
+        # 1. Получение вложения из БД
+        attachment = await self.repository.read(attachment_id)
+        if attachment is None:
+            raise NotFoundError(f"Attachment with ID {attachment_id} not found")
+
+        # 2. Удаление файла из хранилища
+        await self.storage.delete(attachment.storage_key)
+
+        # 3. Soft-delete записи в БД
+        await self.repository.delete(attachment_id)
+        await self.session.commit()
