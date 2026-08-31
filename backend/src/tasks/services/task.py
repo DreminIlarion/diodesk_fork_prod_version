@@ -10,7 +10,7 @@ from src.projects.domain.repos import ProjectRepository
 from src.shared.domain.events import EventPublisher
 from src.shared.domain.exceptions import InvalidStateError, NotFoundError
 from src.shared.domain.repos import UnitOfWork, finalize, get_or_raise_404
-from src.shared.domain.vo import Tag
+from src.shared.domain.vo import Priority, Tag
 from src.tickets.domain.entities import Ticket
 from src.tickets.domain.repos import TicketRepository
 
@@ -64,6 +64,16 @@ class TaskService:
 
         return project_id
 
+    @staticmethod
+    def _resolve_priority(
+        data: TaskCreate,
+        ticket: Ticket | None = None,
+    ) -> Priority:
+        if ticket is not None:
+            return ticket.priority
+
+        return data.priority
+
     async def create(self, data: TaskCreate, current_subject: Subject) -> TaskResponse:
         """
         Создание новой задачи.
@@ -104,11 +114,13 @@ class TaskService:
             sequence=sequence,
         )
 
+        priority = self._resolve_priority(data, ticket)
+
         task = Task.create(
             number=task_number,
             title=data.title,
             description=data.description,
-            priority=data.priority,
+            priority=priority,
             due_date=data.due_date,
             estimated_hours=data.estimated_hours,
             story_points=data.story_points,  # ← добавить
@@ -137,7 +149,7 @@ class TaskService:
             activity_recorder=self.activity_log_recorder
         )
 
-        return map_task_to_response(task)
+        return await self._map_response(task)
 
     async def change_status(
             self, task_id: UUID, new_status: TaskStatus, current_subject: Subject
@@ -148,8 +160,15 @@ class TaskService:
 
         task = await get_or_raise_404(self.task_repo.read, task_id, Task)
 
+        if new_status == TaskStatus.TO_REVIEW:
+            raise InvalidStateError(
+                "Use the request-review endpoint to move a task to review"
+            )
+
         permission = await self.task_authz_service.can_change_status(
-            subject=current_subject, task=task, new_status=new_status
+            subject=current_subject,
+            task=task,
+            new_status=new_status
         )
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
@@ -163,7 +182,7 @@ class TaskService:
             activity_recorder=self.activity_log_recorder
         )
 
-        return map_task_to_response(task)
+        return await self._map_response(task)
 
     async def edit(
             self, task_id: UUID, data: TaskUpdate, current_subject: Subject
@@ -201,7 +220,7 @@ class TaskService:
             activity_recorder=self.activity_log_recorder
         )
 
-        return map_task_to_response(task)
+        return await self._map_response(task)
 
     async def assign_to(
             self, task_id: UUID, assignee_id: UUID, current_subject: Subject
@@ -228,7 +247,7 @@ class TaskService:
             activity_recorder=self.activity_log_recorder
         )
 
-        return map_task_to_response(task)
+        return await self._map_response(task)
 
     async def request_review(
             self, task_id: UUID, reviewer_id: UUID, current_subject: Subject
@@ -240,8 +259,10 @@ class TaskService:
         task = await get_or_raise_404(self.task_repo.read, task_id, Task)
         reviewer = await get_or_raise_404(self.user_repo.read, reviewer_id, User)
 
-        permission = await self.task_authz_service.can_review_task(
-            subject=current_subject, task=task,
+        permission = await self.task_authz_service.can_request_review(
+            subject=current_subject, 
+            task=task,
+            reviewer=reviewer
         )
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
@@ -255,7 +276,7 @@ class TaskService:
             activity_recorder=self.activity_log_recorder
         )
 
-        return map_task_to_response(task)
+        return await self._map_response(task)
 
     async def review(
             self, task_id: UUID, decision: ReviewDecision, current_subject: Subject
@@ -281,7 +302,7 @@ class TaskService:
             activity_recorder=self.activity_log_recorder
         )
 
-        return map_task_to_response(task)
+        return await self._map_response(task)
 
     async def archive(self, task_id: UUID, current_subject: Subject) -> TaskResponse:
         """
@@ -305,7 +326,7 @@ class TaskService:
             activity_recorder=self.activity_log_recorder
         )
 
-        return map_task_to_response(task)
+        return await self._map_response(task)
 
     async def add_actual_hours(self, task_id: UUID, hours: Decimal) -> None:
         """
@@ -322,3 +343,33 @@ class TaskService:
             event_publisher=self.event_publisher,
             activity_recorder=self.activity_log_recorder
         )
+
+    async def _map_response(self, task: Task) -> TaskResponse:
+        ticket = None
+        reporter = None
+        project = None
+
+        if task.ticket_id is not None:
+            ticket = await self.ticket_repo.read(task.ticket_id)
+
+            if ticket is not None:
+                reporter = await self.user_repo.read(ticket.reporter_id)
+
+        if task.project_id is not None:
+            project = await self.project_repo.read(task.project_id)
+
+        return map_task_to_response(
+            task,
+            ticket=ticket,
+            reporter=reporter,
+            project=project,
+        )
+
+    async def get(self, task_id: UUID) -> TaskResponse:
+        task = await get_or_raise_404(
+            self.task_repo.read,
+            task_id,
+            Task,
+        )
+
+        return await self._map_response(task)

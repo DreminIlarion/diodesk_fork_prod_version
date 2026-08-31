@@ -1,11 +1,15 @@
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
-from src.iam.dependencies import CurrentSubjectDep
+from src.iam.dependencies import CurrentSubjectDep, get_current_subject
 from src.shared.dependencies import PaginationDep
 
-from .dependencies import KanbanFiltersDep, TaskBoardServiceDep, TaskServiceDep
+from .dependencies import (
+    KanbanFiltersDep,
+    TaskBoardServiceDep,
+    TaskServiceDep,
+)
 from .schemas import (
     AssigneeId,
     KanbanBoard,
@@ -31,6 +35,20 @@ async def create_task(
         data: TaskCreate, current_subject: CurrentSubjectDep, service: TaskServiceDep
 ) -> TaskResponse:
     return await service.create(data, current_subject)
+
+
+@router.get(
+    path="/{task_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=TaskResponse,
+    dependencies=[Depends(get_current_subject)],
+    summary="Получить задачу",
+)
+async def get_task(
+        task_id: UUID,
+        service: TaskServiceDep,
+) -> TaskResponse:
+    return await service.get(task_id)
 
 
 @router.patch(
