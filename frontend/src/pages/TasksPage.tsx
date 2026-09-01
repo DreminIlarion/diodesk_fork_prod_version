@@ -1496,6 +1496,16 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
 }) {
   const { toast } = useToast();
 
+
+      const [baseTicket, setBaseTicket] = useState<any | null>(null);
+const [baseTicketCreator, setBaseTicketCreator] = useState<SimpleUser | null>(null);
+
+const requesterLabel =
+  baseTicketCreator?.full_name ||
+  baseTicketCreator?.username ||
+  baseTicketCreator?.email ||
+  (baseTicket?.created_by ? `ID: ${baseTicket.created_by}` : '');
+
   const [deleteAttachmentIntent, setDeleteAttachmentIntent] =
     useState<TaskAttachment | null>(null);
 
@@ -1539,43 +1549,13 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
 
   const firstProjectChange = useRef(true);
 
-  // Новое: загрузка данных заявки при создании задачи на основании заявки
-  useEffect(() => {
-    if (mode !== 'create' || context.type !== 'ticket' || !context.ticket_id) {
-      return;
-    }
-
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const ticket = await ticketsApi.getById(context.ticket_id!);
-
-        if (cancelled) return;
-
-        // Подставляем проект из заявки
-        if (ticket.project_id) {
-          setProjectId(ticket.project_id);
-          firstProjectChange.current = true; // Сбрасываем, чтобы useEffect не сбросил ticketId
-        }
-
-        // Подставляем приоритет из заявки
-        if (ticket.priority) {
-          setPri(ticket.priority as TaskPriority);
-        }
-      } catch {
-        // Игнорируем ошибку — пользователь может заполнить вручную
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [mode, context.type, context.ticket_id]);
+  
 
   useEffect(() => {
     if (!assigneeId && todo) setTodo(false);
   }, [assigneeId, todo]);
+
+
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !saving) onClose(); };
@@ -1770,6 +1750,44 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
 
     return result;
   };
+
+useEffect(() => {
+  if (mode !== 'create' || context.type !== 'ticket' || !context.ticket_id) return;
+
+  let cancelled = false;
+
+  (async () => {
+    try {
+      setBaseTicket(null);
+      setBaseTicketCreator(null);
+
+      const ticket = await ticketsApi.getById(context.ticket_id);
+      if (cancelled) return;
+
+      setBaseTicket(ticket);
+
+      if (ticket.project_id) {
+        setProjectId(ticket.project_id);
+        firstProjectChange.current = true;
+      }
+
+      if (ticket.priority) {
+        setPri(ticket.priority as TaskPriority);
+      }
+
+      if (ticket.created_by) {
+        try {
+          const u = await usersApi.getById(ticket.created_by); // важно: чтобы этот метод был добавлен
+          if (!cancelled) setBaseTicketCreator(u);
+        } catch {}
+      }
+    } catch {}
+  })();
+
+  return () => {
+    cancelled = true;
+  };
+}, [mode, context.type, context.ticket_id]);
 
   const submit = async () => {
     if (!title.trim()) return;
@@ -2003,6 +2021,25 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
   const subtitleText = mode === 'create' ? 'Проверьте заполнение' : `Изменение задачи ${task?.number ?? ''}`;
   const lockTicket = context.type === 'ticket' && mode === 'create';
 
+
+
+const getTicketRequester = (t: any) => {
+  return (
+    t?.requester?.full_name ||
+    t?.requester?.email ||
+    t?.requester_name ||
+    t?.created_by_user?.full_name ||
+    t?.created_by_user?.email ||
+    t?.created_by?.full_name ||
+    t?.created_by?.email ||
+    t?.author?.full_name ||
+    t?.author?.email ||
+    t?.created_by_full_name ||
+    t?.created_by_email ||
+    ''
+  );
+};
+
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-2 md:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !saving && onClose()} />
@@ -2182,14 +2219,33 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
               )}
 
               {lockTicket && (
-                <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 flex items-center gap-3">
-                  <Ticket className="w-5 h-5 text-blue-400 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-primary)]">Создание на основании заявки</p>
-                    <p className="text-xs text-blue-400 truncate mt-0.5">{ticketLabel || 'Заявка будет привязана автоматически'}</p>
-                  </div>
-                </div>
-              )}
+  <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 flex items-center gap-3">
+    <Ticket className="w-5 h-5 text-blue-400 shrink-0" />
+    <div className="min-w-0">
+      <p className="text-sm font-medium text-[var(--text-primary)]">
+        Создание на основании заявки
+      </p>
+
+     {baseTicket ? (
+  <>
+    <p className="text-xs text-blue-400 truncate mt-0.5">
+      {baseTicket.number} — {baseTicket.title}
+    </p>
+
+    {!!requesterLabel && (
+      <p className="text-xs text-[var(--text-primary)]/55 truncate">
+        от: {requesterLabel}
+      </p>
+    )}
+  </>
+) : (
+  <p className="text-xs text-blue-400 truncate mt-0.5">
+    {ticketLabel || 'Заявка будет привязана автоматически'}
+  </p>
+)}
+    </div>
+  </div>
+)}
 
               {/* Приоритет */}
               <div>
