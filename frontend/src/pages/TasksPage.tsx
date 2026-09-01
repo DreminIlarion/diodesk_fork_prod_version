@@ -9,7 +9,7 @@ import {
   ArrowUpRight, ChevronDown, Flag, AlertCircle, CheckCircle2, Ban, RotateCcw,
   RefreshCw, Archive, FolderOpen, Ticket, Zap, Star, User, Layers, UserCheck,
   GitPullRequest, ThumbsUp, ThumbsDown, Pencil, List, LayoutGrid, Clock3,
-  FileText, File as FileIcon, Download, BarChart3, Trash2,
+  FileText, File as FileIcon, Download, BarChart3, Trash2,Paperclip ,
 } from 'lucide-react';
 import { tasksApi, projectsApi, ticketsApi, usersApi } from '../api/client';
 import { attachmentsApi } from '../api/attachments';
@@ -1055,6 +1055,9 @@ export const TCard = memo(function TCard({
     ? (a.full_name || a.username || '').split(' ')[0]
     : null;
 
+    const hasAttachments =
+  Array.isArray((t as any).attachments) && (t as any).attachments.length > 0;
+
   return (
     <div
       data-task-id={t.id}
@@ -1120,6 +1123,10 @@ export const TCard = memo(function TCard({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+
+          {hasAttachments && (
+    <Paperclip className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+  )}
           {t.ticket_id && (
             <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
           )}
