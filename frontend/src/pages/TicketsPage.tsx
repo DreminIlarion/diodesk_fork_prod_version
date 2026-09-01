@@ -1321,7 +1321,7 @@ function TicketRow({ ticket, showAssignee, showReporter, onTicketUpdated }: {
         </span>
         {ticket.has_attachments && (
   <span className="inline-flex items-center gap-1 text-[13px] text-[var(--text-primary)]/40 mt-1">
-    <Paperclip size={12} /> Вложение
+    <Paperclip size={18} /> Вложение
   </span>
 )}
       </div>
