@@ -93,7 +93,7 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
     async def paginate(
             self, pagination: Pagination, filters: TicketFilters | None = None,
     ) -> Page[Ticket]:
-        stmt = select(self.model).options(joinedload(self.model.attachments))
+        stmt = select(self.model).options(selectinload(self.model.attachments))
 
         if filters is not None:
             stmt = self._apply_ticket_filters(stmt, filters)
