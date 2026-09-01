@@ -1596,19 +1596,20 @@ export default function TicketsPage() {
   }, [isClientUser]);
 
 
-  useEffect(() => {
-    const spSearch = searchParams.get('search') || '';
-    const spStatus = getMultiParam('status');
-    const spPriority = searchParams.get('priority') || '';
+useEffect(() => {
+  const spSearch = searchParams.get('search') || '';
+  const spStatus = getMultiParam('status');
+  const spPriority = searchParams.get('priority') || '';
+  const spPage = parseInt(searchParams.get('page') || '1', 10) || 1;
 
-    setSearch(spSearch);
-    setDebouncedSearch(spSearch);
+  setSearch(spSearch);
+  setDebouncedSearch(spSearch);
 
-    setStatusFilter(spStatus);
-    setPriorityFilter(spPriority);
+  setStatusFilter(spStatus);
+  setPriorityFilter(spPriority);
 
-    setPage(1);
-  }, [searchParams, getMultiParam]);
+  setPage(spPage); // ✅ вместо setPage(1)
+}, [searchParams, getMultiParam]);
 
   /* ── Загрузка справочников при открытии фильтров ── */
   useEffect(() => {
@@ -1677,20 +1678,9 @@ export default function TicketsPage() {
   }, [loadTickets]);
 
   /* ── Пагинация ── */
-  const handlePageChange = async (pageNum: number) => {
-    setPage(pageNum);
-    setLoading(true);
-    try {
-      const response = await ticketsApi.getAll(pageNum, 9, buildFilters());
-      setTickets(response.items);
-      setTotalPages(response.total_pages);
-      setTotalItems(response.total_items);
-    } catch (e) {
-      console.error('handlePageChange error:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
+const handlePageChange = (pageNum: number) => {
+  setPage(pageNum); // загрузка пойдёт через useEffect(() => loadTickets(), [loadTickets])
+};
 
   /* ── Сброс фильтров ── */
   const resetFilters = () => {
