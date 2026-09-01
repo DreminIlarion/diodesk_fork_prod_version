@@ -1181,8 +1181,11 @@ export default function CounterpartyDetailPage() {
 
         <div className="flex gap-2.5 flex-shrink-0 flex-wrap">
           <button onClick={() => setShowEditModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--hover-2)]
-                       hover:bg-[var(--hover-3)] border border-[var(--border-color)] text-[var(--text-primary)]/80 text-base font-medium transition-colors">
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-base
+                             bg-emerald-600 hover:bg-emerald-700
+                             text-white font-semibold
+                             shadow-sm
+                             transition-colors">
             <Edit size={16} /> Редактировать
           </button>
           <button onClick={() => setShowDeleteModal(true)}

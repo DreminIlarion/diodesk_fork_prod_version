@@ -2659,7 +2659,11 @@ function DetailModal({
               <button
                 type="button"
                 onClick={() => onEdit(t)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/75 text-sm font-medium hover:bg-[var(--hover-3)] transition-colors"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-base
+                             bg-emerald-600 hover:bg-emerald-700
+                             text-white font-semibold
+                             shadow-sm
+                             transition-colors"
               >
                 <Pencil className="w-4 h-4" />
                 Редактировать
@@ -3309,7 +3313,11 @@ function DetailModal({
               setShowArchive(true)
             }
             disabled={busy === 'arch'}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-[var(--text-primary)]/40 hover:bg-red-500/10 hover:text-red-400 transition-colors disabled:opacity-40"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-base
+                             bg-red-600 hover:bg-red-700
+                             text-white font-semibold
+                             shadow-sm
+                             transition-colors"
           >
             <Archive className="w-4 h-4" />
             В архив
@@ -3318,7 +3326,11 @@ function DetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 text-sm font-medium hover:bg-[var(--hover-3)] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-base
+                             bg-emerald-600 hover:bg-emerald-700
+                             text-white font-semibold
+                             shadow-sm
+                             transition-colors"
           >
             Закрыть
           </button>

@@ -1094,9 +1094,9 @@ export default function TicketDetailPage() {
                   <button
                     onClick={openEditModal}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl text-base
-                             bg-[var(--hover-2)] hover:bg-[var(--hover-3)]
-                             border border-[var(--border-color)]
-                             text-[var(--text-primary)]/70 hover:text-[var(--text-primary)]
+                             bg-emerald-600 hover:bg-emerald-700
+                             text-white font-semibold
+                             shadow-sm
                              transition-colors"
                   >
                     <Edit className="w-4 h-4" />
