@@ -1769,7 +1769,7 @@ export default function TicketsPage() {
             transition-all whitespace-nowrap cursor-pointer
             ${showFilters || activeFiltersCount > 0
               ? 'bg-[var(--accent)]/10 border-[var(--accent)]/40 text-[var(--text-primary)]'
-              : 'bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm transition-colors'
+              : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70'
             }`}
         >
           <SlidersHorizontal size={18}
