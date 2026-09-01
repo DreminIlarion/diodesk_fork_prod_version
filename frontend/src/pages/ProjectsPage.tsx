@@ -147,7 +147,6 @@ function ProjectsTableHeader() {
     { label: <>Проект<br /><span className="font-normal normal-case tracking-normal">Ключ</span></> },
     { label: 'Описание' },
     { label: 'Статус' },
-    { label: <>Моя роль<br /><span className="font-normal normal-case tracking-normal">/ участники</span></> },
     { label: 'Создан', align: 'text-right' },
     { label: '' },
   ];
@@ -259,25 +258,7 @@ function ProjectRow({
         </span>
       </div>
 
-      {/* Моя роль / участники */}
-      <div className="self-center min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          {roleBadge ? (
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[14px] font-semibold border ${roleBadge.cls}`}>
-              {roleBadge.icon}
-              {roleBadge.label}
-            </span>
-          ) : (
-            <span className="text-[16px] text-[var(--text-primary)]/25">—</span>
-          )}
-
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[14px] font-semibold
-                           bg-[var(--hover-2)] text-[var(--text-primary)]/60 border border-[var(--border-color)]">
-            <Users size={14} />
-            {participantsCount}
-          </span>
-        </div>
-      </div>
+      
 
       {/* Создан */}
       <div className="self-center text-right">
