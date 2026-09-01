@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef,useMemo  } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import React, { memo } from 'react';
 
 import { Link, useSearchParams } from 'react-router-dom';
@@ -1184,9 +1184,8 @@ function KCol({
       onDragOver={(e) => onDO(e, col.status)}
       onDragLeave={onDL}
       onDrop={(e) => onDrop(e, col.status)}
-      className={`bg-[var(--hover-1)] rounded-xl flex flex-col w-[320px] shrink-0 border transition-colors h-full ${
-        isDO ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--border-color)]'
-      }`}
+      className={`bg-[var(--hover-1)] rounded-xl flex flex-col w-[320px] shrink-0 border transition-colors h-full ${isDO ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--border-color)]'
+        }`}
     >
       <div className="px-3 py-3 flex items-center justify-between border-b border-[var(--border-color)] shrink-0 bg-[var(--bg-card)] rounded-t-xl">
         <div className="flex items-center gap-2 min-w-0">
@@ -1544,7 +1543,7 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
     (async () => {
       try {
         const ticket = await ticketsApi.getById(context.ticket_id!);
-        
+
         if (cancelled) return;
 
         // Подставляем проект из заявки
@@ -1594,7 +1593,7 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
     };
   }, [files]);
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || []);
     setFiles((prev) => [...prev, ...selected].slice(0, 10));
     e.target.value = '';
@@ -1992,7 +1991,7 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
       setSaving(false);
     }
   };
-  
+
   const titleText = mode === 'create' ? 'Создание задачи' : 'Редактирование задачи';
   const subtitleText = mode === 'create' ? 'Проверьте заполнение' : `Изменение задачи ${task?.number ?? ''}`;
   const lockTicket = context.type === 'ticket' && mode === 'create';
@@ -2158,11 +2157,11 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
               {/* Проект */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Проект</label>
-                <AsyncDD 
-                  value={projectId} 
-                  onChange={setProjectId} 
-                  loadFn={loadProjects} 
-                  placeholder="Не выбран" 
+                <AsyncDD
+                  value={projectId}
+                  onChange={setProjectId}
+                  loadFn={loadProjects}
+                  placeholder="Не выбран"
                   icon={FolderOpen}
                 />
               </div>
@@ -2586,6 +2585,67 @@ function DetailModal({
             <h2 className="text-xl md:text-2xl font-bold text-[var(--text-primary)] leading-snug tracking-tight">
               {t.title}
             </h2>
+
+            {/* Context: Ticket + Project (вверху и подсвечено) */}
+            {(ticketPath || t.project_id) && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {t.project_id && (
+                  <Link
+                    to={`/projects/${t.project_id}`}
+                    onClick={onClose}
+                    title={t.project_name ?? 'Открыть проект'}
+                    className="
+          group inline-flex items-center gap-2
+          px-3 py-2 rounded-xl
+          bg-amber-500/10 border border-amber-500/25
+          text-amber-400
+          hover:bg-amber-500/15 hover:border-amber-500/40
+          transition-colors
+        "
+                  >
+                    <FolderOpen className="w-4 h-4" />
+                    <div className="leading-tight">
+                      <div className="text-[10px] uppercase tracking-widest text-amber-300/80">
+                        Проект
+                      </div>
+                      <div className="text-sm font-semibold max-w-[420px] truncate">
+                        {t.project_name || 'Открыть проект'}
+                      </div>
+                    </div>
+
+                    <ArrowUpRight className="w-4 h-4 opacity-60 group-hover:opacity-100" />
+                  </Link>
+                )}
+
+                {ticketPath && (
+                  <Link
+                    to={ticketPath}
+                    onClick={onClose}
+                    title={ticketNo ?? 'Открыть заявку'}
+                    className="
+          group inline-flex items-center gap-2
+          px-3 py-2 rounded-xl
+          bg-violet-500/10 border border-violet-500/25
+          text-violet-300
+          hover:bg-violet-500/15 hover:border-violet-500/40
+          transition-colors
+        "
+                  >
+                    <Ticket className="w-4 h-4" />
+                    <div className="leading-tight">
+                      <div className="text-[10px] uppercase tracking-widest text-violet-200/80">
+                        Заявка
+                      </div>
+                      <div className="text-sm font-semibold truncate">
+                        {ticketNo ?? 'Открыть заявку'}
+                      </div>
+                    </div>
+
+                    <ArrowUpRight className="w-4 h-4 opacity-60 group-hover:opacity-100" />
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -2727,59 +2787,7 @@ function DetailModal({
                 </section>
               )}
 
-              {/* Relations */}
-              {(ticketPath ||
-                t.project_id) && (
-                  <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
-                    {ticketPath && (
-                      <div className="flex items-center gap-4 px-5 py-4 border-b border-[var(--border-color)] last:border-b-0">
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs text-[var(--text-primary)]/40 mb-1">
-                            Заявка
-                          </div>
-
-                          <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">
-                            {ticketNo ??
-                              'Открыть заявку'}
-                          </div>
-                        </div>
-
-                        <Link
-                          to={ticketPath}
-                          onClick={onClose}
-                          className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline shrink-0"
-                        >
-                          Открыть
-                          <ArrowUpRight className="w-4 h-4" />
-                        </Link>
-                      </div>
-                    )}
-
-                    {t.project_id && (
-                      <div className="flex items-center gap-4 px-5 py-4">
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs text-[var(--text-primary)]/40 mb-1">
-                            Проект
-                          </div>
-
-                          <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">
-                            {t.project_name ||
-                              'Открыть проект'}
-                          </div>
-                        </div>
-
-                        <Link
-                          to={`/projects/${t.project_id}`}
-                          onClick={onClose}
-                          className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline shrink-0"
-                        >
-                          Открыть
-                          <ArrowUpRight className="w-4 h-4" />
-                        </Link>
-                      </div>
-                    )}
-                  </section>
-                )}
+              
             </div>
 
             {/* RIGHT */}
@@ -3804,13 +3812,13 @@ export default function TasksPage() {
         return next.map((c) =>
           c.status === to
             ? {
-                ...c,
-                tasks: {
-                  ...c.tasks,
-                  items: [updated, ...c.tasks.items.filter((x) => x.id !== id)],
-                  total_items: c.tasks.total_items + 1,
-                },
-              }
+              ...c,
+              tasks: {
+                ...c.tasks,
+                items: [updated, ...c.tasks.items.filter((x) => x.id !== id)],
+                total_items: c.tasks.total_items + 1,
+              },
+            }
             : c,
         );
       });
@@ -3959,24 +3967,24 @@ export default function TasksPage() {
   }, [lastMove, undoingMove, fetchBoard, highlightMovedTask, revealTask, toast]);
 
   const ql = q.trim().toLowerCase();
-const disp = useMemo(() => {
-  if (!ql) return cols;
-  return cols.map((c) => ({
-    ...c,
-    tasks: {
-      ...c.tasks,
-      items: c.tasks.items.filter((t) => {
-        const ticketNo = getTaskTicketNumber(t) ?? '';
-        return (
-          t.title.toLowerCase().includes(ql) ||
-          t.number.toLowerCase().includes(ql) ||
-          String(t.description ?? '').toLowerCase().includes(ql) ||
-          ticketNo.toLowerCase().includes(ql)
-        );
-      }),
-    },
-  }));
-}, [cols, ql]);
+  const disp = useMemo(() => {
+    if (!ql) return cols;
+    return cols.map((c) => ({
+      ...c,
+      tasks: {
+        ...c.tasks,
+        items: c.tasks.items.filter((t) => {
+          const ticketNo = getTaskTicketNumber(t) ?? '';
+          return (
+            t.title.toLowerCase().includes(ql) ||
+            t.number.toLowerCase().includes(ql) ||
+            String(t.description ?? '').toLowerCase().includes(ql) ||
+            ticketNo.toLowerCase().includes(ql)
+          );
+        }),
+      },
+    }));
+  }, [cols, ql]);
 
   const hf = fp.length > 0 || fo;
   const done = cols.find((c) => c.status === 'done')?.tasks.total_items ?? 0;
@@ -4009,10 +4017,10 @@ const disp = useMemo(() => {
     const r = await projectsApi.getAll(p, 20);
     const f = search
       ? r.items.filter(
-          (x) =>
-            x.name.toLowerCase().includes(search.toLowerCase()) ||
-            x.key.toLowerCase().includes(search.toLowerCase()),
-        )
+        (x) =>
+          x.name.toLowerCase().includes(search.toLowerCase()) ||
+          x.key.toLowerCase().includes(search.toLowerCase()),
+      )
       : r.items;
     return {
       items: f.map((x) => ({
@@ -4034,10 +4042,10 @@ const disp = useMemo(() => {
     }
     const f = search
       ? items.filter(
-          (u) =>
-            (u.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
-            u.email.toLowerCase().includes(search.toLowerCase()),
-        )
+        (u) =>
+          (u.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
+          u.email.toLowerCase().includes(search.toLowerCase()),
+      )
       : items;
     return {
       items: f.map((u) => ({
@@ -4051,9 +4059,9 @@ const disp = useMemo(() => {
 
   const dragInfo = drag
     ? (() => {
-        const t = cols.flatMap((c) => c.tasks.items).find((x) => x.id === drag.id);
-        return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null;
-      })()
+      const t = cols.flatMap((c) => c.tasks.items).find((x) => x.id === drag.id);
+      return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null;
+    })()
     : null;
 
   const handleScrollbarPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -4149,11 +4157,10 @@ const disp = useMemo(() => {
           <div className="relative">
             <button
               onClick={() => setSf((v) => !v)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${
-                hf
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${hf
                   ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--accent)]'
                   : 'bg-[var(--hover-2)] border-[var(--border-color)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-3)]'
-              }`}
+                }`}
             >
               <Filter className="w-4 h-4" />
               Фильтры
@@ -4176,11 +4183,10 @@ const disp = useMemo(() => {
                             onClick={() =>
                               setFp((v) => (v.includes(p.value) ? v.filter((x) => x !== p.value) : [...v, p.value]))
                             }
-                            className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-all ${
-                              fp.includes(p.value)
+                            className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-all ${fp.includes(p.value)
                                 ? `${m.bg} ${m.c} ${m.brd}`
                                 : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                            }`}
+                              }`}
                           >
                             <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
                             {p.label}
@@ -4192,14 +4198,12 @@ const disp = useMemo(() => {
                   <div className="border-t border-[var(--border-color)] pt-2">
                     <button
                       onClick={() => setFo((v) => !v)}
-                      className={`w-full flex items-center gap-2 py-1.5 px-2 rounded font-medium text-sm transition-colors ${
-                        fo ? 'text-[var(--accent)] bg-[var(--accent)]/5' : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'
-                      }`}
+                      className={`w-full flex items-center gap-2 py-1.5 px-2 rounded font-medium text-sm transition-colors ${fo ? 'text-[var(--accent)] bg-[var(--accent)]/5' : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'
+                        }`}
                     >
                       <div
-                        className={`w-4 h-4 rounded border flex items-center justify-center ${
-                          fo ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'
-                        }`}
+                        className={`w-4 h-4 rounded border flex items-center justify-center ${fo ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'
+                          }`}
                       >
                         {fo && <Check className="w-3 h-3 text-white" />}
                       </div>
@@ -4250,11 +4254,10 @@ const disp = useMemo(() => {
                 <button
                   key={t.id}
                   onClick={() => setMode(t.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    mode === t.id
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${mode === t.id
                       ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
                       : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'
-                  }`}
+                    }`}
                 >
                   <I className="w-3.5 h-3.5" />
                   {t.label}
@@ -4305,11 +4308,10 @@ const disp = useMemo(() => {
         <div className="flex items-center gap-1 p-1 bg-[var(--hover-1)] rounded-lg border border-[var(--border-color)]">
           <button
             onClick={() => setViewMode('kanban')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'kanban'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'kanban'
                 ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
                 : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
-            }`}
+              }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
             Доска
@@ -4317,11 +4319,10 @@ const disp = useMemo(() => {
 
           <button
             onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'list'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'list'
                 ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
                 : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
-            }`}
+              }`}
           >
             <List className="w-3.5 h-3.5" />
             Список
@@ -4330,11 +4331,10 @@ const disp = useMemo(() => {
           <button
             type="button"
             onClick={() => setViewMode('analytics')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'analytics'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'analytics'
                 ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
                 : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
-            }`}
+              }`}
           >
             <BarChart3 className="w-3.5 h-3.5" />
             Аналитика
@@ -4351,8 +4351,8 @@ const disp = useMemo(() => {
                 {mode === 'project' && !selP
                   ? 'Выберите проект'
                   : mode === 'assignee' && !selA
-                  ? 'Выберите исполнителя'
-                  : 'Выберите заявку'}
+                    ? 'Выберите исполнителя'
+                    : 'Выберите заявку'}
               </p>
               <p className="text-sm mt-1 text-[var(--text-primary)]/25">
                 После выбора здесь появится аналитика
@@ -4381,10 +4381,10 @@ const disp = useMemo(() => {
               {mode === 'project' && !selP
                 ? 'Выберите проект'
                 : mode === 'assignee' && !selA
-                ? 'Выберите исполнителя'
-                : mode === 'ticket' && !selT
-                ? 'Выберите заявку'
-                : 'Нет задач'}
+                  ? 'Выберите исполнителя'
+                  : mode === 'ticket' && !selT
+                    ? 'Выберите заявку'
+                    : 'Нет задач'}
             </p>
           </div>
         ) : (
