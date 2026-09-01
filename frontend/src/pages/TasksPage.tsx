@@ -1125,14 +1125,14 @@ export const TCard = memo(function TCard({
         <div className="flex items-center gap-1.5 shrink-0">
 
           {hasAttachments && (
-    <Paperclip className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+    <Paperclip className="w-4.5 h-4.5 text-[var(--text-primary)]/30" />
   )}
           {t.ticket_id && (
-            <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+            <Ticket className="w-4.5 h-4.5 text-[var(--text-primary)]/30" />
           )}
 
           {t.project_id && (
-            <FolderOpen className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+            <FolderOpen className="w-4.5 h-4.5 text-[var(--text-primary)]/30" />
           )}
 
           {t.due_date && (
