@@ -341,22 +341,20 @@ function FilterDropdown({
 
 /* ═══ STAT CARD ═══ */
 
-function StatCard({ label, value, icon: Icon, color, bg, onClick, active }: {
+function StatCard({ label, value, icon: Icon, color, bg, onClick }: {
   label: string; 
   value: number; 
   icon: ElementType; 
   color: string; 
   bg: string;
   onClick?: () => void;
-  active?: boolean;
 }) {
   return (
     <div 
       onClick={onClick}
-      className={`rounded-xl border p-4 flex items-center gap-3
+      className={`rounded-xl border border-[var(--border-color)] p-4 flex items-center gap-3
         hover:border-[var(--border-hover)] hover:-translate-y-0.5 transition-all duration-200
-        ${onClick ? 'cursor-pointer' : ''}
-        ${active ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/20 bg-[var(--accent)]/5' : 'border-[var(--border-color)]'}`}
+        ${onClick ? 'cursor-pointer' : ''}`}
     >
       <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
         <Icon className={`w-5 h-5 ${color}`} />
@@ -1751,25 +1749,18 @@ const handlePageChange = (pageNum: number) => {
     sublabel: p.key,
   }));
 
-  const handleStatClick = (type: 'all' | 'new' | 'in_progress' | 'critical') => {
+const handleStatClick = (type: 'new' | 'in_progress' | 'critical') => {
   setPage(1);
   
-  switch (type) {
-    case 'all':
-      resetFilters();
-      break;
-    case 'new':
-      setStatusFilter(['new']);
-      setPriorityFilter('');
-      break;
-    case 'in_progress':
-      setStatusFilter(['in_progress', 'open']);
-      setPriorityFilter('');
-      break;
-    case 'critical':
-      setPriorityFilter('critical');
-      setStatusFilter([]);
-      break;
+  if (type === 'new') {
+    setStatusFilter(['new']);
+    setPriorityFilter('');
+  } else if (type === 'in_progress') {
+    setStatusFilter(['in_progress', 'open']);
+    setPriorityFilter('');
+  } else if (type === 'critical') {
+    setPriorityFilter('critical');
+    setStatusFilter([]);
   }
 };
 
@@ -1823,17 +1814,14 @@ const handlePageChange = (pageNum: number) => {
     icon={Ticket} 
     color="text-[var(--text-secondary)]" 
     bg="bg-[var(--hover-1)]"
-    onClick={() => handleStatClick('all')}
-    active={!hasActiveFilters}
   />
-  <StatCard 
+ <StatCard 
     label="Новых" 
     value={tickets.filter(t => t.status === 'new').length}
     icon={Clock} 
     color="text-[var(--status-new-text)]" 
     bg="bg-[var(--status-new-bg)]"
     onClick={() => handleStatClick('new')}
-    active={statusFilter.includes('new') && statusFilter.length === 1 && !priorityFilter}
   />
   <StatCard 
     label="В работе" 
@@ -1842,7 +1830,6 @@ const handlePageChange = (pageNum: number) => {
     color="text-[var(--status-progress-text)]" 
     bg="bg-[var(--status-progress-bg)]"
     onClick={() => handleStatClick('in_progress')}
-    active={statusFilter.includes('in_progress') && statusFilter.includes('open') && statusFilter.length === 2 && !priorityFilter}
   />
   <StatCard 
     label="Критических" 
@@ -1851,7 +1838,6 @@ const handlePageChange = (pageNum: number) => {
     color="text-[var(--priority-critical-text)]" 
     bg="bg-[var(--priority-critical-bg)]"
     onClick={() => handleStatClick('critical')}
-    active={priorityFilter === 'critical' && statusFilter.length === 0}
   />
 </div>
 
