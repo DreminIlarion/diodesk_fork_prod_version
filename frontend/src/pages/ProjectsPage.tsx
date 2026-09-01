@@ -144,7 +144,7 @@ function FilterTag({ label, icon, colorClass, onRemove }: {
 
 function ProjectsTableHeader() {
   const cols: { label: ReactNode; align?: string }[] = [
-    { label: <>Проект<br /><span className="font-normal normal-case tracking-normal">Ключ</span></> },
+    { label: <>Проект<br />/ Ключ</> },
     { label: 'Описание' },
     { label: 'Статус' },
     { label: 'Создан', align: 'text-right' },
@@ -153,7 +153,7 @@ function ProjectsTableHeader() {
 
   return (
     <div
-      className="hidden lg:grid px-5 py-3 text-[12px] uppercase tracking-widest
+      className="hidden lg:grid px-5 py-3 text-[13px] uppercase tracking-widest
                  font-semibold text-[var(--text-primary)]/25 border-b border-[var(--border-color)]"
       style={{ gridTemplateColumns: 'minmax(0,2.2fr) minmax(0,2fr) 160px 220px 160px 44px' }}
     >
