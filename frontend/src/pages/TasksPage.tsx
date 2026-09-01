@@ -2228,7 +2228,7 @@ const getTicketRequester = (t: any) => {
 
      {baseTicket ? (
   <>
-    <p className="text-xs text-blue-400 truncate mt-0.5">
+    <p className="text-xs text-blue-400  mt-0.5">
       {baseTicket.number} — {baseTicket.title}
     </p>
 
