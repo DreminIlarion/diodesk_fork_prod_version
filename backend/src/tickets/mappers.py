@@ -66,6 +66,8 @@ def map_ticket_to_view_response(
         if project else None
     )
 
+    
+
     return TicketViewResponse(
         id=ticket.id,
         created_at=ticket.created_at,
@@ -84,6 +86,7 @@ def map_ticket_to_view_response(
         type=ticket.type,
         status=ticket.status,
         priority=ticket.priority,
+        has_attachments=ticket.has_attachments,
     )
 
 

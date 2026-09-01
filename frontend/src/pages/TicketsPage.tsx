@@ -8,7 +8,7 @@ import {
   Building2, User, X, SlidersHorizontal, ChevronDown, Check,
   Sparkles, Flame, MessageSquare, HelpCircle, Edit3, FolderOpen,
   UserCheck, Ticket, MoreVertical,
-  Settings, RefreshCw, Archive,
+  Settings, RefreshCw, Archive, Paperclip, 
 } from 'lucide-react';
 import { ticketsApi, counterpartiesApi, projectsApi, usersApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
@@ -1319,6 +1319,11 @@ function TicketRow({ ticket, showAssignee, showReporter, onTicketUpdated }: {
         <span className="text-[15px] font-mono text-[var(--text-primary)]/65 mt-0.5 block">
           {ticket.number}
         </span>
+        {ticket.has_attachments && (
+  <span className="inline-flex items-center gap-1 text-[13px] text-[var(--text-primary)]/40 mt-1">
+    <Paperclip size={12} /> Вложение
+  </span>
+)}
       </div>
 
       <div className="min-w-0 pr-2 self-center">
@@ -2026,6 +2031,9 @@ export default function TicketsPage() {
                                        border border-[var(--accent)]/10 whitespace-nowrap">
                         {ticket.number}
                       </span>
+                      {ticket.has_attachments && (
+  <Paperclip size={14} className="text-[var(--text-primary)]/40" />
+)}
                       {!closed ? (
                         <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium">
                           <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
