@@ -1577,22 +1577,7 @@ export default function TicketsPage() {
     }
   }, [loading, initialLoad, page]);
 
-  // 5. В loadTickets — не сбрасывать page
-  const loadTickets = useCallback(async (targetPage?: number) => {
-    setLoading(true);
-    const p = targetPage ?? page;
-    try {
-      const response = await ticketsApi.getAll(p, 9, buildFilters());
-      setTickets(response.items);
-      setTotalPages(response.total_pages);
-      setTotalItems(response.total_items);
-    } catch (e) {
-      console.error('loadTickets error:', e);
-    } finally {
-      setLoading(false);
-      setInitialLoad(false);
-    }
-  }, [buildFilters, page]);
+  
 
   /* ── Debounce поиска ── */
   useEffect(() => {
@@ -1670,7 +1655,22 @@ export default function TicketsPage() {
     showCounterpartyFilter, showAssigneeFilter, showReporterFilter,
   ]);
 
-  
+  // 5. В loadTickets — не сбрасывать page
+  const loadTickets = useCallback(async (targetPage?: number) => {
+    setLoading(true);
+    const p = targetPage ?? page;
+    try {
+      const response = await ticketsApi.getAll(p, 9, buildFilters());
+      setTickets(response.items);
+      setTotalPages(response.total_pages);
+      setTotalItems(response.total_items);
+    } catch (e) {
+      console.error('loadTickets error:', e);
+    } finally {
+      setLoading(false);
+      setInitialLoad(false);
+    }
+  }, [buildFilters, page]);
 
   useEffect(() => {
     loadTickets();
