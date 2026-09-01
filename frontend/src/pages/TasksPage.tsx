@@ -1594,8 +1594,405 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
     };
   }, [files]);
 
-  // ... остальной код (handleFileSelect, handleDragOver, handleDrop, removeFile, isAttachmentUsedInDescription, requestDeleteAttachment, deleteExistingAttachment, loadProjects, loadUsers, loadTickets, uploadInlineImages, submit) без изменений ...
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files || []);
+    setFiles((prev) => [...prev, ...selected].slice(0, 10));
+    e.target.value = '';
+  };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const droppedFiles = Array.from(e.dataTransfer.files || []);
+    setFiles((prev) => [...prev, ...droppedFiles].slice(0, 10));
+  };
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const isAttachmentUsedInDescription = useCallback(
+    (attachmentId: string) =>
+      descriptionBlocks.some(
+        (block) =>
+          block.type === 'image' &&
+          block.attachmentId === attachmentId,
+      ),
+    [descriptionBlocks],
+  );
+
+  const requestDeleteAttachment = (
+    attachment: TaskAttachment,
+  ) => {
+    if (!attachment.id) return;
+
+    if (
+      isAttachmentUsedInDescription(
+        attachment.id,
+      )
+    ) {
+      toast({
+        title: 'Файл используется в описании',
+        description:
+          'Сначала удалите изображение из описания задачи и сохраните изменения.',
+        variant: 'destructive',
+      });
+
+      return;
+    }
+
+    setDeleteAttachmentIntent(
+      attachment,
+    );
+  };
+
+  const deleteExistingAttachment = async () => {
+    const attachment = deleteAttachmentIntent;
+
+    if (!attachment?.id) return;
+
+    setDeletingAttachmentId(attachment.id);
+
+    try {
+      await attachmentsApi.deleteAttachment(
+        attachment.id,
+      );
+
+      setExistingAttachments((prev) =>
+        prev.filter(
+          (item) =>
+            item.id !== attachment.id,
+        ),
+      );
+
+      setDeleteAttachmentIntent(null);
+
+      toast({
+        title: 'Файл откреплён',
+        description:
+          getAttachmentName(attachment),
+      });
+    } catch (e: any) {
+      toast({
+        title: 'Не удалось открепить файл',
+        description: apiErr(e),
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingAttachmentId(null);
+    }
+  };
+
+  const loadProjects = useCallback(async (q: string, p: number) => {
+    const r = await projectsApi.getAll(p, 20);
+    const f = q
+      ? r.items.filter((x) => x.name.toLowerCase().includes(q.toLowerCase()) || x.key.toLowerCase().includes(q.toLowerCase()))
+      : r.items;
+    return {
+      items: f.map((x) => ({ value: x.id, label: x.name, sublabel: x.key, icon: <FolderOpen className="w-4 h-4 text-amber-400" /> })),
+      hasNext: r.items.length === 20,
+    };
+  }, []);
+
+  const loadUsers = useCallback(async (q: string, p: number) => {
+    let items: any[] = [];
+    try { items = (await usersApi.getAllUsers(p, 20)).items; } catch { items = []; }
+    const f = q
+      ? items.filter((u) => (u.full_name || '').toLowerCase().includes(q.toLowerCase()) || u.email.toLowerCase().includes(q.toLowerCase()))
+      : items;
+    return {
+      items: f.map((u) => ({ value: u.id, label: u.full_name || u.username || u.email, sublabel: u.email })),
+      hasNext: items.length === 20,
+    };
+  }, []);
+
+  const loadTickets = useCallback(async (q: string, p: number) => {
+    const r = await ticketsApi.getAll(p, 20, {
+      project_ids: projectId ? [projectId] : undefined,
+      query: q || undefined,
+    });
+    return {
+      items: r.items.map((t: any) => ({
+        value: t.id,
+        label: `${t.number} — ${t.title}`,
+        icon: <Ticket className="w-4 h-4 text-[var(--text-primary)]/40" />,
+      })),
+      hasNext: r.items.length === 20,
+    };
+  }, [projectId]);
+
+  const uploadInlineImages = async (
+    blocks: DescriptionBlock[],
+    taskId: string,
+  ): Promise<DescriptionBlock[]> => {
+    const result: DescriptionBlock[] = [];
+
+    for (const block of blocks) {
+      if (
+        block.type === 'image' &&
+        block.localFile &&
+        !block.attachmentId
+      ) {
+        const uploaded =
+          await attachmentsApi.uploadAttachment(
+            block.localFile,
+            'task',
+            taskId,
+          );
+
+        result.push({
+          ...block,
+          attachmentId: uploaded.id,
+          localFile: undefined,
+        });
+
+        continue;
+      }
+
+      result.push(block);
+    }
+
+    return result;
+  };
+
+  const submit = async () => {
+    if (!title.trim()) return;
+
+    setSaving(true);
+
+    try {
+      let taskId = task?.id;
+
+      if (mode === 'create') {
+        /*
+         * Сначала создаём задачу.
+         *
+         * Inline-картинки ещё нельзя загрузить,
+         * поскольку attachment требует taskId.
+         */
+        const initialDescription = serializeBlocks(
+          descriptionBlocks.filter(
+            (b) =>
+              b.type !== 'image' ||
+              !!b.attachmentId,
+          ),
+        );
+
+        const payload: Record<string, any> = {
+          title: title.trim(),
+          priority: pri,
+        };
+
+        if (initialDescription.trim()) {
+          payload.description = initialDescription;
+        }
+
+        if (projectId) payload.project_id = projectId;
+        if (ticketId) payload.ticket_id = ticketId;
+        if (sp) payload.story_points = Number(sp);
+
+        if (estimatedHours) {
+          payload.estimated_hours = Number(estimatedHours);
+        }
+
+        if (assigneeId) payload.assignee_id = assigneeId;
+        if (dueDate) payload.due_date = dueDate;
+
+        const created = await tasksApi.create(
+          payload as TaskCreateInput,
+        );
+
+        taskId = created.id;
+
+        /*
+         * Теперь taskId существует:
+         * загружаем картинки, вставленные непосредственно
+         * в описание.
+         */
+        const preparedBlocks = await uploadInlineImages(
+          descriptionBlocks,
+          created.id,
+        );
+
+        const finalDescription =
+          serializeBlocks(preparedBlocks);
+
+        if (
+          finalDescription !== initialDescription
+        ) {
+          await tasksApi.update(created.id, {
+            description: finalDescription || null,
+          } as TaskUpdateInput);
+        }
+
+        /*
+         * Обычные вложения.
+         */
+        for (const file of files) {
+          try {
+            await attachmentsApi.uploadAttachment(
+              file,
+              'task',
+              created.id,
+            );
+          } catch (err) {
+            console.error(
+              'File upload failed:',
+              file.name,
+              err,
+            );
+          }
+        }
+
+        if (todo) {
+          await tasksApi.changeStatus(created.id, 'todo');
+        }
+
+        toast({
+          title: 'Задача создана',
+          description: `${created.number} — ${created.title}`,
+        });
+      } else if (task) {
+        /*
+         * При редактировании ID уже известен,
+         * поэтому картинки можно загрузить до update.
+         */
+        const preparedBlocks = await uploadInlineImages(
+          descriptionBlocks,
+          task.id,
+        );
+
+        const finalDescription =
+          serializeBlocks(preparedBlocks);
+
+        const payload: Record<string, any> = {};
+
+        if (title.trim() !== task.title) {
+          payload.title = title.trim();
+        }
+
+        if (
+          finalDescription.trim() !==
+          (task.description?.trim() ?? '')
+        ) {
+          payload.description =
+            finalDescription.trim() || null;
+        }
+
+        if (pri !== task.priority) {
+          payload.priority = pri;
+        }
+
+        const currentSP =
+          task.story_points != null
+            ? String(task.story_points)
+            : '';
+
+        if (sp !== currentSP) {
+          payload.story_points = sp
+            ? Number(sp)
+            : null;
+        }
+
+        const currentEst =
+          task.estimated_hours != null
+            ? String(
+              toNumberOrNull(
+                task.estimated_hours,
+              ) ?? '',
+            )
+            : '';
+
+        if (estimatedHours !== currentEst) {
+          payload.estimated_hours =
+            estimatedHours
+              ? Number(estimatedHours)
+              : null;
+        }
+
+        if (dueDate !== (task.due_date ?? '')) {
+          payload.due_date = dueDate || null;
+        }
+
+        if (
+          assigneeId !==
+          (task.assignee_id ?? '')
+        ) {
+          payload.assignee_id =
+            assigneeId || null;
+        }
+
+        if (
+          projectId !==
+          (task.project_id ?? '')
+        ) {
+          payload.project_id =
+            projectId || null;
+        }
+
+        if (
+          ticketId !==
+          (task.ticket_id ?? '')
+        ) {
+          payload.ticket_id =
+            ticketId || null;
+        }
+
+        if (Object.keys(payload).length > 0) {
+          await tasksApi.update(
+            task.id,
+            payload as TaskUpdateInput,
+          );
+        }
+
+        /*
+         * Новые обычные вложения.
+         */
+        for (const file of files) {
+          try {
+            await attachmentsApi.uploadAttachment(
+              file,
+              'task',
+              task.id,
+            );
+          } catch (err) {
+            console.error(
+              'File upload failed:',
+              file.name,
+              err,
+            );
+          }
+        }
+
+        toast({
+          title: 'Задача обновлена',
+          description: `${task.number} — ${title.trim()}`,
+        });
+      }
+
+      await onSaved();
+      onClose();
+    } catch (e: any) {
+      toast({
+        title: 'Ошибка',
+        description: apiErr(e),
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+  
   const titleText = mode === 'create' ? 'Создание задачи' : 'Редактирование задачи';
   const subtitleText = mode === 'create' ? 'Проверьте заполнение' : `Изменение задачи ${task?.number ?? ''}`;
   const lockTicket = context.type === 'ticket' && mode === 'create';
