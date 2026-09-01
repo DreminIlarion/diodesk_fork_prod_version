@@ -1,7 +1,7 @@
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.media.infra.repo import AttachmentMapper
@@ -90,6 +90,7 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
             status=model.status,
             priority=model.priority,
             assignee_id=model.assignee_id,
+            reviewer_id=model.reviewer_id,
             due_date=model.due_date,
             story_points=None if model.story_points is None else Decimal(model.story_points),
             estimated_hours=None if model.estimated_hours is None else Decimal(model.estimated_hours),
@@ -151,6 +152,7 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
             ticket_id: UUID | None = None,
             assignee_id: UUID | None = None,
             created_by: UUID | None = None,  # ← добавить
+            reviewer_id: UUID | None = None,
             # Дополнительные фильтры
             priorities: list[Priority] | None = None,
             overdue_only: bool = False,
@@ -166,15 +168,25 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
         if ticket_id is not None:
             conditions.append(self.model.ticket_id == ticket_id)
 
-        if assignee_id is not None and created_by is not None:
-            # Мои задачи: создатель ИЛИ исполнитель
-            conditions.append(
-                (self.model.assignee_id == assignee_id) | (self.model.created_by == created_by)
+        user_conditions = []
+
+        if assignee_id is not None:
+            user_conditions.append(
+                self.model.assignee_id == assignee_id
             )
-        elif assignee_id is not None:
-            conditions.append(self.model.assignee_id == assignee_id)
-        elif created_by is not None:
-            conditions.append(self.model.created_by == created_by)   
+
+        if created_by is not None:
+            user_conditions.append(
+                self.model.created_by == created_by
+            )
+
+        if reviewer_id is not None:
+            user_conditions.append(
+                self.model.reviewer_id == reviewer_id
+            )
+
+        if user_conditions:
+            conditions.append(or_(*user_conditions))  
 
         if priorities is not None:
             conditions.append(self.model.priority.in_(priorities))

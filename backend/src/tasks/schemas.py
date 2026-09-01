@@ -136,6 +136,10 @@ class TaskViewResponse(BaseModel):
     working_since: datetime | None = Field(None, description="Время начала текущей рабочей сессии")
 
     assignee_id: UUID | None = Field(None, description="Исполнитель задачи")
+    reviewer_id: UUID | None = Field(
+        None,
+        description="Проверяющий задачу",
+    )
     status: TaskStatus = Field(..., description="Текущий cтатус задачи")
     due_date: date | None = Field(None, description="Срок выполнения (deadline)")
 
