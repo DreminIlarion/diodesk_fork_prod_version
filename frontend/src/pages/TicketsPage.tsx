@@ -8,7 +8,7 @@ import {
   Building2, User, X, SlidersHorizontal, ChevronDown, Check,
   Sparkles, Flame, MessageSquare, HelpCircle, Edit3, FolderOpen,
   UserCheck, Ticket, MoreVertical,
-  Settings, RefreshCw, Archive, Paperclip, 
+  Settings, RefreshCw, Archive, Paperclip,
 } from 'lucide-react';
 import { ticketsApi, counterpartiesApi, projectsApi, usersApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
@@ -1292,11 +1292,13 @@ function TicketActions({
 
 /* ═══ TICKET ROW ═══ */
 
-function TicketRow({ ticket, showAssignee, showReporter, onTicketUpdated }: {
+function TicketRow({ ticket, showAssignee, showReporter, onTicketUpdated, onNavigate, highlighted }: {
   ticket: TicketListItem;
   showAssignee: boolean;
   showReporter: boolean;
   onTicketUpdated?: () => void;
+  onNavigate?: (ticketId: string) => void;
+  highlighted?: boolean;
 }) {
   const statusLabel = STATUS_MAP[ticket.status]?.label || ticket.status;
   const statusColor = STATUS_MAP[ticket.status]?.color || 'status-closed';
@@ -1306,9 +1308,11 @@ function TicketRow({ ticket, showAssignee, showReporter, onTicketUpdated }: {
   return (
     <Link
       to={`/tickets/${ticket.number}`}
-      className="grid items-start px-4 py-3.5 rounded-xl
+      onClick={() => onNavigate?.(ticket.id)}
+      className={`grid items-start px-4 py-3.5 rounded-xl
                  hover:bg-[var(--hover-1)] active:bg-[var(--hover-2)]
-                 transition-colors duration-100 group"
+                 transition-colors duration-100 group
+                 ${highlighted ? 'ring-2 ring-[var(--accent)]/40 bg-[var(--accent)]/5' : ''}`}
       style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) 160px 120px 110px 50px' }}
     >
       <div className="min-w-0 pr-3">
@@ -1320,10 +1324,10 @@ function TicketRow({ ticket, showAssignee, showReporter, onTicketUpdated }: {
           {ticket.number}
         </span>
         {ticket.has_attachments && (
-  <span className="inline-flex items-center gap-1 text-[13px] text-[var(--text-primary)]/40 mt-1">
-    <Paperclip size={18} /> Вложение
-  </span>
-)}
+          <span className="inline-flex items-center gap-1 text-[13px] text-[var(--text-primary)]/40 mt-1">
+            <Paperclip size={18} /> Вложение
+          </span>
+        )}
       </div>
 
       <div className="min-w-0 pr-2 self-center">
@@ -1493,7 +1497,6 @@ export default function TicketsPage() {
   const [tickets, setTickets] = useState<TicketListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
@@ -1519,6 +1522,78 @@ export default function TicketsPage() {
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
+
+  // 1. Читать page из URL
+  const initialPage = parseInt(searchParams.get('page') || '1', 10) || 1;
+  const [page, setPage] = useState(initialPage);
+
+  // 2. Синхронизация page с URL
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    if (page > 1) {
+      params.set('page', String(page));
+    } else {
+      params.delete('page');
+    }
+    const qs = params.toString();
+    const target = qs ? `/tickets?${qs}` : '/tickets';
+    if (window.location.pathname + window.location.search !== target) {
+      navigate(target, { replace: true });
+    }
+  }, [page, searchParams, navigate]);
+
+  // 3. Сохранение состояния
+  const saveScrollState = useCallback((ticketId?: string) => {
+    sessionStorage.setItem('tickets-scroll', String(window.scrollY));
+    sessionStorage.setItem('tickets-page', String(page));
+    if (ticketId) sessionStorage.setItem('tickets-highlight', ticketId);
+  }, [page]);
+
+  // 4. Восстановление
+  const [highlightTicketId, setHighlightTicketId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (loading || initialLoad) return;
+
+    const savedScroll = sessionStorage.getItem('tickets-scroll');
+    const savedPage = sessionStorage.getItem('tickets-page');
+    const savedHighlight = sessionStorage.getItem('tickets-highlight');
+
+    if (savedScroll && savedPage && parseInt(savedPage, 10) === page) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, parseInt(savedScroll, 10));
+
+          if (savedHighlight) {
+            setHighlightTicketId(savedHighlight);
+            setTimeout(() => setHighlightTicketId(null), 2000);
+          }
+
+          sessionStorage.removeItem('tickets-scroll');
+          sessionStorage.removeItem('tickets-page');
+          sessionStorage.removeItem('tickets-highlight');
+        });
+      });
+    }
+  }, [loading, initialLoad, page]);
+
+  // 5. В loadTickets — не сбрасывать page
+  const loadTickets = useCallback(async (targetPage?: number) => {
+    setLoading(true);
+    const p = targetPage ?? page;
+    try {
+      const response = await ticketsApi.getAll(p, 9, buildFilters());
+      setTickets(response.items);
+      setTotalPages(response.total_pages);
+      setTotalItems(response.total_items);
+    } catch (e) {
+      console.error('loadTickets error:', e);
+    } finally {
+      setLoading(false);
+      setInitialLoad(false);
+    }
+  }, [buildFilters, page]);
+
   /* ── Debounce поиска ── */
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 500);
@@ -1537,18 +1612,18 @@ export default function TicketsPage() {
 
 
   useEffect(() => {
-  const spSearch = searchParams.get('search') || '';
-  const spStatus = getMultiParam('status');
-  const spPriority = searchParams.get('priority') || '';
+    const spSearch = searchParams.get('search') || '';
+    const spStatus = getMultiParam('status');
+    const spPriority = searchParams.get('priority') || '';
 
-  setSearch(spSearch);
-  setDebouncedSearch(spSearch);
+    setSearch(spSearch);
+    setDebouncedSearch(spSearch);
 
-  setStatusFilter(spStatus);
-  setPriorityFilter(spPriority);
+    setStatusFilter(spStatus);
+    setPriorityFilter(spPriority);
 
-  setPage(1);
-}, [searchParams, getMultiParam]);
+    setPage(1);
+  }, [searchParams, getMultiParam]);
 
   /* ── Загрузка справочников при открытии фильтров ── */
   useEffect(() => {
@@ -1595,22 +1670,7 @@ export default function TicketsPage() {
     showCounterpartyFilter, showAssigneeFilter, showReporterFilter,
   ]);
 
-  /* ── Загрузка тикетов ── */
-  const loadTickets = useCallback(async () => {
-    setLoading(true);
-    setPage(1);
-    try {
-      const response = await ticketsApi.getAll(1, 9, buildFilters());
-      setTickets(response.items);
-      setTotalPages(response.total_pages);
-      setTotalItems(response.total_items);
-    } catch (e) {
-      console.error('loadTickets error:', e);
-    } finally {
-      setLoading(false);
-      setInitialLoad(false);
-    }
-  }, [buildFilters]);
+  
 
   useEffect(() => {
     loadTickets();
@@ -2006,6 +2066,8 @@ export default function TicketsPage() {
                   showAssignee={showAssigneeCol}
                   showReporter={showReporterCol}
                   onTicketUpdated={loadTickets}
+                  onNavigate={(id) => saveScrollState(id)}
+                  highlighted={highlightTicketId === ticket.id}
                 />
               ))}
             </div>
@@ -2021,6 +2083,7 @@ export default function TicketsPage() {
 
               return (
                 <Link key={ticket.id} to={`/tickets/${ticket.number}`}
+                onClick={() => saveScrollState(ticket.id)} 
                   className="glass-card rounded-xl border border-[var(--border-color)] p-4 block
                              hover:bg-[var(--hover-1)] hover:border-[var(--border-hover)]
                              transition-all group">
@@ -2032,8 +2095,8 @@ export default function TicketsPage() {
                         {ticket.number}
                       </span>
                       {ticket.has_attachments && (
-  <Paperclip size={14} className="text-[var(--text-primary)]/40" />
-)}
+                        <Paperclip size={14} className="text-[var(--text-primary)]/40" />
+                      )}
                       {!closed ? (
                         <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium">
                           <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
