@@ -6,7 +6,7 @@ import {
   Loader2, Download, Image, File, ChevronDown, ChevronUp,
   Calendar, UserPlus, UserCheck, CheckCircle2, X, Plus,
   Search, Settings, AlertCircle, RefreshCw, Tag, Edit,
-  Paperclip as PaperclipIcon, MessageCircle, Building2, Phone, Mail, ChevronRight,
+  Paperclip as PaperclipIcon, MessageCircle, Building2, Phone, Mail, ChevronRight,FolderOpen, 
   Archive, Star, Check,
 } from 'lucide-react';
 import { ticketsApi, usersApi, counterpartiesApi, feedbacksApi } from '../api/client';
