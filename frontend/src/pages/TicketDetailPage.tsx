@@ -983,36 +983,73 @@ export default function TicketDetailPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Header */}
-      <div className="flex items-start gap-5">
-        <button onClick={() => navigate(-1)} className="p-3 rounded-xl hover:bg-[var(--hover-1)] text-[var(--text-primary)]/60 hover:text-[var(--text-primary)] transition-all mt-1">
-          <ArrowLeft className="w-6 h-6" />
-        </button>
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0">
-          <Tic className="w-10 h-10 text-[var(--text-primary)]" />
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
-            <h1 className="text-2xl text-[var(--text-primary)] font-semibold">Заявка</h1>
-            <span className="text-[var(--text-primary)]/50 font-mono text-base">#{ticket.number}</span>
-            {ticket.is_archived && (
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-base font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                <Archive className="w-4 h-4" /> Архив
-              </span>
-            )}
-            {!ticket.is_archived && canEdit && (user?.user_id === ticket.created_by || user?.user_id === ticket.reporter_id || isStaff) && (
-              <button onClick={openEditModal}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-base bg-[var(--hover-2)] hover:bg-[var(--hover-3)] border border-[var(--border-color)] text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] transition-colors">
-                <Edit className="w-4 h-4" /> Редактировать
-              </button>
-            )}
-          </div>
-          <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-4">{ticket.title}</h1>
-          <div className="flex flex-wrap items-center gap-6 text-base text-[var(--text-primary)]/40">
-            <div className="flex items-center gap-2"><Calendar className="w-5 h-5" />Создана: {formatDate(ticket.created_at)}</div>
-            {ticket.closed_at && <div className="flex items-center gap-2"><Clock className="w-5 h-5" />Закрыта: {formatDate(ticket.closed_at)}</div>}
-          </div>
-        </div>
+<div className="flex items-start justify-between gap-4">
+  <div className="flex items-start gap-4 min-w-0">
+    <button
+      onClick={() => navigate(-1)}
+      className="p-3 rounded-xl hover:bg-[var(--hover-1)] text-[var(--text-primary)]/60 hover:text-[var(--text-primary)] transition-all mt-1 shrink-0"
+    >
+      <ArrowLeft className="w-6 h-6" />
+    </button>
+
+    <div className="min-w-0">
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
+        <h1 className="text-2xl text-[var(--text-primary)] font-semibold">
+          Заявка
+        </h1>
+
+        <span className="text-[var(--text-primary)]/50 font-mono text-base">
+          #{ticket.number}
+        </span>
+
+        {ticket.is_archived && (
+          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-base font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
+            <Archive className="w-4 h-4" /> Архив
+          </span>
+        )}
       </div>
+
+      <h2 className="text-3xl font-bold text-[var(--text-primary)] mb-3 break-words">
+        {ticket.title}
+      </h2>
+
+      <div className="flex flex-wrap items-center gap-6 text-base text-[var(--text-primary)]/40">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-5 h-5" />
+          Создана: {formatDate(ticket.created_at)}
+        </div>
+
+        {ticket.closed_at && (
+          <div className="flex items-center gap-2">
+            <Clock className="w-5 h-5" />
+            Закрыта: {formatDate(ticket.closed_at)}
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+
+  {/* actions справа */}
+  <div className="flex items-center gap-2 shrink-0">
+    {!ticket.is_archived &&
+      canEdit &&
+      (user?.user_id === ticket.created_by ||
+        user?.user_id === ticket.reporter_id ||
+        isStaff) && (
+        <button
+          onClick={openEditModal}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-base
+                     bg-[var(--hover-2)] hover:bg-[var(--hover-3)]
+                     border border-[var(--border-color)]
+                     text-[var(--text-primary)]/70 hover:text-[var(--text-primary)]
+                     transition-colors"
+        >
+          <Edit className="w-4 h-4" />
+          Редактировать
+        </button>
+      )}
+  </div>
+</div>
 
       {/* ── Feedback Banner ── */}
       {feedbackBannerState === 'show' && !existingFeedback && (
@@ -1525,7 +1562,16 @@ export default function TicketDetailPage() {
         </div>
 
         {/* Правая колонка */}
-        <div className="space-y-6 animate-in fade-in duration-500">
+        <aside
+  className="
+    space-y-6 animate-in fade-in duration-500
+    lg:sticky lg:top-6 lg:self-start
+    lg:max-h-[calc(100vh-24px)]
+    overflow-y-auto overscroll-contain
+    pr-1
+    scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent
+  "
+>
           <div className="bg-[var(--hover-1)] backdrop-blur-sm rounded-xl border border-[var(--border-color)] p-6">
             <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-5 flex items-center gap-3">
               <UserCheck className="w-5 h-5 text-[var(--info)]" /> Исполнитель
@@ -1574,8 +1620,27 @@ export default function TicketDetailPage() {
               {[
                 { label: 'Номер', value: <span className="font-mono">{ticket.number || '—'}</span> },
                 { label: 'Тип', value: <span className={`px-3 py-1 rounded-lg text-base font-medium border ${getTypeColor(ticket.type)}`}>{ticket.type}</span> },
+                
                 { label: 'Статус', value: <span className={`px-3 py-1 rounded-lg text-base font-medium border ${getStatusColor(ticket.status || '')}`}>{STATUS_LABELS[ticket.status || ''] || ticket.status}</span> },
                 { label: 'Приоритет', value: <span className={`px-3 py-1 rounded-lg text-base font-medium border ${getPriorityColor(ticket.priority)}`}>{PRIORITY_LABELS[ticket.priority] || ticket.priority}</span> },
+                    ...(ticket.project?.id || (ticket as any).project_id
+      ? [{
+          label: 'Проект',
+          value: (
+            <Link
+              to={`/projects/${ticket.project?.id ?? (ticket as any).project_id}`}
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-lg text-base font-medium
+                         bg-[var(--hover-2)] border border-[var(--border-color)]
+                         text-[var(--text-primary)]/80 hover:text-[var(--accent)] transition-colors"
+            >
+              <FolderOpen className="w-4 h-4" />
+              <span className="font-mono">
+                {ticket.project?.key || ticket.project?.name || 'Открыть'}
+              </span>
+            </Link>
+          ),
+        }]
+      : []),
               ].map(r => (
                 <div key={r.label} className="flex justify-between items-center py-2 border-b border-[var(--border-color)]">
                   <span className="text-[var(--text-primary)]/50 text-base">{r.label}</span>
@@ -1690,7 +1755,7 @@ export default function TicketDetailPage() {
               return <p className="text-[var(--text-primary)]/40 text-base">Автор не указан</p>;
             })()}
           </div>
-        </div>
+        </aside>
       </div>
 
       {/* Превью файла */}

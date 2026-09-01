@@ -1451,9 +1451,22 @@ function EmptyState({ hasFilters, hasSearch, onCreateClick }: {
 /* ═══ ОСНОВНОЙ КОМПОНЕНТ ═══ */
 
 export default function TicketsPage() {
+
+
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [searchParams] = useSearchParams();
+  const getMultiParam = useCallback(
+    (key: string) => {
+      const all = searchParams.getAll(key).map((x) => x.trim()).filter(Boolean);
+      if (all.length > 0) return all;
+
+      // на случай если кто-то передаст CSV: status=open,in_progress
+      const csv = searchParams.get(key);
+      return csv ? csv.split(',').map((x) => x.trim()).filter(Boolean) : [];
+    },
+    [searchParams],
+  );
 
   /* ── Роли ── */
   const roles = user?.roles ?? [];
@@ -1469,6 +1482,8 @@ export default function TicketsPage() {
 
   /* ── State ── */
   const initialSearch = searchParams.get('search') || '';
+  const initialStatus = getMultiParam('status');
+  const initialPriority = searchParams.get('priority') || '';
 
   const [tickets, setTickets] = useState<TicketListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1480,8 +1495,8 @@ export default function TicketsPage() {
   const [search, setSearch] = useState(initialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
 
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [priorityFilter, setPriorityFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string[]>(initialStatus);
+  const [priorityFilter, setPriorityFilter] = useState(initialPriority);
   const [typeFilter, setTypeFilter] = useState('');
   const [counterpartyFilter, setCounterpartyFilter] = useState('');
   const [projectFilter, setProjectFilter] = useState<string[]>([]);
@@ -1514,6 +1529,21 @@ export default function TicketsPage() {
       .catch(() => setProjects([]))
       .finally(() => setLoadingProjects(false));
   }, [isClientUser]);
+
+
+  useEffect(() => {
+  const spSearch = searchParams.get('search') || '';
+  const spStatus = getMultiParam('status');
+  const spPriority = searchParams.get('priority') || '';
+
+  setSearch(spSearch);
+  setDebouncedSearch(spSearch);
+
+  setStatusFilter(spStatus);
+  setPriorityFilter(spPriority);
+
+  setPage(1);
+}, [searchParams, getMultiParam]);
 
   /* ── Загрузка справочников при открытии фильтров ── */
   useEffect(() => {

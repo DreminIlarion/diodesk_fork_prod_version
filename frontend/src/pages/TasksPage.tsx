@@ -2580,13 +2580,9 @@ function DetailModal({
                 />
                 {ST_LABEL[t.status]}
               </span>
-            </div>
 
-            <h2 className="text-xl md:text-2xl font-bold text-[var(--text-primary)] leading-snug tracking-tight">
-              {t.title}
-            </h2>
 
-            {/* Context: Ticket + Project (вверху и подсвечено) */}
+{/* Context: Ticket + Project (вверху и подсвечено) */}
             {(ticketPath || t.project_id) && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {t.project_id && (
@@ -2646,6 +2642,16 @@ function DetailModal({
                 )}
               </div>
             )}
+
+
+
+            </div>
+
+            <h2 className="text-xl md:text-2xl font-bold text-[var(--text-primary)] leading-snug tracking-tight">
+              {t.title}
+            </h2>
+
+            
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
