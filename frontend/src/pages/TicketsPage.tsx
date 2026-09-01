@@ -341,12 +341,23 @@ function FilterDropdown({
 
 /* ═══ STAT CARD ═══ */
 
-function StatCard({ label, value, icon: Icon, color, bg }: {
-  label: string; value: number; icon: ElementType; color: string; bg: string;
+function StatCard({ label, value, icon: Icon, color, bg, onClick, active }: {
+  label: string; 
+  value: number; 
+  icon: ElementType; 
+  color: string; 
+  bg: string;
+  onClick?: () => void;
+  active?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--border-color)] p-4 flex items-center gap-3
-                    hover:border-[var(--border-hover)] hover:-translate-y-0.5 transition-all duration-200">
+    <div 
+      onClick={onClick}
+      className={`rounded-xl border p-4 flex items-center gap-3
+        hover:border-[var(--border-hover)] hover:-translate-y-0.5 transition-all duration-200
+        ${onClick ? 'cursor-pointer' : ''}
+        ${active ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/20 bg-[var(--accent)]/5' : 'border-[var(--border-color)]'}`}
+    >
       <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
         <Icon className={`w-5 h-5 ${color}`} />
       </div>
@@ -1740,6 +1751,28 @@ const handlePageChange = (pageNum: number) => {
     sublabel: p.key,
   }));
 
+  const handleStatClick = (type: 'all' | 'new' | 'in_progress' | 'critical') => {
+  setPage(1);
+  
+  switch (type) {
+    case 'all':
+      resetFilters();
+      break;
+    case 'new':
+      setStatusFilter(['new']);
+      setPriorityFilter('');
+      break;
+    case 'in_progress':
+      setStatusFilter(['in_progress', 'open']);
+      setPriorityFilter('');
+      break;
+    case 'critical':
+      setPriorityFilter('critical');
+      setStatusFilter([]);
+      break;
+  }
+};
+
   const userOptions: DropdownOption[] = users.map(u => ({
     value: u.id,
     label: u.full_name || u.username || u.email || 'Без имени',
@@ -1754,6 +1787,8 @@ const handlePageChange = (pageNum: number) => {
       </div>
     );
   }
+
+  
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -1782,15 +1817,43 @@ const handlePageChange = (pageNum: number) => {
 
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Всего" value={totalItems}
-          icon={Ticket} color="text-[var(--text-secondary)]" bg="bg-[var(--hover-1)]" />
-        <StatCard label="Новых" value={tickets.filter(t => t.status === 'new').length}
-          icon={Clock} color="text-[var(--status-new-text)]" bg="bg-[var(--status-new-bg)]" />
-        <StatCard label="В работе" value={tickets.filter(t => t.status === 'in_progress' || t.status === 'open').length}
-          icon={CheckCircle2} color="text-[var(--status-progress-text)]" bg="bg-[var(--status-progress-bg)]" />
-        <StatCard label="Критических" value={tickets.filter(t => t.priority === 'critical').length}
-          icon={AlertTriangle} color="text-[var(--priority-critical-text)]" bg="bg-[var(--priority-critical-bg)]" />
-      </div>
+  <StatCard 
+    label="Всего" 
+    value={totalItems}
+    icon={Ticket} 
+    color="text-[var(--text-secondary)]" 
+    bg="bg-[var(--hover-1)]"
+    onClick={() => handleStatClick('all')}
+    active={!hasActiveFilters}
+  />
+  <StatCard 
+    label="Новых" 
+    value={tickets.filter(t => t.status === 'new').length}
+    icon={Clock} 
+    color="text-[var(--status-new-text)]" 
+    bg="bg-[var(--status-new-bg)]"
+    onClick={() => handleStatClick('new')}
+    active={statusFilter.includes('new') && statusFilter.length === 1 && !priorityFilter}
+  />
+  <StatCard 
+    label="В работе" 
+    value={tickets.filter(t => t.status === 'in_progress' || t.status === 'open').length}
+    icon={CheckCircle2} 
+    color="text-[var(--status-progress-text)]" 
+    bg="bg-[var(--status-progress-bg)]"
+    onClick={() => handleStatClick('in_progress')}
+    active={statusFilter.includes('in_progress') && statusFilter.includes('open') && statusFilter.length === 2 && !priorityFilter}
+  />
+  <StatCard 
+    label="Критических" 
+    value={tickets.filter(t => t.priority === 'critical').length}
+    icon={AlertTriangle} 
+    color="text-[var(--priority-critical-text)]" 
+    bg="bg-[var(--priority-critical-bg)]"
+    onClick={() => handleStatClick('critical')}
+    active={priorityFilter === 'critical' && statusFilter.length === 0}
+  />
+</div>
 
       {/* ── Search + Filters toggle ── */}
       <div className="flex flex-wrap items-center gap-2.5">
