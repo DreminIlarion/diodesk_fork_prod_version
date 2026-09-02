@@ -21,7 +21,6 @@ from .dependencies import (
     TicketQueryServiceDep,
     TicketServiceDep,
     get_ticket_or_404,
-    paginate_tickets,
 )
 from .domain.activity_logs import AGGREGATE_TYPE
 from .domain.vo import ReactionType, TicketStatus
@@ -67,7 +66,7 @@ async def create_ticket(
 )
 async def search_tickets(
         filters: TicketFiltersBodyDep,
-        current_subject: CurrentSubjectDep, 
+        current_subject: CurrentSubjectDep,
         pagination: PaginationDep,
         service: TicketQueryServiceDep,
 ) -> Page[TicketViewResponse]:
@@ -344,15 +343,16 @@ async def change_ticket_status(
         TicketStatus.REJECTED: service.reject,
         TicketStatus.REOPENED: service.reopen,
     }
-    
+
     handler = status_map.get(data.status)
     if handler is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unsupported target status: {data.status.value}",
         )
-    
+
     return await handler(ticket_id, current_subject)
+
 
 @router.post(
     path="/predict",
