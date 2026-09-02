@@ -297,8 +297,8 @@ class TicketService:
         return await self._execute(
             ticket_id=ticket_id,
             current_subject=current_subject,
-            authz=self.ticket_authz_service.can_track_ticket,
-            action=lambda t: t.resolve(current_subject.id),
+            authz=self.ticket_authz_service.can_resolve_ticket,
+            action=lambda ticket: ticket.resolve(current_subject.id),
         )
         
     async def reopen(self, ticket_id: UUID, current_subject: Subject) -> TicketResponse:

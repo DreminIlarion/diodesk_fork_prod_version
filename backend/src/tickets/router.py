@@ -2,7 +2,7 @@ from typing import Annotated
 
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Query, status, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 
 from src.activity_logs.dependencies import ActivityLogPaginatorFunc, get_activity_logs_paginator
 from src.activity_logs.schemas import ActivityLogResponse
@@ -24,7 +24,7 @@ from .dependencies import (
     paginate_tickets,
 )
 from .domain.activity_logs import AGGREGATE_TYPE
-from .domain.vo import ReactionType
+from .domain.vo import ReactionType, TicketStatus
 from .infra.ai import suggest_ticket_fields
 from .schemas import (
     CommentCreate,
@@ -39,6 +39,7 @@ from .schemas import (
     TicketParticipant,
     TicketPredict,
     TicketResponse,
+    TicketStatusChange,
     TicketViewResponse,
 )
 
@@ -328,26 +329,28 @@ async def get_comment_reactions(
 )
 async def change_ticket_status(
         ticket_id: UUID,
-        new_status: Annotated[str, Body(..., embed=True)],
+        data: TicketStatusChange,
         current_subject: CurrentSubjectDep,
         service: TicketServiceDep,
 ) -> TicketResponse:
     status_map = {
-        "pending_approval": service.submit_for_approval,
-        "open": service.approve,
-        "in_progress": service.start_progress,
-        "waiting": service.start_progress,
-        "resolved": service.resolve,
-        "closed": service.close,
-        "canceled": service.cancel,
-        "rejected": service.reject,
-        "reopened": service.reopen,
-        "waiting": service.wait,
+        TicketStatus.PENDING_APPROVAL: service.submit_for_approval,
+        TicketStatus.OPEN: service.approve,
+        TicketStatus.IN_PROGRESS: service.start_progress,
+        TicketStatus.WAITING: service.wait,
+        TicketStatus.RESOLVED: service.resolve,
+        TicketStatus.CLOSED: service.close,
+        TicketStatus.CANCELED: service.cancel,
+        TicketStatus.REJECTED: service.reject,
+        TicketStatus.REOPENED: service.reopen,
     }
     
-    handler = status_map.get(new_status)
+    handler = status_map.get(data.status)
     if handler is None:
-        raise HTTPException(status_code=400, detail=f"Unsupported status: {new_status}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported target status: {data.status.value}",
+        )
     
     return await handler(ticket_id, current_subject)
 
