@@ -719,11 +719,15 @@ export default function ProjectDetailPage() {
     finally { setLoadingTickets(false); }
   }, [project?.id]);
 
-  const loadStages = useCallback(async () => {
-    // TODO: заменить моки на реальный API
-    await new Promise(r => setTimeout(r, 300));
-    setStages(MOCK_PROJECT_STAGES);
-  }, []);
+const loadStages = useCallback(async () => {
+  if (!project?.id) return;
+  try {
+    const data = await projectsApi.getById(project.id);
+    setStages(data.stages || []);
+  } catch {
+    setStages([]);
+  }
+}, [project?.id]);
 
   const loadAvailableUsers = useCallback(async () => {
     setLoadingAvailable(true);
