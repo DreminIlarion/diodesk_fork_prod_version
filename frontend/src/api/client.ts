@@ -912,6 +912,7 @@ export const ticketsApi = {
 
 };
 
+const userByIdCache = new Map<string, SimpleUser>();
 
 // ==== Users API ====
 export const usersApi = {
@@ -938,6 +939,15 @@ export const usersApi = {
     const response = await api.get<PaginatedResponse<SimpleUser>>('/api/v1/users', {
       params: { page, size }
     });
+    return response.data;
+  },
+
+  getById: async (userId: string): Promise<SimpleUser> => {
+    const cached = userByIdCache.get(userId);
+    if (cached) return cached;
+
+    const response = await api.get<SimpleUser>(`/api/v1/users/${userId}`);
+    userByIdCache.set(userId, response.data);
     return response.data;
   },
 

@@ -121,6 +121,7 @@ class TicketViewResponse(BaseModel):
     type: TicketType = Field(..., description="Тип заявки")
     status: TicketStatus = Field(..., description="Текущий статус")
     priority: Priority = Field(..., description="Приоритет")
+    has_attachments: bool = Field(False, description="Есть ли прикреплённые файлы")
 
 
 class TicketResponse(TicketBase):

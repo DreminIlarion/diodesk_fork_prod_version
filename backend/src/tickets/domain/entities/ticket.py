@@ -70,6 +70,7 @@ class Ticket(AggregateRoot):
 
     tags: list[Tag] = field(default_factory=list)
     attachments: list[Attachment] = field(default_factory=list)
+    has_attachments: bool = False
 
     def __post_init__(self) -> None:
         if not self.title.strip() or not self.description.strip():

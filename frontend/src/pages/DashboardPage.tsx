@@ -1,6 +1,6 @@
 // pages/DashboardPage.tsx
 
-import { useEffect, useMemo, useState, type PropsWithChildren } from 'react';
+import { useEffect, useMemo, useState, useCallback, type PropsWithChildren } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -503,46 +503,69 @@ export default function DashboardPage() {
 
   const displayedTickets = tickets.slice(0, 7);
 
-  const statCards = [
-    {
-      label: 'Всего заявок',
-      value: stats.total,
-      description:
-        stats.new > 0
-          ? `${stats.new} новых`
-          : 'Новых заявок нет',
-      icon: Ticket,
-      iconColor: 'text-[var(--info)]',
-      iconBackground: 'bg-[var(--info)]/10',
-    },
-    {
-      label: 'Активные заявки',
-      value: stats.inProgress,
-      description: 'Требуют внимания',
-      icon: Timer,
-      iconColor: 'text-[var(--status-open-text)]',
-      iconBackground: 'bg-[var(--status-open-bg)]',
-    },
-    {
-      label: 'Критические',
-      value: stats.critical,
-      description:
-        stats.critical > 0
-          ? 'Нужно проверить в первую очередь'
-          : 'Критичных заявок нет',
-      icon: Flame,
-      iconColor: 'text-[var(--accent)]',
-      iconBackground: 'bg-[var(--accent-soft)]',
-    },
-    {
-      label: 'Решено',
-      value: stats.resolved,
-      description: `${resolvePercent}% от загруженных заявок`,
-      icon: CheckCircle2,
-      iconColor: 'text-[var(--success)]',
-      iconBackground: 'bg-[var(--success)]/10',
-    },
-  ];
+  const goToTickets = useCallback(
+  (opts?: { status?: string[]; priority?: string }) => {
+    const params = new URLSearchParams();
+
+    // multi: status=open&status=in_progress
+    (opts?.status ?? []).forEach((s) => params.append('status', s));
+
+    // single: priority=critical
+    if (opts?.priority) params.set('priority', opts.priority);
+
+    const qs = params.toString();
+    navigate(qs ? `/tickets?${qs}` : '/tickets');
+  },
+  [navigate],
+);
+
+ const ACTIVE_STATUSES = [
+  'pending_approval',
+  'open',
+  'in_progress',
+  'waiting',
+];
+
+const RESOLVED_STATUSES = ['resolved', 'closed'];
+
+const statCards = [
+  {
+    label: 'Всего заявок',
+    value: stats.total,
+    description: stats.new > 0 ? `${stats.new} новых` : 'Новых заявок нет',
+    icon: Ticket,
+    iconColor: 'text-[var(--info)]',
+    iconBackground: 'bg-[var(--info)]/10',
+    onClick: () => goToTickets(),
+  },
+  {
+    label: 'Активные заявки',
+    value: stats.inProgress,
+    description: 'Требуют внимания',
+    icon: Timer,
+    iconColor: 'text-[var(--status-open-text)]',
+    iconBackground: 'bg-[var(--status-open-bg)]',
+    onClick: () => goToTickets({ status: ACTIVE_STATUSES }),
+  },
+  {
+    label: 'Критические',
+    value: stats.critical,
+    description: stats.critical > 0 ? 'Нужно проверить в первую очередь' : 'Критичных заявок нет',
+    icon: Flame,
+    iconColor: 'text-[var(--accent)]',
+    iconBackground: 'bg-[var(--accent-soft)]',
+    onClick: () => goToTickets({ status: ACTIVE_STATUSES, priority: 'critical' }),
+  },
+  {
+    label: 'Решено',
+    value: stats.resolved,
+    description: `${resolvePercent}% от загруженных заявок`,
+    icon: CheckCircle2,
+    iconColor: 'text-[var(--success)]',
+    iconBackground: 'bg-[var(--success)]/10',
+    onClick: () => goToTickets({ status: RESOLVED_STATUSES }),
+  },
+];
 
   if (loading) {
     return (
@@ -634,10 +657,16 @@ export default function DashboardPage() {
           const Icon = card.icon;
 
           return (
-            <div
-              key={card.label}
-              className=" rounded-2xl border border-[var(--border-color)] p-5 shadow-sm transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-[var(--border-hover)] lg:p-6"
-            >
+                <button
+      key={card.label}
+      type="button"
+      onClick={card.onClick}
+      className="rounded-2xl border border-[var(--border-color)] p-5 shadow-sm
+                 transition-[border-color,transform] duration-200
+                 hover:-translate-y-0.5 hover:border-[var(--border-hover)]
+                 lg:p-6 text-left w-full
+                 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+    >
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium text-[var(--text-primary)]/50 lg:text-base">
@@ -662,7 +691,7 @@ export default function DashboardPage() {
               <p className="mt-5 min-h-5 text-sm leading-5 text-[var(--text-primary)]/40">
                 {card.description}
               </p>
-            </div>
+            </button>
           );
         })}
       </section>

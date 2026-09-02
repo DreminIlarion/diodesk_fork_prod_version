@@ -653,9 +653,11 @@ function markdownToHtml(text: string): string {
       <button
         type="button"
         onClick={() => fileInputRef.current?.click()}
-        className="mt-3 flex items-center gap-2 px-4 py-2 rounded-xl text-sm
-                   bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08]
-                   text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 transition-all"
+        className="mt-3 flex items-center gap-2 px-4 py-2 rounded-xl text-base
+                             bg-emerald-600 hover:bg-emerald-700
+                             text-white font-semibold
+                             shadow-sm
+                             transition-colors"
       >
         <ImagePlus size={16} /> Добавить изображение
       </button>
