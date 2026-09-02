@@ -2,7 +2,7 @@ from typing import Annotated
 
 from uuid import UUID
 
-from fastapi import Depends, Query
+from fastapi import Body, Depends, Query
 
 from src.activity_logs.dependencies import ActivityLogRecorderDep
 from src.core.database import session_factory
@@ -180,9 +180,9 @@ def get_ticket_filters(
         time_range=time_range,
     )
 
+
 TicketFiltersDep = Annotated[TicketFilters, Depends(get_ticket_filters)]
 
-from fastapi import Body
 
 def get_ticket_filters_from_body(
         time_range: TimeRangeFiltersDep,
@@ -190,6 +190,7 @@ def get_ticket_filters_from_body(
         tags: Annotated[list[str] | None, Body()] = None,
         counterparty_id: Annotated[UUID | None, Body()] = None,
         project_ids: Annotated[list[UUID] | None, Body()] = None,
+        stage_ids: Annotated[list[UUID] | None, Body()] = None,
         statuses: Annotated[list[TicketStatus] | None, Body()] = None,
         priorities: Annotated[Priority | None, Body()] = None,
         ticket_type: Annotated[TicketType | None, Body(alias="type")] = None,
@@ -199,6 +200,7 @@ def get_ticket_filters_from_body(
         search_query=search_query,
         counterparty_id=counterparty_id,
         project_ids=set(project_ids) if project_ids else None,
+        stage_ids=set(stage_ids) if stage_ids else None,
         statuses=statuses,
         priorities=[priorities] if priorities else None,
         type=ticket_type,
@@ -213,6 +215,7 @@ def get_ticket_filters_from_body(
 
 
 TicketFiltersBodyDep = Annotated[TicketFilters, Depends(get_ticket_filters_from_body)]
+
 
 async def get_ticket_or_404(ticket_id: UUID, ticket_repo: TicketRepoDep) -> TicketResponse:
     ticket = await get_or_raise_404(ticket_repo.read, ticket_id, Ticket)

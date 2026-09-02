@@ -1,25 +1,26 @@
-from collections.abc import Awaitable, Callable
+import inspect
+from collections.abc import Callable
 from dataclasses import dataclass
 from uuid import UUID
-import inspect
 
 from src.activity_logs.recorder import ActivityLogRecorder
 from src.crm.domain.entities import Counterparty
 from src.crm.domain.repo import CounterpartyRepository
-from src.iam.domain.authz import PermissionResult, Subject
+from src.iam.domain.authz import Subject
 from src.iam.domain.entities import User
 from src.iam.domain.exceptions import PermissionDeniedError
 from src.iam.domain.repos import UserRepository
 from src.projects.domain.entities import Project
 from src.projects.domain.repos import ProjectRepository
 from src.shared.domain.events import EventPublisher
+from src.shared.domain.exceptions import NotFoundError
 from src.shared.domain.repos import UnitOfWork, finalize, get_or_raise_404
 from src.shared.domain.vo import Tag
 
 from ..domain.authz import TicketAuthZService
 from ..domain.entities import Ticket
 from ..domain.repos import TicketRepository
-from ..domain.vo import ProjectKey, TicketNumber, TicketAction
+from ..domain.vo import ProjectKey, TicketAction, TicketNumber
 from ..mappers import map_ticket_to_response
 from ..schemas import TicketCreate, TicketEdit, TicketResponse
 
@@ -34,6 +35,7 @@ class TicketCreationContext:
     project_key: ProjectKey | None = None
     counterparty_id: UUID | None = None
     counterparty_name: str | None = None
+    stage_id: UUID | None = None
 
 
 class TicketService:
@@ -72,12 +74,22 @@ class TicketService:
         if data.project_id is not None:
             project = await get_or_raise_404(self.project_repo.read, data.project_id, Project)
 
+            if data.stage_id is not None and project.find_stage(data.stage_id) is None:
+                raise NotFoundError(
+                    f"Stage with ID {data.stage_id} does not exist "
+                    f"in project {project.id}"
+                )
+
             return TicketCreationContext(
                 project_id=data.project_id,
+                stage_id=data.stage_id,
                 project_key=project.key,
                 counterparty_id=project.counterparty_id,
                 counterparty_name=None,
             )
+
+        if data.stage_id is not None and data.project_id is None:
+            raise ValueError("Stage cannot be specified without project")
 
         if data.counterparty_id is not None:
             counterparty = await get_or_raise_404(
@@ -121,7 +133,7 @@ class TicketService:
 
         tags = [Tag(name=tag.name, color=tag.color) for tag in data.tags]
         ticket = Ticket.create(
-            
+
             number=number,
             created_by=current_subject.id,
             reporter_id=data.reporter_id,
@@ -134,6 +146,7 @@ class TicketService:
             counterparty_id=context.counterparty_id,
             product_id=data.product_id,
             tags=tags,
+            stage_id=context.stage_id,
         )
         await self.ticket_repo.create(ticket)
         await finalize(
@@ -156,6 +169,22 @@ class TicketService:
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
 
+        if data.stage_id is not None:
+            if ticket.project_id is None:
+                raise ValueError("Stage cannot be specified for ticket without project")
+
+            project = await get_or_raise_404(
+                self.project_repo.read,
+                ticket.project_id,
+                Project,
+            )
+
+            if project.find_stage(data.stage_id) is None:
+                raise NotFoundError(
+                    f"Stage with ID {data.stage_id} does not exist "
+                    f"in project {project.id}"
+                )
+
         tags = (
             None if data.tags is None else
             [Tag(name=tag.name, color=tag.color) for tag in data.tags]
@@ -166,6 +195,7 @@ class TicketService:
             description=data.description,
             priority=data.priority,
             tags=tags,
+            stage_id=data.stage_id,
         )
         await self.ticket_repo.update(ticket)
         await finalize(
@@ -201,12 +231,15 @@ class TicketService:
 
     async def wait(self, ticket_id: UUID, current_subject: Subject) -> TicketResponse:
         """Ожидание ответа от клиента."""
-        
+
         return await self._execute(
             ticket_id=ticket_id,
             current_subject=current_subject,
             authz=self.ticket_authz_service.can_track_ticket,
-            action=lambda t: t._perform(TicketAction.WAIT, current_subject.id),
+            action=lambda t: t._perform(  # noqa: SLF001
+                TicketAction.WAIT,
+                current_subject.id,
+            ),
         )
 
     async def _execute(
@@ -220,7 +253,7 @@ class TicketService:
 
         result = authz(current_subject, ticket)
         permission = await result if inspect.isawaitable(result) else result
-        
+
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
 
@@ -261,7 +294,11 @@ class TicketService:
 
         return map_ticket_to_response(ticket)
 
-    async def submit_for_approval(self, ticket_id: UUID, current_subject: Subject) -> TicketResponse:
+    async def submit_for_approval(
+            self,
+            ticket_id: UUID,
+            current_subject: Subject,
+    ) -> TicketResponse:
         """Отправить тикет на согласование."""
 
         return await self._execute(
@@ -297,10 +334,10 @@ class TicketService:
         return await self._execute(
             ticket_id=ticket_id,
             current_subject=current_subject,
-            authz=self.ticket_authz_service.can_track_ticket,
-            action=lambda t: t.resolve(current_subject.id),
+            authz=self.ticket_authz_service.can_resolve_ticket,
+            action=lambda ticket: ticket.resolve(current_subject.id),
         )
-        
+
     async def reopen(self, ticket_id: UUID, current_subject: Subject) -> TicketResponse:
         """Переоткрыть тикет."""
         return await self._execute(

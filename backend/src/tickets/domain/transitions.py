@@ -1,7 +1,6 @@
-from .entities import Ticket
-
 from uuid import UUID
 
+from .entities import Ticket
 from .transition_factory import register_transition, transition
 from .vo import TicketAction, TicketStatus
 
@@ -20,9 +19,6 @@ register_transition(
     action=TicketAction.START_PROGRESS,
     to=TicketStatus.IN_PROGRESS,
 )
-
-# Пере-открытие тикета
-# register_transition(TicketStatus.RESOLVED, action=TicketAction.REOPEN, to=TicketStatus.REOPENED)
 
 # Поставить тикет на паузу
 register_transition(TicketStatus.IN_PROGRESS, action=TicketAction.PAUSE, to=TicketStatus.PAUSED)
@@ -52,7 +48,7 @@ register_transition(
     action=TicketAction.EDIT,
 )
 
-# Ожидание обратной связи клиента - блок вызывает ошибку 
+# Ожидание обратной связи клиента
 register_transition(
     TicketStatus.IN_PROGRESS,
     TicketStatus.PAUSED,
@@ -73,6 +69,7 @@ register_transition(
     action=TicketAction.APPROVE,
     to=TicketStatus.OPEN,
 )
+
 
 @transition(
     TicketStatus.OPEN,
