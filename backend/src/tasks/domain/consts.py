@@ -90,6 +90,9 @@ ALLOWED_ASSIGN_STATUSES: set[TaskStatus] = {
     TaskStatus.IN_PROGRESS,
     TaskStatus.BLOCKED,
     TaskStatus.TO_REVIEW,
+    TaskStatus.PAUSED,
+    TaskStatus.TO_FIX,
+    TaskStatus.TO_TEST,
 }
 
 # Маппинг статусов задач в русские представления для UI
