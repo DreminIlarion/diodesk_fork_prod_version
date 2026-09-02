@@ -712,22 +712,29 @@ export default function ProjectDetailPage() {
   const loadTickets = useCallback(async () => {
     if (!project?.id) return;
     setLoadingTickets(true);
+
     try {
-      const res = await ticketsApi.getAllWithFilters(1, 100, { project_id: project.id });
+      const res = await ticketsApi.getAll(1, 100, {
+        project_ids: [project.id],
+      });
+
       setProjectTickets(res.items);
-    } catch { setProjectTickets([]); }
-    finally { setLoadingTickets(false); }
+    } catch {
+      setProjectTickets([]);
+    } finally {
+      setLoadingTickets(false);
+    }
   }, [project?.id]);
 
-const loadStages = useCallback(async () => {
-  if (!project?.id) return;
-  try {
-    const data = await projectsApi.getById(project.id);
-    setStages(data.stages || []);
-  } catch {
-    setStages([]);
-  }
-}, [project?.id]);
+  const loadStages = useCallback(async () => {
+    if (!project?.id) return;
+    try {
+      const data = await projectsApi.getById(project.id);
+      setStages(data.stages || []);
+    } catch {
+      setStages([]);
+    }
+  }, [project?.id]);
 
   const loadAvailableUsers = useCallback(async () => {
     setLoadingAvailable(true);
