@@ -14,7 +14,7 @@ import { projectsApi, ticketsApi, counterpartiesApi, usersApi } from '../api/cli
 import { useAuthStore } from '../stores/authStore';
 import { useToast } from '../components/ui/use-toast';
 import type { Project, Counterparty, TicketListItem, SimpleUser, CounterpartyCustomer } from '../types';
-import  ProjectStagesSection  from './ProjectStagesPage';
+import ProjectStagesSection from './ProjectStagesPage';
 
 // ═══════════════════════════════════════════════════════════════════
 // ТИПЫ
@@ -136,12 +136,12 @@ const MOCK_PROJECT_STAGES: ProjectStage[] = [
 // ═══════════════════════════════════════════════════════════════════
 
 const PROJECT_ROLES = [
-  { value: 'owner',           label: 'Владелец',         color: 'text-[var(--accent)]',         bg: 'bg-[var(--accent-soft)]',  border: 'border-[var(--accent)]/15' },
-  { value: 'manager',         label: 'Менеджер',         color: 'text-[var(--info)]',           bg: 'bg-blue-500/15',           border: 'border-blue-500/30' },
-  { value: 'contributor',     label: 'Участник',         color: 'text-[var(--success)]',        bg: 'bg-[var(--success)]/8',    border: 'border-emerald-500/30' },
-  { value: 'viewer',          label: 'Наблюдатель',      color: 'text-[var(--text-primary)]/50',bg: 'bg-[var(--hover-2)]',      border: 'border-[var(--border-color)]' },
-  { value: 'customer',        label: 'Клиент',           color: 'text-violet-400',              bg: 'bg-violet-500/15',         border: 'border-violet-500/30' },
-  { value: 'customer_manager',label: 'Менеджер клиента', color: 'text-[var(--info)]',           bg: 'bg-cyan-500/15',           border: 'border-cyan-500/30' },
+  { value: 'owner', label: 'Владелец', color: 'text-[var(--accent)]', bg: 'bg-[var(--accent-soft)]', border: 'border-[var(--accent)]/15' },
+  { value: 'manager', label: 'Менеджер', color: 'text-[var(--info)]', bg: 'bg-blue-500/15', border: 'border-blue-500/30' },
+  { value: 'contributor', label: 'Участник', color: 'text-[var(--success)]', bg: 'bg-[var(--success)]/8', border: 'border-emerald-500/30' },
+  { value: 'viewer', label: 'Наблюдатель', color: 'text-[var(--text-primary)]/50', bg: 'bg-[var(--hover-2)]', border: 'border-[var(--border-color)]' },
+  { value: 'customer', label: 'Клиент', color: 'text-violet-400', bg: 'bg-violet-500/15', border: 'border-violet-500/30' },
+  { value: 'customer_manager', label: 'Менеджер клиента', color: 'text-[var(--info)]', bg: 'bg-cyan-500/15', border: 'border-cyan-500/30' },
 ] as const;
 
 type RoleValue = typeof PROJECT_ROLES[number]['value'];
@@ -153,11 +153,11 @@ const STAGE_STATUS_META: Record<StageStatus, {
   label: string; chip: string; soft: string; text: string;
   border: string; icon: any; barColor: string;
 }> = {
-  planned:     { label: 'Запланирован',   chip: 'bg-slate-500/15 text-slate-300',   soft: 'bg-slate-500/10',   text: 'text-slate-200',   border: 'border-slate-500/20',   icon: Clock3,         barColor: 'bg-slate-500' },
-  in_progress: { label: 'В работе',       chip: 'bg-blue-500/15 text-blue-300',     soft: 'bg-blue-500/10',    text: 'text-blue-300',    border: 'border-blue-500/20',    icon: PlayCircle,     barColor: 'bg-blue-500' },
-  completed:   { label: 'Завершён',       chip: 'bg-emerald-500/15 text-emerald-300', soft: 'bg-emerald-500/10', text: 'text-emerald-300', border: 'border-emerald-500/20', icon: CheckCircle2,   barColor: 'bg-emerald-500' },
-  blocked:     { label: 'Заблокирован',   chip: 'bg-red-500/15 text-red-300',       soft: 'bg-red-500/10',     text: 'text-red-300',     border: 'border-red-500/20',     icon: AlertTriangle,  barColor: 'bg-red-500' },
-  paused:      { label: 'На паузе',       chip: 'bg-amber-500/15 text-amber-300',   soft: 'bg-amber-500/10',   text: 'text-amber-300',   border: 'border-amber-500/20',   icon: PauseCircle,    barColor: 'bg-amber-500' },
+  planned: { label: 'Запланирован', chip: 'bg-slate-500/15 text-slate-300', soft: 'bg-slate-500/10', text: 'text-slate-200', border: 'border-slate-500/20', icon: Clock3, barColor: 'bg-slate-500' },
+  in_progress: { label: 'В работе', chip: 'bg-blue-500/15 text-blue-300', soft: 'bg-blue-500/10', text: 'text-blue-300', border: 'border-blue-500/20', icon: PlayCircle, barColor: 'bg-blue-500' },
+  completed: { label: 'Завершён', chip: 'bg-emerald-500/15 text-emerald-300', soft: 'bg-emerald-500/10', text: 'text-emerald-300', border: 'border-emerald-500/20', icon: CheckCircle2, barColor: 'bg-emerald-500' },
+  blocked: { label: 'Заблокирован', chip: 'bg-red-500/15 text-red-300', soft: 'bg-red-500/10', text: 'text-red-300', border: 'border-red-500/20', icon: AlertTriangle, barColor: 'bg-red-500' },
+  paused: { label: 'На паузе', chip: 'bg-amber-500/15 text-amber-300', soft: 'bg-amber-500/10', text: 'text-amber-300', border: 'border-amber-500/20', icon: PauseCircle, barColor: 'bg-amber-500' },
 };
 
 const STAGE_STATUS_OPTIONS: { value: StageStatus; label: string }[] = [
@@ -509,11 +509,10 @@ function StageModal({ stage, loading, onSubmit, onClose }: {
               <div className="flex flex-wrap gap-1.5">
                 {STAGE_STATUS_OPTIONS.map(s => (
                   <button key={s.value} onClick={() => setStatus(s.value)}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                      status === s.value
-                        ? `${STAGE_STATUS_META[s.value].chip} border-current`
-                        : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)]'
-                    }`}>{s.label}</button>
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${status === s.value
+                      ? `${STAGE_STATUS_META[s.value].chip} border-current`
+                      : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)]'
+                      }`}>{s.label}</button>
                 ))}
               </div>
             </div>
@@ -653,47 +652,47 @@ export default function ProjectDetailPage() {
   const [searchUser, setSearchUser] = useState('');
   const [addingMembers, setAddingMembers] = useState(false);
 
-const isSupportOrHigher = user?.roles?.some(r => 
-  r === 'admin' || 
-  r === 'support_manager' || 
-  r === 'support_agent'
-) ?? false;
+  const isSupportOrHigher = user?.roles?.some(r =>
+    r === 'admin' ||
+    r === 'support_manager' ||
+    r === 'support_agent'
+  ) ?? false;
   const canEdit = isSupportOrHigher || project?.owner_id === user?.id;
   const isActive = project?.status === 'active';
 
   // ── Загрузка участников ──────────────────────────────────────────────
 
-const loadMembers = useCallback(async () => {
-  if (!project?.id) return;
-  setLoadingMembers(true);
-  try {
-    const memberships = await projectsApi.getMembers(project.id);
-    
-    // Загружаем всех пользователей для сопоставления
-    const usersRes = await usersApi.getAllUsers(1, 100);
-    const userMap = new Map<string, SimpleUser>();
-    usersRes.items.forEach((u: SimpleUser) => userMap.set(u.id, u));
-    
-    // Если есть counterparty_id, загружаем клиентов
-    if (project.counterparty_id) {
-      try {
-        const customersRes = await counterpartiesApi.getCustomers(project.counterparty_id, 1, 100);
-        (customersRes.items ?? []).forEach((u: any) => userMap.set(u.id, u));
-      } catch {}
+  const loadMembers = useCallback(async () => {
+    if (!project?.id) return;
+    setLoadingMembers(true);
+    try {
+      const memberships = await projectsApi.getMembers(project.id);
+
+      // Загружаем всех пользователей для сопоставления
+      const usersRes = await usersApi.getAllUsers(1, 100);
+      const userMap = new Map<string, SimpleUser>();
+      usersRes.items.forEach((u: SimpleUser) => userMap.set(u.id, u));
+
+      // Если есть counterparty_id, загружаем клиентов
+      if (project.counterparty_id) {
+        try {
+          const customersRes = await counterpartiesApi.getCustomers(project.counterparty_id, 1, 100);
+          (customersRes.items ?? []).forEach((u: any) => userMap.set(u.id, u));
+        } catch { }
+      }
+
+      setMembers(memberships.map((m: any) => ({
+        user_id: m.user_id,
+        project_role: m.roles?.[0] || m.project_role || 'contributor',
+        user: userMap.get(m.user_id) || null,
+      })));
+    } catch (e) {
+      console.error('Failed to load members:', e);
+      setMembers([]);
+    } finally {
+      setLoadingMembers(false);
     }
-    
-    setMembers(memberships.map((m: any) => ({
-      user_id: m.user_id,
-      project_role: m.roles?.[0] || m.project_role || 'contributor',
-      user: userMap.get(m.user_id) || null,
-    })));
-  } catch (e) {
-    console.error('Failed to load members:', e);
-    setMembers([]);
-  } finally {
-    setLoadingMembers(false);
-  }
-}, [project?.id, project?.counterparty_id]);
+  }, [project?.id, project?.counterparty_id]);
 
   const loadProject = useCallback(async () => {
     setLoading(true);
@@ -701,7 +700,7 @@ const loadMembers = useCallback(async () => {
       const data = await projectsApi.getById(id!);
       setProject(data);
       await Promise.all([
-        data.counterparty_id ? counterpartiesApi.getById(data.counterparty_id).then(cp => setCounterparty(cp)).catch(() => {}) : Promise.resolve(),
+        data.counterparty_id ? counterpartiesApi.getById(data.counterparty_id).then(cp => setCounterparty(cp)).catch(() => { }) : Promise.resolve(),
         await loadMembers(),
       ]);
     } catch {
@@ -736,20 +735,20 @@ const loadMembers = useCallback(async () => {
         try {
           const res = await counterpartiesApi.getCustomers(project.counterparty_id, 1, 15);
           (res.items ?? []).forEach((u: CounterpartyCustomer) => { if (!existingIds.has(u.id) && !seenIds.has(u.id)) { allAvailable.push(u); seenIds.add(u.id); } });
-        } catch {}
+        } catch { }
       }
       try {
-  // Загружаем всех пользователей, включая админов и поддержку
-  const res = await usersApi.getAllUsers(1, 100);
-  (res.items ?? []).forEach((u: SimpleUser) => { 
-    if (!existingIds.has(u.id) && !seenIds.has(u.id)) { 
-      allAvailable.push(u); 
-      seenIds.add(u.id); 
-    } 
-  });
-} catch (e) {
-  console.error('Ошибка загрузки всех пользователей:', e);
-}
+        // Загружаем всех пользователей, включая админов и поддержку
+        const res = await usersApi.getAllUsers(1, 100);
+        (res.items ?? []).forEach((u: SimpleUser) => {
+          if (!existingIds.has(u.id) && !seenIds.has(u.id)) {
+            allAvailable.push(u);
+            seenIds.add(u.id);
+          }
+        });
+      } catch (e) {
+        console.error('Ошибка загрузки всех пользователей:', e);
+      }
       setAvailableUsers(allAvailable);
     } catch {
       toast({ title: 'Ошибка', description: 'Не удалось загрузить пользователей', variant: 'destructive' });
@@ -757,8 +756,8 @@ const loadMembers = useCallback(async () => {
   }, [project?.counterparty_id, members, toast]);
 
   useEffect(() => { if (id) loadProject(); }, [id, loadProject]);
-  useEffect(() => { if (activeTab === 'tickets') loadTickets(); }, [activeTab, loadTickets]);
-  useEffect(() => { if (activeTab === 'stages') loadStages(); }, [activeTab, loadStages]);
+  useEffect(() => { if (project?.id) loadTickets(); }, [project?.id, loadTickets]);
+  useEffect(() => { if (project?.id) loadStages(); }, [project?.id, loadStages]);
   useEffect(() => { if (showAddModal) loadAvailableUsers(); }, [showAddModal, loadAvailableUsers]);
 
   // ── Действия ──────────────────────────────────────────────────────
@@ -774,38 +773,38 @@ const loadMembers = useCallback(async () => {
     finally { setArchiving(false); }
   };
 
- const handleAddMembers = async () => {
-  if (!selectedUsers.size) return;
-  setAddingMembers(true);
-  try {
-    // Новый формат: каждый пользователь добавляется отдельно с массивом ролей
-    const selectedUsersArray = Array.from(selectedUsers.values());
-    for (const u of selectedUsersArray) {
-      await projectsApi.addMember(id!, u.id, selectedRoles);
+  const handleAddMembers = async () => {
+    if (!selectedUsers.size) return;
+    setAddingMembers(true);
+    try {
+      // Новый формат: каждый пользователь добавляется отдельно с массивом ролей
+      const selectedUsersArray = Array.from(selectedUsers.values());
+      for (const u of selectedUsersArray) {
+        await projectsApi.addMember(id!, u.id, selectedRoles);
+      }
+
+      toast({
+        title: 'Успешно',
+        description: `Добавлено ${selectedUsersArray.length} участников`
+      });
+      setShowAddModal(false);
+      setSelectedUsers(new Map());
+      setSearchUser('');
+      setSelectedRoles(['contributor']);
+      await loadProject();
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail?.[0]?.msg ||
+        e?.response?.data?.detail ||
+        'Не удалось добавить';
+      toast({
+        title: 'Ошибка',
+        description: typeof msg === 'string' ? msg : 'Не удалось добавить',
+        variant: 'destructive'
+      });
+    } finally {
+      setAddingMembers(false);
     }
-    
-    toast({ 
-      title: 'Успешно', 
-      description: `Добавлено ${selectedUsersArray.length} участников` 
-    });
-    setShowAddModal(false);
-    setSelectedUsers(new Map());
-    setSearchUser('');
-    setSelectedRole('contributor');
-    await loadProject();
-  } catch (e: any) {
-    const msg = e?.response?.data?.detail?.[0]?.msg || 
-                e?.response?.data?.detail || 
-                'Не удалось добавить';
-    toast({ 
-      title: 'Ошибка', 
-      description: typeof msg === 'string' ? msg : 'Не удалось добавить', 
-      variant: 'destructive' 
-    });
-  } finally { 
-    setAddingMembers(false); 
-  }
-};
+  };
 
   // Stage CRUD (МОКИ — потом заменить на API)
   const handleSaveStage = async (data: Partial<ProjectStage>) => {
@@ -868,25 +867,25 @@ const loadMembers = useCallback(async () => {
     return name.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
   });
 
-const statusClr = (s: string) => ({
-  'new': 'bg-blue-500/15 text-[var(--info)] border-blue-500/30',
-  'pending_approval': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
-  'open': 'bg-cyan-500/15 text-[var(--info)] border-cyan-500/30',
-  'in_progress': 'bg-yellow-500/15 text-[var(--warning)] border-yellow-500/30',
-  'waiting': 'bg-purple-500/15 text-[var(--info)] border-purple-500/30',
-  'resolved': 'bg-emerald-500/15 text-[var(--success)] border-emerald-500/30',
-  'closed': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
-  'reopened': 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/15',
-  'rejected': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
-  'cancelled': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
-}[s] ?? 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-white/10');
+  const statusClr = (s: string) => ({
+    'new': 'bg-blue-500/15 text-[var(--info)] border-blue-500/30',
+    'pending_approval': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
+    'open': 'bg-cyan-500/15 text-[var(--info)] border-cyan-500/30',
+    'in_progress': 'bg-yellow-500/15 text-[var(--warning)] border-yellow-500/30',
+    'waiting': 'bg-purple-500/15 text-[var(--info)] border-purple-500/30',
+    'resolved': 'bg-emerald-500/15 text-[var(--success)] border-emerald-500/30',
+    'closed': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
+    'reopened': 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/15',
+    'rejected': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
+    'cancelled': 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15',
+  }[s] ?? 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-white/10');
 
-const priorityClr = (p: string) => ({
-  'low': 'bg-[var(--success)]/8 text-[var(--success)] border-emerald-500/30',
-  'medium': 'bg-yellow-500/15 text-[var(--warning)] border-yellow-500/30',
-  'high': 'bg-orange-500/15 text-[var(--warning)] border-orange-500/30',
-  'critical': 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/15',
-}[p] ?? 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-white/10');
+  const priorityClr = (p: string) => ({
+    'low': 'bg-[var(--success)]/8 text-[var(--success)] border-emerald-500/30',
+    'medium': 'bg-yellow-500/15 text-[var(--warning)] border-yellow-500/30',
+    'high': 'bg-orange-500/15 text-[var(--warning)] border-orange-500/30',
+    'critical': 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/15',
+  }[p] ?? 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-white/10');
   // ── Render ────────────────────────────────────────────────────────
 
   if (loading) return (
@@ -919,9 +918,8 @@ const priorityClr = (p: string) => ({
             <div>
               <div className="flex items-center gap-3 flex-wrap mb-2">
                 <h1 className="text-3xl font-bold text-[var(--text-primary)]">{project.name}</h1>
-                <span className={`px-3 py-1 rounded-lg text-base font-medium border ${
-                  isActive ? 'bg-[var(--success)]/8 text-[var(--success)] border-emerald-500/30' : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40 border-[var(--border-color)]'
-                }`}>{isActive ? 'Активен' : 'Архивирован'}</span>
+                <span className={`px-3 py-1 rounded-lg text-base font-medium border ${isActive ? 'bg-[var(--success)]/8 text-[var(--success)] border-emerald-500/30' : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40 border-[var(--border-color)]'
+                  }`}>{isActive ? 'Активен' : 'Архивирован'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Hash className="w-4 h-4 text-[var(--text-primary)]/40" />
@@ -932,6 +930,10 @@ const priorityClr = (p: string) => ({
         </div>
         {canEdit && isActive && (
           <div className="flex gap-2.5 flex-shrink-0">
+            <button onClick={() => navigate(`/projects/${project.id}/edit`)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] border border-[var(--border-color)] text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] text-base font-medium transition-colors">
+              <Pencil className="w-4 h-4" /> Редактировать
+            </button>
             <button onClick={() => setShowArchiveModal(true)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 text-base font-medium">
               <Archive className="w-4 h-4" /> Архивировать
@@ -954,11 +956,10 @@ const priorityClr = (p: string) => ({
 
         ]).map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-5 py-3 rounded-t-xl transition-all whitespace-nowrap ${
-              activeTab === tab.id
-                ? 'bg-[var(--accent)]/50 text-white border-b-2 border-[var(--accent)]'
-                : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)]'
-            }`}>
+            className={`flex items-center gap-2 px-5 py-3 rounded-t-xl transition-all whitespace-nowrap ${activeTab === tab.id
+              ? 'bg-[var(--accent)]/50 text-white border-b-2 border-[var(--accent)]'
+              : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)]'
+              }`}>
             <tab.icon className="w-4 h-4" />
             <span className="text-base font-medium">{tab.label}</span>
             {'count' in tab && (tab.count ?? 0) > 0 && (
@@ -1068,48 +1069,48 @@ const priorityClr = (p: string) => ({
                   ) : (
                     <div className="divide-y divide-[var(--border-color)]">
                       {members.map(member => {
-  const { name, email, isMe } = resolveDisplay(member);
-  const role = getRoleMeta(member.project_role);
-  return (
-    <div key={member.user_id} className={`flex items-center gap-4 py-4 px-2 rounded-xl ${isMe ? 'bg-[var(--accent)]/[0.04]' : ''}`}>
-      <Avatar name={name} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[var(--text-primary)] font-semibold text-base truncate">{name}</span>
-          {isMe && <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-[var(--text-primary)]/50">Вы</span>}
-        </div>
-        {email ? (
-          <a href={`mailto:${email}`} className="text-[var(--text-primary)]/40 text-sm hover:text-[var(--text-primary)]/60 truncate block">{email}</a>
-        ) : <span className="text-[var(--text-primary)]/20 text-sm">email не указан</span>}
-      </div>
-      <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border flex-shrink-0 ${role.bg} ${role.color} ${role.border}`}>
-        {member.project_role === 'owner' && <Crown className="w-3 h-3" />} {role.label}
-      </span>
-      {canEdit && member.project_role !== 'owner' && (
-        <button
-          onClick={async () => {
-            if (!confirm(`Удалить пользователя "${name}" из проекта?`)) return;
-            try {
-              await projectsApi.removeMember(project.id, member.user_id);
-              toast({ title: 'Успешно', description: 'Участник удалён' });
-              await loadProject();
-            } catch (e) {
-              toast({ 
-                title: 'Ошибка', 
-                description: 'Не удалось удалить участника', 
-                variant: 'destructive' 
-              });
-            }
-          }}
-          className="p-2 rounded-lg hover:bg-red-500/10 text-[var(--text-primary)]/40 hover:text-red-400 transition-colors"
-          title="Удалить"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      )}
-    </div>
-  );
-})}
+                        const { name, email, isMe } = resolveDisplay(member);
+                        const role = getRoleMeta(member.project_role);
+                        return (
+                          <div key={member.user_id} className={`flex items-center gap-4 py-4 px-2 rounded-xl ${isMe ? 'bg-[var(--accent)]/[0.04]' : ''}`}>
+                            <Avatar name={name} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[var(--text-primary)] font-semibold text-base truncate">{name}</span>
+                                {isMe && <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-[var(--text-primary)]/50">Вы</span>}
+                              </div>
+                              {email ? (
+                                <a href={`mailto:${email}`} className="text-[var(--text-primary)]/40 text-sm hover:text-[var(--text-primary)]/60 truncate block">{email}</a>
+                              ) : <span className="text-[var(--text-primary)]/20 text-sm">email не указан</span>}
+                            </div>
+                            <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border flex-shrink-0 ${role.bg} ${role.color} ${role.border}`}>
+                              {member.project_role === 'owner' && <Crown className="w-3 h-3" />} {role.label}
+                            </span>
+                            {canEdit && member.project_role !== 'owner' && (
+                              <button
+                                onClick={async () => {
+                                  if (!confirm(`Удалить пользователя "${name}" из проекта?`)) return;
+                                  try {
+                                    await projectsApi.removeMember(project.id, member.user_id);
+                                    toast({ title: 'Успешно', description: 'Участник удалён' });
+                                    await loadProject();
+                                  } catch (e) {
+                                    toast({
+                                      title: 'Ошибка',
+                                      description: 'Не удалось удалить участника',
+                                      variant: 'destructive'
+                                    });
+                                  }
+                                }}
+                                className="p-2 rounded-lg hover:bg-red-500/10 text-[var(--text-primary)]/40 hover:text-red-400 transition-colors"
+                                title="Удалить"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1124,11 +1125,11 @@ const priorityClr = (p: string) => ({
                     <Ticket className="w-5 h-5 text-[var(--text-primary)]/40" /> Заявки
                   </h2>
                   {(isSupportOrHigher || project?.owner_id === user?.id) && (
-        <Link to={`/tickets/new?project_id=${project.id}`}
-          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[var(--accent)] text-white text-base font-medium shadow-[var(--shadow-md)]">
-          <Plus className="w-4 h-4" /> Создать
-        </Link>
-      )}
+                    <Link to={`/tickets/new?project_id=${project.id}`}
+                      className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[var(--accent)] text-white text-base font-medium shadow-[var(--shadow-md)]">
+                      <Plus className="w-4 h-4" /> Создать
+                    </Link>
+                  )}
                 </div>
                 <div className="p-6">
                   {loadingTickets ? (
@@ -1147,11 +1148,11 @@ const priorityClr = (p: string) => ({
                             <div className="flex items-center gap-2 mb-2 flex-wrap">
                               <span className="text-[var(--accent)] font-mono text-sm bg-[var(--accent-soft)] border border-[var(--accent)]/15 px-2 py-0.5 rounded-lg">#{ticket.number}</span>
                               <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${statusClr(ticket.status)}`}>
-  {TICKET_STATUS_LABELS[ticket.status] || ticket.status}
-</span>
+                                {TICKET_STATUS_LABELS[ticket.status] || ticket.status}
+                              </span>
                               <span className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${priorityClr(ticket.priority)}`}>
-  {TICKET_PRIORITY_LABELS[ticket.priority] || ticket.priority}
-</span>
+                                {TICKET_PRIORITY_LABELS[ticket.priority] || ticket.priority}
+                              </span>
                             </div>
                             <p className="text-[var(--text-primary)] font-medium text-base group-hover:text-[var(--accent)] truncate">{ticket.title}</p>
                             <p className="text-[var(--text-primary)]/40 text-sm mt-1">{fmtDate(ticket.created_at)}</p>
@@ -1236,26 +1237,25 @@ const priorityClr = (p: string) => ({
               <div>
                 <label className="block text-base text-[var(--text-primary)]/60 mb-3">Роль в проекте</label>
                 <div className="flex flex-wrap gap-2">
-  {PROJECT_ROLES.map(role => (
-    <button
-      key={role.value}
-      onClick={() => {
-        setSelectedRoles(prev => 
-          prev.includes(role.value) 
-            ? prev.filter(r => r !== role.value)
-            : [...prev, role.value]
-        );
-      }}
-      className={`px-3.5 py-2 rounded-xl text-base font-medium transition-all border ${
-        selectedRoles.includes(role.value)
-          ? `${role.bg} ${role.color} ${role.border}`
-          : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-      }`}
-    >
-      {role.label}
-    </button>
-  ))}
-</div>
+                  {PROJECT_ROLES.map(role => (
+                    <button
+                      key={role.value}
+                      onClick={() => {
+                        setSelectedRoles(prev =>
+                          prev.includes(role.value)
+                            ? prev.filter(r => r !== role.value)
+                            : [...prev, role.value]
+                        );
+                      }}
+                      className={`px-3.5 py-2 rounded-xl text-base font-medium transition-all border ${selectedRoles.includes(role.value)
+                        ? `${role.bg} ${role.color} ${role.border}`
+                        : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+                        }`}
+                    >
+                      {role.label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
                 <label className="block text-base text-[var(--text-primary)]/60 mb-2">
