@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef,useMemo  } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import React, { memo } from 'react';
 
 import { Link, useSearchParams } from 'react-router-dom';
@@ -9,7 +9,7 @@ import {
   ArrowUpRight, ChevronDown, Flag, AlertCircle, CheckCircle2, Ban, RotateCcw,
   RefreshCw, Archive, FolderOpen, Ticket, Zap, Star, User, Layers, UserCheck,
   GitPullRequest, ThumbsUp, ThumbsDown, Pencil, List, LayoutGrid, Clock3,
-  FileText, File as FileIcon, Download, BarChart3, Trash2,
+  FileText, File as FileIcon, Download, BarChart3, Trash2,Paperclip ,
 } from 'lucide-react';
 import { tasksApi, projectsApi, ticketsApi, usersApi } from '../api/client';
 import { attachmentsApi } from '../api/attachments';
@@ -1055,6 +1055,9 @@ export const TCard = memo(function TCard({
     ? (a.full_name || a.username || '').split(' ')[0]
     : null;
 
+    const hasAttachments =
+  Array.isArray((t as any).attachments) && (t as any).attachments.length > 0;
+
   return (
     <div
       data-task-id={t.id}
@@ -1120,12 +1123,16 @@ export const TCard = memo(function TCard({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+
+          {hasAttachments && (
+    <Paperclip className="w-4.5 h-4.5 text-[var(--text-primary)]/30" />
+  )}
           {t.ticket_id && (
-            <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+            <Ticket className="w-4.5 h-4.5 text-[var(--text-primary)]/30" />
           )}
 
           {t.project_id && (
-            <FolderOpen className="w-3.5 h-3.5 text-[var(--text-primary)]/30" />
+            <FolderOpen className="w-4.5 h-4.5 text-[var(--text-primary)]/30" />
           )}
 
           {t.due_date && (
@@ -1184,9 +1191,8 @@ function KCol({
       onDragOver={(e) => onDO(e, col.status)}
       onDragLeave={onDL}
       onDrop={(e) => onDrop(e, col.status)}
-      className={`bg-[var(--hover-1)] rounded-xl flex flex-col w-[320px] shrink-0 border transition-colors h-full ${
-        isDO ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--border-color)]'
-      }`}
+      className={`bg-[var(--hover-1)] rounded-xl flex flex-col w-[320px] shrink-0 border transition-colors h-full ${isDO ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--border-color)]'
+        }`}
     >
       <div className="px-3 py-3 flex items-center justify-between border-b border-[var(--border-color)] shrink-0 bg-[var(--bg-card)] rounded-t-xl">
         <div className="flex items-center gap-2 min-w-0">
@@ -1490,6 +1496,16 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
 }) {
   const { toast } = useToast();
 
+
+      const [baseTicket, setBaseTicket] = useState<any | null>(null);
+const [baseTicketCreator, setBaseTicketCreator] = useState<SimpleUser | null>(null);
+
+const requesterLabel =
+  baseTicketCreator?.full_name ||
+  baseTicketCreator?.username ||
+  baseTicketCreator?.email ||
+  (baseTicket?.created_by ? `ID: ${baseTicket.created_by}` : '');
+
   const [deleteAttachmentIntent, setDeleteAttachmentIntent] =
     useState<TaskAttachment | null>(null);
 
@@ -1531,13 +1547,15 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
         : [],
     );
 
-
-
   const firstProjectChange = useRef(true);
+
+  
 
   useEffect(() => {
     if (!assigneeId && todo) setTodo(false);
   }, [assigneeId, todo]);
+
+
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !saving) onClose(); };
@@ -1732,6 +1750,44 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
 
     return result;
   };
+
+useEffect(() => {
+  if (mode !== 'create' || context.type !== 'ticket' || !context.ticket_id) return;
+
+  let cancelled = false;
+
+  (async () => {
+    try {
+      setBaseTicket(null);
+      setBaseTicketCreator(null);
+
+      const ticket = await ticketsApi.getById(context.ticket_id);
+      if (cancelled) return;
+
+      setBaseTicket(ticket);
+
+      if (ticket.project_id) {
+        setProjectId(ticket.project_id);
+        firstProjectChange.current = true;
+      }
+
+      if (ticket.priority) {
+        setPri(ticket.priority as TaskPriority);
+      }
+
+      if (ticket.created_by) {
+        try {
+          const u = await usersApi.getById(ticket.created_by); // важно: чтобы этот метод был добавлен
+          if (!cancelled) setBaseTicketCreator(u);
+        } catch {}
+      }
+    } catch {}
+  })();
+
+  return () => {
+    cancelled = true;
+  };
+}, [mode, context.type, context.ticket_id]);
 
   const submit = async () => {
     if (!title.trim()) return;
@@ -1965,6 +2021,25 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
   const subtitleText = mode === 'create' ? 'Проверьте заполнение' : `Изменение задачи ${task?.number ?? ''}`;
   const lockTicket = context.type === 'ticket' && mode === 'create';
 
+
+
+const getTicketRequester = (t: any) => {
+  return (
+    t?.requester?.full_name ||
+    t?.requester?.email ||
+    t?.requester_name ||
+    t?.created_by_user?.full_name ||
+    t?.created_by_user?.email ||
+    t?.created_by?.full_name ||
+    t?.created_by?.email ||
+    t?.author?.full_name ||
+    t?.author?.email ||
+    t?.created_by_full_name ||
+    t?.created_by_email ||
+    ''
+  );
+};
+
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-2 md:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !saving && onClose()} />
@@ -1972,6 +2047,7 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
         className="relative w-full max-w-7xl h-[94vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Header */}
         <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
           <div>
             <div className="flex items-center gap-2">
@@ -1989,10 +2065,12 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
           </button>
         </div>
 
+        {/* Content */}
         <div className="flex-1 min-h-0 overflow-y-auto p-6 lg:p-8">
           <div className="grid xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.75fr)] gap-8">
-
+            {/* LEFT */}
             <div className="space-y-4">
+              {/* Название */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
                   Название <span className="text-red-400">*</span>
@@ -2000,6 +2078,7 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                 <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Что нужно сделать?" autoFocus className={INP} />
               </div>
 
+              {/* Описание */}
               <div>
                 <label className="block text-base font-semibold text-[var(--text-primary)] mb-3">
                   Описание
@@ -2015,6 +2094,7 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                 </p>
               </div>
 
+              {/* Вложения */}
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70">
                   Вложения <span className="text-[var(--text-primary)]/40 text-xs">(до 10 файлов)</span>
@@ -2027,17 +2107,11 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                       <div className="space-y-2">
                         {existingAttachments.map((att, i) => (
                           <TaskAttachmentItem
-                            key={
-                              att.id ??
-                              `${getAttachmentName(att)}-${i}`
-                            }
+                            key={att.id ?? `${getAttachmentName(att)}-${i}`}
                             attachment={att}
                             onPreview={setPreviewItem}
                             onDelete={requestDeleteAttachment}
-                            deleting={
-                              !!att.id &&
-                              deletingAttachmentId === att.id
-                            }
+                            deleting={!!att.id && deletingAttachmentId === att.id}
                           />
                         ))}
                       </div>
@@ -2046,7 +2120,6 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                         У задачи пока нет вложений
                       </div>
                     )}
-
                   </div>
                 )}
 
@@ -2071,8 +2144,7 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                         ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30'
                         : 'bg-[var(--hover-3)] border-[var(--border-color)] group-hover:bg-[var(--accent)]/10 group-hover:border-[var(--accent)]/30'
                         }`}>
-                        <Plus className={`w-6 h-6 transition-colors ${isDragOver ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40 group-hover:text-[var(--accent)]'
-                          }`} />
+                        <Plus className={`w-6 h-6 transition-colors ${isDragOver ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40 group-hover:text-[var(--accent)]'}`} />
                       </div>
                       <div>
                         <p className="text-sm text-[var(--accent)] font-medium">
@@ -2122,18 +2194,23 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                   </div>
                 )}
               </div>
-
-
-
             </div>
 
-
+            {/* RIGHT */}
             <div className="space-y-4">
+              {/* Проект */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Проект</label>
-                <AsyncDD value={projectId} onChange={setProjectId} loadFn={loadProjects} placeholder="Не выбран" icon={FolderOpen} />
+                <AsyncDD
+                  value={projectId}
+                  onChange={setProjectId}
+                  loadFn={loadProjects}
+                  placeholder="Не выбран"
+                  icon={FolderOpen}
+                />
               </div>
 
+              {/* Заявка */}
               {!lockTicket && (
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Заявка</label>
@@ -2142,16 +2219,35 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
               )}
 
               {lockTicket && (
-                <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 flex items-center gap-3">
-                  <Ticket className="w-5 h-5 text-blue-400 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-primary)]">Создание на основании заявки</p>
-                    <p className="text-xs text-blue-400 truncate mt-0.5">{ticketLabel || 'Заявка будет привязана автоматически'}</p>
-                  </div>
-                </div>
-              )}
+  <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 flex items-center gap-3">
+    <Ticket className="w-5 h-5 text-blue-400 shrink-0" />
+    <div className="min-w-0">
+      <p className="text-sm font-medium text-[var(--text-primary)]">
+        Создание на основании заявки
+      </p>
 
+     {baseTicket ? (
+  <>
+    <p className="text-xs text-blue-400  mt-0.5">
+      {baseTicket.number} — {baseTicket.title}
+    </p>
 
+    {!!requesterLabel && (
+      <p className="text-xs text-[var(--text-primary)]/55 truncate">
+        от: {requesterLabel}
+      </p>
+    )}
+  </>
+) : (
+  <p className="text-xs text-blue-400 truncate mt-0.5">
+    {ticketLabel || 'Заявка будет привязана автоматически'}
+  </p>
+)}
+    </div>
+  </div>
+)}
+
+              {/* Приоритет */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Приоритет</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -2167,6 +2263,8 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                   })}
                 </div>
               </div>
+
+              {/* Сложность */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
                   Сложность
@@ -2196,10 +2294,8 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                 </div>
               </div>
 
+              {/* Трудозатраты и срок */}
               <div className="grid md:grid-cols-2 gap-4">
-
-
-
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5" title="Плановые трудозатраты">Трудозатраты (ч)</label>
                   <input type="number" min="0" step="0.5" value={estimatedHours} onChange={(e) => setEstimatedHours(e.target.value)} placeholder="Например 4" className={INP} />
@@ -2210,6 +2306,7 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                 </div>
               </div>
 
+              {/* Исполнитель */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">Исполнитель</label>
                 <AsyncDD value={assigneeId} onChange={setAssigneeId} loadFn={loadUsers} placeholder="Не назначен" icon={UserCheck} />
@@ -2231,6 +2328,7 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
           </div>
         </div>
 
+        {/* Footer */}
         <div className="flex justify-end gap-2.5 px-5 py-4 border-t border-[var(--border-color)] bg-[var(--hover-1)] shrink-0">
           <button onClick={() => !saving && onClose()} disabled={saving} className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 font-medium hover:bg-[var(--hover-3)] disabled:opacity-50 text-sm">Отмена</button>
           <button onClick={submit} disabled={!title.trim() || saving}
@@ -2241,77 +2339,35 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
         </div>
       </div>
 
-      {
-        previewItem && (
-          <AttachmentPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
-        )
-      }
+      {previewItem && (
+        <AttachmentPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
+      )}
+
       {deleteAttachmentIntent && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/60"
-            onClick={() => {
-              if (!deletingAttachmentId) {
-                setDeleteAttachmentIntent(null);
-              }
-            }}
-          />
-
-          <div
-            className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="absolute inset-0 bg-black/60" onClick={() => { if (!deletingAttachmentId) setDeleteAttachmentIntent(null); }} />
+          <div className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="p-5">
               <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center mb-4">
                 <Trash2 className="w-5 h-5 text-red-400" />
               </div>
-
-              <h3 className="text-base font-bold text-[var(--text-primary)]">
-                Открепить файл?
-              </h3>
-
-              <p className="mt-1.5 text-sm text-[var(--text-primary)]/50">
-                Файл будет удалён из вложений задачи.
-              </p>
-
+              <h3 className="text-base font-bold text-[var(--text-primary)]">Открепить файл?</h3>
+              <p className="mt-1.5 text-sm text-[var(--text-primary)]/50">Файл будет удалён из вложений задачи.</p>
               <div className="mt-3 px-3 py-2.5 rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)] text-sm text-[var(--text-primary)]/70 break-all">
-                {getAttachmentName(
-                  deleteAttachmentIntent,
-                )}
+                {getAttachmentName(deleteAttachmentIntent)}
               </div>
             </div>
-
             <div className="flex border-t border-[var(--border-color)]">
-              <button
-                type="button"
-                disabled={!!deletingAttachmentId}
-                onClick={() =>
-                  setDeleteAttachmentIntent(null)
-                }
-                className="flex-1 py-3 text-sm font-medium text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)] disabled:opacity-40"
-              >
-                Отмена
-              </button>
-
-              <button
-                type="button"
-                disabled={!!deletingAttachmentId}
-                onClick={deleteExistingAttachment}
-                className="flex-1 flex items-center justify-center gap-2 py-3 border-l border-[var(--border-color)] text-sm font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-40"
-              >
-                {deletingAttachmentId ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Trash2 className="w-4 h-4" />
-                )}
-
+              <button type="button" disabled={!!deletingAttachmentId} onClick={() => setDeleteAttachmentIntent(null)} className="flex-1 py-3 text-sm font-medium text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)] disabled:opacity-40">Отмена</button>
+              <button type="button" disabled={!!deletingAttachmentId} onClick={deleteExistingAttachment} className="flex-1 flex items-center justify-center gap-2 py-3 border-l border-[var(--border-color)] text-sm font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-40">
+                {deletingAttachmentId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 Открепить
               </button>
             </div>
           </div>
         </div>
       )}
-    </div >
+    </div>
   );
 }
 
@@ -2587,11 +2643,78 @@ function DetailModal({
                 />
                 {ST_LABEL[t.status]}
               </span>
+
+
+{/* Context: Ticket + Project (вверху и подсвечено) */}
+            {(ticketPath || t.project_id) && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {t.project_id && (
+                  <Link
+                    to={`/projects/${t.project_id}`}
+                    onClick={onClose}
+                    title={t.project_name ?? 'Открыть проект'}
+                    className="
+          group inline-flex items-center gap-2
+          px-3 py-2 rounded-xl
+          bg-amber-500/10 border border-amber-500/25
+          text-amber-400
+          hover:bg-amber-500/15 hover:border-amber-500/40
+          transition-colors
+        "
+                  >
+                    <FolderOpen className="w-4 h-4" />
+                    <div className="leading-tight">
+                      <div className="text-[10px] uppercase tracking-widest text-amber-300/80">
+                        Проект
+                      </div>
+                      <div className="text-sm font-semibold max-w-[420px] truncate">
+                        {t.project_name || 'Открыть проект'}
+                      </div>
+                    </div>
+
+                    <ArrowUpRight className="w-4 h-4 opacity-60 group-hover:opacity-100" />
+                  </Link>
+                )}
+
+                {ticketPath && (
+                  <Link
+                    to={ticketPath}
+                    onClick={onClose}
+                    title={ticketNo ?? 'Открыть заявку'}
+                    className="
+          group inline-flex items-center gap-2
+          px-3 py-2 rounded-xl
+          bg-violet-500/10 border border-violet-500/25
+          text-violet-300
+          hover:bg-violet-500/15 hover:border-violet-500/40
+          transition-colors
+        "
+                  >
+                    <Ticket className="w-4 h-4" />
+                    <div className="leading-tight">
+                      <div className="text-[10px] uppercase tracking-widest text-violet-200/80">
+                        Заявка
+                      </div>
+                      <div className="text-sm font-semibold truncate">
+                        {ticketNo ?? 'Открыть заявку'}
+                      </div>
+                    </div>
+
+                    <ArrowUpRight className="w-4 h-4 opacity-60 group-hover:opacity-100" />
+                  </Link>
+                )}
+              </div>
+            )}
+
+
+
             </div>
 
             <h2 className="text-xl md:text-2xl font-bold text-[var(--text-primary)] leading-snug tracking-tight">
               {t.title}
             </h2>
+
+            
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -2599,7 +2722,11 @@ function DetailModal({
               <button
                 type="button"
                 onClick={() => onEdit(t)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/75 text-sm font-medium hover:bg-[var(--hover-3)] transition-colors"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-base
+                             bg-emerald-600 hover:bg-emerald-700
+                             text-white font-semibold
+                             shadow-sm
+                             transition-colors"
               >
                 <Pencil className="w-4 h-4" />
                 Редактировать
@@ -2733,59 +2860,7 @@ function DetailModal({
                 </section>
               )}
 
-              {/* Relations */}
-              {(ticketPath ||
-                t.project_id) && (
-                  <section className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
-                    {ticketPath && (
-                      <div className="flex items-center gap-4 px-5 py-4 border-b border-[var(--border-color)] last:border-b-0">
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs text-[var(--text-primary)]/40 mb-1">
-                            Заявка
-                          </div>
-
-                          <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">
-                            {ticketNo ??
-                              'Открыть заявку'}
-                          </div>
-                        </div>
-
-                        <Link
-                          to={ticketPath}
-                          onClick={onClose}
-                          className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline shrink-0"
-                        >
-                          Открыть
-                          <ArrowUpRight className="w-4 h-4" />
-                        </Link>
-                      </div>
-                    )}
-
-                    {t.project_id && (
-                      <div className="flex items-center gap-4 px-5 py-4">
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs text-[var(--text-primary)]/40 mb-1">
-                            Проект
-                          </div>
-
-                          <div className="text-sm text-[var(--text-primary)]/80 font-medium truncate">
-                            {t.project_name ||
-                              'Открыть проект'}
-                          </div>
-                        </div>
-
-                        <Link
-                          to={`/projects/${t.project_id}`}
-                          onClick={onClose}
-                          className="text-sm text-[var(--accent)] flex items-center gap-1 font-medium hover:underline shrink-0"
-                        >
-                          Открыть
-                          <ArrowUpRight className="w-4 h-4" />
-                        </Link>
-                      </div>
-                    )}
-                  </section>
-                )}
+              
             </div>
 
             {/* RIGHT */}
@@ -3301,7 +3376,11 @@ function DetailModal({
               setShowArchive(true)
             }
             disabled={busy === 'arch'}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-[var(--text-primary)]/40 hover:bg-red-500/10 hover:text-red-400 transition-colors disabled:opacity-40"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-base
+                             bg-red-600 hover:bg-red-700
+                             text-white font-semibold
+                             shadow-sm
+                             transition-colors"
           >
             <Archive className="w-4 h-4" />
             В архив
@@ -3310,7 +3389,11 @@ function DetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 text-sm font-medium hover:bg-[var(--hover-3)] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-base
+                             bg-emerald-600 hover:bg-emerald-700
+                             text-white font-semibold
+                             shadow-sm
+                             transition-colors"
           >
             Закрыть
           </button>
@@ -3810,13 +3893,13 @@ export default function TasksPage() {
         return next.map((c) =>
           c.status === to
             ? {
-                ...c,
-                tasks: {
-                  ...c.tasks,
-                  items: [updated, ...c.tasks.items.filter((x) => x.id !== id)],
-                  total_items: c.tasks.total_items + 1,
-                },
-              }
+              ...c,
+              tasks: {
+                ...c.tasks,
+                items: [updated, ...c.tasks.items.filter((x) => x.id !== id)],
+                total_items: c.tasks.total_items + 1,
+              },
+            }
             : c,
         );
       });
@@ -3965,24 +4048,24 @@ export default function TasksPage() {
   }, [lastMove, undoingMove, fetchBoard, highlightMovedTask, revealTask, toast]);
 
   const ql = q.trim().toLowerCase();
-const disp = useMemo(() => {
-  if (!ql) return cols;
-  return cols.map((c) => ({
-    ...c,
-    tasks: {
-      ...c.tasks,
-      items: c.tasks.items.filter((t) => {
-        const ticketNo = getTaskTicketNumber(t) ?? '';
-        return (
-          t.title.toLowerCase().includes(ql) ||
-          t.number.toLowerCase().includes(ql) ||
-          String(t.description ?? '').toLowerCase().includes(ql) ||
-          ticketNo.toLowerCase().includes(ql)
-        );
-      }),
-    },
-  }));
-}, [cols, ql]);
+  const disp = useMemo(() => {
+    if (!ql) return cols;
+    return cols.map((c) => ({
+      ...c,
+      tasks: {
+        ...c.tasks,
+        items: c.tasks.items.filter((t) => {
+          const ticketNo = getTaskTicketNumber(t) ?? '';
+          return (
+            t.title.toLowerCase().includes(ql) ||
+            t.number.toLowerCase().includes(ql) ||
+            String(t.description ?? '').toLowerCase().includes(ql) ||
+            ticketNo.toLowerCase().includes(ql)
+          );
+        }),
+      },
+    }));
+  }, [cols, ql]);
 
   const hf = fp.length > 0 || fo;
   const done = cols.find((c) => c.status === 'done')?.tasks.total_items ?? 0;
@@ -4015,10 +4098,10 @@ const disp = useMemo(() => {
     const r = await projectsApi.getAll(p, 20);
     const f = search
       ? r.items.filter(
-          (x) =>
-            x.name.toLowerCase().includes(search.toLowerCase()) ||
-            x.key.toLowerCase().includes(search.toLowerCase()),
-        )
+        (x) =>
+          x.name.toLowerCase().includes(search.toLowerCase()) ||
+          x.key.toLowerCase().includes(search.toLowerCase()),
+      )
       : r.items;
     return {
       items: f.map((x) => ({
@@ -4040,10 +4123,10 @@ const disp = useMemo(() => {
     }
     const f = search
       ? items.filter(
-          (u) =>
-            (u.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
-            u.email.toLowerCase().includes(search.toLowerCase()),
-        )
+        (u) =>
+          (u.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
+          u.email.toLowerCase().includes(search.toLowerCase()),
+      )
       : items;
     return {
       items: f.map((u) => ({
@@ -4057,9 +4140,9 @@ const disp = useMemo(() => {
 
   const dragInfo = drag
     ? (() => {
-        const t = cols.flatMap((c) => c.tasks.items).find((x) => x.id === drag.id);
-        return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null;
-      })()
+      const t = cols.flatMap((c) => c.tasks.items).find((x) => x.id === drag.id);
+      return t ? { id: drag.id, from: drag.from, title: t.title, number: t.number } : null;
+    })()
     : null;
 
   const handleScrollbarPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -4155,11 +4238,10 @@ const disp = useMemo(() => {
           <div className="relative">
             <button
               onClick={() => setSf((v) => !v)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${
-                hf
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${hf
                   ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--accent)]'
                   : 'bg-[var(--hover-2)] border-[var(--border-color)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-3)]'
-              }`}
+                }`}
             >
               <Filter className="w-4 h-4" />
               Фильтры
@@ -4182,11 +4264,10 @@ const disp = useMemo(() => {
                             onClick={() =>
                               setFp((v) => (v.includes(p.value) ? v.filter((x) => x !== p.value) : [...v, p.value]))
                             }
-                            className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-all ${
-                              fp.includes(p.value)
+                            className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-all ${fp.includes(p.value)
                                 ? `${m.bg} ${m.c} ${m.brd}`
                                 : 'bg-[var(--hover-1)] text-[var(--text-primary)]/50 border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                            }`}
+                              }`}
                           >
                             <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
                             {p.label}
@@ -4198,14 +4279,12 @@ const disp = useMemo(() => {
                   <div className="border-t border-[var(--border-color)] pt-2">
                     <button
                       onClick={() => setFo((v) => !v)}
-                      className={`w-full flex items-center gap-2 py-1.5 px-2 rounded font-medium text-sm transition-colors ${
-                        fo ? 'text-[var(--accent)] bg-[var(--accent)]/5' : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'
-                      }`}
+                      className={`w-full flex items-center gap-2 py-1.5 px-2 rounded font-medium text-sm transition-colors ${fo ? 'text-[var(--accent)] bg-[var(--accent)]/5' : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'
+                        }`}
                     >
                       <div
-                        className={`w-4 h-4 rounded border flex items-center justify-center ${
-                          fo ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'
-                        }`}
+                        className={`w-4 h-4 rounded border flex items-center justify-center ${fo ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'
+                          }`}
                       >
                         {fo && <Check className="w-3 h-3 text-white" />}
                       </div>
@@ -4256,11 +4335,10 @@ const disp = useMemo(() => {
                 <button
                   key={t.id}
                   onClick={() => setMode(t.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    mode === t.id
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${mode === t.id
                       ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
                       : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80 hover:bg-[var(--hover-2)]'
-                  }`}
+                    }`}
                 >
                   <I className="w-3.5 h-3.5" />
                   {t.label}
@@ -4311,11 +4389,10 @@ const disp = useMemo(() => {
         <div className="flex items-center gap-1 p-1 bg-[var(--hover-1)] rounded-lg border border-[var(--border-color)]">
           <button
             onClick={() => setViewMode('kanban')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'kanban'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'kanban'
                 ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
                 : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
-            }`}
+              }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
             Доска
@@ -4323,11 +4400,10 @@ const disp = useMemo(() => {
 
           <button
             onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'list'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'list'
                 ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
                 : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
-            }`}
+              }`}
           >
             <List className="w-3.5 h-3.5" />
             Список
@@ -4336,11 +4412,10 @@ const disp = useMemo(() => {
           <button
             type="button"
             onClick={() => setViewMode('analytics')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'analytics'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'analytics'
                 ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
                 : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'
-            }`}
+              }`}
           >
             <BarChart3 className="w-3.5 h-3.5" />
             Аналитика
@@ -4357,8 +4432,8 @@ const disp = useMemo(() => {
                 {mode === 'project' && !selP
                   ? 'Выберите проект'
                   : mode === 'assignee' && !selA
-                  ? 'Выберите исполнителя'
-                  : 'Выберите заявку'}
+                    ? 'Выберите исполнителя'
+                    : 'Выберите заявку'}
               </p>
               <p className="text-sm mt-1 text-[var(--text-primary)]/25">
                 После выбора здесь появится аналитика
@@ -4387,10 +4462,10 @@ const disp = useMemo(() => {
               {mode === 'project' && !selP
                 ? 'Выберите проект'
                 : mode === 'assignee' && !selA
-                ? 'Выберите исполнителя'
-                : mode === 'ticket' && !selT
-                ? 'Выберите заявку'
-                : 'Нет задач'}
+                  ? 'Выберите исполнителя'
+                  : mode === 'ticket' && !selT
+                    ? 'Выберите заявку'
+                    : 'Нет задач'}
             </p>
           </div>
         ) : (

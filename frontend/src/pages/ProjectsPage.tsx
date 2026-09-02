@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useLayoutEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useLayoutEffect, useCallback, } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus, FolderOpen, Search, Loader2, Users,
@@ -9,6 +9,8 @@ import {
 import { projectsApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import type { Project } from '../types';
+
+import type { ElementType, ReactNode } from 'react';
 
 /* 
    ROLE DROPDOWN
@@ -139,110 +141,221 @@ function FilterTag({ label, icon, colorClass, onRemove }: {
   );
 }
 
-/* 
-   PROJECT CARD — крупная, информативная карточка
-    */
 
-function ProjectCard({ project, userRole, formatDate, getParticipantsCount }: {
+function ProjectsTableHeader() {
+  const cols: { label: ReactNode; align?: string }[] = [
+    { label: <>Проект<br />/ Ключ</> },
+    { label: 'Описание' },
+    { label: 'Статус' },
+    { label: 'Создан', align: 'text-right' },
+    { label: '' },
+  ];
+
+  return (
+    <div
+      className="hidden lg:grid px-5 py-3 text-[13px] uppercase tracking-widest
+                 font-semibold text-[var(--text-primary)]/25 border-b border-[var(--border-color)]"
+      style={{ gridTemplateColumns: 'minmax(0,2.2fr) minmax(0,2fr) 160px 220px 160px 44px' }}
+    >
+      {cols.map((c, i) => (
+        <div key={i} className={c.align || ''}>{c.label}</div>
+      ))}
+    </div>
+  );
+}
+
+function ProjectRow({
+  project,
+  userRole,
+  formatDate,
+  participantsCount,
+}: {
   project: Project;
   userRole: string | null;
   formatDate: (d: string) => string;
-  getParticipantsCount: (p: Project) => number;
+  participantsCount: number;
 }) {
   const isActive = project.status === 'active';
-  const participantsCount = getParticipantsCount(project);
+
+  const roleBadge =
+    userRole === 'owner'
+      ? { label: 'Владелец', cls: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: <Crown size={14} /> }
+      : userRole === 'member'
+        ? { label: 'Участник', cls: 'bg-blue-500/10 text-[var(--info)] border-blue-500/20', icon: <UserCheck size={14} /> }
+        : null;
 
   return (
-    <Link to={`/projects/${project.id}`}
-      className=" rounded-2xl border border-[var(--border-color)] overflow-hidden
-                 hover:border-[var(--border-hover)] hover:-translate-y-0.5
-                 transition-all duration-200 group block">
-
-      {/* Верхняя часть */}
-      <div className="p-6">
-        {/* Шапка: иконка + название + стрелка */}
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div className="flex items-center gap-4 min-w-0 flex-1">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[var(--status-open-bg)] to-[var(--status-agreement-bg)]
-                                        flex items-center justify-center flex-shrink-0
-                                        ring-1 ring-[var(--status-open-border)]
-                                        group-hover:ring-[var(--status-open-text)]/30 transition-all">
-              <FolderOpen className="w-5 h-5 text-[var(--status-open-text)]/70 group-hover:text-[var(--status-open-text)] transition-colors" />
-            </div>
-
-            <div className="min-w-0">
-              <h3 className="text-lg font-bold text-[var(--text-primary)] leading-snug
-                             group-hover:text-[var(--accent)] transition-colors truncate">
-                {project.name || 'Без названия'}
-              </h3>
-              <span className="text-base font-mono text-[var(--text-muted)] mt-0.5 block">
-                {project.key || '—'}
-              </span>
-            </div>
+    <Link
+      to={`/projects/${project.id}`}
+      className="
+        grid items-start px-5 py-4 rounded-xl
+        hover:bg-[var(--hover-1)] active:bg-[var(--hover-2)]
+        transition-colors duration-100 group
+      "
+      style={{ gridTemplateColumns: 'minmax(0,2.2fr) minmax(0,2fr) 160px 220px 160px 44px' }}
+    >
+      {/* Проект / ключ */}
+      <div className="min-w-0 pr-4">
+        <div className="flex items-start gap-3">
+          <div
+            className="
+              w-11 h-11 rounded-xl flex items-center justify-center shrink-0
+              bg-gradient-to-br from-[var(--status-open-bg)] to-[var(--status-agreement-bg)]
+              ring-1 ring-[var(--status-open-border)]
+            "
+          >
+            <FolderOpen className="w-5 h-5 text-[var(--status-open-text)]/80" />
           </div>
 
-          <ChevronRight size={18}
-            className="text-[var(--text-muted)] group-hover:text-[var(--accent)]
-                       group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-2" />
-        </div>
-
-        {/* Описание */}
-        {project.description && (
-          <p className="text-base text-[var(--text-secondary)] mb-4 line-clamp-2 leading-relaxed">
-            {project.description}
-          </p>
-        )}
-
-        {/* Бейджи */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border
-            ${isActive
-              ? 'bg-emerald-500/10 text-[var(--success)] border-emerald-500/20'
-              : 'bg-[var(--hover-1)] text-[var(--text-muted)] border-[var(--border-color)]'
-            }`}>
-            {isActive ? <Check size={14} /> : <Archive size={14} />}
-            {isActive ? 'Активен' : 'Архив'}
-          </span>
-
-          {userRole && (
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border
-              ${userRole === 'owner'
-                ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                : 'bg-blue-500/10 text-[var(--info)] border-blue-500/20'
-              }`}>
-              {userRole === 'owner' ? <Crown size={14} /> : <UserCheck size={14} />}
-              {userRole === 'owner' ? 'Владелец' : 'Участник'}
+          <div className="min-w-0">
+            <span
+              className="
+                text-[18px] font-semibold text-[var(--text-primary)] block leading-snug
+                group-hover:text-[var(--accent-light)] transition-colors
+                line-clamp-1
+              "
+            >
+              {project.name || 'Без названия'}
             </span>
-          )}
 
-          {participantsCount > 0 && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
-                             bg-[var(--hover-2)] text-[var(--text-primary)]/60 border border-[var(--border-color)]">
-              <Users size={14} />
-              {participantsCount} {participantsCount === 1 ? 'участник' : participantsCount < 5 ? 'участника' : 'участников'}
+            <span className="text-[15px] font-mono text-[var(--text-primary)]/55 mt-1 block truncate">
+              {project.key || '—'}
             </span>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* Нижняя часть */}
-      <div className="flex items-center justify-between px-6 py-3 border-t border-[var(--border-color)]
-                      bg-[var(--hover-1)]/50 text-base text-[var(--text-muted)]">
-        <span className="flex items-center gap-2">
-          <Calendar size={14} />
-          Создан {formatDate(project.created_at)}
-        </span>
+      {/* Описание */}
+      <div className="min-w-0 pr-4 self-center">
+        {project.description ? (
+          <p className="text-[16px] text-[var(--text-primary)]/55 leading-snug line-clamp-2">
+            {project.description}
+          </p>
+        ) : (
+          <span className="text-[16px] text-[var(--text-primary)]/20">—</span>
+        )}
 
         {project.counterparty_id && (
-          <span className="flex items-center gap-2">
-            <Building2 size={14} />
-            Привязан к контрагенту
-          </span>
+          <div className="mt-1 flex items-center gap-2 text-[14px] text-[var(--text-primary)]/35">
+            <Building2 size={16} className="shrink-0" />
+            <span className="truncate">Привязан к контрагенту</span>
+          </div>
         )}
+      </div>
+
+      {/* Статус */}
+      <div className="self-center">
+        <span
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[14px] font-semibold border whitespace-nowrap
+            ${
+              isActive
+                ? 'bg-emerald-500/10 text-[var(--success)] border-emerald-500/20'
+                : 'bg-[var(--hover-1)] text-[var(--text-muted)] border-[var(--border-color)]'
+            }`}
+        >
+          {isActive ? <Check size={14} /> : <Archive size={14} />}
+          {isActive ? 'Активен' : 'Архив'}
+        </span>
+      </div>
+
+      
+
+      {/* Создан */}
+      <div className="self-center text-right">
+        <span className="text-[15px] text-[var(--text-primary)]/45 whitespace-nowrap">
+          {formatDate(project.created_at)}
+        </span>
+      </div>
+
+      {/* Arrow */}
+      <div className="self-center flex items-center justify-end">
+        <ChevronRight
+          size={20}
+          className="text-[var(--text-primary)]/20 group-hover:text-[var(--accent-light)] group-hover:translate-x-0.5 transition-all shrink-0"
+        />
       </div>
     </Link>
   );
 }
+
+function ProjectMobileCard({
+  project,
+  userRole,
+  formatDate,
+  participantsCount,
+}: {
+  project: Project;
+  userRole: string | null;
+  formatDate: (d: string) => string;
+  participantsCount: number;
+}) {
+  const isActive = project.status === 'active';
+
+  return (
+    <Link
+      to={`/projects/${project.id}`}
+      className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5 block
+                 hover:bg-[var(--hover-1)] hover:border-[var(--border-hover)] transition-all"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[18px] font-semibold text-[var(--text-primary)] truncate">
+            {project.name || 'Без названия'}
+          </p>
+          <p className="mt-1 text-[15px] font-mono text-[var(--text-primary)]/55 truncate">
+            {project.key || '—'}
+          </p>
+        </div>
+        <ChevronRight className="w-5 h-5 text-[var(--text-primary)]/25 shrink-0" />
+      </div>
+
+      {project.description && (
+        <p className="mt-3 text-[16px] text-[var(--text-primary)]/55 line-clamp-2">
+          {project.description}
+        </p>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <span
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[14px] font-semibold border
+            ${isActive ? 'bg-emerald-500/10 text-[var(--success)] border-emerald-500/20' : 'bg-[var(--hover-1)] text-[var(--text-muted)] border-[var(--border-color)]'}`}
+        >
+          {isActive ? <Check size={14} /> : <Archive size={14} />}
+          {isActive ? 'Активен' : 'Архив'}
+        </span>
+
+        {userRole && (
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[14px] font-semibold border
+            ${userRole === 'owner'
+              ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+              : 'bg-blue-500/10 text-[var(--info)] border-blue-500/20'
+            }`}
+          >
+            {userRole === 'owner' ? <Crown size={14} /> : <UserCheck size={14} />}
+            {userRole === 'owner' ? 'Владелец' : 'Участник'}
+          </span>
+        )}
+
+        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[14px] font-semibold
+                         bg-[var(--hover-2)] text-[var(--text-primary)]/60 border border-[var(--border-color)]">
+          <Users size={14} />
+          {participantsCount}
+        </span>
+
+        <span className="ml-auto text-[14px] text-[var(--text-primary)]/40 flex items-center gap-2">
+          <Calendar size={14} />
+          {formatDate(project.created_at)}
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+/* 
+   PROJECT CARD — крупная, информативная карточка
+    */
+
+
 
 /* 
    EMPTY STATE
@@ -360,7 +473,7 @@ const canCreateProject = isSupport || isAdmin;
 
   const getUserRoleInProject = (project: Project) => {
     if (!user?.id) return null;
-    return project.memberships?.find(m => m.user_id === user.user_id)?.project_role ?? null;
+    return project.memberships?.find(m => m.user_id === user.id)?.project_role ?? null;
   };
   
   const hasFilters = !!(search || (isCustomer && projectRole !== 'all'));
@@ -523,17 +636,35 @@ const canCreateProject = isSupport || isAdmin;
         <EmptyState hasFilters={hasFilters} search={search} isCustomer={isCustomer} canCreate={canCreateProject} />
       ) : (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {filteredProjects.map(project => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                userRole={getUserRoleInProject(project)}
-                formatDate={formatDate}
-                getParticipantsCount={getParticipantsCount}
-              />
-            ))}
-          </div>
+          {/* Desktop table */}
+<div className="hidden lg:block rounded-xl border border-[var(--border-color)] relative overflow-visible">
+  <ProjectsTableHeader />
+
+  <div className="divide-y divide-[var(--border-color)]/40 px-1 py-1">
+    {filteredProjects.map((project) => (
+      <ProjectRow
+        key={project.id}
+        project={project}
+        userRole={getUserRoleInProject(project)}
+        formatDate={formatDate}
+        participantsCount={getParticipantsCount(project)}
+      />
+    ))}
+  </div>
+</div>
+
+{/* Mobile cards */}
+<div className="lg:hidden space-y-3">
+  {filteredProjects.map((project) => (
+    <ProjectMobileCard
+      key={project.id}
+      project={project}
+      userRole={getUserRoleInProject(project)}
+      formatDate={formatDate}
+      participantsCount={getParticipantsCount(project)}
+    />
+  ))}
+</div>
 
           {/* ── Pagination ─────────────────────────────────────────── */}
           {totalPages > 1 && (

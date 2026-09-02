@@ -6,9 +6,10 @@ from uuid import UUID
 from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import selectinload
 
+from src.comments.domain.vo import CommentVisibility
+from src.comments.infra.models import CommentOrm, ReactionOrm
 from src.shared.infra.repos import SqlAlchemyRepository
 from src.shared.schemas import Page, Pagination
-from src.comments.domain.vo import CommentVisibility
 
 from ..domain.dtos import ActorsFilters
 from ..domain.entities import Comment, Reaction, Ticket
@@ -16,7 +17,6 @@ from ..domain.repos import ReactionStats, TicketFilters
 from ..domain.vo import ReactionType
 from .mappers import CommentMapper, ReactionMapper, TicketMapper
 from .models import TicketOrm
-from src.comments.infra.models import CommentOrm, ReactionOrm
 
 
 class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
@@ -49,7 +49,7 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
 
         return stmt
 
-    def _apply_ticket_filters(
+    def _apply_ticket_filters(  # noqa: C901
             self, stmt: Select[tuple[TicketOrm]], filters: TicketFilters,
     ) -> Select[tuple[TicketOrm]]:
         if filters.statuses:
@@ -69,6 +69,10 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
         if filters.project_ids:
             stmt = stmt.where(self.model.project_id.in_(filters.project_ids))
 
+        # фильтр по этапам проекта
+        if filters.stage_ids:
+            stmt = stmt.where(self.model.stage_id.in_(filters.stage_ids))
+
         # фильтр по контрагенту
         if filters.counterparty_id:
             stmt = stmt.where(self.model.counterparty_id == filters.counterparty_id)
@@ -77,7 +81,6 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
             stmt = stmt.where(
                 self.model.search_vector.op("@@")(
                     func.plainto_tsquery("russian", filters.search_query)
-                    
                 )
             )
 
@@ -93,7 +96,7 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
     async def paginate(
             self, pagination: Pagination, filters: TicketFilters | None = None,
     ) -> Page[Ticket]:
-        stmt = select(self.model)
+        stmt = select(self.model).options(selectinload(self.model.attachments))
 
         if filters is not None:
             stmt = self._apply_ticket_filters(stmt, filters)

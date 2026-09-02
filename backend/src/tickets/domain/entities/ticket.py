@@ -7,7 +7,6 @@ from uuid import UUID
 from typing_extensions import Doc
 
 from src.iam.domain.vo import UserRole
-
 from src.media.domain.entities import Attachment
 from src.shared.domain.entities import AggregateRoot
 from src.shared.domain.exceptions import InvalidStateError
@@ -45,6 +44,7 @@ class Ticket(AggregateRoot):
     """
 
     project_id: UUID | None = None
+    stage_id: UUID | None = None
     counterparty_id: UUID | None = None
     product_id: UUID | None = None
 
@@ -70,10 +70,14 @@ class Ticket(AggregateRoot):
 
     tags: list[Tag] = field(default_factory=list)
     attachments: list[Attachment] = field(default_factory=list)
+    has_attachments: bool = False
 
     def __post_init__(self) -> None:
         if not self.title.strip() or not self.description.strip():
             raise ValueError("Ticket title or description cannot be empty")
+
+        if self.stage_id is not None and self.project_id is None:
+            raise InvalidStateError("Ticket stage requires a project")
 
     def _perform(self, action: TicketAction, actor_id: UUID, *args) -> None:
         """Выполняет переход в новое состояние."""
@@ -115,12 +119,13 @@ class Ticket(AggregateRoot):
         number: TicketNumber,
         reporter_id: UUID,
         created_by: UUID,
-        
+
         title: str,
         description: str | None = None,
         ticket_type: TicketType = TicketType.SERVICE_REQUEST,
         priority: Priority = Priority.MEDIUM,
         project_id: UUID | None = None,
+        stage_id: UUID | None = None,
         counterparty_id: UUID | None = None,
         product_id: UUID | None = None,
         created_by_role: UserRole | None = None,
@@ -128,7 +133,11 @@ class Ticket(AggregateRoot):
         tags: list[Tag] | None = None,
     ) -> Self:
         # Определяем статус в зависимости от роли создателя
-        status = TicketStatus.PENDING_APPROVAL if created_by_role in (UserRole.CUSTOMER, UserRole.CUSTOMER_ADMIN) else TicketStatus.NEW
+        status = (
+            TicketStatus.PENDING_APPROVAL
+            if created_by_role in {UserRole.CUSTOMER, UserRole.CUSTOMER_ADMIN}
+            else TicketStatus.NEW
+        )
 
         ticket = cls(
             created_by=created_by,
@@ -139,6 +148,7 @@ class Ticket(AggregateRoot):
             type=ticket_type,
             priority=priority,
             status=status,
+            stage_id=stage_id,
             created_by_role=created_by_role,
             project_id=project_id,
             counterparty_id=counterparty_id,
@@ -164,6 +174,7 @@ class Ticket(AggregateRoot):
         title: str | None = None,
         description: str | None = None,
         priority: Priority | None = None,
+        stage_id: UUID | None = None,
         tags: list[Tag] | None = None,
     ) -> None:
         """
@@ -205,6 +216,20 @@ class Ticket(AggregateRoot):
                     new_priority=self.priority,
                 )
             )
+
+        if stage_id is not None:
+            if self.project_id is None:
+                raise InvalidStateError("Ticket stage requires a project")
+
+            if stage_id != self.stage_id:
+                old_stage_id = self.stage_id
+                self.stage_id = stage_id
+
+                changes["stage_id"] = [
+                    str(old_stage_id) if old_stage_id else "",
+                    str(stage_id),
+                ]
+                changed = True
 
         if tags is not None and set(tags) != set(self.tags):
             old_tags = ", ".join([tag.name for tag in self.tags])
