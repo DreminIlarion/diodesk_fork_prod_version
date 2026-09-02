@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Query, status
 
 from src.iam.dependencies import CurrentSubjectDep, get_current_subject, require_role
@@ -6,7 +8,12 @@ from src.shared.schemas import Page
 
 from ..dependencies import MyProjectsDep, ProjectDep, ProjectServiceDep, ProjectsPageDep
 from ..domain.services import generate_project_key
-from ..schemas import KeyCheckResult, ProjectCreate, ProjectResponse
+from ..schemas import (
+    KeyCheckResult,
+    ProjectCreate,
+    ProjectResponse,
+    ProjectUpdate,
+)
 
 router = APIRouter(prefix="/projects", tags=["Проекты"])
 
@@ -51,6 +58,42 @@ async def create_project(
         current_subject: CurrentSubjectDep, data: ProjectCreate, service: ProjectServiceDep
 ) -> ProjectResponse:
     return await service.create(data, current_subject)
+
+
+@router.patch(
+    path="/{project_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=ProjectResponse,
+    summary="Редактировать проект",
+)
+async def update_project(
+        project_id: UUID,
+        data: ProjectUpdate,
+        current_subject: CurrentSubjectDep,
+        service: ProjectServiceDep,
+) -> ProjectResponse:
+    return await service.edit(
+        project_id=project_id,
+        data=data,
+        current_subject=current_subject,
+    )
+
+
+@router.delete(
+    path="/{project_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=ProjectResponse,
+    summary="Архивировать проект",
+)
+async def archive_project(
+        project_id: UUID,
+        current_subject: CurrentSubjectDep,
+        service: ProjectServiceDep,
+) -> ProjectResponse:
+    return await service.archive(
+        project_id=project_id,
+        current_subject=current_subject,
+    )
 
 
 @router.get(
