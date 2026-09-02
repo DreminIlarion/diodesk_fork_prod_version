@@ -41,6 +41,13 @@ class ProjectCreate(ProjectBase):
     """Схема для создания проекта"""
 
 
+class ProjectUpdate(BaseModel):
+    """Редактирование проекта"""
+
+    name: str | None = Field(None, description="Наименование проекта")
+    description: str | None = Field(None, description="Описание проекта")
+
+
 class ProjectMemberResponse(BaseModel):
     """
     Участник проекта.

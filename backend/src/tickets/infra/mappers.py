@@ -1,3 +1,4 @@
+from src.comments.infra.models import CommentOrm, ReactionOrm
 from src.media.infra.repo import AttachmentMapper
 from src.shared.domain.vo import Tag
 from src.shared.infra.repos import ModelMapper
@@ -5,7 +6,6 @@ from src.shared.infra.repos import ModelMapper
 from ..domain.entities import Comment, Reaction, Ticket
 from ..domain.vo import TicketNumber
 from .models import TicketOrm
-from src.comments.infra.models import CommentOrm, ReactionOrm
 
 
 class CommentMapper(ModelMapper[Comment, CommentOrm]):
@@ -55,6 +55,7 @@ class TicketMapper(ModelMapper[Ticket, TicketOrm]):
             updated_at=model.updated_at,
             deleted_at=model.deleted_at,
             project_id=model.project_id,
+            stage_id=model.stage_id,
             counterparty_id=model.counterparty_id,
             product_id=model.product_id,
             created_by=model.created_by,
@@ -86,6 +87,7 @@ class TicketMapper(ModelMapper[Ticket, TicketOrm]):
             updated_at=model.updated_at,
             deleted_at=model.deleted_at,
             project_id=model.project_id,
+            stage_id=model.stage_id,
             counterparty_id=model.counterparty_id,
             product_id=model.product_id,
             created_by=model.created_by,
@@ -116,6 +118,7 @@ class TicketMapper(ModelMapper[Ticket, TicketOrm]):
             updated_at=entity.updated_at,
             deleted_at=entity.deleted_at,
             project_id=entity.project_id,
+            stage_id=entity.stage_id,
             counterparty_id=entity.counterparty_id,
             product_id=entity.product_id,
             created_by=entity.created_by,
