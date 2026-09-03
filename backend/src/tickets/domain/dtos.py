@@ -29,6 +29,7 @@ class TicketFilters:
 
     counterparty_id: UUID | None = None
     project_ids: set[UUID] | None = None
+    stage_ids: set[UUID] | None = None
 
     statuses: list[TicketStatus] | None = None
     priorities: list[Priority] | None = None  # ИСПРАВЛЕНО: было Priority | None

@@ -5,12 +5,14 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.iam.domain.authz import Subject, SubjectType
+from src.iam.domain.exceptions import PermissionDeniedError
 from src.iam.domain.vo import UserRole
-from src.iam.schemas import CurrentUser
-from src.projects.domain.entities import Project
-from src.projects.schemas import ProjectCreate
+from src.projects.domain.entities import Project, ProjectMember
+from src.projects.domain.vo import MemberRole, ProjectKey, ProjectStatus
+from src.projects.schemas import ProjectCreate, ProjectUpdate
 from src.projects.services import ProjectService
-from src.shared.domain.exceptions import AlreadyExistsError
+from src.shared.domain.exceptions import AlreadyExistsError, NotFoundError
 
 
 @pytest.fixture
@@ -20,23 +22,26 @@ def mock_session():
 
 @pytest.fixture
 def project_service(
-        mock_session, fake_project_repo, fake_membership_repo, fake_user_repo, event_publisher
+    mock_session,
+    fake_project_repo,
+    fake_membership_repo,
+    event_publisher,
 ):
     return ProjectService(
-        session=mock_session,
+        uow=mock_session,
         project_repo=fake_project_repo,
         member_repo=fake_membership_repo,
-        user_repo=fake_user_repo,
         event_publisher=event_publisher,
     )
 
 
 @pytest.fixture
-async def created_project(fake_project_repo):
+async def created_project(fake_project_repo, current_support_manager):
     project = Project.create(
         name="Test Project",
-        key="TEST",
-        created_by=uuid4(),
+        key=ProjectKey("TEST"),
+        created_by=current_support_manager.id,
+        description="Initial description",
     )
     await fake_project_repo.create(project)
     return project
@@ -44,11 +49,25 @@ async def created_project(fake_project_repo):
 
 @pytest.fixture
 def current_support_manager():
-    return CurrentUser(
-        user_id=uuid4(),
-        email="support.agent@mail.com",
-        role=UserRole.SUPPORT_MANAGER,
+    return Subject(
+        id=uuid4(),
+        type=SubjectType.USER,
+        roles=[UserRole.SUPPORT_MANAGER],
     )
+
+
+@pytest.fixture
+async def owner_membership(
+        created_project, current_support_manager, fake_membership_repo
+):
+    membership = ProjectMember(
+        project_id=created_project.id,
+        user_id=current_support_manager.id,
+        roles={MemberRole.OWNER},
+        created_by=current_support_manager.id,
+    )
+    await fake_membership_repo.create(membership)
+    return membership
 
 
 class TestCheckKey:
@@ -163,3 +182,157 @@ class TestCreateProject:
 
             assert "2 attempts were not enough" in str(exc.value)
             assert exc.value.details["last_suggested_key"] == "TEST2"
+
+
+class TestEditProject:
+
+    async def test_edit_project_success(
+            self,
+            project_service,
+            created_project,
+            owner_membership,
+            fake_project_repo,
+            current_support_manager,
+            mock_session,
+    ):
+        assert owner_membership.project_id == created_project.id
+
+        response = await project_service.edit(
+            project_id=created_project.id,
+            data=ProjectUpdate(
+                name="  Updated Project  ",
+                description="  Updated description  ",
+            ),
+            current_subject=current_support_manager,
+        )
+
+        assert response.id == created_project.id
+        assert response.name == "Updated Project"
+        assert response.description == "Updated description"
+
+        saved_project = await fake_project_repo.read(created_project.id)
+
+        assert saved_project is not None
+        assert saved_project.name == "Updated Project"
+        assert saved_project.description == "Updated description"
+        mock_session.commit.assert_awaited_once()
+
+    async def test_edit_project_forbidden_for_non_member(
+            self, project_service, created_project, mock_session
+    ):
+        non_member = Subject(
+            id=uuid4(),
+            type=SubjectType.USER,
+            roles=[UserRole.SUPPORT_MANAGER],
+        )
+
+        with pytest.raises(PermissionDeniedError):
+            await project_service.edit(
+                project_id=created_project.id,
+                data=ProjectUpdate(name="Forbidden update"),
+                current_subject=non_member,
+            )
+
+        assert created_project.name == "Test Project"
+        mock_session.commit.assert_not_awaited()
+
+    async def test_edit_missing_project(
+            self, project_service, current_support_manager, mock_session
+    ):
+        with pytest.raises(NotFoundError):
+            await project_service.edit(
+                project_id=uuid4(),
+                data=ProjectUpdate(name="Updated Project"),
+                current_subject=current_support_manager,
+            )
+
+        mock_session.commit.assert_not_awaited()
+
+    async def test_edit_project_rejects_empty_name(
+            self,
+            project_service,
+            created_project,
+            owner_membership,
+            current_support_manager,
+            mock_session,
+    ):
+        assert owner_membership.project_id == created_project.id
+
+        with pytest.raises(ValueError, match="Project name cannot be empty"):
+            await project_service.edit(
+                project_id=created_project.id,
+                data=ProjectUpdate(name="   "),
+                current_subject=current_support_manager,
+            )
+
+        mock_session.commit.assert_not_awaited()
+
+
+class TestArchiveProject:
+
+    async def test_archive_project_success(
+            self,
+            project_service,
+            created_project,
+            owner_membership,
+            fake_project_repo,
+            current_support_manager,
+            mock_session,
+    ):
+        assert owner_membership.project_id == created_project.id
+
+        response = await project_service.archive(
+            project_id=created_project.id,
+            current_subject=current_support_manager,
+        )
+
+        assert response.id == created_project.id
+        assert response.status == ProjectStatus.ARCHIVED
+
+        saved_project = await fake_project_repo.read(created_project.id)
+
+        assert saved_project is not None
+        assert saved_project.status == ProjectStatus.ARCHIVED
+        assert saved_project.is_deleted is True
+        mock_session.commit.assert_awaited_once()
+
+    async def test_only_owner_can_archive_project(
+            self,
+            project_service,
+            created_project,
+            fake_membership_repo,
+            mock_session,
+    ):
+        manager = Subject(
+            id=uuid4(),
+            type=SubjectType.USER,
+            roles=[UserRole.SUPPORT_MANAGER],
+        )
+        membership = ProjectMember(
+            project_id=created_project.id,
+            user_id=manager.id,
+            roles={MemberRole.MANAGER},
+            created_by=created_project.created_by,
+        )
+        await fake_membership_repo.create(membership)
+
+        with pytest.raises(PermissionDeniedError):
+            await project_service.archive(
+                project_id=created_project.id,
+                current_subject=manager,
+            )
+
+        assert created_project.status == ProjectStatus.ACTIVE
+        assert created_project.is_deleted is False
+        mock_session.commit.assert_not_awaited()
+
+    async def test_archive_missing_project(
+            self, project_service, current_support_manager, mock_session
+    ):
+        with pytest.raises(NotFoundError):
+            await project_service.archive(
+                project_id=uuid4(),
+                current_subject=current_support_manager,
+            )
+
+        mock_session.commit.assert_not_awaited()

@@ -81,6 +81,7 @@ async def created_ticket(fake_ticket_repo, created_project):
         created_by_role=UserRole.CUSTOMER,
         project_id=created_project.id,
         counterparty_id=created_project.counterparty_id,
+        priority=Priority.HIGH,
     )
     await fake_ticket_repo.create(ticket)
 
@@ -112,7 +113,7 @@ class TestTaskCreate:
 
     @pytest.mark.asyncio
     async def test_create_in_todo_with_ticket_and_project_success(
-            self, task_service, current_support_user, created_ticket, created_project
+            self, task_service, current_support_user, created_ticket, fake_task_repo,
     ):
         """
         Успешное создание готовой к выполнению задачи,
@@ -122,16 +123,23 @@ class TestTaskCreate:
         data = TaskCreate(
             ticket_id=created_ticket.id,
             title="Тестовая задача",
-            priority=Priority.MEDIUM,
+            priority=Priority.LOW,
             mark_as_todo=True,
         )
 
         response = await task_service.create(data, current_support_user)
 
-        assert response.project_id == created_project.id
+        assert response.project_id == created_ticket.project_id
         assert response.ticket_id == created_ticket.id
+        assert response.priority == created_ticket.priority
         assert response.status == TaskStatus.TODO
         assert response.number == f"{created_ticket.number}-001"
+
+        created_task = await fake_task_repo.read(response.id)
+
+        assert created_task is not None
+        assert created_task.project_id == created_ticket.project_id
+        assert created_task.priority == created_ticket.priority
 
     @pytest.mark.asyncio
     async def test_create_raises_permission_denied(self, task_service, mock_session):

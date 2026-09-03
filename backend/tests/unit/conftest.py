@@ -13,11 +13,12 @@ from src.iam.domain.repos import InvitationRepository, TokenStore, UserRepositor
 from src.iam.domain.vo import FullName, UserRole
 from src.notifications.domain.repos import NotificationRepository, PreferenceRepository
 from src.products.domain.repo import ProductRepository
+from src.projects.domain.authz import ProjectAuthZService
 from src.projects.domain.entities import Project, ProjectMember
 from src.projects.domain.repos import ProjectMemberRepository, ProjectRepository
-from src.projects.domain.services import ProjectAccessService
 from src.projects.domain.vo import MemberRole
 from src.shared.domain.events import EventPublisher
+from src.shared.domain.vo import Priority, Tag
 from src.shared.infra.events import EventBus
 from src.shared.utils.time import current_datetime
 from src.tasks.domain.repos import TaskRepository
@@ -27,7 +28,7 @@ from src.tickets.domain.repos import (
     ReactionRepository,
     TicketRepository,
 )
-from src.tickets.domain.vo import Priority, Tag, TicketNumber, TicketStatus, TicketType
+from src.tickets.domain.vo import TicketNumber, TicketStatus, TicketType
 
 from .in_memory_repos import (
     InMemoryCommentRepository,
@@ -119,8 +120,8 @@ def event_publisher() -> EventPublisher:
 
 
 @pytest.fixture
-def fake_project_access_service(fake_membership_repo) -> ProjectAccessService:
-    return ProjectAccessService(fake_membership_repo)
+def fake_project_access_service(fake_membership_repo) -> ProjectAuthZService:
+    return ProjectAuthZService(fake_membership_repo)
 
 
 @pytest.fixture
