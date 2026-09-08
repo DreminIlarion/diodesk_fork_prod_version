@@ -45,6 +45,15 @@ class ProductFilters(BaseModel):
     status: ProductStatus | None = Field(None, description="По статусу")
     query: str | None = Field(None, description="Запрос для полнотекстового поиска")
 
+    counterparty_id: UUID | None = Field(
+        None,
+        description="Контрагент, с которым связан продукт",
+    )
+    without_counterparty: bool = Field(
+        False,
+        description="Только продукты, не связанные ни с одним контрагентом",
+    )
+
 
 # Динамические поля для конфигураций программных продуктов
 
