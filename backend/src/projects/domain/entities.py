@@ -262,6 +262,33 @@ class Project(AggregateRoot):
         )
         return project
 
+    def edit(
+            self,
+            *,
+            name: str | None = None,
+            description: str | None = None,
+    ) -> None:
+        changed = False
+
+        if name is not None:
+            stripped_name = name.strip()
+            if not stripped_name:
+                raise ValueError("Project name cannot be empty")
+
+            if stripped_name != self.name:
+                self.name = stripped_name
+                changed = True
+
+        if description is not None:
+            normalized_description = description.strip() or None
+
+            if normalized_description != self.description:
+                self.description = normalized_description
+                changed = True
+
+        if changed:
+            self.updated_at = current_datetime()
+
     def create_member(
             self, user_id: UUID, roles: list[MemberRole], created_by: UUID
     ) -> ProjectMember:
@@ -397,7 +424,7 @@ class Project(AggregateRoot):
             raise ValueError(f"Project stage with this name - {name} already exists")
 
         stage = ProjectStage(
-            id=uuid4(), 
+            id=uuid4(),
             project_id=self.id,
             name=name.strip(),
             description=description.strip(),

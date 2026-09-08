@@ -61,8 +61,16 @@ def get_task_service(
 
 def get_task_board_service(
         task_repo: TaskRepoDep,
+        ticket_repo: TicketRepoDep,
+        user_repo: UserRepoDep,
+        project_repo: ProjectRepoDep,
 ) -> TaskBoardService:
-    return TaskBoardService(task_repo=task_repo)
+    return TaskBoardService(
+        task_repo=task_repo,
+        ticket_repo=ticket_repo,
+        user_repo=user_repo,
+        project_repo=project_repo,
+    )
 
 
 TaskServiceDep = Annotated[TaskService, Depends(get_task_service)]

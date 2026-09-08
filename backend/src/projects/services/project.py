@@ -28,6 +28,7 @@ from ..schemas import (
     ProjectStagePlan,
     ProjectStageResponse,
     ProjectStageUpdate,
+    ProjectUpdate,
 )
 
 
@@ -122,6 +123,39 @@ class ProjectService:
             f"Try again with a different key.",
             details={"last_suggested_key": key_candidate},
         )
+
+    async def edit(
+            self,
+            project_id: UUID,
+            data: ProjectUpdate,
+            current_subject: Subject,
+    ) -> ProjectResponse:
+        project = await get_or_raise_404(
+            self.project_repo.read,
+            project_id,
+            Project,
+        )
+
+        permission = await self.authz_service.can_manage_project(
+            subject=current_subject,
+            project_id=project.id,
+        )
+        if not permission.allowed:
+            raise PermissionDeniedError(permission.reason)
+
+        project.edit(
+            name=data.name,
+            description=data.description,
+        )
+
+        await self.project_repo.update(project)
+        await finalize(
+            self.uow,
+            project,
+            event_publisher=self.event_publisher,
+        )
+
+        return map_project_to_response(project)
 
     async def archive(self, project_id: UUID, current_subject: Subject) -> ProjectResponse:
         """

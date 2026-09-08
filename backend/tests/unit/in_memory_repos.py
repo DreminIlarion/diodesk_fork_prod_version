@@ -11,7 +11,7 @@ from src.notifications.domain.entities import Notification, UserPreference
 from src.notifications.domain.vo import NotificationType
 from src.products.domain.entities import SoftwareProduct
 from src.projects.domain.entities import Project, ProjectMember
-from src.projects.domain.vo import ProjectKey, MemberRole
+from src.projects.domain.vo import MemberRole, ProjectKey
 from src.shared.infra.repos import InMemoryRepository
 from src.shared.schemas import Page, Pagination
 from src.shared.utils.time import current_datetime
@@ -19,7 +19,6 @@ from src.tasks.domain.entities import Task
 from src.tasks.domain.vo import TaskNumber
 from src.tickets.domain.entities import Comment, Reaction, Ticket
 from src.tickets.domain.repos import ReactionStats, TicketFilters
-from src.tickets.domain.services import TicketScopes
 from src.tickets.domain.vo import CommentType, ReactionType
 
 
@@ -195,30 +194,9 @@ class InMemoryTicketRepository(InMemoryRepository[Ticket]):
     async def paginate(
             self,
             pagination: Pagination,
-            scopes: TicketScopes | None = None,
             filters: TicketFilters | None = None,
     ) -> Page[Ticket]:
         tickets = [ticket for ticket in self.data.values() if not ticket.is_deleted]
-
-        # Ограничение по области видимости
-        if scopes is not None:
-            if scopes.reporter_id is not None:
-                tickets = [
-                    ticket for ticket in tickets if ticket.reporter_id == scopes.reporter_id
-                ]
-            elif scopes.counterparty_id is not None:
-                tickets = [
-                    ticket
-                    for ticket in tickets
-                    if ticket.counterparty_id == scopes.counterparty_id
-                    or (ticket.project_id is not None and ticket.project_id in scopes.project_ids)
-                ]
-            elif scopes.project_ids is not None:
-                tickets = [
-                    ticket
-                    for ticket in tickets
-                    if ticket.project_id is None or ticket.project_id in scopes.project_ids
-                ]
 
         tickets.sort(key=lambda x: x.created_at)
 

@@ -30,6 +30,7 @@ def map_ticket_to_preview(ticket: Ticket) -> TicketPreview:
         type=ticket.type,
         status=ticket.status,
         priority=ticket.priority,
+        stage_id=ticket.stage_id,
     )
 
 
@@ -66,8 +67,6 @@ def map_ticket_to_view_response(
         if project else None
     )
 
-    
-
     return TicketViewResponse(
         id=ticket.id,
         created_at=ticket.created_at,
@@ -81,6 +80,7 @@ def map_ticket_to_view_response(
         assignee=assignee_ref,
         counterparty=counterparty_ref,
         project=project_ref,
+        stage_id=ticket.stage_id,
         number=ticket.number.value,
         title=ticket.title,
         type=ticket.type,
@@ -105,6 +105,7 @@ def map_comment_to_response(comment: Comment) -> CommentResponse:
         attachments=[map_attachment_to_response(attachment) for attachment in comment.attachments],
     )
 
+
 def map_comment_with_reactions_to_response(
         comment: Comment,
         reaction_counts: dict[ReactionType, int],
@@ -125,12 +126,15 @@ def map_comment_with_reactions_to_response(
         reaction_counts=reaction_counts,
         user_reactions=user_reactions,
     )
+
+
 def map_ticket_to_response(ticket: Ticket) -> TicketResponse:
     return TicketResponse(
         id=ticket.id,
         created_at=ticket.created_at,
         updated_at=ticket.updated_at,
         project_id=ticket.project_id,
+        stage_id=ticket.stage_id,
         counterparty_id=ticket.counterparty_id,
         product_id=ticket.product_id,
         created_by=ticket.created_by,

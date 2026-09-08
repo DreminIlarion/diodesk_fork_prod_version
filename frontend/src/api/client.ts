@@ -468,7 +468,9 @@ export const projectsApi = {
 
   // Архивировать проект
   archive: async (id: string): Promise<Project> => {
-    const response = await api.patch<Project>(`/api/v1/projects/${id}`, { status: 'archived' });
+    const response = await api.delete<Project>(
+      `/api/v1/projects/${id}`
+    );
     return response.data;
   },
 
