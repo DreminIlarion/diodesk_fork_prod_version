@@ -70,8 +70,8 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
             stmt = stmt.where(self.model.project_id.in_(filters.project_ids))
 
         # фильтр по этапам проекта
-        if filters.stage_ids:
-            stmt = stmt.where(self.model.stage_id.in_(filters.stage_ids))
+        # if filters.stage_ids:
+        #     stmt = stmt.where(self.model.stage_id.in_(filters.stage_ids))
 
         # фильтр по контрагенту
         if filters.counterparty_id:
