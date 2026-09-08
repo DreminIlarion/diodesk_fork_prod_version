@@ -1923,9 +1923,7 @@ export default function TicketDetailPage() {
                   className="group block rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 hover:bg-[var(--hover-2)] hover:border-[var(--border-hover)] transition-colors"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="flex w-10 h-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
-                      <FolderOpen className="w-5 h-5 text-amber-400" />
-                    </div>
+                    
 
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-base font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">

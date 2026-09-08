@@ -233,6 +233,148 @@ function getStageProgress(stage: ProjectStage): number {
   }
 }
 
+// modal edit
+function ProjectEditModal({
+  project,
+  onClose,
+  onSaved,
+}: {
+  project: Project;
+  onClose: () => void;
+  onSaved: () => Promise<void> | void;
+}) {
+  const { toast } = useToast();
+
+  const [name, setName] = useState(project.name ?? '');
+  const [description, setDescription] = useState(project.description ?? '');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) onClose();
+    };
+    document.addEventListener('keydown', h);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', h);
+      document.body.style.overflow = '';
+    };
+  }, [onClose, saving]);
+
+  const submit = async () => {
+    if (!name.trim()) return;
+
+    setSaving(true);
+    try {
+      // ВАЖНО: убедитесь, что такой метод есть в projectsApi
+      await projectsApi.update(project.id, {
+        name: name.trim(),
+        description: description.trim() || null,
+      });
+
+      toast({ title: 'Проект обновлён' });
+      await onSaved();
+    } catch (e: any) {
+      toast({
+        title: 'Ошибка',
+        description: e?.response?.data?.detail || 'Не удалось сохранить проект',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={() => !saving && onClose()}
+      />
+
+      <div
+        className="relative w-full max-w-lg bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[var(--accent)]/20 flex items-center justify-center">
+              <Pencil className="w-4 h-4 text-[var(--accent)]" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-[var(--text-primary)]">
+                Редактирование проекта
+              </h2>
+              <p className="text-sm text-[var(--text-primary)]/40 mt-0.5 font-mono">
+                {project.key}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => !saving && onClose()}
+            disabled={saving}
+            className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)] disabled:opacity-50"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm text-[var(--text-primary)]/60 mb-2">
+              Название <span className="text-red-400">*</span>
+            </label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-4 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-sm placeholder-white/25 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)]"
+              placeholder="Название проекта"
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-[var(--text-primary)]/60 mb-2">
+              Описание
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={5}
+              className="w-full px-4 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-sm placeholder-white/25 resize-none focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)]"
+              placeholder="Описание проекта (опционально)"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--hover-1)]">
+          <button
+            onClick={() => !saving && onClose()}
+            disabled={saving}
+            className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-sm disabled:opacity-50"
+          >
+            Отмена
+          </button>
+
+          <button
+            onClick={submit}
+            disabled={saving || !name.trim()}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-40"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            Сохранить
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // МОДАЛКА АРХИВИРОВАНИЯ
 // ═══════════════════════════════════════════════════════════════════
@@ -633,6 +775,8 @@ export default function ProjectDetailPage() {
   const [projectTickets, setProjectTickets] = useState<TicketListItem[]>([]);
   const [loadingTickets, setLoadingTickets] = useState(false);
 
+  const [showEditProjectModal, setShowEditProjectModal] = useState(false);
+
   // Stages
   const [stages, setStages] = useState<ProjectStage[]>([]);
   const [showStageModal, setShowStageModal] = useState(false);
@@ -941,8 +1085,10 @@ export default function ProjectDetailPage() {
         </div>
         {canEdit && isActive && (
           <div className="flex gap-2.5 flex-shrink-0">
-            <button onClick={() => navigate(`/projects/${project.id}/edit`)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] border border-[var(--border-color)] text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] text-base font-medium transition-colors">
+            <button
+              onClick={() => setShowEditProjectModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] border border-[var(--border-color)] text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] text-base font-medium transition-colors"
+            >
               <Pencil className="w-4 h-4" /> Редактировать
             </button>
             <button onClick={() => setShowArchiveModal(true)}
@@ -1227,6 +1373,17 @@ export default function ProjectDetailPage() {
 
       {deletingStage && (
         <DeleteStageModal stageName={deletingStage.name} loading={deletingStageLoading} onConfirm={handleDeleteStage} onClose={() => setDeletingStage(null)} />
+      )}
+
+      {showEditProjectModal && project && (
+        <ProjectEditModal
+          project={project}
+          onClose={() => setShowEditProjectModal(false)}
+          onSaved={async () => {
+            setShowEditProjectModal(false);
+            await loadProject(); // перезагрузить проект после сохранения
+          }}
+        />
       )}
 
       {showAddModal && (
