@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import TEXT, Computed, DateTime, Enum, ForeignKey, Index, String, exists
+from sqlalchemy import TEXT, Computed, DateTime, Enum, ForeignKey, Index, String, exists, select
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
 
@@ -57,14 +57,17 @@ class TicketOrm(Base):
     )
 
     has_attachments = column_property(
-        exists()
-        .where(
-            (AttachmentOrm.owner_type == 'ticket') &
-            (AttachmentOrm.owner_id == id) &
-            (AttachmentOrm.deleted_at.is_(None))
+        select(
+            exists()
+            .where(
+                (AttachmentOrm.owner_type == 'ticket') &
+                (AttachmentOrm.owner_id == id) &
+                (AttachmentOrm.deleted_at.is_(None))
+            )
         )
+        .correlate_except(AttachmentOrm)
         .scalar_subquery()
-)
+    )
 
     search_vector: Mapped[str] = mapped_column(
         TSVECTOR,
