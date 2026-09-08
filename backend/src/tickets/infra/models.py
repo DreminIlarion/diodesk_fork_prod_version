@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import TEXT, Computed, DateTime, Enum, ForeignKey, Index, String, exists, select
+from sqlalchemy import TEXT, Computed, DateTime, Enum, ForeignKey, Index, String, exists, select, literal
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
 
@@ -56,18 +56,7 @@ class TicketOrm(Base):
         viewonly=True,
     )
 
-    has_attachments = column_property(
-        select(
-            exists()
-            .where(
-                (AttachmentOrm.owner_type == 'ticket') &
-                (AttachmentOrm.owner_id == __table__.c.id) &
-                (AttachmentOrm.deleted_at.is_(None))
-            )
-        )
-        .correlate_except(AttachmentOrm)
-        .scalar_subquery()
-    )
+   
 
     search_vector: Mapped[str] = mapped_column(
         TSVECTOR,
@@ -81,3 +70,15 @@ class TicketOrm(Base):
         Index("ix_tickets_search_vector", "search_vector", postgresql_using="gin"),
         # Index("ix_tickets_stage_id", "stage_id"),
     )
+
+TicketOrm.has_attachments = column_property(
+    select(
+        exists().where(
+            (AttachmentOrm.owner_type == literal("ticket")) &
+            (AttachmentOrm.owner_id == TicketOrm.id) &
+            (AttachmentOrm.deleted_at.is_(None))
+        )
+    )
+    .correlate_except(AttachmentOrm)
+    .scalar_subquery()
+)
