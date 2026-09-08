@@ -61,7 +61,7 @@ class TicketOrm(Base):
             exists()
             .where(
                 (AttachmentOrm.owner_type == 'ticket') &
-                (AttachmentOrm.owner_id == id) &
+                (AttachmentOrm.owner_id == __table__.c.id) &
                 (AttachmentOrm.deleted_at.is_(None))
             )
         )
