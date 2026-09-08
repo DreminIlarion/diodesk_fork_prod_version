@@ -60,7 +60,7 @@ class TicketOrm(Base):
         exists()
         .where(
             (AttachmentOrm.owner_type == 'ticket') &
-            (AttachmentOrm.owner_id == TicketOrm.id) &
+            (AttachmentOrm.owner_id == id) &
             (AttachmentOrm.deleted_at.is_(None))
         )
         .scalar_subquery()
