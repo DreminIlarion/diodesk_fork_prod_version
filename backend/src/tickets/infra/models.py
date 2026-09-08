@@ -79,6 +79,6 @@ TicketOrm.has_attachments = column_property(
             (AttachmentOrm.deleted_at.is_(None))
         )
     )
-    .correlate_except(AttachmentOrm)
+    .correlate(TicketOrm)  
     .scalar_subquery()
 )
