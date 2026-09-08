@@ -44,7 +44,7 @@ class Ticket(AggregateRoot):
     """
 
     project_id: UUID | None = None
-    stage_id: UUID | None = None
+    # stage_id: UUID | None = None
     counterparty_id: UUID | None = None
     product_id: UUID | None = None
 
@@ -76,8 +76,8 @@ class Ticket(AggregateRoot):
         if not self.title.strip() or not self.description.strip():
             raise ValueError("Ticket title or description cannot be empty")
 
-        if self.stage_id is not None and self.project_id is None:
-            raise InvalidStateError("Ticket stage requires a project")
+        # if self.stage_id is not None and self.project_id is None:
+        #     raise InvalidStateError("Ticket stage requires a project")
 
     def _perform(self, action: TicketAction, actor_id: UUID, *args) -> None:
         """Выполняет переход в новое состояние."""
@@ -125,7 +125,7 @@ class Ticket(AggregateRoot):
         ticket_type: TicketType = TicketType.SERVICE_REQUEST,
         priority: Priority = Priority.MEDIUM,
         project_id: UUID | None = None,
-        stage_id: UUID | None = None,
+        # stage_id: UUID | None = None,
         counterparty_id: UUID | None = None,
         product_id: UUID | None = None,
         created_by_role: UserRole | None = None,
@@ -148,7 +148,7 @@ class Ticket(AggregateRoot):
             type=ticket_type,
             priority=priority,
             status=status,
-            stage_id=stage_id,
+            # stage_id=stage_id,
             created_by_role=created_by_role,
             project_id=project_id,
             counterparty_id=counterparty_id,
@@ -174,7 +174,7 @@ class Ticket(AggregateRoot):
         title: str | None = None,
         description: str | None = None,
         priority: Priority | None = None,
-        stage_id: UUID | None = None,
+        # stage_id: UUID | None = None,
         tags: list[Tag] | None = None,
     ) -> None:
         """
@@ -217,19 +217,19 @@ class Ticket(AggregateRoot):
                 )
             )
 
-        if stage_id is not None:
-            if self.project_id is None:
-                raise InvalidStateError("Ticket stage requires a project")
+        # if stage_id is not None:
+        #     if self.project_id is None:
+        #         raise InvalidStateError("Ticket stage requires a project")
 
-            if stage_id != self.stage_id:
-                old_stage_id = self.stage_id
-                self.stage_id = stage_id
+        #     if stage_id != self.stage_id:
+        #         old_stage_id = self.stage_id
+        #         self.stage_id = stage_id
 
-                changes["stage_id"] = [
-                    str(old_stage_id) if old_stage_id else "",
-                    str(stage_id),
-                ]
-                changed = True
+        #         changes["stage_id"] = [
+        #             str(old_stage_id) if old_stage_id else "",
+        #             str(stage_id),
+        #         ]
+        #         changed = True
 
         if tags is not None and set(tags) != set(self.tags):
             old_tags = ", ".join([tag.name for tag in self.tags])
