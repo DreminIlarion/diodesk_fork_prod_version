@@ -17,12 +17,12 @@ from ..schemas import ProjectMemberCreate, ProjectMemberResponse
 
 class ProjectMemberService:
     def __init__(
-            self,
-            uow: UnitOfWork,
-            project_repo: ProjectRepository,
-            member_repo: ProjectMemberRepository,
-            user_repo: UserRepository,
-            event_publisher: EventPublisher,
+        self,
+        uow: UnitOfWork,
+        project_repo: ProjectRepository,
+        member_repo: ProjectMemberRepository,
+        user_repo: UserRepository,
+        event_publisher: EventPublisher,
     ) -> None:
         self.uow = uow
         self.user_repo = user_repo
@@ -30,14 +30,14 @@ class ProjectMemberService:
         self.member_repo = member_repo
         self.authz_service = ProjectAuthZService(member_repo)
         self.event_publisher = event_publisher
-    
+
     async def get_members(self, project_id: UUID) -> list[ProjectMemberResponse]:
         """Получить всех участников проекта."""
         members = await self.member_repo.list_by_project(project_id)
         return [map_member_to_response(m) for m in members]
 
     async def add_member(
-            self, project_id: UUID, data: ProjectMemberCreate, current_subject: Subject
+        self, project_id: UUID, data: ProjectMemberCreate, current_subject: Subject
     ) -> ProjectMemberResponse:
         """
         Добавление нового участника в проект.
@@ -70,7 +70,7 @@ class ProjectMemberService:
         return map_member_to_response(member)
 
     async def remove_member(
-            self, project_id: UUID, user_id: UUID, current_subject: Subject
+        self, project_id: UUID, user_id: UUID, current_subject: Subject
     ) -> None:
         """
         Удалить участника из проекта.

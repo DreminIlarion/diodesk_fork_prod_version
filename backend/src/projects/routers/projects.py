@@ -16,10 +16,10 @@ router = APIRouter(prefix="/projects", tags=["Проекты"])
     status_code=status.HTTP_200_OK,
     response_model=dict[str, str],
     summary="Предлагает ключ проекта",
-    description="Генерирует человекочитаемый ключ проекта, например - `PRJ`"
+    description="Генерирует человекочитаемый ключ проекта, например - `PRJ`",
 )
 def get_key_suggestion(
-        name: str = Query(..., description="Наименование проекта"),
+    name: str = Query(..., description="Наименование проекта"),
 ) -> dict[str, str]:
     return {"key": generate_project_key(name)}
 
@@ -29,7 +29,7 @@ def get_key_suggestion(
     status_code=status.HTTP_200_OK,
     response_model=KeyCheckResult,
     dependencies=[Depends(require_role(SUPPORT_MANAGER_OR_ABOVE))],
-    summary="Проверяет свободен ли ключ"
+    summary="Проверяет свободен ли ключ",
 )
 async def check_project_key(key: str, service: ProjectServiceDep) -> KeyCheckResult:
     return await service.check_key(key)
@@ -48,7 +48,7 @@ async def check_project_key(key: str, service: ProjectServiceDep) -> KeyCheckRes
     },
 )
 async def create_project(
-        current_subject: CurrentSubjectDep, data: ProjectCreate, service: ProjectServiceDep
+    current_subject: CurrentSubjectDep, data: ProjectCreate, service: ProjectServiceDep
 ) -> ProjectResponse:
     return await service.create(data, current_subject)
 
@@ -79,7 +79,7 @@ async def get_project(project: ProjectDep) -> ProjectResponse:
     status_code=status.HTTP_200_OK,
     response_model=Page[ProjectResponse],
     dependencies=[Depends(require_role(SUPPORT_MANAGER_OR_ABOVE))],
-    summary="Пагинация проектов"
+    summary="Пагинация проектов",
 )
 async def get_projects(page: ProjectsPageDep) -> Page[ProjectResponse]:
     return page

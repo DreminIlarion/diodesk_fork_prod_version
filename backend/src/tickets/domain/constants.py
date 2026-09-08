@@ -4,5 +4,5 @@ from .vo import CommentType
 COMMENT_TYPE_DISPLAY_NAMES: dict[CommentType, str] = {
     CommentType.INTERNAL: "Внутренний",
     CommentType.PUBLIC: "Публичный",
-    CommentType.NOTE: "Личный (заметка)"
+    CommentType.NOTE: "Личный (заметка)",
 }

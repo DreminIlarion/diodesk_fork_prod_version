@@ -4,11 +4,11 @@ from .vo import Email, FullName, PasswordHash, Username, UserRole
 
 
 def create_user_from_invitation(
-        invitation: Invitation,
-        *,
-        password_hash: str,
-        username: str | None = None,
-        full_name: str | None = None,
+    invitation: Invitation,
+    *,
+    password_hash: str,
+    username: str | None = None,
+    full_name: str | None = None,
 ) -> User:
     """
     Создаёт пользователя, используя приглашение.
@@ -25,11 +25,11 @@ def create_user_from_invitation(
 
 
 def register_new_user(
-        *,
-        invitation: Invitation,
-        password_hash: str,
-        username: str | None = None,
-        full_name: str | None = None,
+    *,
+    invitation: Invitation,
+    password_hash: str,
+    username: str | None = None,
+    full_name: str | None = None,
 ) -> User:
     """
     Регистрирует нового пользователя.

@@ -1,3 +1,4 @@
+from src.comments.infra.models import CommentOrm, ReactionOrm
 from src.media.infra.repo import AttachmentMapper
 from src.shared.domain.vo import Tag
 from src.shared.infra.repos import ModelMapper
@@ -5,7 +6,6 @@ from src.shared.infra.repos import ModelMapper
 from ..domain.entities import Comment, Reaction, Ticket
 from ..domain.vo import TicketNumber
 from .models import TicketOrm
-from src.comments.infra.models import CommentOrm, ReactionOrm
 
 
 class CommentMapper(ModelMapper[Comment, CommentOrm]):

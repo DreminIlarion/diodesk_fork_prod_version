@@ -14,7 +14,7 @@ _activity_mappers_registry: dict[type[EventType], ActivityLogMapper] = {}
 
 
 def register_activity_log_mapper[T: Event](
-        event_type: type[T],
+    event_type: type[T],
 ) -> Callable[[ActivityLogMapper[T]], ActivityLogMapper[T]]:
 
     def decorator(func: ActivityLogMapper[T]) -> ActivityLogMapper[T]:

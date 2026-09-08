@@ -15,7 +15,6 @@ from .models import TimesheetOrm, WorklogOrm
 
 
 class WorklogMapper(ModelMapper[Worklog, WorklogOrm]):
-
     @staticmethod
     def to_entity(model: WorklogOrm) -> Worklog:
         return Worklog(
@@ -100,7 +99,7 @@ class SqlWorklogRepository(SqlAlchemyRepository[Worklog, WorklogOrm]):
                 "submitted_by": stmt.excluded.approved_by,
                 "approved_at": stmt.excluded.approved_at,
                 "rejection_reason": stmt.excluded.rejection_reason,
-            }
+            },
         )
 
         data_to_upsert = [
@@ -110,18 +109,18 @@ class SqlWorklogRepository(SqlAlchemyRepository[Worklog, WorklogOrm]):
         self.session.expire_all()
 
     async def get_unassigned_in_period(
-            self,
-            user_id: UUID,
-            date_from: date,
-            date_to: date,
-            counterparty_id: UUID | None = None,
-            project_id: UUID | None = None,
-            statuses: list[WorklogStatus] | None = None,
+        self,
+        user_id: UUID,
+        date_from: date,
+        date_to: date,
+        counterparty_id: UUID | None = None,
+        project_id: UUID | None = None,
+        statuses: list[WorklogStatus] | None = None,
     ) -> list[Worklog]:
         stmt = select(self.model).where(
-            (self.model.user_id == user_id) &
-            (self.model.entry_date.between(date_from, date_to)) &
-            (self.model.timesheet_id.is_(None))
+            (self.model.user_id == user_id)
+            & (self.model.entry_date.between(date_from, date_to))
+            & (self.model.timesheet_id.is_(None))
         )
 
         # Фильтрация по статусам
@@ -140,8 +139,7 @@ class SqlWorklogRepository(SqlAlchemyRepository[Worklog, WorklogOrm]):
 
         if project_id is not None:
             stmt = stmt.where(
-                (TicketOrm.project_id == project_id) |
-                (TaskOrm.project_id == project_id)
+                (TicketOrm.project_id == project_id) | (TaskOrm.project_id == project_id)
             )
 
         # Сортировка от старой дате к новой
@@ -153,7 +151,6 @@ class SqlWorklogRepository(SqlAlchemyRepository[Worklog, WorklogOrm]):
 
 
 class TimesheetMapper(ModelMapper[Timesheet, TimesheetOrm]):
-
     @staticmethod
     def to_entity(model: TimesheetOrm) -> Timesheet:
         return Timesheet(

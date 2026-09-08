@@ -23,14 +23,14 @@ jinja_env = jinja2.Environment(
 
 class MailSender(Protocol):
     async def send(
-            self,
-            to: str | list[str],
-            subject: str,
-            template_name: str | None = None,
-            context: dict[str, Any] | None = None,
-            plain_text: str | None = None,
-            from_email: str | None = None,
-            reply_to: str | None = None,
+        self,
+        to: str | list[str],
+        subject: str,
+        template_name: str | None = None,
+        context: dict[str, Any] | None = None,
+        plain_text: str | None = None,
+        from_email: str | None = None,
+        reply_to: str | None = None,
     ) -> None: ...
 
 

@@ -53,16 +53,16 @@ def remove_media_syntax(md_content: str, chunks: list[MediaChunk]) -> str:
     for chunk in sorted(chunks, key=lambda x: x.start_char, reverse=True):
         # Замена на alt-текст
         replacement = "" if chunk.alt_text is None else chunk.alt_text
-        chars[chunk.start_char:chunk.end_char] = replacement
+        chars[chunk.start_char : chunk.end_char] = replacement
 
     return "".join(chars)
 
 
 def split_markdown(
-        md_content: str,
-        chunk_size: int = 800,
-        chunk_overlap: int = 120,
-        headers_to_split_on: list[tuple[str, str]] | None = None
+    md_content: str,
+    chunk_size: int = 800,
+    chunk_overlap: int = 120,
+    headers_to_split_on: list[tuple[str, str]] | None = None,
 ) -> list[TextChunk | MediaChunk]:
     """Разбиение Markdown текста на чанки с определением медиа"""
 
@@ -115,7 +115,7 @@ def split_markdown(
                 TextChunk(
                     order=order,
                     content=document.page_content.strip(),
-                    context_heading=context_headings
+                    context_heading=context_headings,
                 )
             )
             order += 1  # Переход к следующему блоку
@@ -128,9 +128,7 @@ def split_markdown(
                 if text.strip():
                     chunks.append(
                         TextChunk(
-                            order=order,
-                            content=text.strip(),
-                            context_heading=context_headings
+                            order=order, content=text.strip(), context_heading=context_headings
                         )
                     )
                     order += 1

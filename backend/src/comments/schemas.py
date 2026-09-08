@@ -33,7 +33,8 @@ class CommentResponse(BaseModel):
     visibility: CommentVisibility = Field(description="Область видимости комментария")
 
     parent_comment_id: UUID | None = Field(
-        None, description="Комментарий на который был сделан ответ",
+        None,
+        description="Комментарий на который был сделан ответ",
     )
     reply_count: NonNegativeInt = Field(description="Количество ответов")
 

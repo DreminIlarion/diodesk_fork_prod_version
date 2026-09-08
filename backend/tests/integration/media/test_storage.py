@@ -51,9 +51,12 @@ class TestS3Storage:
             storage_key, content_type, expires_in=60
         )
 
-        async with aiohttp.ClientSession() as session, session.put(
-            url=url, data=file_bytes, headers={"Content-Type": content_type}
-        ) as response:
+        async with (
+            aiohttp.ClientSession() as session,
+            session.put(
+                url=url, data=file_bytes, headers={"Content-Type": content_type}
+            ) as response,
+        ):
             assert response.status == status.HTTP_200_OK
 
         file_info = await s3_storage.get_file_info(storage_key)

@@ -1,4 +1,4 @@
-from typing import Annotated, Self
+from typing import Annotated, Any, Self
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -6,7 +6,6 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from typing_extensions import Doc
-from typing import Any
 
 from src.media.domain.entities import Attachment
 from src.shared.domain.entities import AggregateRoot
@@ -94,18 +93,18 @@ class Task(AggregateRoot):
 
     @classmethod
     def create(
-            cls,
-            number: TaskNumber,
-            title: str,
-            created_by: UUID,
-            description: str | None = None,
-            priority: Priority = Priority.MEDIUM,
-            ticket_id: UUID | None = None,
-            project_id: UUID | None = None,
-            due_date: date | None = None,
-            estimated_hours: Decimal | None = None,
-            story_points: int | None = None, #добавил
-            tags: list[Tag] | None = None,
+        cls,
+        number: TaskNumber,
+        title: str,
+        created_by: UUID,
+        description: str | None = None,
+        priority: Priority = Priority.MEDIUM,
+        ticket_id: UUID | None = None,
+        project_id: UUID | None = None,
+        due_date: date | None = None,
+        estimated_hours: Decimal | None = None,
+        story_points: int | None = None,  # добавил
+        tags: list[Tag] | None = None,
     ) -> Self:
         task_id = uuid4()
         title = title.strip()
@@ -147,6 +146,9 @@ class Task(AggregateRoot):
 
         if new_status == self.status:
             return
+
+        if new_status == TaskStatus.TO_REVIEW and self.reviewer_id is None:
+            raise InvalidStateError("Task cannot be moved to review without a reviewer")
 
         transition = task_workflow.resolve(self.status, new_status)
         for action in transition.actions:
@@ -195,14 +197,14 @@ class Task(AggregateRoot):
         )
 
     def edit(  # noqa: C901
-            self,
-            *,
-            title: str | None = None,
-            description: str | None = None,
-            priority: Priority | None = None,
-            story_points: int | None = None,
-            estimated_hours: Decimal | None = None,
-            due_date: date | None = None,
+        self,
+        *,
+        title: str | None = None,
+        description: str | None = None,
+        priority: Priority | None = None,
+        story_points: int | None = None,
+        estimated_hours: Decimal | None = None,
+        due_date: date | None = None,
     ) -> None:
         """Редактирование задачи"""
 
@@ -400,7 +402,7 @@ class Task(AggregateRoot):
             )
         )
 
-    def reopen(self, *args: Any) -> None:
+    def reopen(self, _reopened_by: Any) -> None:
         """
         Переоткрыть задачу - задача была выполнена и снова вернулась в работу.
         """
@@ -408,7 +410,7 @@ class Task(AggregateRoot):
         self.completed_at = None
         self.started_at = current_datetime()
 
-    def reset_reviewer(self, *args: Any) -> None:
+    def reset_reviewer(self, _reset_by: Any) -> None:
         """
         Убрать ревьювера с задачи.
         """

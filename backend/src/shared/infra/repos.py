@@ -48,11 +48,11 @@ class SqlAlchemyRepository[EntityT: Entity, ModelT: Base]:
         return await self._paginate(stmt, pagination)
 
     async def _paginate(
-            self,
-            stmt: Select[tuple[ModelT]],
-            pagination: Pagination,
-            *,
-            model_mapper: Callable[[ModelT], EntityT] | None = None,
+        self,
+        stmt: Select[tuple[ModelT]],
+        pagination: Pagination,
+        *,
+        model_mapper: Callable[[ModelT], EntityT] | None = None,
     ) -> Page[EntityT]:
         if model_mapper is None:
             model_mapper = self.model_mapper.to_entity
@@ -96,7 +96,9 @@ class SqlAlchemyRepository[EntityT: Entity, ModelT: Base]:
         return [self.model_mapper.to_entity(model) for model in results.scalars().all()]
 
     def _apply_time_range_filters(
-            self, stmt: Select[tuple[ModelT]], filters: TimeRangeFilters,
+        self,
+        stmt: Select[tuple[ModelT]],
+        filters: TimeRangeFilters,
     ) -> Select[tuple[ModelT]]:
         if filters.created_after:
             stmt = stmt.where(self.model.created_at >= filters.created_after)
@@ -127,7 +129,7 @@ class InMemoryRepository[EntityT: Entity]:
             total_pages=1,
             has_next=False,
             has_prev=False,
-            items=items[:params.size],
+            items=items[: params.size],
         )
 
     async def update(self, entity: EntityT) -> None:

@@ -20,7 +20,7 @@ def mock_session():
 
 @pytest.fixture
 def project_service(
-        mock_session, fake_project_repo, fake_membership_repo, fake_user_repo, event_publisher
+    mock_session, fake_project_repo, fake_membership_repo, fake_user_repo, event_publisher
 ):
     return ProjectService(
         session=mock_session,
@@ -79,7 +79,9 @@ class TestGenerateKeySuggestions:
 
     @pytest.mark.asyncio
     async def test_generate_suggestions_returns_unique_available_keys(
-        self, project_service, created_project  # noqa: ARG002
+        self,
+        project_service,
+        created_project,  # noqa: ARG002
     ):
         suggestions = await project_service.generate_key_suggestions("TEST", max_attempts=3)
 
@@ -110,7 +112,7 @@ class TestCreateProject:
     """
 
     async def test_create_success(
-            self, project_service, mock_session, fake_project_repo, current_support_manager
+        self, project_service, mock_session, fake_project_repo, current_support_manager
     ):
         data = ProjectCreate(name="New Project", key="NEW")
 
@@ -127,7 +129,10 @@ class TestCreateProject:
         assert existing_project.key.value == "NEW"
 
     async def test_create_with_key_conflict_retries_with_suffix(
-        self, project_service, mock_session, created_project, current_support_manager  # noqa: ARG002
+        self,
+        project_service,
+        mock_session,
+        current_support_manager,
     ):
         # Создание проекта с занятым ключом
         data = ProjectCreate(name="Another Project", key="TEST")
@@ -149,7 +154,9 @@ class TestCreateProject:
         mock_session.commit.assert_awaited_once()
 
     async def test_create_fails_after_max_attempts(
-        self, project_service, mock_session, created_project, current_support_manager  # noqa: ARG002
+        self,
+        project_service,
+        current_support_manager,
     ):
         data = ProjectCreate(name="Failing Project", key="TEST")
 

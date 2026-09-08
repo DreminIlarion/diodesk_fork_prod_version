@@ -27,11 +27,7 @@ class Reaction(Entity):
     def create(cls, comment_id: UUID, author_id: UUID, reaction_type: ReactionType) -> Self:
         reaction = cls(comment_id=comment_id, author_id=author_id, reaction_type=reaction_type)
         reaction.register_event(
-            ReactionAdded(
-                comment_id=comment_id,
-                author_id=author_id,
-                reaction_type=reaction_type
-            )
+            ReactionAdded(comment_id=comment_id, author_id=author_id, reaction_type=reaction_type)
         )
         return reaction
 
@@ -80,11 +76,11 @@ class Comment(Entity):
 
     @classmethod
     def create(
-            cls,
-            ticket_id: UUID,
-            author_id: UUID,
-            text: str,
-            comment_type: CommentType = CommentType.PUBLIC
+        cls,
+        ticket_id: UUID,
+        author_id: UUID,
+        text: str,
+        comment_type: CommentType = CommentType.PUBLIC,
     ) -> Self:
         comment = cls(
             ticket_id=ticket_id,
@@ -104,10 +100,10 @@ class Comment(Entity):
         return comment
 
     def create_reply(
-            self,
-            author_id: UUID,
-            text: str,
-            comment_type: CommentType = CommentType.PUBLIC,
+        self,
+        author_id: UUID,
+        text: str,
+        comment_type: CommentType = CommentType.PUBLIC,
     ) -> "Comment":
         """Создание ответа на комментарий"""
 

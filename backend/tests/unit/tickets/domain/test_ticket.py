@@ -217,11 +217,12 @@ class TestChangeStatus:
         return create
 
     @pytest.mark.parametrize(
-        ("from_status", "to_status"), [
+        ("from_status", "to_status"),
+        [
             (source, destination)
             for source, targets in ALLOWED_TRANSITIONS.items()
             for destination in targets
-        ]
+        ],
     )
     def test_valid_transitions(self, ticket_factory, from_status, to_status):
         """
@@ -250,12 +251,13 @@ class TestChangeStatus:
             assert ticket.closed_at is None
 
     @pytest.mark.parametrize(
-        ("from_status", "to_status"), [
+        ("from_status", "to_status"),
+        [
             (source, destination)
             for source in list(TicketStatus)
             for destination in list(TicketStatus)
             if destination not in ALLOWED_TRANSITIONS.get(source, [])
-        ]
+        ],
     )
     def test_invalid_transition_must_raises_error(self, ticket_factory, from_status, to_status):
         """
@@ -323,12 +325,13 @@ class TestAssignTo:
         assert old_updated_at == ticket_in_open.updated_at
 
     @pytest.mark.parametrize(
-        "new_status", [
+        "new_status",
+        [
             TicketStatus.NEW,
             TicketStatus.PENDING_APPROVAL,
             TicketStatus.CLOSED,
             TicketStatus.REOPENED,
-        ]
+        ],
     )
     def test_cannot_assign_when_status_not_allowed(self, ticket_in_open, new_status):
         """
@@ -426,7 +429,7 @@ class TestEdit:
         ticket.change_status(new_status=TicketStatus.OPEN, changed_by=reporter_id)
 
         with pytest.raises(
-                InvariantViolationError, match="Cannot edit ticket in not allowed status"
+            InvariantViolationError, match="Cannot edit ticket in not allowed status"
         ):
             ticket.edit(edited_by=reporter_id, title="New title")
 

@@ -56,7 +56,9 @@ class SqlActivityLogRepository:
         self.session.add_all(models)
 
     def _apply_activity_log_filters(
-            self, stmt: Select[tuple[ActivityLogOrm]], filters: ActivityLogFilters,
+        self,
+        stmt: Select[tuple[ActivityLogOrm]],
+        filters: ActivityLogFilters,
     ) -> Select[tuple[ActivityLogOrm]]:
         if filters.actor_id:
             stmt = stmt.where(self.model.actor_id == filters.actor_id)
@@ -73,16 +75,16 @@ class SqlActivityLogRepository:
         return stmt
 
     async def get_for_aggregate(
-            self,
-            aggregate_type: str,
-            aggregate_id: UUID,
-            *,
-            pagination: Pagination,
-            filters: ActivityLogFilters | None = None,
+        self,
+        aggregate_type: str,
+        aggregate_id: UUID,
+        *,
+        pagination: Pagination,
+        filters: ActivityLogFilters | None = None,
     ) -> Page[ActivityLog]:
         stmt = select(self.model).where(
-            (self.model.aggregate_type == aggregate_type) &
-            (self.model.aggregate_id == aggregate_id)
+            (self.model.aggregate_type == aggregate_type)
+            & (self.model.aggregate_id == aggregate_id)
         )
 
         if filters:
@@ -93,10 +95,7 @@ class SqlActivityLogRepository:
 
         if total_items == 0:
             return Page.create(
-                items=[],
-                total_items=total_items,
-                page=pagination.page,
-                size=pagination.size
+                items=[], total_items=total_items, page=pagination.page, size=pagination.size
             )
 
         stmt = (
@@ -112,5 +111,5 @@ class SqlActivityLogRepository:
             items=[self.model_mapper.from_orm(model) for model in models],
             total_items=total_items,
             page=pagination.page,
-            size=pagination.size
+            size=pagination.size,
         )

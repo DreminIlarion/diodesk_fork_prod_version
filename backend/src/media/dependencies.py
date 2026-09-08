@@ -25,9 +25,9 @@ def get_attachment_repo(session: SessionDep) -> SqlAttachmentRepository:
 
 
 def get_attachment_service(
-        session: SessionDep,
-        storage: Storage = Depends(get_storage),
-        repository: AttachmentRepository = Depends(get_attachment_repo),
+    session: SessionDep,
+    storage: Storage = Depends(get_storage),
+    repository: AttachmentRepository = Depends(get_attachment_repo),
 ) -> AttachmentService:
     return AttachmentService(session=session, storage=storage, repository=repository)
 

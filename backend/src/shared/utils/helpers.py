@@ -6,7 +6,7 @@ from ..schemas import Pagination
 
 
 async def iterate_batches[EntityT: Entity](
-        repository: Repository[EntityT], start_page: int = 1, size: int = 50, **kwargs
+    repository: Repository[EntityT], start_page: int = 1, size: int = 50, **kwargs
 ) -> AsyncIterable[list[EntityT]]:
     """
     Итератор по коллекции сущностей (реализация паттерна batching)

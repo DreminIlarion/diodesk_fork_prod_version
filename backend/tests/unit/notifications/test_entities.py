@@ -119,7 +119,7 @@ class TestUserPreference:
         ],
     )
     def test_is_enabled_for_channel_returns_false_when_muted(
-            self, user_preference, channel, expected
+        self, user_preference, channel, expected
     ):
         duration = timedelta(hours=1)
         user_preference.mute(duration)
@@ -134,7 +134,7 @@ class TestUserPreference:
         ],
     )
     def test_is_enabled_for_channel_restores_after_mute_expires(
-            self, user_preference, channel, expected
+        self, user_preference, channel, expected
     ):
         duration = timedelta(hours=1)
         user_preference.mute(duration)

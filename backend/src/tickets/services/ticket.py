@@ -1,12 +1,12 @@
-from collections.abc import Awaitable, Callable
+import inspect
+from collections.abc import Callable
 from dataclasses import dataclass
 from uuid import UUID
-import inspect
 
 from src.activity_logs.recorder import ActivityLogRecorder
 from src.crm.domain.entities import Counterparty
 from src.crm.domain.repo import CounterpartyRepository
-from src.iam.domain.authz import PermissionResult, Subject
+from src.iam.domain.authz import Subject
 from src.iam.domain.entities import User
 from src.iam.domain.exceptions import PermissionDeniedError
 from src.iam.domain.repos import UserRepository
@@ -19,7 +19,7 @@ from src.shared.domain.vo import Tag
 from ..domain.authz import TicketAuthZService
 from ..domain.entities import Ticket
 from ..domain.repos import TicketRepository
-from ..domain.vo import ProjectKey, TicketNumber, TicketAction
+from ..domain.vo import ProjectKey, TicketNumber
 from ..mappers import map_ticket_to_response
 from ..schemas import TicketCreate, TicketEdit, TicketResponse
 
@@ -38,15 +38,15 @@ class TicketCreationContext:
 
 class TicketService:
     def __init__(
-            self,
-            uow: UnitOfWork,
-            ticket_repo: TicketRepository,
-            project_repo: ProjectRepository,
-            user_repo: UserRepository,
-            counterparty_repo: CounterpartyRepository,
-            ticket_authz_service: TicketAuthZService,
-            activity_log_recorder: ActivityLogRecorder,
-            event_publisher: EventPublisher,
+        self,
+        uow: UnitOfWork,
+        ticket_repo: TicketRepository,
+        project_repo: ProjectRepository,
+        user_repo: UserRepository,
+        counterparty_repo: CounterpartyRepository,
+        ticket_authz_service: TicketAuthZService,
+        activity_log_recorder: ActivityLogRecorder,
+        event_publisher: EventPublisher,
     ) -> None:
         self.uow = uow
         self.ticket_repo = ticket_repo
@@ -81,7 +81,9 @@ class TicketService:
 
         if data.counterparty_id is not None:
             counterparty = await get_or_raise_404(
-                self.counterparty_repo.read, data.counterparty_id, Counterparty,
+                self.counterparty_repo.read,
+                data.counterparty_id,
+                Counterparty,
             )
 
             return TicketCreationContext(
@@ -121,7 +123,6 @@ class TicketService:
 
         tags = [Tag(name=tag.name, color=tag.color) for tag in data.tags]
         ticket = Ticket.create(
-            
             number=number,
             created_by=current_subject.id,
             reporter_id=data.reporter_id,
@@ -137,7 +138,8 @@ class TicketService:
         )
         await self.ticket_repo.create(ticket)
         await finalize(
-            self.uow, ticket,
+            self.uow,
+            ticket,
             activity_recorder=self.activity_log_recorder,
             event_publisher=self.event_publisher,
         )
@@ -145,20 +147,25 @@ class TicketService:
         return map_ticket_to_response(ticket)
 
     async def edit(
-            self, ticket_id: UUID, data: TicketEdit, current_subject: Subject,
+        self,
+        ticket_id: UUID,
+        data: TicketEdit,
+        current_subject: Subject,
     ) -> TicketResponse:
 
         ticket = await get_or_raise_404(self.ticket_repo.read, ticket_id, Ticket)
 
         permission = self.ticket_authz_service.can_edit_ticket(
-            subject=current_subject, ticket=ticket,
+            subject=current_subject,
+            ticket=ticket,
         )
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
 
         tags = (
-            None if data.tags is None else
-            [Tag(name=tag.name, color=tag.color) for tag in data.tags]
+            None
+            if data.tags is None
+            else [Tag(name=tag.name, color=tag.color) for tag in data.tags]
         )
         ticket.edit(
             edited_by=current_subject.id,
@@ -169,7 +176,8 @@ class TicketService:
         )
         await self.ticket_repo.update(ticket)
         await finalize(
-            self.uow, ticket,
+            self.uow,
+            ticket,
             activity_recorder=self.activity_log_recorder,
             event_publisher=self.event_publisher,
         )
@@ -184,7 +192,8 @@ class TicketService:
         ticket = await get_or_raise_404(self.ticket_repo.read, ticket_id, Ticket)
 
         permission = await self.ticket_authz_service.can_archive_ticket(
-            subject=current_subject, ticket=ticket,
+            subject=current_subject,
+            ticket=ticket,
         )
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
@@ -192,7 +201,8 @@ class TicketService:
         ticket.archive(archived_by=current_subject.id)
         await self.ticket_repo.update(ticket)
         await finalize(
-            self.uow, ticket,
+            self.uow,
+            ticket,
             activity_recorder=self.activity_log_recorder,
             event_publisher=self.event_publisher,
         )
@@ -201,26 +211,26 @@ class TicketService:
 
     async def wait(self, ticket_id: UUID, current_subject: Subject) -> TicketResponse:
         """Ожидание ответа от клиента."""
-        
+
         return await self._execute(
             ticket_id=ticket_id,
             current_subject=current_subject,
             authz=self.ticket_authz_service.can_track_ticket,
-            action=lambda t: t._perform(TicketAction.WAIT, current_subject.id),
+            action=lambda ticket: ticket.wait(current_subject.id),
         )
 
     async def _execute(
-            self,
-            ticket_id: UUID,
-            current_subject: Subject,
-            authz: Callable,
-            action: Callable[[Ticket], None],
+        self,
+        ticket_id: UUID,
+        current_subject: Subject,
+        authz: Callable,
+        action: Callable[[Ticket], None],
     ) -> TicketResponse:
         ticket = await get_or_raise_404(self.ticket_repo.read, ticket_id, Ticket)
 
         result = authz(current_subject, ticket)
         permission = await result if inspect.isawaitable(result) else result
-        
+
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
 
@@ -228,7 +238,8 @@ class TicketService:
         await self.ticket_repo.update(ticket)
 
         await finalize(
-            self.uow, ticket,
+            self.uow,
+            ticket,
             activity_recorder=self.activity_log_recorder,
             event_publisher=self.event_publisher,
         )
@@ -236,7 +247,10 @@ class TicketService:
         return map_ticket_to_response(ticket)
 
     async def assign(
-            self, ticket_id: UUID, assignee_id: UUID, current_subject: Subject,
+        self,
+        ticket_id: UUID,
+        assignee_id: UUID,
+        current_subject: Subject,
     ) -> TicketResponse:
         """
         Назначить исполнителя на заявку.
@@ -246,7 +260,9 @@ class TicketService:
         assignee = await get_or_raise_404(self.user_repo.read, assignee_id, User)
 
         permission = await self.ticket_authz_service.can_assign_ticket(
-            subject=current_subject, ticket=ticket, assignee=assignee,
+            subject=current_subject,
+            ticket=ticket,
+            assignee=assignee,
         )
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
@@ -254,14 +270,17 @@ class TicketService:
         ticket.assign(assignee_id=assignee_id, assigned_by=current_subject.id)
         await self.ticket_repo.update(ticket)
         await finalize(
-            self.uow, ticket,
+            self.uow,
+            ticket,
             activity_recorder=self.activity_log_recorder,
             event_publisher=self.event_publisher,
         )
 
         return map_ticket_to_response(ticket)
 
-    async def submit_for_approval(self, ticket_id: UUID, current_subject: Subject) -> TicketResponse:
+    async def submit_for_approval(
+        self, ticket_id: UUID, current_subject: Subject
+    ) -> TicketResponse:
         """Отправить тикет на согласование."""
 
         return await self._execute(
@@ -300,7 +319,7 @@ class TicketService:
             authz=self.ticket_authz_service.can_track_ticket,
             action=lambda t: t.resolve(current_subject.id),
         )
-        
+
     async def reopen(self, ticket_id: UUID, current_subject: Subject) -> TicketResponse:
         """Переоткрыть тикет."""
         return await self._execute(

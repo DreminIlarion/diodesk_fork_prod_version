@@ -37,7 +37,8 @@ class WebsocketManager:
             except WebSocketException:
                 logger.warning(
                     "Error occurred while sending message to WS for user with ID %s, "
-                    "start kill connection", user_id
+                    "start kill connection",
+                    user_id,
                 )
                 dead_connections.append(connection)
 

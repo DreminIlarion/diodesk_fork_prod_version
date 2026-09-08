@@ -12,7 +12,6 @@ from src.knowledge.infra.splitters import (
 
 
 class TestExtractMedia:
-
     @pytest.fixture
     def md_text_without_media(self):
         return """\
@@ -76,7 +75,7 @@ class TestExtractMedia:
         assert extract_media(md_text_without_media) == []
 
     def test_extract_media_success(
-            self, attachment_id_1, attachment_id_2, md_text_with_valid_media
+        self, attachment_id_1, attachment_id_2, md_text_with_valid_media
     ):
         chunks = extract_media(md_text_with_valid_media)
 
@@ -103,7 +102,6 @@ class TestExtractMedia:
 
 
 class TestRemoveMediaSyntax:
-
     def test_empty_text_and_empty_chunks(self):
         assert not remove_media_syntax("", [])
 
@@ -131,7 +129,6 @@ class TestRemoveMediaSyntax:
 
 
 class TestSplitMarkdown:
-
     @pytest.fixture
     def md_content(self):
         return f"""\

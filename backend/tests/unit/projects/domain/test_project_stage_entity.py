@@ -33,8 +33,8 @@ class TestInvariants:
 
     def test_must_valid_planned_period(self):
         with pytest.raises(
-                InvariantViolationError,
-                match="planned_start date cannot be greater than planned planned_end date"
+            InvariantViolationError,
+            match="planned_start date cannot be greater than planned planned_end date",
         ):
             ProjectStage(
                 project_id=uuid4(),
@@ -58,13 +58,10 @@ class TestInvariants:
 
 
 class TestEstablishPlannedSchedule:
-
     def test_planning_success(self, stage_factory):
         stage = stage_factory()
         old_updated_at = stage.updated_at
-        stage.establish_planned_schedule(
-            start=date(2026, 6, 12), end=date(2026, 6, 15)
-        )
+        stage.establish_planned_schedule(start=date(2026, 6, 12), end=date(2026, 6, 15))
         excepted_planned_duration_days = 4
         assert stage.planned_duration_days == excepted_planned_duration_days
         assert stage.is_overdue is False
@@ -74,29 +71,26 @@ class TestEstablishPlannedSchedule:
         stage = stage_factory()
 
         with pytest.raises(
-                ValueError, match="Start planned date cannot be greater than planned planned_end date"
+            ValueError, match="Start planned date cannot be greater than planned planned_end date"
         ):
-            stage.establish_planned_schedule(
-                start=date(2026, 6, 15), end=date(2026, 6, 12)
-            )
+            stage.establish_planned_schedule(start=date(2026, 6, 15), end=date(2026, 6, 12))
 
     def test_failed_when_panned_start_before_actual_start(self, stage_factory):
         stage = stage_factory(started_at=current_datetime())
 
-        with pytest.raises(InvariantViolationError, match="planned_start date before actual planned_start date"):
-            stage.establish_planned_schedule(
-                start=date(2026, 6, 11), end=date(2026, 6, 12)
-            )
+        with pytest.raises(
+            InvariantViolationError, match="planned_start date before actual planned_start date"
+        ):
+            stage.establish_planned_schedule(start=date(2026, 6, 11), end=date(2026, 6, 12))
 
 
 class TestEdit:
-
     def test_edit_success(self, stage_factory):
         stage = stage_factory(
             name="First stage",
             description="This is first stage",
             responsible_id=uuid4(),
-            completion_criteria=["Completed tasks > 10", "Develop MVP"]
+            completion_criteria=["Completed tasks > 10", "Develop MVP"],
         )
         old_updated_at = stage.updated_at
         new_responsible_id = uuid4()
@@ -104,7 +98,7 @@ class TestEdit:
             name=" Second stage   ",
             description="This is second stage  ",
             responsible_id=new_responsible_id,
-            completion_criteria=["Completed tasks > 20", "Develop MVP"]
+            completion_criteria=["Completed tasks > 20", "Develop MVP"],
         )
         assert stage.name == "Second stage"
         assert stage.description == "This is second stage"
@@ -133,7 +127,6 @@ class TestEdit:
 
 
 class TestStart:
-
     def test_start_success(self, stage_factory):
         stage = stage_factory(status=ProjectStageStatus.PLANNED)
         old_updated_at = stage.updated_at
@@ -160,7 +153,6 @@ class TestStart:
 
 
 class TestComplete:
-
     def test_complete_success(self, stage_factory):
         stage = stage_factory(status=ProjectStageStatus.ACTIVE)
         old_updated_at = stage.updated_at
@@ -176,8 +168,8 @@ class TestComplete:
             ProjectStageStatus.PLANNED,
             ProjectStageStatus.COMPLETED,
             ProjectStageStatus.ON_HOLD,
-            ProjectStageStatus.SKIPPED
-        ]
+            ProjectStageStatus.SKIPPED,
+        ],
     )
     def test_failed_when_not_active_status(self, stage_factory, wrong_status):
         stage = stage_factory(status=wrong_status)

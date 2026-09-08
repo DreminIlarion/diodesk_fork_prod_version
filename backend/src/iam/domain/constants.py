@@ -6,9 +6,7 @@ from .vo import UserRole
 CUSTOMER_ROLES = {UserRole.CUSTOMER, UserRole.CUSTOMER_ADMIN}
 
 # Все роли внутренней команды
-INTERNAL_ROLES = {
-    UserRole.SUPPORT_AGENT, UserRole.SUPPORT_MANAGER, UserRole.ADMIN
-}
+INTERNAL_ROLES = {UserRole.SUPPORT_AGENT, UserRole.SUPPORT_MANAGER, UserRole.ADMIN}
 
 # Роли с правами администратора заказчика и выше
 CUSTOMER_ADMIN_AND_ABOVE = {

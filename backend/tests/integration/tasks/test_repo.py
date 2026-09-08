@@ -10,7 +10,6 @@ def task_repo(session):
 
 @pytest.mark.asyncio
 class TestGetNextSequence:
-
     async def test_first_call_returns_one(self, task_repo):
         """
         При первом вызове должна возвращаться единица

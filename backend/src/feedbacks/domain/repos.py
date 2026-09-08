@@ -31,9 +31,9 @@ class FeedbackRepository(Repository[Feedback]):
         """
 
     async def paginate(
-            self,
-            pagination: Pagination,
-            filters: FeedbackFilters | None = None,
+        self,
+        pagination: Pagination,
+        filters: FeedbackFilters | None = None,
     ) -> Page[Feedback]:
         """
         Получить страницу активных отзывов с опциональными фильтрами.

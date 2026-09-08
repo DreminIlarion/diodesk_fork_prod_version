@@ -46,7 +46,7 @@ class EmailChannel:
         if template_name is None:
             logger.warning(
                 "No such template registered for this notification type - '%s'",
-                notification.type.value
+                notification.type.value,
             )
         try:
             await self.mail_sender.send(

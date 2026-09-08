@@ -45,9 +45,7 @@ class ArticleVersionOrm(Base):
     article: Mapped["ArticleOrm"] = relationship(back_populates="versions")
     chunks: Mapped[list["ArticleChunkOrm"]] = relationship(back_populates="version")
 
-    __table_args__ = (
-        UniqueConstraint("article_id", "number", name="uq_article_version_number"),
-    )
+    __table_args__ = (UniqueConstraint("article_id", "number", name="uq_article_version_number"),)
 
 
 class ArticleOrm(Base):
@@ -82,7 +80,7 @@ class ArticleOrm(Base):
             ")"
         ),
         viewonly=True,
-        lazy="select"
+        lazy="select",
     )
     versions: Mapped[list["ArticleVersionOrm"]] = relationship(back_populates="article")
 
@@ -90,9 +88,7 @@ class ArticleOrm(Base):
 class ArticleChunkOrm(Base):
     __tablename__ = "article_chunks"
 
-    version_id: Mapped[UUID] = mapped_column(
-        ForeignKey("article_versions.id"), unique=False
-    )
+    version_id: Mapped[UUID] = mapped_column(ForeignKey("article_versions.id"), unique=False)
     # Ссылка на вложенный медиа контент
     attachment_id: Mapped[UUID | None] = mapped_column(nullable=True)
 
@@ -121,7 +117,7 @@ class ArticleChunkOrm(Base):
             "idx_chunks_embedding",
             "embedding",
             postgresql_using="hnsw",
-            postgresql_ops={"embedding": "vector_cosine_ops"}
+            postgresql_ops={"embedding": "vector_cosine_ops"},
         ),
         Index("idx_chunks_content_search_vector", "search_vector", postgresql_using="gin"),
     )

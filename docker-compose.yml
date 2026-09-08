@@ -110,6 +110,10 @@ services:
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+      RABBIT_HOST: rabbitmq
+      RABBIT_PORT: 5672
+      RABBIT_USER: ${RABBIT_USER}
+      RABBIT_PASSWORD: ${RABBIT_PASSWORD}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       YANDEX_CLOUD_FOLDER_ID: ${YANDEX_CLOUD_FOLDER_ID}
@@ -117,9 +121,11 @@ services:
       YANDEX_CLOUD_ACCESS_KEY_ID: ${YANDEX_CLOUD_ACCESS_KEY_ID}
       YANDEX_CLOUD_SECRET_ACCESS_KEY: ${YANDEX_CLOUD_SECRET_ACCESS_KEY}
       LANGTOOL_HOST: ${LANGTOOL_HOST}
-      LNAGTOOL_PORT: ${LANGTOOL_PORT}
+      LANGTOOL_PORT: ${LANGTOOL_PORT}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       minio:
         condition: service_healthy

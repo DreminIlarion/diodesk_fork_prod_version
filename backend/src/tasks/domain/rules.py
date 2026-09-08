@@ -11,7 +11,9 @@ from .vo import TaskStatus
 
 class IsProjectStaffRule:
     ALLOWED_PROJECT_ROLES: ClassVar[set[MemberRole]] = {
-        MemberRole.CONTRIBUTOR, MemberRole.MANAGER, MemberRole.OWNER
+        MemberRole.CONTRIBUTOR,
+        MemberRole.MANAGER,
+        MemberRole.OWNER,
     }
 
     def __init__(self, membership: ProjectMember | None = None) -> None:
@@ -55,7 +57,7 @@ class TaskReviewerStatusRule:
         TaskStatus.DONE,
         TaskStatus.CANCELLED,
     }
-    
+
     ALLOWED_FROM_STATUSES: ClassVar[set[TaskStatus]] = {
         TaskStatus.TO_REVIEW,
         TaskStatus.DONE,
@@ -84,6 +86,9 @@ class TaskReviewerStatusRule:
                 f"{', '.join([status.value for status in self.ALLOWED_NEXT_STATUSES])}",
             )
 
+        return PermissionResult(True)
+
+
 class TaskAssigneeStatusRule:
     """
     Правило перевода задачи в новый статус для её исполнителя.
@@ -96,7 +101,7 @@ class TaskAssigneeStatusRule:
         TaskStatus.BLOCKED,
         TaskStatus.PAUSED,
         TaskStatus.TO_REVIEW,
-        TaskStatus.TO_FIX, 
+        TaskStatus.TO_FIX,
         TaskStatus.TO_TEST,
         TaskStatus.DONE,
         TaskStatus.CANCELLED,

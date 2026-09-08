@@ -11,10 +11,10 @@ from src.tickets.services import ReactionService
 
 @pytest.fixture
 def reaction_service(
-        mock_session,
-        fake_comment_repo,
-        fake_reaction_repo,
-        event_publisher,
+    mock_session,
+    fake_comment_repo,
+    fake_reaction_repo,
+    event_publisher,
 ):
     return ReactionService(
         session=mock_session,
@@ -39,7 +39,7 @@ async def sample_comment(current_user, fake_comment_repo):
         ticket_id=uuid4(),
         author_id=current_user.user_id,
         author_role=current_user.role,
-        text="Тестовый комментарий"
+        text="Тестовый комментарий",
     )
     await fake_comment_repo.create(comment)
     return comment
@@ -63,7 +63,7 @@ class TestToggle:
 
     @pytest.mark.asyncio
     async def test_create_new_reaction_when_none_exists(
-            self, reaction_service, current_user, sample_comment, mock_session, fake_reaction_repo
+        self, reaction_service, current_user, sample_comment, mock_session, fake_reaction_repo
     ):
         """
         Добавление новой реакции
@@ -87,13 +87,13 @@ class TestToggle:
 
     @pytest.mark.asyncio
     async def test_delete_reaction_when_same_type_clicked(
-            self,
-            reaction_service,
-            current_user,
-            sample_comment,
-            sample_reaction,
-            mock_session,
-            fake_reaction_repo,
+        self,
+        reaction_service,
+        current_user,
+        sample_comment,
+        sample_reaction,
+        mock_session,
+        fake_reaction_repo,
     ):
         """
         Реакция должна удалиться, если пользователь нажал на неё ещё раз
@@ -113,13 +113,13 @@ class TestToggle:
 
     @pytest.mark.asyncio
     async def test_change_reaction_type_when_different_clicked(
-            self,
-            reaction_service,
-            current_user,
-            sample_comment,
-            sample_reaction,
-            mock_session,
-            fake_reaction_repo,
+        self,
+        reaction_service,
+        current_user,
+        sample_comment,
+        sample_reaction,
+        mock_session,
+        fake_reaction_repo,
     ):
         """
         При нажатии на другую реакцию меняется тип

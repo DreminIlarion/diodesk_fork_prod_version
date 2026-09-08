@@ -50,8 +50,8 @@ def get_pagination(
 
 
 def get_time_range_filters(
-        created_after: Annotated[datetime | None, Query(description="Создан после")] = None,
-        created_before: Annotated[datetime | None, Query(description="Создан до")] = None,
+    created_after: Annotated[datetime | None, Query(description="Создан после")] = None,
+    created_before: Annotated[datetime | None, Query(description="Создан до")] = None,
 ) -> TimeRangeFilters:
     return TimeRangeFilters(created_after=created_after, created_before=created_before)
 
@@ -89,7 +89,7 @@ def get_rate_limiter() -> RateLimiter:
 
 
 def create_rate_limiter(
-        max_requests: int, window_seconds: int, identifier: IdentifierFunc = ip_identifier
+    max_requests: int, window_seconds: int, identifier: IdentifierFunc = ip_identifier
 ):
     """Создание зависимости для проверки лимита запросов"""
 

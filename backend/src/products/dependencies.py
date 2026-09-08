@@ -25,15 +25,9 @@ ProductServiceDep = Annotated[ProductService, Depends(get_product_service)]
 
 
 def get_product_filters(
-        category: Annotated[
-            ProductCategory | None, Query(..., description="По категории")
-        ] = None,
-        status: Annotated[
-            ProductStatus | None, Query(..., description="По статусу")
-        ] = None,
-        query: Annotated[
-            str | None, Query(..., description="Полнотекстовый поиск")
-        ] = None,
+    category: Annotated[ProductCategory | None, Query(..., description="По категории")] = None,
+    status: Annotated[ProductStatus | None, Query(..., description="По статусу")] = None,
+    query: Annotated[str | None, Query(..., description="Полнотекстовый поиск")] = None,
 ) -> ProductFilters:
     return ProductFilters(category=category, status=status, query=query)
 

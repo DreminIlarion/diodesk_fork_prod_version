@@ -4,8 +4,8 @@ from uuid import uuid4
 
 import pytest
 from redis.asyncio import Redis
-
 from src.iam.infra.blacklist import RedisTokenBlacklist
+
 from src.shared.utils.time import current_datetime, get_expiration_timestamp
 
 

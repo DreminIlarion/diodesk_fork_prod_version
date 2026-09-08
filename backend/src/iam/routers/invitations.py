@@ -30,19 +30,18 @@ broker_router = RabbitRouter(settings.rabbit.url)
     status_code=status.HTTP_202_ACCEPTED,
     response_model=InvitationResponse,
     summary="Создать приглашения",
-    description="Пригласительное письмо отправиться в фоне"
+    description="Пригласительное письмо отправиться в фоне",
 )
 async def create_invitation(
-        current_subject: CurrentSubjectDep,
-        data: InvitationCreate,
-        service: InvitationServiceDep,
+    current_subject: CurrentSubjectDep,
+    data: InvitationCreate,
+    service: InvitationServiceDep,
 ) -> InvitationResponse:
     return await service.create(data, current_subject)
 
 
 @broker_router.subscriber(
-    queue=RabbitQueue("user.invite", durable=True),
-    description="Отправить пригласительное письмо"
+    queue=RabbitQueue("user.invite", durable=True), description="Отправить пригласительное письмо"
 )
 async def on_user_invited(event: UserInvited, service: InvitationServiceDep) -> None:
     await service.send(event.invitation_id)
@@ -53,10 +52,10 @@ async def on_user_invited(event: UserInvited, service: InvitationServiceDep) -> 
     status_code=status.HTTP_200_OK,
     response_model=InvitationResponse,
     dependencies=[Depends(require_role(UserRole.staff_roles()))],
-    summary="Получение информации и приглашении"
+    summary="Получение информации и приглашении",
 )
 async def get_invitation(
-        invitation: InvitationResponse = Depends(get_invitation_or_404),
+    invitation: InvitationResponse = Depends(get_invitation_or_404),
 ) -> InvitationResponse:
     return invitation
 
@@ -69,7 +68,7 @@ async def get_invitation(
     summary="Получение всех приглашений",
 )
 async def get_invitations(
-        invitations: Page[InvitationResponse] = Depends(paginate_invitations),
+    invitations: Page[InvitationResponse] = Depends(paginate_invitations),
 ) -> Page[InvitationResponse]:
     return invitations
 
@@ -84,10 +83,10 @@ async def get_invitations(
     """,
     responses={
         204: {"description": "Приглашение успешно удалено"},
-        404: {"description": "Приглашение не найдено"}
-    }
+        404: {"description": "Приглашение не найдено"},
+    },
 )
 async def revoke_invitation(
-        invitation_id: UUID, service: InvitationServiceDep, current_subject: CurrentSubjectDep
+    invitation_id: UUID, service: InvitationServiceDep, current_subject: CurrentSubjectDep
 ) -> None:
     await service.revoke_invitation(invitation_id, current_subject)

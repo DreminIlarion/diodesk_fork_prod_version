@@ -93,7 +93,8 @@ def map_ticket_priority_changed_to_activity_log(event: TicketPriorityChanged) ->
         action="ticket.priority_changed",
         actor_id=event.changed_by,
         changes={
-            "old_priority": event.old_priority.value, "new_priority": event.new_priority.value
+            "old_priority": event.old_priority.value,
+            "new_priority": event.new_priority.value,
         },
         event_id=event.event_id,
     )

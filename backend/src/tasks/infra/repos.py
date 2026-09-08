@@ -1,7 +1,7 @@
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.media.infra.repo import AttachmentMapper
@@ -90,12 +90,15 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
             status=model.status,
             priority=model.priority,
             assignee_id=model.assignee_id,
+            reviewer_id=model.reviewer_id,
             due_date=model.due_date,
             story_points=None if model.story_points is None else Decimal(model.story_points),
-            estimated_hours=None if model.estimated_hours is None else Decimal(model.estimated_hours),
+            estimated_hours=None
+            if model.estimated_hours is None
+            else Decimal(model.estimated_hours),
             actual_hours=None if model.actual_hours is None else Decimal(model.actual_hours),
-            started_at=model.started_at,        # ← Добавиl
-            completed_at=model.completed_at,    # ← Добавил
+            started_at=model.started_at,  # ← Добавиl
+            completed_at=model.completed_at,  # ← Добавил
             working_since=model.working_since,  # ← Добавил
             project_id=model.project_id,
             ticket_id=model.ticket_id,
@@ -115,7 +118,7 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
         return None if model is None else self.model_mapper.to_entity(model)
 
     async def get_next_sequence(
-            self, ticket_id: UUID | None = None, project_id: UUID | None = None
+        self, ticket_id: UUID | None = None, project_id: UUID | None = None
     ) -> int:
         # Считаем реальное количество задач
         count_stmt = select(func.count()).select_from(TaskOrm)
@@ -124,11 +127,13 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
         elif project_id is not None:
             count_stmt = count_stmt.where(TaskOrm.project_id == project_id)
         else:
-            count_stmt = count_stmt.where(TaskOrm.ticket_id.is_(None), TaskOrm.project_id.is_(None))
-        
+            count_stmt = count_stmt.where(
+                TaskOrm.ticket_id.is_(None), TaskOrm.project_id.is_(None)
+            )
+
         real_count = await self.session.scalar(count_stmt)
         next_num = (real_count or 0) + 1
-        
+
         # Атомарная вставка/обновление
         stmt = (
             pg_insert(TaskSequence)
@@ -139,21 +144,22 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
             )
             .returning(TaskSequence.last_number)
         )
-        
+
         result = await self.session.execute(stmt)
         return result.scalar_one()
 
     async def get_grouped_by_status(
-            self,
-            pagination: Pagination,
-            *,
-            project_id: UUID | None = None,
-            ticket_id: UUID | None = None,
-            assignee_id: UUID | None = None,
-            created_by: UUID | None = None,  # ← добавить
-            # Дополнительные фильтры
-            priorities: list[Priority] | None = None,
-            overdue_only: bool = False,
+        self,
+        pagination: Pagination,
+        *,
+        project_id: UUID | None = None,
+        ticket_id: UUID | None = None,
+        assignee_id: UUID | None = None,
+        created_by: UUID | None = None,  # ← добавить
+        reviewer_id: UUID | None = None,
+        # Дополнительные фильтры
+        priorities: list[Priority] | None = None,
+        overdue_only: bool = False,
     ) -> dict[TaskStatus, Page[TaskView]]:
         # Общие условия фильтрации (исключаем удалённые задачи)
         conditions = [self.model.deleted_at.is_(None)]
@@ -166,15 +172,19 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
         if ticket_id is not None:
             conditions.append(self.model.ticket_id == ticket_id)
 
-        if assignee_id is not None and created_by is not None:
-            # Мои задачи: создатель ИЛИ исполнитель
-            conditions.append(
-                (self.model.assignee_id == assignee_id) | (self.model.created_by == created_by)
-            )
-        elif assignee_id is not None:
-            conditions.append(self.model.assignee_id == assignee_id)
-        elif created_by is not None:
-            conditions.append(self.model.created_by == created_by)   
+        user_conditions = []
+
+        if assignee_id is not None:
+            user_conditions.append(self.model.assignee_id == assignee_id)
+
+        if created_by is not None:
+            user_conditions.append(self.model.created_by == created_by)
+
+        if reviewer_id is not None:
+            user_conditions.append(self.model.reviewer_id == reviewer_id)
+
+        if user_conditions:
+            conditions.append(or_(*user_conditions))
 
         if priorities is not None:
             conditions.append(self.model.priority.in_(priorities))

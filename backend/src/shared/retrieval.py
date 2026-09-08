@@ -6,9 +6,9 @@ from .domain.exceptions import NotFoundError
 
 
 async def get_or_raise_404[EntityT: Entity](
-        loader: Callable[[UUID, ...], Awaitable[EntityT | None]],
-        uid: UUID,
-        aggregate_type: type[EntityT],
+    loader: Callable[[UUID, ...], Awaitable[EntityT | None]],
+    uid: UUID,
+    aggregate_type: type[EntityT],
 ) -> EntityT:
     obj = await loader(uid)
     if obj is None:

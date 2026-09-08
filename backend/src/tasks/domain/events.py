@@ -166,5 +166,5 @@ def map_task_unassigned_to_activity_log(event: TaskUnassigned) -> ActivityLog:
         aggregate_id=event.task_id,
         action="task.unassigned",
         actor_id=event.unassigned_by,
-        changes={"old_assignee": str(event.old_assignee)}
+        changes={"old_assignee": str(event.old_assignee)},
     )

@@ -56,7 +56,7 @@ async def get_feedbacks(
             page=pagination.page,
             size=pagination.size,
         )
-    
+
     return await service.get_feedbacks(
         pagination=pagination,
         filters=filters,
@@ -98,6 +98,7 @@ async def archive_feedback(
         feedback_id=feedback_id,
         current_subject=current_subject,
     )
+
 
 @router.get(
     path="/my",

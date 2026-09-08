@@ -4,7 +4,6 @@ from src.projects.domain.vo import ProjectKey
 
 
 class TestProjectKey:
-
     @pytest.mark.parametrize(
         ("raw", "expected"),
         [

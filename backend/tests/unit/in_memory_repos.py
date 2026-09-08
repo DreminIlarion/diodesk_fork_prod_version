@@ -3,6 +3,8 @@ from typing import override
 import math
 from uuid import UUID
 
+from src.tickets.domain.services import TicketScopes
+
 from src.crm.domain.entities import Counterparty
 from src.crm.domain.vo import Inn
 from src.iam.domain.entities import Invitation, User
@@ -11,7 +13,7 @@ from src.notifications.domain.entities import Notification, UserPreference
 from src.notifications.domain.vo import NotificationType
 from src.products.domain.entities import SoftwareProduct
 from src.projects.domain.entities import Project, ProjectMember
-from src.projects.domain.vo import ProjectKey, MemberRole
+from src.projects.domain.vo import MemberRole, ProjectKey
 from src.shared.infra.repos import InMemoryRepository
 from src.shared.schemas import Page, Pagination
 from src.shared.utils.time import current_datetime
@@ -19,7 +21,6 @@ from src.tasks.domain.entities import Task
 from src.tasks.domain.vo import TaskNumber
 from src.tickets.domain.entities import Comment, Reaction, Ticket
 from src.tickets.domain.repos import ReactionStats, TicketFilters
-from src.tickets.domain.services import TicketScopes
 from src.tickets.domain.vo import CommentType, ReactionType
 
 
@@ -41,10 +42,9 @@ class InMemoryCounterpartyRepository(InMemoryRepository[Counterparty]):
 
 
 class InMemoryUserRepository(InMemoryRepository[User]):
-
     @override
     async def paginate(
-            self, params: Pagination, include_roles: list[UserRole] | None = None
+        self, params: Pagination, include_roles: list[UserRole] | None = None
     ) -> Page[User]:
         all_users = list(self.data.values())
 
@@ -56,7 +56,7 @@ class InMemoryUserRepository(InMemoryRepository[User]):
 
         total_items = len(filtered_users)
         sorted_users = sorted(filtered_users, key=lambda user: user.created_at)
-        page_items = sorted_users[params.offset:params.offset + params.size]
+        page_items = sorted_users[params.offset : params.offset + params.size]
 
         return Page.create(
             items=page_items,
@@ -73,7 +73,8 @@ class InMemoryUserRepository(InMemoryRepository[User]):
 
     async def get_customer_admins(self, counterparty_id: UUID) -> list[User]:
         return [
-            user for user in self.data.values()
+            user
+            for user in self.data.values()
             if user.counterparty_id == counterparty_id and user.role == UserRole.CUSTOMER_ADMIN
         ]
 
@@ -104,7 +105,7 @@ class InMemoryInvitationRepository(InMemoryRepository[Invitation]):
         return None
 
     async def get_active_by_email_and_role(
-            self, email: str, user_role: UserRole
+        self, email: str, user_role: UserRole
     ) -> Invitation | None:
         for invitation in self.data.values():
             if (
@@ -117,13 +118,12 @@ class InMemoryInvitationRepository(InMemoryRepository[Invitation]):
 
 
 class InMemoryMembershipRepository(InMemoryRepository[ProjectMember]):
-
     @override
     async def paginate(
-            self,
-            pagination: Pagination,
-            project_id: UUID | None = None,
-            include_project_roles: list[MemberRole] | None = None,
+        self,
+        pagination: Pagination,
+        project_id: UUID | None = None,
+        include_project_roles: list[MemberRole] | None = None,
     ) -> Page[ProjectMember]:
         all_memberships = list(self.data.values())
 
@@ -136,7 +136,7 @@ class InMemoryMembershipRepository(InMemoryRepository[ProjectMember]):
 
         total_items = len(filtered_memberships)
         sorted_memberships = sorted(filtered_memberships, key=lambda member: member.created_at)
-        page_items = sorted_memberships[pagination.offset:pagination.offset + pagination.size]
+        page_items = sorted_memberships[pagination.offset : pagination.offset + pagination.size]
 
         return Page.create(
             items=page_items,
@@ -153,15 +153,10 @@ class InMemoryMembershipRepository(InMemoryRepository[ProjectMember]):
         return None
 
     async def get_by_user(self, user_id: UUID) -> list[ProjectMember]:
-        return [
-            membership
-            for membership in self.data.values()
-            if membership.user_id == user_id
-        ]
+        return [membership for membership in self.data.values() if membership.user_id == user_id]
 
 
 class InMemoryProjectRepository(InMemoryRepository[Project]):
-
     async def get_by_key(self, key: ProjectKey) -> Project | None:
         for project in self.data.values():
             if project.key == key:
@@ -184,19 +179,19 @@ class InMemoryProjectRepository(InMemoryRepository[Project]):
                         membership
                         for membership in project.members
                         if membership.user_id == user_id
-                    ), None
+                    ),
+                    None,
                 )
         return None
 
 
 class InMemoryTicketRepository(InMemoryRepository[Ticket]):
-
     @override
     async def paginate(
-            self,
-            pagination: Pagination,
-            scopes: TicketScopes | None = None,
-            filters: TicketFilters | None = None,
+        self,
+        pagination: Pagination,
+        scopes: TicketScopes | None = None,
+        filters: TicketFilters | None = None,
     ) -> Page[Ticket]:
         tickets = [ticket for ticket in self.data.values() if not ticket.is_deleted]
 
@@ -225,7 +220,7 @@ class InMemoryTicketRepository(InMemoryRepository[Ticket]):
         return Page.create(tickets, len(tickets), pagination.page, pagination.size)
 
     async def get_total(
-            self, project_id: UUID | None = None, counterparty_id: UUID | None = None
+        self, project_id: UUID | None = None, counterparty_id: UUID | None = None
     ) -> int:
         counter = 0
         if project_id is not None:
@@ -242,15 +237,14 @@ class InMemoryTicketRepository(InMemoryRepository[Ticket]):
 
 
 class InMemoryCommentRepository(InMemoryRepository[Comment]):
-
     async def get_by_ticket(
-            self,
-            ticket_id: UUID,
-            pagination: Pagination,
-            *,
-            user_id: UUID | None = None,
-            include_notes: bool = False,
-            include_internal: bool = False,
+        self,
+        ticket_id: UUID,
+        pagination: Pagination,
+        *,
+        user_id: UUID | None = None,
+        include_notes: bool = False,
+        include_internal: bool = False,
     ) -> Page[Comment]:
         if include_notes and user_id is None:
             raise ValueError("User ID required for received NOTE comments")
@@ -268,13 +262,13 @@ class InMemoryCommentRepository(InMemoryRepository[Comment]):
         return self._paginate_list(filtered, pagination)
 
     async def get_replies(
-            self,
-            parent_comment_id: UUID,
-            pagination: Pagination,
-            *,
-            user_id: UUID | None = None,
-            include_notes: bool = False,
-            include_internal: bool = False,
+        self,
+        parent_comment_id: UUID,
+        pagination: Pagination,
+        *,
+        user_id: UUID | None = None,
+        include_notes: bool = False,
+        include_internal: bool = False,
     ) -> Page[Comment]:
         if include_notes and user_id is None:
             raise ValueError("User ID required for received NOTE comments")
@@ -282,8 +276,7 @@ class InMemoryCommentRepository(InMemoryRepository[Comment]):
         filtered = [
             c
             for c in self.data.values()
-            if c.parent_comment_id
-            == parent_comment_id
+            if c.parent_comment_id == parent_comment_id
             and c.deleted_at is None
             and self._is_visible(c, user_id, include_notes, include_internal)
         ]
@@ -324,9 +317,8 @@ class InMemoryCommentRepository(InMemoryRepository[Comment]):
 
 
 class InMemoryPreferenceRepository(InMemoryRepository[UserPreference]):
-
     async def get_for_notification(
-            self, user_id: UUID, notification_type: NotificationType
+        self, user_id: UUID, notification_type: NotificationType
     ) -> UserPreference | None:
         for preference in self.data.values():
             if preference.user_id == user_id and preference.notification_type == notification_type:
@@ -334,13 +326,10 @@ class InMemoryPreferenceRepository(InMemoryRepository[UserPreference]):
         return None
 
     async def get_by_user(self, user_id: UUID) -> list[UserPreference]:
-        return [
-            preference for preference in self.data.values() if preference.user_id == user_id
-        ]
+        return [preference for preference in self.data.values() if preference.user_id == user_id]
 
 
 class InMemoryNotificationRepository(InMemoryRepository[Notification]):
-
     async def get_unread_count(self, user_id: UUID) -> int:
         return sum(
             notification
@@ -349,12 +338,10 @@ class InMemoryNotificationRepository(InMemoryRepository[Notification]):
         )
 
     async def get_by_user(
-            self, user_id: UUID, pagination: Pagination, unread_only: bool = False
+        self, user_id: UUID, pagination: Pagination, unread_only: bool = False
     ) -> Page[Notification]:
         user_notifications = [
-            notification
-            for notification in self.data.values()
-            if notification.user_id == user_id
+            notification for notification in self.data.values() if notification.user_id == user_id
         ]
         if unread_only:
             user_notifications = [
@@ -364,7 +351,7 @@ class InMemoryNotificationRepository(InMemoryRepository[Notification]):
             ]
         total_items = len(user_notifications)
         sorted_users = sorted(user_notifications, key=lambda user: user.created_at)
-        page_items = sorted_users[pagination.offset:pagination.offset + pagination.size]
+        page_items = sorted_users[pagination.offset : pagination.offset + pagination.size]
 
         return Page.create(
             items=page_items,
@@ -375,15 +362,14 @@ class InMemoryNotificationRepository(InMemoryRepository[Notification]):
 
 
 class InMemoryReactionRepository(InMemoryRepository[Reaction]):
-
     async def find(
-            self, comment_id: UUID, author_id: UUID, reaction_type: ReactionType
+        self, comment_id: UUID, author_id: UUID, reaction_type: ReactionType
     ) -> Reaction | None:
         for reaction in self.data.values():
             if (
-                reaction.comment_id == comment_id and
-                reaction.author_id == author_id and
-                reaction.reaction_type == reaction_type
+                reaction.comment_id == comment_id
+                and reaction.author_id == author_id
+                and reaction.reaction_type == reaction_type
             ):
                 return reaction
 
@@ -416,8 +402,7 @@ class InMemoryReactionRepository(InMemoryRepository[Reaction]):
         return ReactionStats(counts=counts, user_reactions=user_reactions)
 
 
-class InMemoryProductRepository(InMemoryRepository[SoftwareProduct]):
-    ...
+class InMemoryProductRepository(InMemoryRepository[SoftwareProduct]): ...
 
 
 class InMemoryTaskRepository(InMemoryRepository[Task]):

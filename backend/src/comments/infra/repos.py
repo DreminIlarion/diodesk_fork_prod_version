@@ -85,15 +85,17 @@ class SqlCommentRepository(SqlAlchemyRepository[Comment, CommentOrm]):
     model_mapper = CommentMapper
 
     def _apply_comment_visibility_policy(
-            self, stmt: Select[tuple[CommentOrm]], policy: CommentVisibilityPolicy,
+        self,
+        stmt: Select[tuple[CommentOrm]],
+        policy: CommentVisibilityPolicy,
     ) -> Select[tuple[CommentOrm]]:
         conditions = [self.model.visibility == CommentVisibility.PUBLIC]
 
         if policy.visible:
             if CommentVisibility.NOTE in policy.visible:
                 conditions.append(
-                    (self.model.visibility == CommentVisibility.NOTE) &
-                    (self.model.author_id == policy.viewer_id),
+                    (self.model.visibility == CommentVisibility.NOTE)
+                    & (self.model.author_id == policy.viewer_id),
                 )
             if CommentVisibility.INTERNAL:
                 conditions.append(self.model.visibility == CommentVisibility.INTERNAL)
@@ -102,10 +104,10 @@ class SqlCommentRepository(SqlAlchemyRepository[Comment, CommentOrm]):
 
     @override
     async def paginate(
-            self,
-            pagination: Pagination,
-            aggregate_ref: AggregateReference,
-            policy: CommentVisibilityPolicy,
+        self,
+        pagination: Pagination,
+        aggregate_ref: AggregateReference,
+        policy: CommentVisibilityPolicy,
     ) -> Page[Comment]:
         stmt = select(self.model)
 
@@ -124,11 +126,11 @@ class SqlCommentRepository(SqlAlchemyRepository[Comment, CommentOrm]):
         return await self._paginate(stmt, pagination)
 
     async def get_replies(
-            self,
-            comment_id: UUID,
-            pagination: Pagination,
-            *,
-            policy: CommentVisibilityPolicy | None = None,
+        self,
+        comment_id: UUID,
+        pagination: Pagination,
+        *,
+        policy: CommentVisibilityPolicy | None = None,
     ) -> Page[Comment]:
         conditions = [
             self.model.parent_comment_id == comment_id,
@@ -147,16 +149,11 @@ class SqlReactionRepository(SqlAlchemyRepository[Reaction, ReactionOrm]):
     model = ReactionOrm
     model_mapper = ReactionMapper
 
-    async def find(
-            self, comment_id: UUID, author_id: UUID, emoji: str
-    ) -> Reaction | None:
-        stmt = (
-            select(self.model)
-            .where(
-                (self.model.comment_id == comment_id) &
-                (self.model.author_id == author_id) &
-                (self.model.emoji == emoji)
-            )
+    async def find(self, comment_id: UUID, author_id: UUID, emoji: str) -> Reaction | None:
+        stmt = select(self.model).where(
+            (self.model.comment_id == comment_id)
+            & (self.model.author_id == author_id)
+            & (self.model.emoji == emoji)
         )
         result = await self.session.execute(stmt)
         model = result.scalar_one_or_none()
@@ -168,14 +165,12 @@ class SqlReactionRepository(SqlAlchemyRepository[Reaction, ReactionOrm]):
                 self.model.comment_id,
                 self.model.emoji,
                 func.count(self.model.id).label("cnt"),
-                func.count(self.model.id)
+                func
+                .count(self.model.id)
                 .filter(self.model.author_id == author_id)
-                .label("user_has_type")
+                .label("user_has_type"),
             )
-            .where(
-                (self.model.comment_id.in_(comment_ids)) &
-                (self.model.deleted_at.is_(None))
-            )
+            .where((self.model.comment_id.in_(comment_ids)) & (self.model.deleted_at.is_(None)))
             .group_by(self.model.comment_id, self.model.emoji)
         )
 

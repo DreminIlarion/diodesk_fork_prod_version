@@ -1,4 +1,3 @@
-
 # Константы для приглашений
 INVITATION_EXPIRE_IN_DAYS = 7
 

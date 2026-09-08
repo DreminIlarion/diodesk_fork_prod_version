@@ -12,11 +12,11 @@ from ..domain.ports import Storage
 
 class S3Storage(Storage):
     def __init__(
-            self,
-            access_key: str,
-            secret_key: str,
-            endpoint_url: str,
-            bucket_name: str,
+        self,
+        access_key: str,
+        secret_key: str,
+        endpoint_url: str,
+        bucket_name: str,
     ) -> None:
         self.config = {
             "service_name": "s3",
@@ -46,13 +46,15 @@ class S3Storage(Storage):
             await client.delete_object(Bucket=self.bucket_name, Key=storage_key)
 
     async def create_presigned_upload_url(
-            self, storage_key: str, content_type: str, expires_in: int = 3600
+        self, storage_key: str, content_type: str, expires_in: int = 3600
     ) -> str:
         async with self.get_client() as client:
             return await client.generate_presigned_url(
                 "put_object",
                 Params={
-                    "Bucket": self.bucket_name, "Key": storage_key, "ContentType": content_type
+                    "Bucket": self.bucket_name,
+                    "Key": storage_key,
+                    "ContentType": content_type,
                 },
                 ExpiresIn=expires_in,
                 HttpMethod="PUT",

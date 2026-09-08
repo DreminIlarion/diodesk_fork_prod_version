@@ -2,7 +2,7 @@ from typing import Annotated
 
 from uuid import UUID
 
-from fastapi import Depends, Query
+from fastapi import Body, Depends, Query
 
 from src.activity_logs.dependencies import ActivityLogRecorderDep
 from src.core.database import session_factory
@@ -62,14 +62,14 @@ TicketAuthZServiceDep = Annotated[TicketAuthZService, Depends(get_ticket_authz_s
 
 
 def get_ticket_service(
-        session: SessionDep,
-        counterparty_repo: CounterpartyRepoDep,
-        ticket_repo: TicketRepoDep,
-        project_repo: ProjectRepoDep,
-        user_repo: UserRepoDep,
-        ticket_authz_service: TicketAuthZServiceDep,
-        activity_log_recorder: ActivityLogRecorderDep,
-        event_publisher: EventPublisherDep
+    session: SessionDep,
+    counterparty_repo: CounterpartyRepoDep,
+    ticket_repo: TicketRepoDep,
+    project_repo: ProjectRepoDep,
+    user_repo: UserRepoDep,
+    ticket_authz_service: TicketAuthZServiceDep,
+    activity_log_recorder: ActivityLogRecorderDep,
+    event_publisher: EventPublisherDep,
 ) -> TicketService:
     return TicketService(
         uow=session,
@@ -79,7 +79,7 @@ def get_ticket_service(
         user_repo=user_repo,
         ticket_authz_service=ticket_authz_service,
         activity_log_recorder=activity_log_recorder,
-        event_publisher=event_publisher
+        event_publisher=event_publisher,
     )
 
 
@@ -110,39 +110,39 @@ def get_reference_loader() -> ReferenceLoader:
 
 
 def get_ticket_query_service(
-        ticket_repo: TicketRepoDep,
-        reference_loader: ReferenceLoader = Depends(get_reference_loader),
+    ticket_repo: TicketRepoDep,
+    reference_loader: ReferenceLoader = Depends(get_reference_loader),
 ) -> TicketQueryService:
     return TicketQueryService(ticket_repo=ticket_repo, reference_loader=reference_loader)
 
 
 def get_comment_service(
-        session: SessionDep,
-        ticket_repo: TicketRepoDep,
-        comment_repo: CommentRepoDep,
-        reaction_repo: ReactionRepoDep,
-        event_publisher: EventPublisherDep
+    session: SessionDep,
+    ticket_repo: TicketRepoDep,
+    comment_repo: CommentRepoDep,
+    reaction_repo: ReactionRepoDep,
+    event_publisher: EventPublisherDep,
 ) -> CommentService:
     return CommentService(
         session=session,
         ticket_repo=ticket_repo,
         comment_repo=comment_repo,
         reaction_repo=reaction_repo,
-        event_publisher=event_publisher
+        event_publisher=event_publisher,
     )
 
 
 def get_reaction_service(
-        session: SessionDep,
-        comment_repo: CommentRepoDep,
-        reaction_repo: ReactionRepoDep,
-        event_publisher: EventPublisherDep,
+    session: SessionDep,
+    comment_repo: CommentRepoDep,
+    reaction_repo: ReactionRepoDep,
+    event_publisher: EventPublisherDep,
 ) -> ReactionService:
     return ReactionService(
         session=session,
         comment_repo=comment_repo,
         reaction_repo=reaction_repo,
-        event_publisher=event_publisher
+        event_publisher=event_publisher,
     )
 
 
@@ -153,20 +153,16 @@ ReactionServiceDep = Annotated[ReactionService, Depends(get_reaction_service)]
 
 
 def get_ticket_filters(
-        time_range: TimeRangeFiltersDep,
-        statuses: Annotated[
-            list[TicketStatus] | None, Query(max_length=5, description="По статусу")
-        ] = None,
-        priorities: Annotated[
-            Priority | None, Query(description="По приоритету")  # ИСПРАВЛЕНО
-        ] = None,
-        ticket_type: Annotated[
-            TicketType | None, Query(description="По виду заявки")
-        ] = None,
-        tags: Annotated[
-            list[str] | None, Query(max_length=10, description="По тегам")
-        ] = None,
-        q: Annotated[str | None, Query(description="Поисковый запрос")] = None,
+    time_range: TimeRangeFiltersDep,
+    statuses: Annotated[
+        list[TicketStatus] | None, Query(max_length=5, description="По статусу")
+    ] = None,
+    priorities: Annotated[
+        Priority | None, Query(description="По приоритету")  # ИСПРАВЛЕНО
+    ] = None,
+    ticket_type: Annotated[TicketType | None, Query(description="По виду заявки")] = None,
+    tags: Annotated[list[str] | None, Query(max_length=10, description="По тегам")] = None,
+    q: Annotated[str | None, Query(description="Поисковый запрос")] = None,
 ) -> TicketFilters:
     return TicketFilters(
         search_query=q,
@@ -180,20 +176,20 @@ def get_ticket_filters(
         time_range=time_range,
     )
 
+
 TicketFiltersDep = Annotated[TicketFilters, Depends(get_ticket_filters)]
 
-from fastapi import Body
 
 def get_ticket_filters_from_body(
-        time_range: TimeRangeFiltersDep,
-        search_query: Annotated[str | None, Body()] = None,
-        tags: Annotated[list[str] | None, Body()] = None,
-        counterparty_id: Annotated[UUID | None, Body()] = None,
-        project_ids: Annotated[list[UUID] | None, Body()] = None,
-        statuses: Annotated[list[TicketStatus] | None, Body()] = None,
-        priorities: Annotated[Priority | None, Body()] = None,
-        ticket_type: Annotated[TicketType | None, Body(alias="type")] = None,
-        actors: Annotated[dict | None, Body()] = None,
+    time_range: TimeRangeFiltersDep,
+    search_query: Annotated[str | None, Body()] = None,
+    tags: Annotated[list[str] | None, Body()] = None,
+    counterparty_id: Annotated[UUID | None, Body()] = None,
+    project_ids: Annotated[list[UUID] | None, Body()] = None,
+    statuses: Annotated[list[TicketStatus] | None, Body()] = None,
+    priorities: Annotated[Priority | None, Body()] = None,
+    ticket_type: Annotated[TicketType | None, Body(alias="type")] = None,
+    actors: Annotated[dict | None, Body()] = None,
 ) -> TicketFilters:
     return TicketFilters(
         search_query=search_query,
@@ -207,12 +203,15 @@ def get_ticket_filters_from_body(
             assignee_id=actors.get("assignee_id"),
             reporter_id=actors.get("reporter_id"),
             creator_id=actors.get("creator_id"),
-        ) if actors else None,
+        )
+        if actors
+        else None,
         time_range=time_range,
     )
 
 
 TicketFiltersBodyDep = Annotated[TicketFilters, Depends(get_ticket_filters_from_body)]
+
 
 async def get_ticket_or_404(ticket_id: UUID, ticket_repo: TicketRepoDep) -> TicketResponse:
     ticket = await get_or_raise_404(ticket_repo.read, ticket_id, Ticket)
@@ -220,6 +219,8 @@ async def get_ticket_or_404(ticket_id: UUID, ticket_repo: TicketRepoDep) -> Tick
 
 
 async def paginate_tickets(
-        pagination: PaginationDep, filters: TicketFilters, service: TicketQueryServiceDep,
+    pagination: PaginationDep,
+    filters: TicketFilters,
+    service: TicketQueryServiceDep,
 ) -> Page[TicketViewResponse]:
     return await service.get_tickets(pagination, filters=filters)

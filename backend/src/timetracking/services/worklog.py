@@ -31,12 +31,12 @@ class WorklogCreationContext:
 
 class WorklogService:
     def __init__(
-            self,
-            session: AsyncSession,
-            worklog_repo: WorklogRepository,
-            task_repo: TaskRepository,
-            ticket_repo: TicketRepository,
-            event_publisher: EventPublisher,
+        self,
+        session: AsyncSession,
+        worklog_repo: WorklogRepository,
+        task_repo: TaskRepository,
+        ticket_repo: TicketRepository,
+        event_publisher: EventPublisher,
     ) -> None:
         self.session = session
         self.worklog_repo = worklog_repo
@@ -45,7 +45,7 @@ class WorklogService:
         self.event_publisher = event_publisher
 
     async def _resolve_creation_context(
-            self, task_id: UUID | None, ticket_id: UUID | None
+        self, task_id: UUID | None, ticket_id: UUID | None
     ) -> WorklogCreationContext:
         """
         Определение контекста создание записи журнала.
@@ -118,7 +118,7 @@ class WorklogService:
         return map_worklog_to_response(worklog)
 
     async def edit(
-            self, worklog_id: UUID, data: WorklogEdit, current_user: CurrentUser
+        self, worklog_id: UUID, data: WorklogEdit, current_user: CurrentUser
     ) -> WorklogResponse:
         """Редактирование записи журнала о потраченном времени"""
 

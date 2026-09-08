@@ -79,11 +79,11 @@ def build_invitation_mail(invitation: Invitation) -> dict[str, Any]:
 
 class AuthService:
     def __init__(
-            self,
-            uow: UnitOfWork,
-            user_repo: UserRepository,
-            invitation_repo: InvitationRepository,
-            token_store: TokenStore,
+        self,
+        uow: UnitOfWork,
+        user_repo: UserRepository,
+        invitation_repo: InvitationRepository,
+        token_store: TokenStore,
     ) -> None:
         self.uow = uow
         self.user_repo = user_repo
@@ -129,8 +129,8 @@ class AuthService:
             raise UnauthorizedError(f"User not found by email - {email}")
 
         if (
-                not await verify_password_async(password, user.password_hash.get_hashed_value()) or
-                not user.is_active
+            not await verify_password_async(password, user.password_hash.get_hashed_value())
+            or not user.is_active
         ):
             raise UnauthorizedError("Invalid password or user is not active")
 
@@ -191,20 +191,18 @@ class AuthService:
 
 class InvitationService:
     def __init__(
-            self,
-            uow: UnitOfWork,
-            invitation_repo: InvitationRepository,
-            mail_sender: MailSender,
-            event_publisher: EventPublisher,
+        self,
+        uow: UnitOfWork,
+        invitation_repo: InvitationRepository,
+        mail_sender: MailSender,
+        event_publisher: EventPublisher,
     ) -> None:
         self.uow = uow
         self.invitation_repo = invitation_repo
         self.mail_sender = mail_sender
         self.event_publisher = event_publisher
 
-    async def create(
-            self, data: InvitationCreate, current_subject: Subject
-    ) -> InvitationResponse:
+    async def create(self, data: InvitationCreate, current_subject: Subject) -> InvitationResponse:
         """
         Создаёт приглашение + публикует событие для отправки на почту.
         """
@@ -235,20 +233,22 @@ class InvitationService:
         return map_invitation_to_response(invitation)
 
     async def send(self, invitation_id: UUID) -> None:
-        logger.info(f"📧 Sending invitation {invitation_id}")
+        logger.info("📧 Sending invitation %s", invitation_id)
         invitation = await self.invitation_repo.read(invitation_id)
         if invitation is None:
             logger.warning("Invitation with ID %s not found, skip send mail", invitation_id)
             return
-        logger.info(f"📧 Invitation found: {invitation.email}")
+        logger.info("📧 Invitation found: %s", invitation.email)
         payload = build_invitation_mail(invitation)
-        logger.info(f"📧 Payload: {payload}")
+        logger.info("📧 Payload: %s", payload)
         await self.mail_sender.send(**payload)
-        logger.info(f"📧 Email sent to {invitation.email}")
+        logger.info("📧 Email sent to %s", invitation.email)
 
         logger.info(
             "Invitation sent: %s -> %s (%s)",
-            invitation.invited_by, invitation.email, "; ".join(invitation.granted_roles)
+            invitation.invited_by,
+            invitation.email,
+            "; ".join(invitation.granted_roles),
         )
 
     async def revoke_invitation(self, invitation_id: UUID, current_subject: Subject) -> None:

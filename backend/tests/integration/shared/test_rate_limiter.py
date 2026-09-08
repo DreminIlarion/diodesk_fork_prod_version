@@ -25,7 +25,7 @@ async def test_sliding_window_logic(redis_client):
         client_id=client_id,
         endpoint=endpoint,
         max_requests=max_requests,
-        window_seconds=window_seconds
+        window_seconds=window_seconds,
     )
     assert r1.allowed is True
     assert r1.remaining == 1

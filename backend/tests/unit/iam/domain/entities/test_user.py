@@ -79,7 +79,7 @@ def test_create_support_minimal(valid_email, valid_password_hash):
     assert isinstance(user, User)
     assert str(user.email) == valid_email
     assert user.role == UserRole.SUPPORT_AGENT
-    assert user.counterparty_id is None          # для support это нормально
+    assert user.counterparty_id is None  # для support это нормально
     assert user.is_active is True
     assert user.username is None
     assert user.full_name is None
@@ -124,7 +124,7 @@ def test_direct_creation_customer_without_counterparty_raises(valid_email, valid
 
 
 def test_direct_creation_customer_admin_without_counterparty_raises(
-        valid_email, valid_password_hash
+    valid_email, valid_password_hash
 ):
     with pytest.raises(InvariantViolationError):
         User(

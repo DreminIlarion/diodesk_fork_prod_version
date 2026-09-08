@@ -20,9 +20,9 @@ class IsCustomerRule:
         for role in self.subject.roles:
             if role.is_customer():
                 return PermissionResult(True)
-        
+
         return PermissionResult(False, "Only customer can leave feedback")
-            
+
 
 class IsSupportRule:
     """
@@ -42,9 +42,9 @@ class IsSupportRule:
         for role in self.ALLOWED_ROLES:
             if self.subject.has_role(role):
                 return PermissionResult(True)
-            
+
         return PermissionResult(False, "Only support can view feedback list")
-    
+
 
 class IsTicketReporterRule:
     """
@@ -54,13 +54,13 @@ class IsTicketReporterRule:
     def __init__(self, subject: Subject, ticket: Ticket) -> None:
         self.subject = subject
         self.ticket = ticket
-    
+
     def check(self) -> PermissionResult:
         if self.subject.id == self.ticket.reporter_id:
             return PermissionResult(True)
-        
+
         return PermissionResult(False, "Only ticket reporter can leave feedback")
-    
+
 
 class IsTicketClosedRule:
     """
@@ -75,7 +75,7 @@ class IsTicketClosedRule:
             return PermissionResult(True)
 
         return PermissionResult(False, "Feedback can be left only for closed tickets")
-    
+
 
 class IsFeedbackAuthorRule:
     """
@@ -89,5 +89,5 @@ class IsFeedbackAuthorRule:
     def check(self) -> PermissionResult:
         if str(self.subject.id) == str(self.feedback.author_id):  # ← str()
             return PermissionResult(True)
-        
+
         return PermissionResult(False, "Only feedback author can manage feedback")

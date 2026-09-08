@@ -17,7 +17,7 @@ router = APIRouter(prefix="/users", tags=["Пользователи"])
     path="/me",
     status_code=status.HTTP_200_OK,
     response_model=UserResponse,
-    summary="Получить информацию о своём учётной записи"
+    summary="Получить информацию о своём учётной записи",
 )
 async def get_me(user: UserResponse = Depends(get_me_or_404)) -> UserResponse:
     return user

@@ -22,13 +22,15 @@ router = APIRouter(prefix="/products", tags=["Программные проду�
     status_code=status.HTTP_201_CREATED,
     response_model=ProductResponse,
     summary="Создание программного продукта",
-    description="Создаёт новую запись в справочнике"
+    description="Создаёт новую запись в справочнике",
 )
 async def create_product(
-        current_user: CurrentUserDep, data: ProductCreate, service: ProductServiceDep
+    current_user: CurrentUserDep, data: ProductCreate, service: ProductServiceDep
 ) -> ProductResponse:
     return await service.create(
-        data, created_by=current_user.id, created_by_role=current_user.roles[0] if current_user.roles else None
+        data,
+        created_by=current_user.id,
+        created_by_role=current_user.roles[0] if current_user.roles else None,
     )
 
 
@@ -36,7 +38,7 @@ async def create_product(
     path="/categories/{category}/attributes-schema",
     status_code=status.HTTP_200_OK,
     response_model=AttributesSchemaResponse,
-    summary="Получение JSON схемы аттрибутов продукта"
+    summary="Получение JSON схемы аттрибутов продукта",
 )
 def get_product_category_attributes_schema(category: ProductCategory) -> AttributesSchemaResponse:
     schema = get_product_attributes_schema(category)
@@ -51,9 +53,9 @@ def get_product_category_attributes_schema(category: ProductCategory) -> Attribu
     summary="Получение программных продуктов",
 )
 async def get_products(
-        pagination: PaginationDep,
-        filters: ProductFiltersDep,
-        repository: ProductRepoDep,
+    pagination: PaginationDep,
+    filters: ProductFiltersDep,
+    repository: ProductRepoDep,
 ) -> Page[ProductResponse]:
     page = await repository.paginate(
         pagination, category=filters.category, status=filters.status, search=filters.query

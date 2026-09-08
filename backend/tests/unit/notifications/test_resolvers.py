@@ -36,7 +36,7 @@ class TestChannelResolver:
 
     @pytest.mark.asyncio
     async def test_resolve_no_preference_returns_all_channels(
-            self, channel_resolver, email_channel, in_app_channel
+        self, channel_resolver, email_channel, in_app_channel
     ):
         """
         Если нет настройки, то доступны все каналы
@@ -54,7 +54,7 @@ class TestChannelResolver:
 
     @pytest.mark.asyncio
     async def test_resolve_with_preference_enabled_channels(
-            self, fake_preference_repo, channel_resolver, email_channel, in_app_channel
+        self, fake_preference_repo, channel_resolver, email_channel, in_app_channel
     ):
         """
         Должны быть доступны только разрешённые каналы уведомлений
@@ -76,7 +76,7 @@ class TestChannelResolver:
 
     @pytest.mark.asyncio
     async def test_resolve_all_channels_disabled_returns_empty_list(
-            self, fake_preference_repo, channel_resolver
+        self, fake_preference_repo, channel_resolver
     ):
         """
         Если все каналы отключены пользователем, то нет уведомлений
@@ -96,7 +96,7 @@ class TestChannelResolver:
 
     @pytest.mark.asyncio
     async def test_resolve_when_preference_muted_returns_empty_list(
-            self, channel_resolver, fake_preference_repo
+        self, channel_resolver, fake_preference_repo
     ):
         """
         В настройках каналы заглушены - то пустой список

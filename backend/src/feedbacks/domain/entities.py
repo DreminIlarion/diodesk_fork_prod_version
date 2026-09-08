@@ -1,6 +1,7 @@
+from typing import Self
+
 from dataclasses import dataclass
 from uuid import UUID
-from typing import Self
 
 from src.shared.domain.entities import AggregateRoot
 from src.shared.utils.time import current_datetime
@@ -14,7 +15,7 @@ class Feedback(AggregateRoot):
     """
     Отзыв клиента о качестве обслуживания по закрутому тикету.
     """
-    
+
     ticket_id: UUID
     author_id: UUID
     rating: FeedbackRating
@@ -26,14 +27,11 @@ class Feedback(AggregateRoot):
 
     @classmethod
     def create(
-        cls, 
-        *, 
-        ticket_id: UUID, 
-        author_id: UUID, 
-        rating: int, 
-        comment: str | None = None
+        cls, *, ticket_id: UUID, author_id: UUID, rating: int, comment: str | None = None
     ) -> Self:
-        comment = None if (comment is None or not comment.strip()) else comment.strip()  # ← исправлено
+        comment = (
+            None if (comment is None or not comment.strip()) else comment.strip()
+        )  # ← исправлено
 
         feedback = cls(
             ticket_id=ticket_id,
@@ -53,7 +51,7 @@ class Feedback(AggregateRoot):
         )
 
         return feedback
-    
+
     def edit(
         self,
         *,
@@ -69,7 +67,7 @@ class Feedback(AggregateRoot):
                 is_edited = True
 
         if comment is not None:
-            new_comment = comment.strip() if comment.strip() else None  # ← исправлено
+            new_comment = comment.strip() or None
             if new_comment != self.comment:
                 self.comment = new_comment
                 is_edited = True

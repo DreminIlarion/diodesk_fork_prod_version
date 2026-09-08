@@ -60,13 +60,13 @@ class TestNotificationServiceNotify:
 
     @pytest.mark.asyncio
     async def test_notify_creates_and_sends_success(
-            self,
-            mock_session,
-            notification,
-            notification_service,
-            fake_notification_repo,
-            email_channel,
-            in_app_channel,
+        self,
+        mock_session,
+        notification,
+        notification_service,
+        fake_notification_repo,
+        email_channel,
+        in_app_channel,
     ):
         await notification_service.notify(notification)
 
@@ -82,7 +82,7 @@ class TestNotificationServiceNotify:
 
     @pytest.mark.asyncio
     async def test_notify_continues_sending_after_failure(
-            self, notification, notification_service, email_channel, in_app_channel
+        self, notification, notification_service, email_channel, in_app_channel
     ):
         email_channel.send.side_effect = NotificationSendingFailedError("Fail 1")
 
@@ -99,7 +99,7 @@ class TestNotificationServiceMarkAsRead:
 
     @pytest.mark.asyncio
     async def test_mark_as_read_updates_unread_notification(
-            self, notification, mock_session, notification_service, fake_notification_repo
+        self, notification, mock_session, notification_service, fake_notification_repo
     ):
         await fake_notification_repo.create(notification)
 
@@ -113,12 +113,7 @@ class TestNotificationServiceMarkAsRead:
 
     @pytest.mark.asyncio
     async def test_mark_as_read_does_nothing_if_already_read(
-            self,
-            notification,
-            mock_session,
-            notification_service,
-            fake_notification_repo,
-            caplog
+        self, notification, mock_session, notification_service, fake_notification_repo, caplog
     ):
         notification = Notification(
             user_id=uuid4(),
@@ -137,9 +132,9 @@ class TestNotificationServiceMarkAsRead:
 
     @pytest.mark.asyncio
     async def test_mark_as_read_raises_not_found_error_when_notification_missing(
-            self, notification_service, notification
+        self, notification_service, notification
     ):
         with pytest.raises(
-                NotFoundError, match=f"Notification with ID {notification.id} not found"
+            NotFoundError, match=f"Notification with ID {notification.id} not found"
         ):
             await notification_service.mark_as_read(notification.id, read_by=notification.user_id)

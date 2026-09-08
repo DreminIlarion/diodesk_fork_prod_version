@@ -47,12 +47,12 @@ def content_type():
 class TestAttachmentService:
     @pytest.mark.asyncio
     async def test_create_presigned_upload_url(
-            self,
-            attachment_service,
-            owner_type,
-            owner_id,
-            original_filename,
-            content_type,
+        self,
+        attachment_service,
+        owner_type,
+        owner_id,
+        original_filename,
+        content_type,
     ):
         request = PresignedUploadRequest(
             filename=original_filename,
@@ -88,11 +88,14 @@ class TestAttachmentService:
         presigned_response = await attachment_service.create_presigned_upload_url(upload_request)
 
         # 2. Загрузка файла по подписанному URL
-        async with aiohttp.ClientSession() as session, session.put(
-            url=presigned_response.upload_url,
+        async with (
+            aiohttp.ClientSession() as session,
+            session.put(
+                url=presigned_response.upload_url,
                 data=sample_file_bytes,
                 headers={"Content-Type": content_type},
-        ) as response:
+            ) as response,
+        ):
             assert response.status == status.HTTP_200_OK
 
         # 3. Подтверждение загрузки
@@ -125,14 +128,14 @@ class TestAttachmentService:
 
     @pytest.mark.asyncio
     async def test_create_presigned_download_url_success(
-            self,
-            attachment_service,
-            owner_type,
-            owner_id,
-            original_filename,
-            content_type,
-            uploaded_by,
-            sample_file_bytes,
+        self,
+        attachment_service,
+        owner_type,
+        owner_id,
+        original_filename,
+        content_type,
+        uploaded_by,
+        sample_file_bytes,
     ):
         # 1. Загрузка файла в хранилище
         upload_request = PresignedUploadRequest(
@@ -143,11 +146,14 @@ class TestAttachmentService:
         )
         upload_response = await attachment_service.create_presigned_upload_url(upload_request)
 
-        async with aiohttp.ClientSession() as session, session.put(
-            upload_response.upload_url,
-            data=sample_file_bytes,
-            headers={"Content-Type": content_type},
-        ) as resp:
+        async with (
+            aiohttp.ClientSession() as session,
+            session.put(
+                upload_response.upload_url,
+                data=sample_file_bytes,
+                headers={"Content-Type": content_type},
+            ) as resp,
+        ):
             assert resp.status == status.HTTP_200_OK
 
         confirm_request = ConfirmUploadRequest(
@@ -165,9 +171,10 @@ class TestAttachmentService:
         assert download_response.download_url is not None
         assert download_response.storage_key == upload_response.storage_key
 
-        async with aiohttp.ClientSession() as session, session.get(
-                download_response.download_url
-        ) as response:
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(download_response.download_url) as response,
+        ):
             assert response.status == status.HTTP_200_OK
 
             downloaded_file = await response.read()
@@ -184,13 +191,13 @@ class TestAttachmentService:
 
     @pytest.mark.asyncio
     async def test_confirm_upload_file_missing(
-            self,
-            attachment_service,
-            owner_type,
-            owner_id,
-            original_filename,
-            content_type,
-            uploaded_by,
+        self,
+        attachment_service,
+        owner_type,
+        owner_id,
+        original_filename,
+        content_type,
+        uploaded_by,
     ):
         storage_key = f"{owner_type}/{owner_id}/{uuid4()}.txt"
         confirm_request = ConfirmUploadRequest(

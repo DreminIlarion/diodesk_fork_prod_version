@@ -1,8 +1,8 @@
 import pytest
+from src.tickets.loaders import TicketRelations
 
 from src.iam.domain.vo import UserRole
 from src.tickets.domain.vo import TicketNumber
-from src.tickets.loaders import TicketRelations
 
 
 @pytest.fixture
@@ -47,7 +47,6 @@ async def ticket_list(counterparty_factory, user_factory, project_factory, ticke
 
 @pytest.mark.asyncio
 class TestTicketDataLoader:
-
     async def test_load_populates_relations_correctly(self, ticket_data_loader, ticket_list):
         """Успешная загрузка и заполнение маппингов"""
 

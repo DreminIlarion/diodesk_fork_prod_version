@@ -2,6 +2,8 @@ import logging
 
 import aiohttp
 
+from ..domain.exceptions import NotificationSendingFailedError
+
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.vk.com/method/"
@@ -13,16 +15,16 @@ class VkApiClient:
         self.service_token = service_token
 
     async def send_notification(
-            self,
-            user_ids: list[int],
-            message: str,
-            fragment: str | None = None,
-            group_id: str | None = None,
+        self,
+        user_ids: list[int],
+        message: str,
+        fragment: str | None = None,
+        group_id: str | None = None,
     ):
         """Отправка уведомления пользователю мини-приложения"""
 
         if not user_ids:
-            ...
+            return
 
         payload = {
             "user_ids": ",".join(map(str, user_ids)),
@@ -35,11 +37,13 @@ class VkApiClient:
         if group_id is not None:
             payload["group_id"] = group_id
 
-        async with aiohttp.ClientSession(base_url=BASE_URL) as session, session.post(
-            url="notifications.sendMessage", data=payload
-        ) as response:
+        async with (
+            aiohttp.ClientSession(base_url=BASE_URL) as session,
+            session.post(url="notifications.sendMessage", data=payload) as response,
+        ):
             response.raise_for_status()
             data = await response.json()
 
         if "error" in data:
-            error = data["error"]
+            logger.error("VK API returned an error: %s", data["error"])
+            raise NotificationSendingFailedError("VK API notification request failed")

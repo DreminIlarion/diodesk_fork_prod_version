@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class ChannelResolver:
     def __init__(
-            self, preference_repo: PreferenceRepository, *channels: NotificationChannel
+        self, preference_repo: PreferenceRepository, *channels: NotificationChannel
     ) -> None:
         self.preference_repo = preference_repo
         self.channels: dict[ChannelType, NotificationChannel] = {
@@ -22,7 +22,7 @@ class ChannelResolver:
         }
 
     async def resolve(
-            self, user_id: UUID, notification_type: NotificationType
+        self, user_id: UUID, notification_type: NotificationType
     ) -> list[NotificationChannel]:
         """Возвращает список каналов, на которые нужно отправить уведомление"""
 

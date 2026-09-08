@@ -33,7 +33,7 @@ pwd_context = CryptContext(
     argon2__parallelism=PARALLELISM,
     argon2__salt_size=SALT_SIZE,
     bcrypt__rounds=ROUNDS,
-    deprecated="auto"
+    deprecated="auto",
 )
 
 MAX_WORKERS = max(1, (os.cpu_count() or 2) // 2)
@@ -71,10 +71,10 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
 
 
 def create_access_token(
-        user_id: UUID,
-        email: Email,
-        user_roles: set[UserRole],
-        counterparty_id: UUID | None = None,
+    user_id: UUID,
+    email: Email,
+    user_roles: set[UserRole],
+    counterparty_id: UUID | None = None,
 ) -> str:
     now = current_datetime()
     expires_at = now + timedelta(minutes=settings.jwt.access_token_expires_in_minutes)
@@ -113,7 +113,7 @@ def validate_token(token: str) -> dict[str, Any]:
             token,
             key=settings.secret_key,
             algorithms=[settings.jwt.algorithm],
-            options={"verify_aud": False}
+            options={"verify_aud": False},
         )
     except jwt.ExpiredSignatureError:
         raise UnauthorizedError("Token signature expired!") from None

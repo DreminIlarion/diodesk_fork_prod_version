@@ -22,12 +22,12 @@ class PresignedUploadRequest(BaseModel):
         ...,
         pattern=r"^[\w\-]+/[\w\-\.]+$",
         description="Тип контента файла",
-        examples=["application/pdf"]
+        examples=["application/pdf"],
     )
     owner_type: str = Field(
         ...,
         pattern="^(ticket|comment|user|counterparty|message|task)$",
-        description="Сущность, которой принадлежит файл"
+        description="Сущность, которой принадлежит файл",
     )
     owner_id: UUID = Field(..., description="ID сущности, которой принадлежит файл")
 
@@ -46,7 +46,8 @@ class ConfirmUploadRequest(BaseModel):
     """Подтверждение загрузки"""
 
     storage_key: str = Field(
-        ..., min_length=1, max_length=255, description="Уникальный ключ загруженного объекта")
+        ..., min_length=1, max_length=255, description="Уникальный ключ загруженного объекта"
+    )
     original_filename: str = Field(..., description="Оригинальное имя файла")
     content_type: str = Field(
         ...,

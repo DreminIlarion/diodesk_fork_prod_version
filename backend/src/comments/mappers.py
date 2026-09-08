@@ -19,9 +19,7 @@ def map_comment_to_response(comment: Comment) -> CommentResponse:
 
 
 def map_comment_with_reactions_to_response(
-        comment: Comment,
-        reaction_counts: dict[str, int],
-        user_reactions: list[str]
+    comment: Comment, reaction_counts: dict[str, int], user_reactions: list[str]
 ) -> CommentWithReactionsResponse:
     return CommentWithReactionsResponse(
         id=comment.id,

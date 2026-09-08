@@ -16,12 +16,12 @@ from ..schemas import CommentCreate, CommentEdit, CommentResponse, CommentWithRe
 
 class CommentService:
     def __init__(
-            self,
-            session: AsyncSession,
-            ticket_repo: TicketRepository,
-            comment_repo: CommentRepository,
-            reaction_repo: ReactionRepository,
-            event_publisher: EventPublisher,
+        self,
+        session: AsyncSession,
+        ticket_repo: TicketRepository,
+        comment_repo: CommentRepository,
+        reaction_repo: ReactionRepository,
+        event_publisher: EventPublisher,
     ) -> None:
         self.session = session
         self.ticket_repo = ticket_repo
@@ -31,11 +31,11 @@ class CommentService:
 
     @staticmethod
     def _prepare_comment(
-            ticket: Ticket,
-            current_subject: Subject,
-            text: str,
-            comment_type: CommentType,
-            parent_comment: Comment | None = None,
+        ticket: Ticket,
+        current_subject: Subject,
+        text: str,
+        comment_type: CommentType,
+        parent_comment: Comment | None = None,
     ) -> tuple[Comment, Comment | None]:
         """
         Подготовка комментария к записи в хранилище.
@@ -61,7 +61,10 @@ class CommentService:
         return reply, parent_comment
 
     async def add_comment(
-            self, ticket_id: UUID, data: CommentCreate, current_subject: Subject,
+        self,
+        ticket_id: UUID,
+        data: CommentCreate,
+        current_subject: Subject,
     ) -> CommentResponse:
         """Добавление комментария к тикету"""
 
@@ -88,11 +91,11 @@ class CommentService:
         return map_comment_to_response(comment)
 
     async def reply_to_comment(
-            self,
-            ticket_id: UUID,
-            parent_comment_id: UUID,
-            data: CommentCreate,
-            current_subject: Subject,
+        self,
+        ticket_id: UUID,
+        parent_comment_id: UUID,
+        data: CommentCreate,
+        current_subject: Subject,
     ) -> CommentResponse:
         """Добавление ответа на комментарий"""
 
@@ -130,7 +133,7 @@ class CommentService:
         return map_comment_to_response(reply)
 
     async def edit_comment(
-            self, ticket_id: UUID, comment_id: UUID, data: CommentEdit, edited_by: UUID
+        self, ticket_id: UUID, comment_id: UUID, data: CommentEdit, edited_by: UUID
     ) -> CommentResponse:
         """Редактирование комментария"""
 
@@ -158,7 +161,10 @@ class CommentService:
         return map_comment_to_response(comment)
 
     async def delete_comment(
-            self, ticket_id: UUID, comment_id: UUID, deleted_by: UUID,
+        self,
+        ticket_id: UUID,
+        comment_id: UUID,
+        deleted_by: UUID,
     ) -> None:
         """Удаление комментария"""
 
@@ -193,11 +199,11 @@ class CommentService:
         await self.session.commit()
 
     async def get_comments(
-            self,
-            ticket_id: UUID,
-            pagination: Pagination,
-            current_subject: Subject,
-            include_internal: bool = False,
+        self,
+        ticket_id: UUID,
+        pagination: Pagination,
+        current_subject: Subject,
+        include_internal: bool = False,
     ) -> Page[CommentWithReactionsResponse]:
         """Получение комментариев к тикету с учётом прав"""
 
@@ -229,11 +235,11 @@ class CommentService:
         return page.to_response(mapper)
 
     async def get_comment_replies(
-            self,
-            comment_id: UUID,
-            pagination: Pagination,
-            current_subject: Subject,
-            include_internal: bool = False,
+        self,
+        comment_id: UUID,
+        pagination: Pagination,
+        current_subject: Subject,
+        include_internal: bool = False,
     ) -> Page[CommentWithReactionsResponse]:
         """Получение дерево ответов на комментарий"""
 

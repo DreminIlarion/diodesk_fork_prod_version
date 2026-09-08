@@ -109,17 +109,17 @@ class TaskNumber(ValueObject):
             return False
 
         return (
-            prefix == cls.INTERNAL_PREFIX or
-            bool(re.fullmatch(ProjectKey.PATTERN, prefix)) or
-            TicketNumber.is_valid_format(prefix)
+            prefix == cls.INTERNAL_PREFIX
+            or bool(re.fullmatch(ProjectKey.PATTERN, prefix))
+            or TicketNumber.is_valid_format(prefix)
         )
 
     @classmethod
     def create(
-            cls,
-            sequence: int = 1,
-            ticket_number: TicketNumber | None = None,
-            project_key: ProjectKey | None = None,
+        cls,
+        sequence: int = 1,
+        ticket_number: TicketNumber | None = None,
+        project_key: ProjectKey | None = None,
     ) -> "TaskNumber":
         """Создание номера задачи"""
 

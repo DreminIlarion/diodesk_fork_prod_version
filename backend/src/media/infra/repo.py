@@ -55,12 +55,8 @@ class SqlAttachmentRepository(SqlAlchemyRepository[Attachment, AttachmentOrm]):
         return None if model is None else self.model_mapper.to_entity(model)
 
     async def get_by_owner(self, owner_type: str, owner_id: UUID) -> list[Attachment]:
-        stmt = (
-            select(self.model)
-            .where(
-                (self.model.owner_type == owner_type) &
-                (self.model.owner_id == owner_id)
-            )
+        stmt = select(self.model).where(
+            (self.model.owner_type == owner_type) & (self.model.owner_id == owner_id)
         )
         results = await self.session.execute(stmt)
         models = results.scalars().all()

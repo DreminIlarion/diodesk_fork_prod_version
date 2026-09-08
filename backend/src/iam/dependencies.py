@@ -50,10 +50,10 @@ InvitationRepoDep = Annotated[InvitationRepository, Depends(get_invitation_repo)
 
 
 def get_auth_service(
-        session: SessionDep,
-        user_repo: UserRepoDep,
-        invitation_repo: InvitationRepoDep,
-        token_store: Annotated[TokenStore, Depends(get_token_store)],
+    session: SessionDep,
+    user_repo: UserRepoDep,
+    invitation_repo: InvitationRepoDep,
+    token_store: Annotated[TokenStore, Depends(get_token_store)],
 ) -> AuthService:
     return AuthService(
         uow=session,
@@ -72,10 +72,10 @@ def get_mail_sender() -> SmtpMailSender:
 
 
 def get_invitation_service(
-        session: SessionDep,
-        invitation_repo: InvitationRepoDep,
-        mail_sender: Annotated[SmtpMailSender, Depends(get_mail_sender)],
-        event_publisher: EventPublisherDep,
+    session: SessionDep,
+    invitation_repo: InvitationRepoDep,
+    mail_sender: Annotated[SmtpMailSender, Depends(get_mail_sender)],
+    event_publisher: EventPublisherDep,
 ) -> InvitationService:
     return InvitationService(
         uow=session,
@@ -90,8 +90,8 @@ InvitationServiceDep = Annotated[InvitationService, Depends(get_invitation_servi
 
 
 async def get_current_subject(
-        token: Annotated[str, Depends(oauth2_scheme)],
-        blacklist: Annotated[TokenStore, Depends(get_token_store)],
+    token: Annotated[str, Depends(oauth2_scheme)],
+    blacklist: Annotated[TokenStore, Depends(get_token_store)],
 ) -> Subject:
     payload = validate_token(token)
     jti, sub, type_ = payload.get("jti"), payload.get("sub"), payload.get("sub_type")
@@ -145,16 +145,16 @@ async def get_user_or_404(user_id: UUID, user_repo: UserRepoDep) -> UserResponse
 
 
 def get_user_filters(
-        roles: list[UserRole] | None = Query(None, min_length=1, description="A least one filter"),
-        counterparty_id: UUID | None = Query(None, description="Идентификатор контрагента"),
+    roles: list[UserRole] | None = Query(None, min_length=1, description="A least one filter"),
+    counterparty_id: UUID | None = Query(None, description="Идентификатор контрагента"),
 ) -> UserFilters:
     return UserFilters(roles=roles, counterparty_id=counterparty_id)
 
 
 async def paginate_users(
-        pagination: PaginationDep,
-        user_repo: UserRepoDep,
-        filters: UserFilters = Depends(get_user_filters),
+    pagination: PaginationDep,
+    user_repo: UserRepoDep,
+    filters: UserFilters = Depends(get_user_filters),
 ) -> Page[UserResponse]:
     page = await user_repo.paginate(pagination, filters=filters)
     return page.to_response(map_user_to_response)
@@ -169,14 +169,14 @@ def require_role(allowed_roles: Iterable[UserRole]):
 
 
 async def get_invitation_or_404(
-        invitation_id: UUID, invitation_repo: InvitationRepoDep
+    invitation_id: UUID, invitation_repo: InvitationRepoDep
 ) -> InvitationResponse:
     invitation = await get_or_raise_404(invitation_repo.read, invitation_id, Invitation)
     return map_invitation_to_response(invitation)
 
 
 async def paginate_invitations(
-        pagination: PaginationDep, invitation_repo: InvitationRepoDep
+    pagination: PaginationDep, invitation_repo: InvitationRepoDep
 ) -> Page[InvitationResponse]:
     page = await invitation_repo.paginate(pagination)
     return page.to_response(map_invitation_to_response)

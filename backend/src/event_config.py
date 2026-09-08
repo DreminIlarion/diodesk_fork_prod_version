@@ -1,9 +1,10 @@
 from typing import TypeVar
 
+from src.iam.domain.events import UserInvited
+
 from .shared.domain.events import Event
 from .tickets.domain.events import TicketCreated, TicketStatusChanged
 from .timetracking.domain.events import WorklogApproved
-from src.iam.domain.events import UserInvited
 
 EventT = TypeVar("EventT", bound=Event)
 

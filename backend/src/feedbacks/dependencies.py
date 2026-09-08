@@ -1,4 +1,5 @@
 from typing import Annotated
+
 from uuid import UUID
 
 from fastapi import Depends, Query
@@ -38,11 +39,11 @@ FeedbackAuthZServiceDep = Annotated[
 
 
 def get_feedback_service(
-        session: SessionDep,
-        feedback_repo: FeedbackRepoDep,
-        ticket_repo: TicketRepoDep,
-        authz_service: FeedbackAuthZServiceDep,
-        event_publisher: EventPublisherDep,
+    session: SessionDep,
+    feedback_repo: FeedbackRepoDep,
+    ticket_repo: TicketRepoDep,
+    authz_service: FeedbackAuthZServiceDep,
+    event_publisher: EventPublisherDep,
 ) -> FeedbackService:
     """
     Создать application service для работы с отзывами.
@@ -61,18 +62,15 @@ FeedbackServiceDep = Annotated[FeedbackService, Depends(get_feedback_service)]
 
 
 def get_feedback_filters(
-        rating: Annotated[
-            int | None,
-            Query(ge=1, le=5, description="Фильтр по оценке от 1 до 5"),
-        ] = None,
-        ticket_id: Annotated[
-            UUID | None,
-            Query(alias="ticketId", description="Фильтр по ID тикета"),
-        ] = None,
-        author_id: Annotated[
-            UUID | None,
-            Query(description="Фильтр по ID автора отзыва")
-        ] = None,
+    rating: Annotated[
+        int | None,
+        Query(ge=1, le=5, description="Фильтр по оценке от 1 до 5"),
+    ] = None,
+    ticket_id: Annotated[
+        UUID | None,
+        Query(alias="ticketId", description="Фильтр по ID тикета"),
+    ] = None,
+    author_id: Annotated[UUID | None, Query(description="Фильтр по ID автора отзыва")] = None,
 ) -> FeedbackFilters:
     """
     Собрать фильтры списка отзывов из query-параметров.

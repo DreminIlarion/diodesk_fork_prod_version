@@ -12,9 +12,9 @@ router = APIRouter(tags=["Общие утилиты"])
     path="/spellchecking",
     status_code=status.HTTP_200_OK,
     response_model=TextCheckResult,
-    summary="Проверить ошибки в тексте"
+    summary="Проверить ошибки в тексте",
 )
 def check_spelling(
-        text: Annotated[str, Body(..., embed=True)], spell_checker: SpellCheckerDep
+    text: Annotated[str, Body(..., embed=True)], spell_checker: SpellCheckerDep
 ) -> TextCheckResult:
     return spell_checker.check(text)

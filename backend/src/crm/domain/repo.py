@@ -20,10 +20,11 @@ class CounterpartyFilters:
 
 
 class CounterpartyRepository(Repository[Counterparty]):
-
     @override
     async def paginate(
-            self, pagination: Pagination, filters: CounterpartyFilters | None = None,
+        self,
+        pagination: Pagination,
+        filters: CounterpartyFilters | None = None,
     ) -> Page[Counterparty]: ...
 
     async def get_by_email(self, email: str) -> Counterparty | None: ...
@@ -45,7 +46,7 @@ class CounterpartyRepository(Repository[Counterparty]):
         """
 
     async def get_products(
-            self, counterparty_id: UUID, params: Pagination
+        self, counterparty_id: UUID, params: Pagination
     ) -> Page[SoftwareProduct]:
         """
         Получение программных продуктов, которые используются контрагентом

@@ -46,8 +46,8 @@ class TestCreate:
                 vendor="ДИО-Консалт",
                 category=ProductCategory.WEB,
                 status=ProductStatus.ACTIVE,
-                attributes={"environment": "local", "framework": "Wagtail"}
-            )
+                attributes={"environment": "local", "framework": "Wagtail"},
+            ),
         ]
 
     @pytest.mark.asyncio
@@ -55,12 +55,12 @@ class TestCreate:
         "created_by_role", [UserRole.SUPPORT_AGENT, UserRole.SUPPORT_MANAGER, UserRole.ADMIN]
     )
     async def test_create_and_commit_success(
-            self,
-            product_service,
-            valid_create_data,
-            created_by_role,
-            mock_session,
-            fake_product_repo,
+        self,
+        product_service,
+        valid_create_data,
+        created_by_role,
+        mock_session,
+        fake_product_repo,
     ):
         """
         Успешное создание записи в справочнике программных продуктов
@@ -68,7 +68,9 @@ class TestCreate:
 
         created_by = uuid4()
         response = await product_service.create(
-            data=valid_create_data, created_by=created_by, created_by_role=created_by_role,
+            data=valid_create_data,
+            created_by=created_by,
+            created_by_role=created_by_role,
         )
 
         mock_session.commit.assert_awaited_once()
@@ -91,7 +93,7 @@ class TestCreate:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("created_by_role", [UserRole.CUSTOMER, UserRole.CUSTOMER_ADMIN])
     async def test_fails_with_permission_denied_for_non_support(
-            self, product_service, valid_create_data, created_by_role
+        self, product_service, valid_create_data, created_by_role
     ):
         """
         Программные продукты могут только записывать сотрудники поддержки
@@ -99,13 +101,15 @@ class TestCreate:
 
         with pytest.raises(PermissionDeniedError, match="Only support staff can create products"):
             await product_service.create(
-                data=valid_create_data, created_by=uuid4(), created_by_role=created_by_role,
+                data=valid_create_data,
+                created_by=uuid4(),
+                created_by_role=created_by_role,
             )
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("initial_status", [ProductStatus.ARCHIVED, ProductStatus.DEPRECATED])
     async def test_fails_with_invalid_initial_status(
-            self, product_service, valid_create_data, initial_status, mock_session
+        self, product_service, valid_create_data, initial_status, mock_session
     ):
         """
         Продукт при создании не может быть в архиве или устаревшим
@@ -124,7 +128,7 @@ class TestCreate:
 
     @pytest.mark.asyncio
     async def test_fails_on_attribute_validation_error(
-            self, product_service, invalid_attributes_create_datas
+        self, product_service, invalid_attributes_create_datas
     ):
         """
         Должна выбрасываться ошибка валидации при создании программного продукта
@@ -133,8 +137,7 @@ class TestCreate:
 
         for invalid_attributes_create_data in invalid_attributes_create_datas:
             with pytest.raises(
-                    ValueError,
-                    match=f"Invalid {invalid_attributes_create_data.category} attributes"
+                ValueError, match=f"Invalid {invalid_attributes_create_data.category} attributes"
             ):
                 await product_service.create(
                     data=invalid_attributes_create_data,

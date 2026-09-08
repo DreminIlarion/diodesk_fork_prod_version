@@ -53,11 +53,11 @@ class SqlProductRepository(SqlAlchemyRepository[SoftwareProduct, SoftwareProduct
 
     @override
     async def paginate(
-            self,
-            pagination: Pagination,
-            category: ProductCategory | None = None,
-            status: ProductStatus | None = None,
-            search: str | None = None,
+        self,
+        pagination: Pagination,
+        category: ProductCategory | None = None,
+        status: ProductStatus | None = None,
+        search: str | None = None,
     ) -> Page[SoftwareProduct]:
         # 1. Базовый запрос на получение всех данных
         stmt = select(self.model).where(self.model.deleted_at.is_(None))

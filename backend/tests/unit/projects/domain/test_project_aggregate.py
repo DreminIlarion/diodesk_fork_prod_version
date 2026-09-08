@@ -3,7 +3,7 @@ from uuid import uuid4
 import pytest
 
 from src.projects.domain.entities import Project, ProjectStage
-from src.projects.domain.vo import ProjectKey, MemberRole, ProjectStageStatus, ProjectStatus
+from src.projects.domain.vo import MemberRole, ProjectKey, ProjectStageStatus, ProjectStatus
 from src.shared.domain.exceptions import InvalidStateError, InvariantViolationError, NotFoundError
 from src.shared.utils.time import current_datetime
 
@@ -37,13 +37,14 @@ class TestCreate:
 
 
 class TestCreateMembership:
-
     @pytest.mark.parametrize("role", list(MemberRole))
     def test_create_membership_with_any_role_success(self, project_factory, project_role):
         project = project_factory(status=ProjectStatus.ACTIVE)  # Явно указываем статус
         created_by = uuid4()
         membership = project.create_member(
-            user_id=uuid4(), project_role=project_role, created_by=created_by,
+            user_id=uuid4(),
+            project_role=project_role,
+            created_by=created_by,
         )
 
         assert membership.project_id == project.id
@@ -54,12 +55,13 @@ class TestCreateMembership:
 
         with pytest.raises(InvalidStateError):
             project.create_member(
-                user_id=uuid4(), project_role=MemberRole.CONTRIBUTOR, created_by=uuid4(),
+                user_id=uuid4(),
+                project_role=MemberRole.CONTRIBUTOR,
+                created_by=uuid4(),
             )
 
 
 class TestArchive:
-
     def test_archive_active_project_success(self, project_factory):
         project = project_factory(status=ProjectStatus.ACTIVE)
         project.archive(archived_by=uuid4())
@@ -212,12 +214,14 @@ class TestStartStage:
         project_id = uuid4()
         project = project_factory(
             id=project_id,
-            stages=[ProjectStage(
-                project_id=project_id,
-                name="Stage 1",
-                order=1,
-                status=ProjectStageStatus.COMPLETED,
-            )]
+            stages=[
+                ProjectStage(
+                    project_id=project_id,
+                    name="Stage 1",
+                    order=1,
+                    status=ProjectStageStatus.COMPLETED,
+                )
+            ],
         )
         stage_id = project.stages[0].id
 
@@ -226,7 +230,6 @@ class TestStartStage:
 
 
 class TestCompleteStage:
-
     def test_complete_final_stage_with_project_success(self, project_factory):
         """При завершении последней стадии должен завершаться проект"""
 

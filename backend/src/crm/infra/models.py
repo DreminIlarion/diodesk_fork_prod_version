@@ -31,15 +31,14 @@ class CounterpartyOrm(Base):
     )
 
     head: Mapped[Optional["CounterpartyOrm"]] = relationship(
-        remote_side="CounterpartyOrm.id", back_populates="branches",
+        remote_side="CounterpartyOrm.id",
+        back_populates="branches",
     )
     branches: Mapped[list["CounterpartyOrm"]] = relationship(
         back_populates="head", cascade="all, delete-orphan"
     )
 
-    products: Mapped[list["CounterpartyProductOrm"]] = relationship(
-        back_populates="counterparty"
-    )
+    products: Mapped[list["CounterpartyProductOrm"]] = relationship(back_populates="counterparty")
 
     __table_args__ = (
         # B-Tree индекс для быстрого поиска по Инн (по префиксу или постфиксу)

@@ -20,6 +20,7 @@ from src.shared.infra.repos import InMemoryRepository
 def pytest_configure(config):
     config.option.asyncio_mode = "auto"
 
+
 # ====================== In memory реализация репозитория с контрагентами ======================
 
 
@@ -64,7 +65,7 @@ def current_admin_user() -> CurrentUser:
 
 @pytest.fixture
 async def client(
-        mock_counterparty_repo, mock_counterparty_service, current_admin_user
+    mock_counterparty_repo, mock_counterparty_service, current_admin_user
 ) -> AsyncClient:
     from main import app
 

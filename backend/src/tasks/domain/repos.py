@@ -26,13 +26,13 @@ class TaskView:
 
     status: TaskStatus
     priority: Priority
-    description: str | None = None  
-
+    description: str | None = None
 
     assignee_id: UUID | None = None
+    reviewer_id: UUID | None = None
     due_date: datetime | None = None
     story_points: Decimal | None = None
-    estimated_hours: Decimal | None = None 
+    estimated_hours: Decimal | None = None
     actual_hours: Decimal | None = None
 
     started_at: datetime | None = None  # ← Добавил
@@ -47,12 +47,11 @@ class TaskView:
 
 
 class TaskRepository(Repository[Task]):
-
     async def get_by_number(self, number: TaskNumber) -> Task | None:
         """Получение задачи по её уникальному номеру"""
 
     async def get_next_sequence(
-            self, ticket_id: UUID | None = None, project_id: UUID | None = None
+        self, ticket_id: UUID | None = None, project_id: UUID | None = None
     ) -> int:
         """
         Получение общего количества задач.
@@ -63,16 +62,17 @@ class TaskRepository(Repository[Task]):
         """
 
     async def get_grouped_by_status(
-            self,
-            pagination: Pagination,
-            *,
-            project_id: UUID | None = None,
-            ticket_id: UUID | None = None,
-            assignee_id: UUID | None = None,
-            created_by: UUID | None = None,  # ← добавить
-            # Дополнительные фильтры
-            priorities: list[Priority] | None = None,
-            overdue_only: bool = False,
+        self,
+        pagination: Pagination,
+        *,
+        project_id: UUID | None = None,
+        ticket_id: UUID | None = None,
+        assignee_id: UUID | None = None,
+        created_by: UUID | None = None,  # ← добавить
+        reviewer_id: UUID | None = None,
+        # Дополнительные фильтры
+        priorities: list[Priority] | None = None,
+        overdue_only: bool = False,
     ) -> dict[TaskStatus, Page[TaskView]]:
         """
         Группировка задач по статусам.

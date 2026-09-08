@@ -17,9 +17,9 @@ def can_create_contract(user_role: UserRole) -> PermissionResult:
 
 
 def can_view_contract(
-        contract: ServiceContract,
-        user_role: UserRole,
-        user_counterparty_id: UUID | None = None,
+    contract: ServiceContract,
+    user_role: UserRole,
+    user_counterparty_id: UUID | None = None,
 ) -> PermissionResult:
     """Может ли пользователь просматривать договор"""
 

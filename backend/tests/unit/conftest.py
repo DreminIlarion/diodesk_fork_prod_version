@@ -141,14 +141,17 @@ def counterparty_factory(fake_counterparty_repo):
 
         if inn is None:
             if counterparty_type in {
-                CounterpartyType.INDIVIDUAL, CounterpartyType.INDIVIDUAL_ENTREPRENEUR
+                CounterpartyType.INDIVIDUAL,
+                CounterpartyType.INDIVIDUAL_ENTREPRENEUR,
             }:
                 inn = Inn("123456789012")
             else:
                 inn = Inn("1234567890")
 
-        if counterparty_type in {CounterpartyType.LEGAL_ENTITY, CounterpartyType.BRANCH} \
-                and kpp is None:
+        if (
+            counterparty_type in {CounterpartyType.LEGAL_ENTITY, CounterpartyType.BRANCH}
+            and kpp is None
+        ):
             kpp = Kpp("123456789")
         else:
             kpp = None
@@ -205,7 +208,7 @@ def project_factory(fake_project_repo):
             name=overrides.pop("name", "Test Project"),
             key=overrides.pop("key", "TESTPRJ"),
             created_by=overrides.pop("created_by", uuid4()),
-            counterparty_id=overrides.pop("counterparty_id", None)
+            counterparty_id=overrides.pop("counterparty_id", None),
         )
         await fake_project_repo.create(project)
         return project
@@ -217,14 +220,14 @@ def project_factory(fake_project_repo):
 def membership_factory(fake_membership_repo):
 
     async def _make_membership(
-            user_id: UUID, project_id: UUID, project_role: MemberRole, **overrides
+        user_id: UUID, project_id: UUID, project_role: MemberRole, **overrides
     ):
         membership = ProjectMember(
             user_id=user_id,
             project_id=project_id,
             project_role=project_role,
             added_by=overrides.pop("created_by", uuid4()),
-            added_at=overrides.pop("added_at", current_datetime())
+            added_at=overrides.pop("added_at", current_datetime()),
         )
         await fake_membership_repo.create(membership)
         return membership

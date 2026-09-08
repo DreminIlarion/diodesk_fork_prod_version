@@ -1,15 +1,14 @@
 from uuid import uuid4
 
 import pytest
+from src.tickets.domain.services import TicketScopes
 
 from src.iam.domain.vo import UserRole
 from src.projects.domain.vo import MemberRole
-from src.tickets.domain.services import TicketScopes
 
 
 @pytest.mark.asyncio
 class TestTicketScopeService:
-
     async def test_admin_has_unrestricted_access(self, ticket_scope_service):
         """Системный администратор имеет неограниченный доступ"""
 
@@ -17,12 +16,13 @@ class TestTicketScopeService:
         assert scopes.is_unrestricted()
 
     @pytest.mark.parametrize(
-        "user_role", [
+        "user_role",
+        [
             UserRole.CUSTOMER,
             UserRole.DEVELOPER,
             UserRole.FINANCE,
             UserRole.ACCOUNT_MANAGER,
-        ]
+        ],
     )
     async def test_user_scope_restricts_to_self(self, ticket_scope_service, user_role):
         """Клиент может видеть только свои тикеты (в которых он инициатор)"""
@@ -32,7 +32,7 @@ class TestTicketScopeService:
         assert scopes == TicketScopes(reporter_id=user_id)
 
     async def test_customer_admin_scope_include_projects(
-            self, ticket_scope_service, membership_factory
+        self, ticket_scope_service, membership_factory
     ):
         """
         В область видимости администратора контрагента должны входить проекты
@@ -79,7 +79,7 @@ class TestTicketScopeService:
 
     @pytest.mark.parametrize("user_role", [UserRole.SUPPORT_AGENT, UserRole.SUPPORT_MANAGER])
     async def test_supports_scope_limited_only_by_project(
-            self, ticket_scope_service, user_role, membership_factory
+        self, ticket_scope_service, user_role, membership_factory
     ):
         """Область видимости поддержки ограничена только проектом"""
 

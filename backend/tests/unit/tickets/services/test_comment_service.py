@@ -15,11 +15,11 @@ from src.tickets.services import CommentService
 
 @pytest.fixture
 def comment_service(
-        mock_session,
-        fake_ticket_repo,
-        fake_comment_repo,
-        fake_reaction_repo,
-        event_publisher,
+    mock_session,
+    fake_ticket_repo,
+    fake_comment_repo,
+    fake_reaction_repo,
+    event_publisher,
 ):
     return CommentService(
         session=mock_session,
@@ -80,7 +80,7 @@ async def created_comment(created_ticket, fake_comment_repo, customer_id):
         ticket_id=created_ticket.id,
         author_id=customer_id,
         author_role=UserRole.CUSTOMER,
-        text="Комментарий клиента"
+        text="Комментарий клиента",
     )
     await fake_comment_repo.create(comment)
     return comment
@@ -93,12 +93,12 @@ class TestAddComment:
 
     @pytest.mark.asyncio
     async def test_creates_success(
-            self,
-            mock_session,
-            fake_comment_repo,
-            comment_service,
-            current_support_user,
-            created_ticket,
+        self,
+        mock_session,
+        fake_comment_repo,
+        comment_service,
+        current_support_user,
+        created_ticket,
     ):
         """
         Успешное создание комментария
@@ -122,7 +122,7 @@ class TestAddComment:
 
     @pytest.mark.asyncio
     async def test_fails_on_permission_denied_no_commit(
-            self, mock_session, comment_service, created_ticket
+        self, mock_session, comment_service, created_ticket
     ):
         """
         Комментарий не должен сохраняться если недостаточно прав
@@ -163,13 +163,13 @@ class TestReplyToComment:
 
     @pytest.mark.asyncio
     async def test_success_creates_reply_and_upsert_parent(
-            self,
-            comment_service,
-            current_support_user,
-            mock_session,
-            fake_comment_repo,
-            created_ticket,
-            created_comment,
+        self,
+        comment_service,
+        current_support_user,
+        mock_session,
+        fake_comment_repo,
+        created_ticket,
+        created_comment,
     ):
         """
         Успешное создание ответа и обновление корневого комментария
@@ -194,12 +194,12 @@ class TestReplyToComment:
 
     @pytest.mark.asyncio
     async def test_fails_when_comment_does_not_belong_ticket(
-            self,
-            comment_service,
-            mock_session,
-            fake_ticket_repo,
-            created_comment,
-            current_customer_user,
+        self,
+        comment_service,
+        mock_session,
+        fake_ticket_repo,
+        created_comment,
+        current_customer_user,
     ):
         """
         Нельзя создать ответ если родительский комментарий не принадлежит тикету
@@ -236,12 +236,12 @@ class TestDeleteComment:
 
     @pytest.mark.asyncio
     async def test_success_deletes_comment(
-            self,
-            comment_service,
-            current_customer_user,
-            created_comment,
-            mock_session,
-            fake_comment_repo,
+        self,
+        comment_service,
+        current_customer_user,
+        created_comment,
+        mock_session,
+        fake_comment_repo,
     ):
         """
         Успешное удаление комментария
@@ -262,12 +262,12 @@ class TestDeleteComment:
 
     @pytest.mark.asyncio
     async def test_success_deleted_reply_and_decrement_parent_counter(
-            self,
-            comment_service,
-            current_support_user,
-            created_ticket,
-            created_comment,
-            fake_comment_repo,
+        self,
+        comment_service,
+        current_support_user,
+        created_ticket,
+        created_comment,
+        fake_comment_repo,
     ):
         """
         Успешное удаление ответа и уменьшение счётчика ответов у родителя
@@ -297,11 +297,11 @@ class TestDeleteComment:
 
     @pytest.mark.asyncio
     async def test_fails_when_comment_does_not_belong_ticket(
-            self,
-            comment_service,
-            current_customer_user,
-            created_comment,
-            fake_ticket_repo,
+        self,
+        comment_service,
+        current_customer_user,
+        created_comment,
+        fake_ticket_repo,
     ):
         """
         Нельзя удалить комментарий не принадлежащий тикету
@@ -328,13 +328,13 @@ class TestDeleteComment:
 
     @pytest.mark.asyncio
     async def test_skip_decrement_counter_if_parent_is_deleted(
-            self,
-            comment_service,
-            current_customer_user,
-            current_support_user,
-            created_ticket,
-            created_comment,
-            fake_comment_repo,
+        self,
+        comment_service,
+        current_customer_user,
+        current_support_user,
+        created_ticket,
+        created_comment,
+        fake_comment_repo,
     ):
         """
         Пропуск уменьшения счётчика, если родитель был удалён
@@ -384,20 +384,20 @@ class TestGetComments:
 
     @pytest.fixture
     async def sample_comments(
-            self, created_ticket, fake_comment_repo, fake_reaction_repo, current_support_user
+        self, created_ticket, fake_comment_repo, fake_reaction_repo, current_support_user
     ):
         first_comment = Comment.create(
             ticket_id=created_ticket.id,
             author_id=uuid4(),
             author_role=UserRole.SUPPORT_AGENT,
-            text="Первый комментарий"
+            text="Первый комментарий",
         )
         comments = [
             first_comment,
             first_comment.create_reply(
                 author_id=uuid4(),
                 author_role=UserRole.CUSTOMER,
-                text="Ответ на первый комментарий"
+                text="Ответ на первый комментарий",
             ),
             Comment.create(
                 ticket_id=created_ticket.id,
@@ -409,7 +409,7 @@ class TestGetComments:
                 ticket_id=created_ticket.id,
                 author_id=uuid4(),
                 author_role=UserRole.CUSTOMER_ADMIN,
-                text="Третий комментарий"
+                text="Третий комментарий",
             ),
             Comment.create(
                 ticket_id=created_ticket.id,
@@ -417,7 +417,7 @@ class TestGetComments:
                 author_role=UserRole.SUPPORT_MANAGER,
                 text="Внутренний комментарий",
                 comment_type=CommentType.INTERNAL,
-            )
+            ),
         ]
         for comment in comments:
             await fake_comment_repo.create(comment)
@@ -434,11 +434,11 @@ class TestGetComments:
 
     @pytest.mark.asyncio
     async def test_success_returns_paginated_with_stats(
-            self,
-            comment_service,
-            current_support_user,
-            created_ticket,
-            sample_comments,
+        self,
+        comment_service,
+        current_support_user,
+        created_ticket,
+        sample_comments,
     ):
         """
         Успешное получение списка комментариев с реакциями
@@ -460,11 +460,11 @@ class TestGetComments:
 
     @pytest.mark.asyncio
     async def test_fails_if_internal_requested_by_non_support(
-            self,
-            comment_service,
-            current_customer_user,
-            sample_comments,  # noqa: ARG002
-            created_ticket,
+        self,
+        comment_service,
+        current_customer_user,
+        sample_comments,  # noqa: ARG002
+        created_ticket,
     ):
         """
         Клиент не может видеть внутренний комментарий

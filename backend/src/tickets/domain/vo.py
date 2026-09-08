@@ -141,11 +141,11 @@ class TicketNumber(ValueObject):
 
     @classmethod
     def create(
-            cls,
-            total_tickets: int,
-            /,
-            project_key: ProjectKey | None = None,
-            counterparty_name: str | None = None,
+        cls,
+        total_tickets: int,
+        /,
+        project_key: ProjectKey | None = None,
+        counterparty_name: str | None = None,
     ) -> Self:
         """Генерация уникального номера для тикета"""
 

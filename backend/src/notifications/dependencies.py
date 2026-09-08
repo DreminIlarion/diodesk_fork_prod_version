@@ -16,16 +16,18 @@ from .services import NotificationService
 
 
 def get_target_resolver(
-        user_repo: UserRepoDep,
-        project_membership_repo: ProjectMemberRepoDep,
+    user_repo: UserRepoDep,
+    project_membership_repo: ProjectMemberRepoDep,
 ) -> TargetResolver:
     target_resolver = TargetResolver()
 
     target_resolver.registry_policy(
-        TicketCreated, TicketCreatedPolicy(project_membership_repo, user_repo),
+        TicketCreated,
+        TicketCreatedPolicy(project_membership_repo, user_repo),
     )
     target_resolver.registry_policy(
-        TicketAssigned, TicketAssignedPolicy(),
+        TicketAssigned,
+        TicketAssignedPolicy(),
     )
 
     return target_resolver
@@ -51,16 +53,16 @@ PreferenceRepoDep = Annotated[PreferenceRepository, Depends(get_preference_repo)
 
 
 def get_channel_resolver(
-        preference_repo: PreferenceRepoDep,
-        email_channel: Annotated[NotificationChannel, Depends(get_email_channel)],
+    preference_repo: PreferenceRepoDep,
+    email_channel: Annotated[NotificationChannel, Depends(get_email_channel)],
 ) -> ChannelResolver:
     return ChannelResolver(preference_repo, email_channel, in_app_channel)
 
 
 def get_notification_service(
-        session: SessionDep,
-        repository: NotificationRepoDep,
-        channel_resolver: ChannelResolver = Depends(get_channel_resolver),
+    session: SessionDep,
+    repository: NotificationRepoDep,
+    channel_resolver: ChannelResolver = Depends(get_channel_resolver),
 ) -> NotificationService:
     return NotificationService(session, repository, channel_resolver)
 

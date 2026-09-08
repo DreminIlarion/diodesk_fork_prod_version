@@ -1,8 +1,9 @@
 from faststream.rabbit import RabbitQueue
 from faststream.rabbit.fastapi import Logger, RabbitRouter
-from src.core.settings import settings
 
+from src.core.settings import settings
 from src.timetracking.domain.events import WorklogApproved
+
 from ..dependencies import TaskServiceDep
 
 router = RabbitRouter(settings.rabbit.url)
@@ -10,7 +11,7 @@ router = RabbitRouter(settings.rabbit.url)
 
 @router.subscriber(queue=RabbitQueue("worklogs.approve", durable=True))
 async def on_worklog_approved(
-        event: WorklogApproved, service: TaskServiceDep, logger: Logger
+    event: WorklogApproved, service: TaskServiceDep, logger: Logger
 ) -> None:
     if event.task_id is None:
         logger.info("Task is not specified for worklog with ID - '%s'", event.worklog_id)
