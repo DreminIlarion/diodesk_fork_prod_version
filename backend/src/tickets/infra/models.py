@@ -3,9 +3,9 @@ from typing import TYPE_CHECKING
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import TEXT, Computed, DateTime, Enum, ForeignKey, Index, String
+from sqlalchemy import TEXT, Computed, DateTime, Enum, ForeignKey, Index, String, exists
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
 
 from src.comments.infra.models import CommentOrm  # Добавить импорт
 from src.core.database import Base
@@ -13,9 +13,7 @@ from src.shared.domain.vo import Priority
 
 from ..domain.vo import TicketStatus, TicketType  # Убрать CommentType, ReactionType
 
-if TYPE_CHECKING:
-    from src.media.infra.models import AttachmentOrm
-
+from src.media.infra.models import AttachmentOrm
 
 class TicketOrm(Base):
     __tablename__ = "tickets"
@@ -57,6 +55,16 @@ class TicketOrm(Base):
         ),
         viewonly=True,
     )
+
+    has_attachments = column_property(
+        exists()
+        .where(
+            (AttachmentOrm.owner_type == 'ticket') &
+            (AttachmentOrm.owner_id == TicketOrm.id) &
+            (AttachmentOrm.deleted_at.is_(None))
+        )
+        .scalar_subquery()
+)
 
     search_vector: Mapped[str] = mapped_column(
         TSVECTOR,
