@@ -13,7 +13,6 @@ from src.iam.domain.repos import UserRepository
 from src.projects.domain.entities import Project
 from src.projects.domain.repos import ProjectRepository
 from src.shared.domain.events import EventPublisher
-from src.shared.domain.exceptions import NotFoundError
 from src.shared.domain.repos import UnitOfWork, finalize, get_or_raise_404
 from src.shared.domain.vo import Tag
 
@@ -35,7 +34,6 @@ class TicketCreationContext:
     project_key: ProjectKey | None = None
     counterparty_id: UUID | None = None
     counterparty_name: str | None = None
-    stage_id: UUID | None = None
 
 
 class TicketService:
@@ -74,22 +72,12 @@ class TicketService:
         if data.project_id is not None:
             project = await get_or_raise_404(self.project_repo.read, data.project_id, Project)
 
-            if data.stage_id is not None and project.find_stage(data.stage_id) is None:
-                raise NotFoundError(
-                    f"Stage with ID {data.stage_id} does not exist "
-                    f"in project {project.id}"
-                )
-
             return TicketCreationContext(
                 project_id=data.project_id,
-                stage_id=data.stage_id,
                 project_key=project.key,
                 counterparty_id=project.counterparty_id,
                 counterparty_name=None,
             )
-
-        if data.stage_id is not None and data.project_id is None:
-            raise ValueError("Stage cannot be specified without project")
 
         if data.counterparty_id is not None:
             counterparty = await get_or_raise_404(
@@ -146,7 +134,6 @@ class TicketService:
             counterparty_id=context.counterparty_id,
             product_id=data.product_id,
             tags=tags,
-            stage_id=context.stage_id,
         )
         await self.ticket_repo.create(ticket)
         await finalize(
@@ -169,22 +156,6 @@ class TicketService:
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
 
-        if data.stage_id is not None:
-            if ticket.project_id is None:
-                raise ValueError("Stage cannot be specified for ticket without project")
-
-            project = await get_or_raise_404(
-                self.project_repo.read,
-                ticket.project_id,
-                Project,
-            )
-
-            if project.find_stage(data.stage_id) is None:
-                raise NotFoundError(
-                    f"Stage with ID {data.stage_id} does not exist "
-                    f"in project {project.id}"
-                )
-
         tags = (
             None if data.tags is None else
             [Tag(name=tag.name, color=tag.color) for tag in data.tags]
@@ -195,7 +166,6 @@ class TicketService:
             description=data.description,
             priority=data.priority,
             tags=tags,
-            stage_id=data.stage_id,
         )
         await self.ticket_repo.update(ticket)
         await finalize(

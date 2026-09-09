@@ -2,7 +2,6 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException, status
 
 from src.tickets.domain.vo import TicketStatus
 from src.tickets.router import change_ticket_status
@@ -49,13 +48,10 @@ async def test_change_ticket_status_dispatches_to_service(
 
 @pytest.mark.asyncio
 async def test_change_ticket_status_rejects_unsupported_status():
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(ValueError, match="Unsupported target status: new"):
         await change_ticket_status(
             ticket_id=uuid4(),
             data=TicketStatusChange(status=TicketStatus.NEW),
             current_subject=MagicMock(),
             service=MagicMock(),
         )
-
-    assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-    assert exc_info.value.detail == "Unsupported target status: new"

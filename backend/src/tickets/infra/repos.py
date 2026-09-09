@@ -49,7 +49,7 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
 
         return stmt
 
-    def _apply_ticket_filters(  # noqa: C901
+    def _apply_ticket_filters(
             self, stmt: Select[tuple[TicketOrm]], filters: TicketFilters,
     ) -> Select[tuple[TicketOrm]]:
         if filters.statuses:
@@ -68,10 +68,6 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
         # фильтр по проектам
         if filters.project_ids:
             stmt = stmt.where(self.model.project_id.in_(filters.project_ids))
-
-        # фильтр по этапам проекта
-        if filters.stage_ids:
-            stmt = stmt.where(self.model.stage_id.in_(filters.stage_ids))
 
         # фильтр по контрагенту
         if filters.counterparty_id:

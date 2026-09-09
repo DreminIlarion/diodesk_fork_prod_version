@@ -9,8 +9,10 @@ from src.iam.domain.vo import UserRole
 from src.iam.schemas import UserReference
 from src.media.schemas import AttachmentResponse
 from src.projects.schemas import ProjectReference
+from src.shared.domain.dtos import TimeRangeFilters
 from src.shared.domain.vo import Priority
 
+from .domain.dtos import ActorsFilters, TicketFilters
 from .domain.vo import CommentType, ReactionType, TicketStatus, TicketType
 
 
@@ -73,10 +75,6 @@ class TicketBase(BaseModel):
     project_id: UUID | None = Field(
         None, description="ID проекта, к которому нужно привязать тикет"
     )
-    stage_id: UUID | None = Field(
-        None,
-        description="ID этапа проекта, к которому относится заявка",
-    )
     counterparty_id: UUID | None = Field(None, description="Контрагент к которому привязан тикет")
     product_id: UUID | None = Field(
         None, description="Программный продукт к которому привязан тикет"
@@ -101,10 +99,6 @@ class TicketPreview(BaseModel):
     type: TicketType = Field(..., description="Тип заявки")
     status: TicketStatus = Field(..., description="Текущий статус")
     priority: Priority = Field(..., description="Приоритет")
-    stage_id: UUID | None = Field(
-        None,
-        description="ID этапа проекта",
-    )
 
 
 class TicketViewResponse(BaseModel):
@@ -129,10 +123,6 @@ class TicketViewResponse(BaseModel):
     type: TicketType = Field(..., description="Тип заявки")
     status: TicketStatus = Field(..., description="Текущий статус")
     priority: Priority = Field(..., description="Приоритет")
-    stage_id: UUID | None = Field(
-        None,
-        description="ID этапа проекта",
-    )
     has_attachments: bool = Field(False, description="Есть ли прикреплённые файлы")
 
 
@@ -201,10 +191,6 @@ class TicketEdit(BaseModel):
     description: str | None = Field(None, description="Описание")
     priority: Priority | None = Field(None, description="Приоритет")
     tags: list[Tag] | None = Field(None, description="Теги")
-    stage_id: UUID | None = Field(
-        None,
-        description="Новый этап проекта",
-    )
 
 
 class TicketPredict(BaseModel):
@@ -263,3 +249,46 @@ class TicketParticipant(BaseModel):
     ticket_id: UUID = Field(description="Идентификатор заявки")
     user: UserReference = Field(description="Ссылка на пользователя")
     roles: set[TicketParticipantRole] = Field(description="Роль участника в рамках заявки")
+
+
+class TicketActorsFiltersRequest(BaseModel):
+    assignee_id: UUID | None = None
+    reporter_id: UUID | None = None
+    creator_id: UUID | None = None
+
+
+class TicketFiltersRequest(BaseModel):
+    search_query: str | None = None
+    tags: list[str] | None = Field(None, max_length=10)
+    counterparty_id: UUID | None = None
+    project_ids: set[UUID] | None = None
+    statuses: list[TicketStatus] | None = Field(None, max_length=5)
+    priorities: list[Priority] | None = None
+    type: TicketType | None = None
+    actors: TicketActorsFiltersRequest | None = None
+    created_after: datetime | None = None
+    created_before: datetime | None = None
+
+    def to_domain(self) -> TicketFilters:
+        return TicketFilters(
+            search_query=self.search_query,
+            tags=self.tags,
+            counterparty_id=self.counterparty_id,
+            project_ids=self.project_ids,
+            statuses=self.statuses,
+            priorities=self.priorities,
+            type=self.type,
+            actors=(
+                ActorsFilters(
+                    assignee_id=self.actors.assignee_id,
+                    reporter_id=self.actors.reporter_id,
+                    creator_id=self.actors.creator_id,
+                )
+                if self.actors is not None
+                else None
+            ),
+            time_range=TimeRangeFilters(
+                created_after=self.created_after,
+                created_before=self.created_before,
+            ),
+        )

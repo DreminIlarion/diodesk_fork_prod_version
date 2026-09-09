@@ -2,6 +2,7 @@ from uuid import UUID
 
 from src.iam.domain.authz import Subject
 from src.iam.domain.entities import User
+from src.iam.domain.vo import UserRole
 from src.iam.mappers import map_user_to_reference
 from src.shared.domain.repos import get_or_raise_404
 from src.shared.schemas import Page, Pagination
@@ -65,7 +66,7 @@ class TicketQueryService:
         # Принудительный фильтр для клиентов
         if (
                 current_subject is not None
-                and current_subject.has_any_role(["customer", "customer_admin"])
+                and current_subject.has_any_role(UserRole.customer_roles())
         ):
             client_cp_id = current_subject.counterparty_id
             if filters is None:
@@ -76,7 +77,6 @@ class TicketQueryService:
                     tags=filters.tags,
                     counterparty_id=client_cp_id or filters.counterparty_id,
                     project_ids=filters.project_ids,
-                    stage_ids=filters.stage_ids,
                     statuses=filters.statuses,
                     priorities=filters.priorities,
                     type=filters.type,
