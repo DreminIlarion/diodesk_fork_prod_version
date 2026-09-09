@@ -643,37 +643,39 @@ export default function TicketDetailPage() {
   /* ═══════════════════════════════════════════════════════════════════
      FEEDBACK BANNER LOGIC
      ═══════════════════════════════════════════════════════════════════ */
+useEffect(() => {
+  if (!ticket || !user) return;
 
-  useEffect(() => {
-    if (!ticket || !user) return;
+  if (ticket.status !== 'closed') {
+    setFeedbackBannerState('hidden');
+    return;
+  }
 
-    if (ticket.status !== 'closed') {
-      setFeedbackBannerState('hidden');
-      return;
-    }
+  // Проверяем только: является ли пользователь автором заявки
+  const isAuthor = user.id === ticket.created_by || user.id === ticket.reporter_id;
+  if (!isAuthor) {
+    setFeedbackBannerState('hidden');
+    return;
+  }
 
-    // Убираем проверку на роль — баннер видит любой автор заявки
-    // Проверяем только: является ли пользователь автором заявки
-    const isAuthor = user.id === ticket.created_by || user.id === ticket.reporter_id;
-    if (!isAuthor) {
-      setFeedbackBannerState('hidden');
-      return;
-    }
+  setFeedbackBannerState('loading');
 
-    setFeedbackBannerState('loading');
-
-    feedbacksApi.getAll(1, 10, {
-      ticketId: ticket.id,
-      author_id: user.id,
-    }).then(res => {
-      if (res.items.length > 0) {
-        setExistingFeedback(res.items[0]);
-      }
+  feedbacksApi.getAll(1, 10, {
+    ticketId: ticket.id,
+    author_id: user.id,
+  }).then(res => {
+    if (res.items.length > 0) {
+      setExistingFeedback(res.items[0]);
+      setFeedbackBannerState('hidden'); // уже есть отзыв — не показываем
+    } else {
       setFeedbackBannerState('show');
-    }).catch(() => {
-      setFeedbackBannerState('hidden');
-    });
-  }, [ticket?.id, ticket?.status, user?.id]);
+      // ✅ АВТОМАТИЧЕСКИ ОТКРЫВАЕМ МОДАЛКУ
+      setShowFeedbackForm(true);
+    }
+  }).catch(() => {
+    setFeedbackBannerState('hidden');
+  });
+}, [ticket?.id, ticket?.status, user?.id]);
 
   /* ═══════════════════════════════════════════════════════════════════
      HANDLERS
@@ -1177,7 +1179,7 @@ export default function TicketDetailPage() {
                     <textarea
                       value={feedbackComment}
                       onChange={(e) => setFeedbackComment(e.target.value)}
-                      placeholder="Расскажите подробнее (необязательно)..."
+                      placeholder="Расскажите подробнее..."
                       rows={3}
                       className="w-full px-4 py-3 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl
                                text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/20
@@ -1210,7 +1212,7 @@ export default function TicketDetailPage() {
                         ) : (
                           <Check className="w-4 h-4" />
                         )}
-                        Отправить оценку
+                        Отправить отзыв
                       </button>
                     </div>
                   </div>
@@ -1931,7 +1933,7 @@ export default function TicketDetailPage() {
 
                         <span
                           className={[
-                            'rounded-md border px-2 py-0.5 text-xs font-medium',
+                            'rounded-md border px-2 py-0.5 text-[15px] font-medium',
                             project.status === 'active'
                               ? 'status-resolved'
                               : 'status-closed',
