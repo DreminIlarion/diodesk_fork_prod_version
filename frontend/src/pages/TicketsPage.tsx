@@ -60,6 +60,24 @@ const PRIORITY_MAP: Record<string, { label: string; color: string }> = {
   'critical': { label: 'Критический', color: 'priority-critical' },
 };
 
+const PRIORITY_RANK: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
+function compareTicketsByPriority(a: TicketListItem, b: TicketListItem) {
+  const ra = PRIORITY_RANK[a.priority] ?? 0;
+  const rb = PRIORITY_RANK[b.priority] ?? 0;
+
+  // сначала более высокий приоритет
+  if (rb !== ra) return rb - ra;
+
+  // при равном приоритете — новые выше
+  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+}
+
 const PRIORITY_OPTIONS = Object.entries(PRIORITY_MAP).map(([value, { label, color }]) => ({
   value, label, color,
 }));
@@ -1484,132 +1502,166 @@ function EmptyState({ hasFilters, hasSearch, onCreateClick }: {
 }
 
 
-function TicketKanbanCard({ ticket, onTicketUpdated }: {
+function TicketKanbanCard({
+  ticket: t,
+  onTicketUpdated,
+}: {
   ticket: TicketListItem;
   onTicketUpdated?: () => void;
 }) {
-  const priorityColor = PRIORITY_MAP[ticket.priority]?.color || 'priority-medium';
-  const priorityLabel = PRIORITY_MAP[ticket.priority]?.label || ticket.priority;
+  const priorityColor = PRIORITY_MAP[t.priority]?.color || 'priority-medium';
+  const priorityLabel = PRIORITY_MAP[t.priority]?.label || t.priority;
+
+  const assigneeName =
+    t.assignee?.full_name || t.assignee?.username || t.assignee?.email || '';
+
+  const reporterName =
+    t.reporter?.full_name || t.reporter?.username || t.reporter?.email || '';
+
+  const hasAttachments = (t as any)?.has_attachments;
 
   return (
     <Link
-      to={`/tickets/${ticket.number}`}
-      className="
-        block rounded-xl border border-[var(--border-color)]
-        bg-[var(--bg-card)]
-        hover:bg-[var(--hover-1)]
-        transition-colors
-        p-3
-      "
+      to={`/tickets/${t.number}`}
+      className={`
+        group bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer shadow-sm min-h-[140px]
+        flex flex-col relative
+        transition-[border-color,background-color,box-shadow] duration-200
+        hover:bg-[var(--hover-2)] hover:border-[var(--accent)]/40
+        border-[var(--border-color)]
+      `}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-[13px] font-mono text-[var(--accent)] bg-[var(--accent-soft)]/40 border border-[var(--accent)]/10 px-2 py-0.5 rounded-lg">
-              #{ticket.number}
-            </span>
+          <span className="text-xs font-mono text-[var(--text-primary)]/45 mb-1.5 leading-none block">
+            #{t.number}
+          </span>
 
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[12px] font-semibold border ${priorityColor}`}>
+          <h4 className="text-[15px] font-bold text-[var(--text-primary)] leading-snug tracking-tight line-clamp-2 mb-3">
+            {t.title}
+          </h4>
+
+          <div className="flex items-center gap-2 mb-3.5 flex-wrap">
+            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[12px] font-semibold border ${priorityColor}`}>
               {priorityLabel}
             </span>
-          </div>
 
-          <div className="text-[14px] font-semibold text-[var(--text-primary)] leading-snug line-clamp-2">
-            {ticket.title}
-          </div>
-
-          <div className="mt-2 text-[12px] text-[var(--text-primary)]/40 flex items-center gap-2 flex-wrap">
-            {ticket.project?.key && (
-              <span className="inline-flex items-center gap-1">
-                <FolderOpen size={14} className="opacity-60" />
-                <span className="font-mono">{ticket.project.key}</span>
-              </span>
-            )}
-            <span className="inline-flex items-center gap-1">
-              <Calendar size={14} className="opacity-60" />
-              {formatDate(ticket.created_at)}
+            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[12px] font-semibold border ${STATUS_MAP[t.status]?.color || 'status-closed'}`}>
+              {STATUS_MAP[t.status]?.label || t.status}
             </span>
           </div>
         </div>
 
         <div className="shrink-0">
-          <TicketActions ticket={ticket} onTicketUpdated={onTicketUpdated} />
+          <TicketActions ticket={t} onTicketUpdated={onTicketUpdated} />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between border-t border-[var(--border-color)] pt-3 mt-auto">
+        <div className="min-w-0">
+          {assigneeName ? (
+            <div className="text-[13px] text-[var(--text-primary)]/75 font-medium truncate max-w-[160px]">
+              <UserCheck className="inline-block w-4 h-4 mr-1 text-[var(--text-primary)]/30 align-[-2px]" />
+              {toShortName(assigneeName)}
+            </div>
+          ) : reporterName ? (
+            <div className="text-[13px] text-[var(--text-primary)]/55 font-medium truncate max-w-[160px]">
+              <User className="inline-block w-4 h-4 mr-1 text-[var(--text-primary)]/30 align-[-2px]" />
+              {toShortName(reporterName)}
+            </div>
+          ) : (
+            <span className="text-xs text-[var(--text-primary)]/30">—</span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0 text-[var(--text-primary)]/30">
+          {hasAttachments && <Paperclip className="w-4.5 h-4.5" />}
+          {t.project?.key && <FolderOpen className="w-4.5 h-4.5" />}
+          <span className="text-[12px] font-semibold ml-0.5 text-[var(--text-primary)]/45">
+            {formatDate(t.created_at)}
+          </span>
         </div>
       </div>
     </Link>
   );
 }
 
-function TicketsKanbanBoard({ tickets, onTicketUpdated }: {
+function TicketsKanbanColumns({
+  tickets,
+  onTicketUpdated,
+}: {
   tickets: TicketListItem[];
   onTicketUpdated?: () => void;
 }) {
-  const grouped = useCallback(() => {
+  const byStatus = useMemo(() => {
     const m = new Map<string, TicketListItem[]>();
-    for (const s of KANBAN_STATUSES) m.set(s, []);
-    m.set('other', []);
+    for (const s of Object.keys(STATUS_MAP)) m.set(s, []);
 
     for (const t of tickets) {
-      const key = m.has(t.status) ? t.status : 'other';
+      const key = m.has(t.status) ? t.status : 'canceled';
       m.get(key)!.push(t);
+    }
+
+    // сортировка внутри каждой колонки: приоритет + дата
+    for (const [k, arr] of m.entries()) {
+      arr.sort(compareTicketsByPriority);
+      m.set(k, arr);
     }
 
     return m;
   }, [tickets]);
 
-  const map = grouped();
-
-  const columns = [
-    ...KANBAN_STATUSES.map((s) => ({ status: s, label: STATUS_MAP[s]?.label || s, color: STATUS_MAP[s]?.color || 'status-closed' })),
-    { status: 'other', label: 'Другое', color: 'status-closed' },
-  ].filter((c) => (map.get(c.status)?.length ?? 0) > 0 || c.status !== 'other'); // "Другое" показываем только если есть
-
   return (
-    <div className="flex gap-4 overflow-x-auto pb-2">
-      {columns.map((col) => {
-        const items = map.get(col.status) ?? [];
+    <>
+      {KANBAN_STATUSES.map((st) => {
+        const items = byStatus.get(st) ?? [];
+
         return (
           <div
-            key={col.status}
+            key={st}
             className="
-              min-w-[340px] max-w-[340px]
-              rounded-2xl border border-[var(--border-color)]
-              bg-[var(--hover-1)]
-              overflow-hidden
-              flex flex-col
+              bg-[var(--hover-1)] rounded-xl flex flex-col w-[320px] shrink-0 border h-full
+              border-[var(--border-color)]
             "
           >
-            <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--hover-2)]">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={`w-2.5 h-2.5 rounded-full ${col.color}`} />
-                  <span className="text-sm font-semibold text-[var(--text-primary)] truncate">
-                    {col.label}
-                  </span>
-                </div>
-                <span className="text-xs font-bold text-[var(--text-primary)]/50 bg-[var(--hover-3)] border border-[var(--border-color)] px-2 py-0.5 rounded-full">
+            {/* header как в KCol */}
+            <div className="px-3 py-3 flex items-center justify-between border-b border-[var(--border-color)] shrink-0 bg-[var(--bg-card)] rounded-t-xl">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className={`w-2 h-2 rounded-full ${STATUS_MAP[st]?.color || 'status-closed'}`} />
+                <span className="text-sm font-bold text-[var(--text-primary)] truncate">
+                  {STATUS_MAP[st]?.label || st}
+                </span>
+                <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--hover-2)] text-[var(--text-primary)]/50 shrink-0">
                   {items.length}
                 </span>
               </div>
             </div>
 
-            <div className="p-3 space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 360px)' }}>
+            {/* body: как в задачах, но scrollbar скрыт */}
+            <div className="p-2.5 flex-1 space-y-2.5 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {items.length === 0 ? (
-                <div className="text-sm text-[var(--text-primary)]/30 px-2 py-3">
-                  Нет заявок
+                <div className="h-24 flex flex-col items-center justify-center text-[var(--text-primary)]/30 border border-dashed border-[var(--border-color)] rounded-xl">
+                  <FileText className="w-5 h-5 mb-1 opacity-50" />
+                  <span className="text-xs">Нет заявок</span>
                 </div>
               ) : (
                 items.map((t) => (
-                  <TicketKanbanCard key={t.id} ticket={t} onTicketUpdated={onTicketUpdated} />
+                  <TicketKanbanCard
+                    key={t.id}
+                    ticket={t}
+                    onTicketUpdated={onTicketUpdated}
+                  />
                 ))
               )}
             </div>
           </div>
         );
       })}
-    </div>
+    </>
   );
 }
+
+
 
 
 /* ═══ ОСНОВНОЙ КОМПОНЕНТ ═══ */
@@ -1643,6 +1695,13 @@ export default function TicketsPage() {
   const showReporterFilter = !isCustomer;
   const showAssigneeCol = !isClientUser;
   const showReporterCol = !isCustomer;
+
+  const boardScrollRef = useRef<HTMLDivElement>(null);
+const boardInnerRef = useRef<HTMLDivElement>(null);
+
+const handleBoardScroll = useCallback(() => {
+  // заглушка для скроллбара
+}, []);
 
   /* ── State ── */
   const initialSearch = searchParams.get('search') || '';
@@ -2136,7 +2195,7 @@ const handleStatClick = (type: 'new' | 'in_progress' | 'critical') => {
       }`}
   >
     <LayoutGrid size={18} className={viewMode === 'board' ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'} />
-    Канбан
+    Доска
   </button>
 </div>
       </div>
@@ -2348,14 +2407,22 @@ const handleStatClick = (type: 'new' | 'in_progress' | 'critical') => {
   />
 ) : shownTickets.length > 0 ? (
   viewMode === 'board' ? (
-    <>
-      <TicketsKanbanBoard
-        tickets={shownTickets}
-        onTicketUpdated={reloadBoard}
-      />
+    <div className="h-[calc(100vh-420px)] min-h-[520px] flex flex-col">
+      <div
+        ref={boardScrollRef}
+        onScroll={handleBoardScroll}
+        className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden pb-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        <div ref={boardInnerRef} className="flex gap-3 h-full w-max min-w-full">
+          <TicketsKanbanColumns
+            tickets={shownTickets}
+            onTicketUpdated={reloadBoard}
+          />
+        </div>
+      </div>
 
       {boardHasMore && (
-        <div className="flex justify-center pt-3">
+        <div className="flex justify-center pt-3 shrink-0">
           <button
             type="button"
             onClick={loadMoreBoard}
@@ -2368,7 +2435,7 @@ const handleStatClick = (type: 'new' | 'in_progress' | 'critical') => {
           </button>
         </div>
       )}
-    </>
+    </div>
   ) : (
     <>
       {/* Desktop */}
@@ -2398,9 +2465,52 @@ const handleStatClick = (type: 'new' | 'in_progress' | 'critical') => {
       </div>
 
       {/* Pagination только для списка */}
-      {totalPages > 1 && (
-        <div>{/* твоя текущая пагинация */}</div>
-      )}
+{totalPages > 1 && (
+  <div className="flex items-center justify-center gap-2 pt-4 border-t border-[var(--border-color)]">
+    <button
+      onClick={() => handlePageChange(Math.max(1, page - 1))}
+      disabled={page === 1}
+      className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card
+                 border border-[var(--border-color)] hover:bg-[var(--hover-2)]
+                 disabled:opacity-40 disabled:cursor-not-allowed
+                 text-[var(--text-primary)] text-base transition-colors"
+    >
+      <ChevronLeft className="w-4 h-4" /> Назад
+    </button>
+
+    <div className="flex items-center gap-1.5">
+      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+        const pageNum = Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
+        if (pageNum > totalPages) return null;
+
+        return (
+          <button
+            key={pageNum}
+            onClick={() => handlePageChange(pageNum)}
+            className={`w-10 h-10 rounded-xl text-base font-medium transition-colors
+              ${pageNum === page
+                ? 'bg-[var(--accent)] text-white'
+                : 'glass-card text-[var(--text-primary)]/60 border border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+              }`}
+          >
+            {pageNum}
+          </button>
+        );
+      })}
+    </div>
+
+    <button
+      onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
+      disabled={page === totalPages}
+      className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card
+                 border border-[var(--border-color)] hover:bg-[var(--hover-2)]
+                 disabled:opacity-40 disabled:cursor-not-allowed
+                 text-[var(--text-primary)] text-base transition-colors"
+    >
+      Вперёд <ChevronRight className="w-4 h-4" />
+    </button>
+  </div>
+)}
     </>
   )
 ) : null}
