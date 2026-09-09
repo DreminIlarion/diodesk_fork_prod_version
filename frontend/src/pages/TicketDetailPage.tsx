@@ -652,14 +652,8 @@ export default function TicketDetailPage() {
       return;
     }
 
-    // Только клиент видит баннер, стафф — нет
-    const isClient = !hasAnyRole(userRoles, ['admin', 'support_manager', 'support_agent', 'executor']);
-    if (!isClient) {
-      setFeedbackBannerState('hidden');
-      return;
-    }
-
-    // Только автор тикета
+    // Убираем проверку на роль — баннер видит любой автор заявки
+    // Проверяем только: является ли пользователь автором заявки
     const isAuthor = user.id === ticket.created_by || user.id === ticket.reporter_id;
     if (!isAuthor) {
       setFeedbackBannerState('hidden');
@@ -667,8 +661,6 @@ export default function TicketDetailPage() {
     }
 
     setFeedbackBannerState('loading');
-
-
 
     feedbacksApi.getAll(1, 10, {
       ticketId: ticket.id,
@@ -1280,8 +1272,8 @@ export default function TicketDetailPage() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-6 py-3 rounded-t-xl transition-all whitespace-nowrap ${activeTab === tab.id
-                      ? 'bg-[var(--accent)]/50 text-white border-b-2 border-[var(--accent)]'
-                      : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-1)]'
+                    ? 'bg-[var(--accent)]/50 text-white border-b-2 border-[var(--accent)]'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-1)]'
                     }`}
                 >
                   <tab.icon className="w-5 h-5" />
@@ -1319,8 +1311,8 @@ export default function TicketDetailPage() {
                               key={order}
                               onClick={() => setCommentSortOrder(order)}
                               className={`px-3 py-1.5 text-base rounded-md transition-colors ${commentSortOrder === order
-                                  ? 'bg-[var(--accent)]/50 text-white'
-                                  : 'text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60'
+                                ? 'bg-[var(--accent)]/50 text-white'
+                                : 'text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60'
                                 }`}
                             >
                               {order === 'newest'
@@ -1923,7 +1915,7 @@ export default function TicketDetailPage() {
                   className="group block rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 hover:bg-[var(--hover-2)] hover:border-[var(--border-hover)] transition-colors"
                 >
                   <div className="flex items-start gap-3">
-                    
+
 
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-base font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
@@ -2315,8 +2307,8 @@ export default function TicketDetailPage() {
                       type="button"
                       onClick={() => setEditPriority(p.value)}
                       className={`px-3 py-2.5 rounded-xl text-base font-medium border transition-all ${editPriority === p.value
-                          ? p.cls
-                          : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--hover-2)]'
+                        ? p.cls
+                        : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--hover-2)]'
                         }`}
                     >
                       {p.label}
