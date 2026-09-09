@@ -1546,9 +1546,7 @@ function TicketKanbanCard({
               {priorityLabel}
             </span>
 
-            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[12px] font-semibold border ${STATUS_MAP[t.status]?.color || 'status-closed'}`}>
-              {STATUS_MAP[t.status]?.label || t.status}
-            </span>
+            
           </div>
         </div>
 
@@ -1638,7 +1636,7 @@ function TicketsKanbanColumns({
             </div>
 
             {/* body: как в задачах, но scrollbar скрыт */}
-            <div className="p-2.5 flex-1 space-y-2.5 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="p-2.5 flex-1 space-y-2.5 overflow-visible">
               {items.length === 0 ? (
                 <div className="h-24 flex flex-col items-center justify-center text-[var(--text-primary)]/30 border border-dashed border-[var(--border-color)] rounded-xl">
                   <FileText className="w-5 h-5 mb-1 opacity-50" />
@@ -2407,13 +2405,13 @@ const handleStatClick = (type: 'new' | 'in_progress' | 'critical') => {
   />
 ) : shownTickets.length > 0 ? (
   viewMode === 'board' ? (
-    <div className="h-[calc(100vh-420px)] min-h-[520px] flex flex-col">
+    <div className="flex flex-col pb-6">
       <div
         ref={boardScrollRef}
         onScroll={handleBoardScroll}
-        className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden pb-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex-1 min-h-0 overflow-x-auto overflow-y-visible pb-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <div ref={boardInnerRef} className="flex gap-3 h-full w-max min-w-full">
+        <div ref={boardInnerRef} className="flex gap-3 w-max min-w-full">
           <TicketsKanbanColumns
             tickets={shownTickets}
             onTicketUpdated={reloadBoard}
