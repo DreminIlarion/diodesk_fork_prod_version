@@ -7,6 +7,8 @@ from sqlalchemy import TEXT, Computed, DateTime, Enum, ForeignKey, Index, String
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
 
+
+
 from src.comments.infra.models import CommentOrm  # Добавить импорт
 from src.core.database import Base
 from src.shared.domain.vo import Priority
@@ -72,13 +74,12 @@ class TicketOrm(Base):
     )
 
 TicketOrm.has_attachments = column_property(
-    select(
-        exists().where(
-            (AttachmentOrm.owner_type == literal("ticket")) &
-            (AttachmentOrm.owner_id == TicketOrm.id) &
-            (AttachmentOrm.deleted_at.is_(None))
-        )
+    select(1)
+    .where(
+        (AttachmentOrm.owner_type == literal("ticket")) &
+        (AttachmentOrm.owner_id == TicketOrm.id) &
+        (AttachmentOrm.deleted_at.is_(None))
     )
-    .correlate(TicketOrm)  
-    .scalar_subquery()
+    .correlate(TicketOrm)
+    .exists()
 )
