@@ -1,5 +1,5 @@
 // pages/TicketsPage.tsx
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback,useMemo } from 'react';
 import type { ElementType, ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
