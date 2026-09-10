@@ -1813,37 +1813,7 @@ const syncBoardScrollbarMetrics = useCallback(() => {
   updateThumbPosition();
 }, [updateThumbPosition]);
 
-useEffect(() => {
-  if (viewMode !== 'board' || loading || !boardTickets.length) {
-    setFixedBoardScrollbarStyle((prev) => ({ ...prev, display: 'none' }));
-    return;
-  }
 
-  const run = () => {
-    requestAnimationFrame(syncBoardScrollbarMetrics);
-  };
-
-  run();
-
-  const board = boardScrollRef.current;
-  const inner = boardInnerRef.current;
-
-  let ro: ResizeObserver | null = null;
-  if (typeof ResizeObserver !== 'undefined' && board && inner) {
-    ro = new ResizeObserver(run);
-    ro.observe(board);
-    ro.observe(inner);
-  }
-
-  window.addEventListener('resize', run);
-  window.addEventListener('scroll', run);
-
-  return () => {
-    ro?.disconnect();
-    window.removeEventListener('resize', run);
-    window.removeEventListener('scroll', run);
-  };
-}, [viewMode, loading, boardTickets.length, syncBoardScrollbarMetrics]);
 
 const handleScrollbarPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
   const board = boardScrollRef.current;
@@ -2221,6 +2191,39 @@ const handlePageChange = (pageNum: number) => {
 useEffect(() => {
   loadStats();
 }, [loadStats]);
+
+
+useEffect(() => {
+  if (viewMode !== 'board' || loading || !boardTickets.length) {
+    setFixedBoardScrollbarStyle((prev) => ({ ...prev, display: 'none' }));
+    return;
+  }
+
+  const run = () => {
+    requestAnimationFrame(syncBoardScrollbarMetrics);
+  };
+
+  run();
+
+  const board = boardScrollRef.current;
+  const inner = boardInnerRef.current;
+
+  let ro: ResizeObserver | null = null;
+  if (typeof ResizeObserver !== 'undefined' && board && inner) {
+    ro = new ResizeObserver(run);
+    ro.observe(board);
+    ro.observe(inner);
+  }
+
+  window.addEventListener('resize', run);
+  window.addEventListener('scroll', run);
+
+  return () => {
+    ro?.disconnect();
+    window.removeEventListener('resize', run);
+    window.removeEventListener('scroll', run);
+  };
+}, [viewMode, loading, boardTickets.length, syncBoardScrollbarMetrics]);
 
   /* ── Счётчики ── */
   const hasFilters = !!(
