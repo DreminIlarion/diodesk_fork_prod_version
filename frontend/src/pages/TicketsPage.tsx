@@ -1682,6 +1682,16 @@ export default function TicketsPage() {
     [searchParams],
   );
 
+  const [stats, setStats] = useState({
+  total: 0,
+  new: 0,
+  in_progress: 0,
+  critical: 0,
+});
+
+
+
+
   /* ── Роли ── */
   const roles = user?.roles ?? [];
   const isCustomer = roles.includes('customer');
@@ -1989,6 +1999,40 @@ const handlePageChange = (pageNum: number) => {
     setPage(1);
   };
 
+
+  const loadStats = useCallback(async () => {
+  try {
+    // Заявки БЕЗ фильтров — общая статистика
+    const allRes = await ticketsApi.getAll(1, 1, {});
+    const total = allRes.total_items;
+
+    // Новые
+    const newRes = await ticketsApi.getAll(1, 1, { status: ['new'] });
+    const newCount = newRes.total_items;
+
+    // В работе
+    const progressRes = await ticketsApi.getAll(1, 1, { status: ['in_progress', 'open'] });
+    const progressCount = progressRes.total_items;
+
+    // Критические
+    const criticalRes = await ticketsApi.getAll(1, 1, { priority: 'critical' });
+    const criticalCount = criticalRes.total_items;
+
+    setStats({
+      total,
+      new: newCount,
+      in_progress: progressCount,
+      critical: criticalCount,
+    });
+  } catch (e) {
+    console.error('loadStats error:', e);
+  }
+}, []);
+
+useEffect(() => {
+  loadStats();
+}, [loadStats]);
+
   /* ── Счётчики ── */
   const hasFilters = !!(
     statusFilter.length || priorityFilter || typeFilter ||
@@ -2033,7 +2077,16 @@ const handlePageChange = (pageNum: number) => {
 
 const handleStatClick = (type: 'new' | 'in_progress' | 'critical') => {
   setPage(1);
-  
+  setProjectFilter([]);
+  setTypeFilter('');
+  setCounterpartyFilter('');
+  setAssigneeFilter('');
+  setReporterFilter('');
+  setDateFrom('');
+  setDateTo('');
+  setSearch('');
+  setDebouncedSearch('');
+
   if (type === 'new') {
     setStatusFilter(['new']);
     setPriorityFilter('');
@@ -2090,37 +2143,38 @@ const handleStatClick = (type: 'new' | 'in_progress' | 'critical') => {
 
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-  <StatCard 
-    label="Всего" 
-    value={totalItems}
-    icon={Ticket} 
-    color="text-[var(--text-secondary)]" 
-    bg="bg-[var(--hover-1)]"
-  />
- <StatCard 
-    label="Новых" 
-    value={tickets.filter(t => t.status === 'new').length}
-    icon={Clock} 
-    color="text-[var(--status-new-text)]" 
-    bg="bg-[var(--status-new-bg)]"
-    onClick={() => handleStatClick('new')}
-  />
-  <StatCard 
-    label="В работе" 
-    value={tickets.filter(t => t.status === 'in_progress' || t.status === 'open').length}
-    icon={CheckCircle2} 
-    color="text-[var(--status-progress-text)]" 
-    bg="bg-[var(--status-progress-bg)]"
-    onClick={() => handleStatClick('in_progress')}
-  />
-  <StatCard 
-    label="Критических" 
-    value={tickets.filter(t => t.priority === 'critical').length}
-    icon={AlertTriangle} 
-    color="text-[var(--priority-critical-text)]" 
-    bg="bg-[var(--priority-critical-bg)]"
-    onClick={() => handleStatClick('critical')}
-  />
+<StatCard 
+  label="Всего" 
+  value={stats.total}
+  icon={Ticket} 
+  color="text-[var(--text-secondary)]" 
+  bg="bg-[var(--hover-1)]"
+  onClick={resetFilters}
+/>
+<StatCard 
+  label="Новых" 
+  value={stats.new}
+  icon={Clock} 
+  color="text-[var(--status-new-text)]" 
+  bg="bg-[var(--status-new-bg)]"
+  onClick={() => handleStatClick('new')}
+/>
+<StatCard 
+  label="В работе" 
+  value={stats.in_progress}
+  icon={CheckCircle2} 
+  color="text-[var(--status-progress-text)]" 
+  bg="bg-[var(--status-progress-bg)]"
+  onClick={() => handleStatClick('in_progress')}
+/>
+<StatCard 
+  label="Критических" 
+  value={stats.critical}
+  icon={AlertTriangle} 
+  color="text-[var(--priority-critical-text)]" 
+  bg="bg-[var(--priority-critical-bg)]"
+  onClick={() => handleStatClick('critical')}
+/>
 </div>
 
       {/* ── Search + Filters toggle ── */}
