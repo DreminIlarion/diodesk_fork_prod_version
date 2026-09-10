@@ -14,7 +14,7 @@ import { ticketsApi, counterpartiesApi, projectsApi, usersApi } from '../api/cli
 import { useAuthStore } from '../stores/authStore';
 import type { TicketListItem, Counterparty, Project, SimpleUser } from '../types';
 import { useToast } from '../components/ui/use-toast';
-
+import { createPortal } from 'react-dom';
 
 
 type TicketsViewMode = 'list' | 'board';
@@ -1707,10 +1707,199 @@ export default function TicketsPage() {
   const boardScrollRef = useRef<HTMLDivElement>(null);
 const boardInnerRef = useRef<HTMLDivElement>(null);
 
-const handleBoardScroll = useCallback(() => {
-  // заглушка для скроллбара
+
+const bottomTrackRef = useRef<HTMLDivElement>(null);
+
+const scrollbarThumbPercentRef = useRef(20);
+const scrollRafRef = useRef<number | null>(null);
+
+const [boardScrollWidth, setBoardScrollWidth] = useState(0);
+const [boardViewportWidth, setBoardViewportWidth] = useState(0);
+
+const scrollbarDragRef = useRef<{
+  startX: number;
+  startScrollLeft: number;
+} | null>(null);
+
+const [fixedBoardScrollbarStyle, setFixedBoardScrollbarStyle] = useState<React.CSSProperties>({
+  position: 'fixed',
+  left: 0,
+  width: 0,
+  bottom: 12,
+  zIndex: 55,
+  display: 'none',
+});
+
+const updateThumbPosition = useCallback(() => {
+  const board = boardScrollRef.current;
+  const track = bottomTrackRef.current;
+  const thumb = track?.querySelector<HTMLElement>('[data-scroll-thumb="true"]');
+
+  if (!board || !track || !thumb) return;
+
+  const boardMax = board.scrollWidth - board.clientWidth;
+  if (boardMax <= 0) {
+    thumb.style.transform = 'translateX(0px)';
+    return;
+  }
+
+  const progress = Math.min(Math.max(board.scrollLeft / boardMax, 0), 1);
+  const trackWidth = track.clientWidth;
+  const thumbWidth = thumb.offsetWidth;
+  const maxTravel = Math.max(trackWidth - thumbWidth, 0);
+
+  thumb.style.transform = `translateX(${progress * maxTravel}px)`;
 }, []);
 
+const handleBoardScroll = useCallback(() => {
+  if (scrollRafRef.current !== null) return;
+  scrollRafRef.current = requestAnimationFrame(() => {
+    scrollRafRef.current = null;
+    updateThumbPosition();
+  });
+}, [updateThumbPosition]);
+
+const syncBoardScrollbarMetrics = useCallback(() => {
+  const board = boardScrollRef.current;
+  const inner = boardInnerRef.current;
+  const track = bottomTrackRef.current;
+  const thumb = track?.querySelector<HTMLElement>('[data-scroll-thumb="true"]');
+
+  if (!board || !inner) {
+    setFixedBoardScrollbarStyle((prev) =>
+      prev.display === 'none' ? prev : { ...prev, display: 'none' }
+    );
+    return;
+  }
+
+  const contentWidth = inner.scrollWidth;
+  const viewportWidth = board.clientWidth;
+  const rect = board.getBoundingClientRect();
+
+  const hasHorizontalOverflow = contentWidth > viewportWidth + 2;
+
+  const thumbPercent = Math.min(Math.max((viewportWidth / contentWidth) * 100, 8), 100);
+  scrollbarThumbPercentRef.current = thumbPercent;
+
+  if (thumb) {
+    thumb.style.width = `${thumbPercent}%`;
+  }
+
+  setBoardScrollWidth((prev) => (prev === contentWidth ? prev : contentWidth));
+  setBoardViewportWidth((prev) => (prev === viewportWidth ? prev : viewportWidth));
+
+  setFixedBoardScrollbarStyle((prev) => {
+    const newStyle: React.CSSProperties = {
+      position: 'fixed',
+      left: rect.left,
+      width: rect.width,
+      bottom: 12,
+      zIndex: 55,
+      display: hasHorizontalOverflow ? 'block' : 'none',
+      pointerEvents: 'auto',
+    };
+
+    if (
+      prev.display === newStyle.display &&
+      prev.left === newStyle.left &&
+      prev.width === newStyle.width &&
+      prev.bottom === newStyle.bottom
+    ) {
+      return prev;
+    }
+    return newStyle;
+  });
+
+  updateThumbPosition();
+}, [updateThumbPosition]);
+
+useEffect(() => {
+  if (viewMode !== 'board' || loading || !boardTickets.length) {
+    setFixedBoardScrollbarStyle((prev) => ({ ...prev, display: 'none' }));
+    return;
+  }
+
+  const run = () => {
+    requestAnimationFrame(syncBoardScrollbarMetrics);
+  };
+
+  run();
+
+  const board = boardScrollRef.current;
+  const inner = boardInnerRef.current;
+
+  let ro: ResizeObserver | null = null;
+  if (typeof ResizeObserver !== 'undefined' && board && inner) {
+    ro = new ResizeObserver(run);
+    ro.observe(board);
+    ro.observe(inner);
+  }
+
+  window.addEventListener('resize', run);
+  window.addEventListener('scroll', run);
+
+  return () => {
+    ro?.disconnect();
+    window.removeEventListener('resize', run);
+    window.removeEventListener('scroll', run);
+  };
+}, [viewMode, loading, boardTickets.length, syncBoardScrollbarMetrics]);
+
+const handleScrollbarPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+  const board = boardScrollRef.current;
+  if (!board) return;
+
+  e.preventDefault();
+  scrollbarDragRef.current = {
+    startX: e.clientX,
+    startScrollLeft: board.scrollLeft,
+  };
+
+  e.currentTarget.setPointerCapture(e.pointerId);
+}, []);
+
+const handleScrollbarPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+  const dragState = scrollbarDragRef.current;
+  const board = boardScrollRef.current;
+  const track = bottomTrackRef.current;
+
+  if (!dragState || !board || !track) return;
+
+  const trackWidth = track.clientWidth;
+  const thumbPercent = scrollbarThumbPercentRef.current;
+  const thumbWidth = trackWidth * (thumbPercent / 100);
+  const thumbTravel = Math.max(trackWidth - thumbWidth, 1);
+  const boardMax = Math.max(board.scrollWidth - board.clientWidth, 0);
+
+  const deltaX = e.clientX - dragState.startX;
+  const scrollDelta = (deltaX / thumbTravel) * boardMax;
+
+  board.scrollLeft = dragState.startScrollLeft + scrollDelta;
+}, []);
+
+const handleScrollbarPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+  scrollbarDragRef.current = null;
+  try {
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  } catch {}
+}, []);
+
+const handleScrollbarTrackClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  const board = boardScrollRef.current;
+  const track = bottomTrackRef.current;
+
+  if (!board || !track) return;
+  if ((e.target as HTMLElement).dataset.scrollThumb === 'true') return;
+
+  const rect = track.getBoundingClientRect();
+  const ratio = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+  const maxScroll = board.scrollWidth - board.clientWidth;
+
+  board.scrollTo({
+    left: ratio * maxScroll,
+    behavior: 'smooth',
+  });
+}, []);
   /* ── State ── */
   const initialSearch = searchParams.get('search') || '';
   const initialStatus = getMultiParam('status');
@@ -2459,11 +2648,12 @@ const handleStatClick = (type: 'new' | 'in_progress' | 'critical') => {
   />
 ) : shownTickets.length > 0 ? (
   viewMode === 'board' ? (
+  <>
     <div className="flex flex-col pb-6">
       <div
         ref={boardScrollRef}
         onScroll={handleBoardScroll}
-        className="flex-1 min-h-0 overflow-x-auto overflow-y-visible pb-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="overflow-x-auto overflow-y-visible pb-12 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <div ref={boardInnerRef} className="flex gap-3 w-max min-w-full">
           <TicketsKanbanColumns
@@ -2488,7 +2678,34 @@ const handleStatClick = (type: 'new' | 'in_progress' | 'critical') => {
         </div>
       )}
     </div>
-  ) : (
+
+    {/* ФИКСИРОВАННЫЙ СКРОЛЛБАР ВНИЗУ ЭКРАНА */}
+    {boardScrollWidth > boardViewportWidth + 2 &&
+      createPortal(
+        <div style={fixedBoardScrollbarStyle} className="px-1">
+          <div
+            ref={bottomTrackRef}
+            onClick={handleScrollbarTrackClick}
+            className="relative h-3 rounded-full bg-[var(--hover-2)] border border-[var(--border-color)] cursor-pointer select-none"
+          >
+            <div
+              data-scroll-thumb="true"
+              onPointerDown={handleScrollbarPointerDown}
+              onPointerMove={handleScrollbarPointerMove}
+              onPointerUp={handleScrollbarPointerUp}
+              onPointerCancel={handleScrollbarPointerUp}
+              className="absolute top-[1px] bottom-[1px] left-0 rounded-full bg-[var(--accent)]/70 cursor-grab active:cursor-grabbing touch-none will-change-transform"
+              style={{
+                width: `${scrollbarThumbPercentRef.current}%`,
+                transform: 'translateX(0px)',
+              }}
+            />
+          </div>
+        </div>,
+        document.body
+      )}
+  </>
+) : (
     <>
       {/* Desktop */}
       <div className="hidden lg:block rounded-xl border border-[var(--border-color)] relative overflow-visible">
