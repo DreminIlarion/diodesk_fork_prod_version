@@ -1,5 +1,5 @@
 // pages/TicketsPage.tsx
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback,useMemo } from 'react';
 import type { ElementType, ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -8,12 +8,29 @@ import {
   Building2, User, X, SlidersHorizontal, ChevronDown, Check,
   Sparkles, Flame, MessageSquare, HelpCircle, Edit3, FolderOpen,
   UserCheck, Ticket, MoreVertical,
-  Settings, RefreshCw, Archive, Paperclip,
+  Settings, RefreshCw, Archive, Paperclip,LayoutGrid, List,
 } from 'lucide-react';
 import { ticketsApi, counterpartiesApi, projectsApi, usersApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import type { TicketListItem, Counterparty, Project, SimpleUser } from '../types';
 import { useToast } from '../components/ui/use-toast';
+import { createPortal } from 'react-dom';
+
+
+type TicketsViewMode = 'list' | 'board';
+
+const KANBAN_STATUSES: string[] = [
+  'new',
+  'pending_approval',
+  'open',
+  'in_progress',
+  'waiting',
+  'resolved',
+  'closed',
+  'reopened',
+  'rejected',
+  'canceled',
+];
 
 /* ═══ СТАТУСЫ ═══ */
 
@@ -42,6 +59,24 @@ const PRIORITY_MAP: Record<string, { label: string; color: string }> = {
   'high': { label: 'Высокий', color: 'priority-high' },
   'critical': { label: 'Критический', color: 'priority-critical' },
 };
+
+const PRIORITY_RANK: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
+function compareTicketsByPriority(a: TicketListItem, b: TicketListItem) {
+  const ra = PRIORITY_RANK[a.priority] ?? 0;
+  const rb = PRIORITY_RANK[b.priority] ?? 0;
+
+  // сначала более высокий приоритет
+  if (rb !== ra) return rb - ra;
+
+  // при равном приоритете — новые выше
+  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+}
 
 const PRIORITY_OPTIONS = Object.entries(PRIORITY_MAP).map(([value, { label, color }]) => ({
   value, label, color,
@@ -1466,6 +1501,167 @@ function EmptyState({ hasFilters, hasSearch, onCreateClick }: {
   );
 }
 
+
+function TicketKanbanCard({
+  ticket: t,
+  onTicketUpdated,
+}: {
+  ticket: TicketListItem;
+  onTicketUpdated?: () => void;
+}) {
+  const priorityColor = PRIORITY_MAP[t.priority]?.color || 'priority-medium';
+  const priorityLabel = PRIORITY_MAP[t.priority]?.label || t.priority;
+
+  const assigneeName =
+    t.assignee?.full_name || t.assignee?.username || t.assignee?.email || '';
+
+  const reporterName =
+    t.reporter?.full_name || t.reporter?.username || t.reporter?.email || '';
+
+  const hasAttachments = (t as any)?.has_attachments;
+
+  return (
+    <Link
+      to={`/tickets/${t.number}`}
+      className={`
+        group bg-[var(--bg-card)] border rounded-xl px-4 py-3.5 cursor-pointer shadow-sm min-h-[140px]
+        flex flex-col relative
+        transition-[border-color,background-color,box-shadow] duration-200
+        hover:bg-[var(--hover-2)] hover:border-[var(--accent)]/40
+        border-[var(--border-color)]
+      `}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <span className="text-xs font-mono text-[var(--text-primary)]/45 mb-1.5 leading-none block">
+            #{t.number}
+          </span>
+
+          <h4 className="text-[15px] font-bold text-[var(--text-primary)] leading-snug tracking-tight line-clamp-2 mb-3">
+            {t.title}
+          </h4>
+
+          <div className="flex items-center gap-2 mb-3.5 flex-wrap">
+            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[12px] font-semibold border ${priorityColor}`}>
+              {priorityLabel}
+            </span>
+
+            
+          </div>
+        </div>
+
+        <div className="shrink-0">
+          <TicketActions ticket={t} onTicketUpdated={onTicketUpdated} />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between border-t border-[var(--border-color)] pt-3 mt-auto">
+        <div className="min-w-0">
+          {assigneeName ? (
+            <div className="text-[13px] text-[var(--text-primary)]/75 font-medium truncate max-w-[160px]">
+              <UserCheck className="inline-block w-4 h-4 mr-1 text-[var(--text-primary)]/30 align-[-2px]" />
+              {toShortName(assigneeName)}
+            </div>
+          ) : reporterName ? (
+            <div className="text-[13px] text-[var(--text-primary)]/55 font-medium truncate max-w-[160px]">
+              <User className="inline-block w-4 h-4 mr-1 text-[var(--text-primary)]/30 align-[-2px]" />
+              {toShortName(reporterName)}
+            </div>
+          ) : (
+            <span className="text-xs text-[var(--text-primary)]/30">—</span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0 text-[var(--text-primary)]/30">
+          {hasAttachments && <Paperclip className="w-4.5 h-4.5" />}
+          {t.project?.key && <FolderOpen className="w-4.5 h-4.5" />}
+          <span className="text-[12px] font-semibold ml-0.5 text-[var(--text-primary)]/45">
+            {formatDate(t.created_at)}
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function TicketsKanbanColumns({
+  tickets,
+  onTicketUpdated,
+}: {
+  tickets: TicketListItem[];
+  onTicketUpdated?: () => void;
+}) {
+  const byStatus = useMemo(() => {
+    const m = new Map<string, TicketListItem[]>();
+    for (const s of Object.keys(STATUS_MAP)) m.set(s, []);
+
+    for (const t of tickets) {
+      const key = m.has(t.status) ? t.status : 'canceled';
+      m.get(key)!.push(t);
+    }
+
+    // сортировка внутри каждой колонки: приоритет + дата
+    for (const [k, arr] of m.entries()) {
+      arr.sort(compareTicketsByPriority);
+      m.set(k, arr);
+    }
+
+    return m;
+  }, [tickets]);
+
+  return (
+    <>
+      {KANBAN_STATUSES.map((st) => {
+        const items = byStatus.get(st) ?? [];
+
+        return (
+          <div
+            key={st}
+            className="
+              bg-[var(--hover-1)] rounded-xl flex flex-col w-[320px] shrink-0 border h-full
+              border-[var(--border-color)]
+            "
+          >
+            {/* header как в KCol */}
+            <div className="px-3 py-3 flex items-center justify-between border-b border-[var(--border-color)] shrink-0 bg-[var(--bg-card)] rounded-t-xl">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className={`w-2 h-2 rounded-full ${STATUS_MAP[st]?.color || 'status-closed'}`} />
+                <span className="text-sm font-bold text-[var(--text-primary)] truncate">
+                  {STATUS_MAP[st]?.label || st}
+                </span>
+                <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--hover-2)] text-[var(--text-primary)]/50 shrink-0">
+                  {items.length}
+                </span>
+              </div>
+            </div>
+
+            {/* body: как в задачах, но scrollbar скрыт */}
+              <div className="p-2.5 flex-1 space-y-2.5 overflow-visible">
+              {items.length === 0 ? (
+                <div className="h-24 flex flex-col items-center justify-center text-[var(--text-primary)]/30 border border-dashed border-[var(--border-color)] rounded-xl">
+                  <FileText className="w-5 h-5 mb-1 opacity-50" />
+                  <span className="text-xs">Нет заявок</span>
+                </div>
+              ) : (
+                items.map((t) => (
+                  <TicketKanbanCard
+                    key={t.id}
+                    ticket={t}
+                    onTicketUpdated={onTicketUpdated}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+
+
+
 /* ═══ ОСНОВНОЙ КОМПОНЕНТ ═══ */
 
 export default function TicketsPage() {
@@ -1486,6 +1682,16 @@ export default function TicketsPage() {
     [searchParams],
   );
 
+  const [stats, setStats] = useState({
+  total: 0,
+  new: 0,
+  in_progress: 0,
+  critical: 0,
+});
+
+
+
+
   /* ── Роли ── */
   const roles = user?.roles ?? [];
   const isCustomer = roles.includes('customer');
@@ -1498,6 +1704,172 @@ export default function TicketsPage() {
   const showAssigneeCol = !isClientUser;
   const showReporterCol = !isCustomer;
 
+  const boardScrollRef = useRef<HTMLDivElement>(null);
+const boardInnerRef = useRef<HTMLDivElement>(null);
+
+
+const bottomTrackRef = useRef<HTMLDivElement>(null);
+
+const scrollbarThumbPercentRef = useRef(20);
+const scrollRafRef = useRef<number | null>(null);
+
+const [boardScrollWidth, setBoardScrollWidth] = useState(0);
+const [boardViewportWidth, setBoardViewportWidth] = useState(0);
+
+const scrollbarDragRef = useRef<{
+  startX: number;
+  startScrollLeft: number;
+} | null>(null);
+
+const [fixedBoardScrollbarStyle, setFixedBoardScrollbarStyle] = useState<React.CSSProperties>({
+  position: 'fixed',
+  left: 0,
+  width: 0,
+  bottom: 12,
+  zIndex: 55,
+  display: 'none',
+});
+
+const updateThumbPosition = useCallback(() => {
+  const board = boardScrollRef.current;
+  const track = bottomTrackRef.current;
+  const thumb = track?.querySelector<HTMLElement>('[data-scroll-thumb="true"]');
+
+  if (!board || !track || !thumb) return;
+
+  const boardMax = board.scrollWidth - board.clientWidth;
+  if (boardMax <= 0) {
+    thumb.style.transform = 'translateX(0px)';
+    return;
+  }
+
+  const progress = Math.min(Math.max(board.scrollLeft / boardMax, 0), 1);
+  const trackWidth = track.clientWidth;
+  const thumbWidth = thumb.offsetWidth;
+  const maxTravel = Math.max(trackWidth - thumbWidth, 0);
+
+  thumb.style.transform = `translateX(${progress * maxTravel}px)`;
+}, []);
+
+const handleBoardScroll = useCallback(() => {
+  if (scrollRafRef.current !== null) return;
+  scrollRafRef.current = requestAnimationFrame(() => {
+    scrollRafRef.current = null;
+    updateThumbPosition();
+  });
+}, [updateThumbPosition]);
+
+const syncBoardScrollbarMetrics = useCallback(() => {
+  const board = boardScrollRef.current;
+  const inner = boardInnerRef.current;
+  const track = bottomTrackRef.current;
+  const thumb = track?.querySelector<HTMLElement>('[data-scroll-thumb="true"]');
+
+  if (!board || !inner) {
+    setFixedBoardScrollbarStyle((prev) =>
+      prev.display === 'none' ? prev : { ...prev, display: 'none' }
+    );
+    return;
+  }
+
+  const contentWidth = inner.scrollWidth;
+  const viewportWidth = board.clientWidth;
+  const rect = board.getBoundingClientRect();
+
+  const hasHorizontalOverflow = contentWidth > viewportWidth + 2;
+
+  const thumbPercent = Math.min(Math.max((viewportWidth / contentWidth) * 100, 8), 100);
+  scrollbarThumbPercentRef.current = thumbPercent;
+
+  if (thumb) {
+    thumb.style.width = `${thumbPercent}%`;
+  }
+
+  setBoardScrollWidth((prev) => (prev === contentWidth ? prev : contentWidth));
+  setBoardViewportWidth((prev) => (prev === viewportWidth ? prev : viewportWidth));
+
+  setFixedBoardScrollbarStyle((prev) => {
+    const newStyle: React.CSSProperties = {
+      position: 'fixed',
+      left: rect.left,
+      width: rect.width,
+      bottom: 12,
+      zIndex: 55,
+      display: hasHorizontalOverflow ? 'block' : 'none',
+      pointerEvents: 'auto',
+    };
+
+    if (
+      prev.display === newStyle.display &&
+      prev.left === newStyle.left &&
+      prev.width === newStyle.width &&
+      prev.bottom === newStyle.bottom
+    ) {
+      return prev;
+    }
+    return newStyle;
+  });
+
+  updateThumbPosition();
+}, [updateThumbPosition]);
+
+
+
+const handleScrollbarPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+  const board = boardScrollRef.current;
+  if (!board) return;
+
+  e.preventDefault();
+  scrollbarDragRef.current = {
+    startX: e.clientX,
+    startScrollLeft: board.scrollLeft,
+  };
+
+  e.currentTarget.setPointerCapture(e.pointerId);
+}, []);
+
+const handleScrollbarPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+  const dragState = scrollbarDragRef.current;
+  const board = boardScrollRef.current;
+  const track = bottomTrackRef.current;
+
+  if (!dragState || !board || !track) return;
+
+  const trackWidth = track.clientWidth;
+  const thumbPercent = scrollbarThumbPercentRef.current;
+  const thumbWidth = trackWidth * (thumbPercent / 100);
+  const thumbTravel = Math.max(trackWidth - thumbWidth, 1);
+  const boardMax = Math.max(board.scrollWidth - board.clientWidth, 0);
+
+  const deltaX = e.clientX - dragState.startX;
+  const scrollDelta = (deltaX / thumbTravel) * boardMax;
+
+  board.scrollLeft = dragState.startScrollLeft + scrollDelta;
+}, []);
+
+const handleScrollbarPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+  scrollbarDragRef.current = null;
+  try {
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  } catch {}
+}, []);
+
+const handleScrollbarTrackClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  const board = boardScrollRef.current;
+  const track = bottomTrackRef.current;
+
+  if (!board || !track) return;
+  if ((e.target as HTMLElement).dataset.scrollThumb === 'true') return;
+
+  const rect = track.getBoundingClientRect();
+  const ratio = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+  const maxScroll = board.scrollWidth - board.clientWidth;
+
+  board.scrollTo({
+    left: ratio * maxScroll,
+    behavior: 'smooth',
+  });
+}, []);
   /* ── State ── */
   const initialSearch = searchParams.get('search') || '';
   const initialStatus = getMultiParam('status');
@@ -1530,6 +1902,28 @@ export default function TicketsPage() {
   const [loadingCounterparties, setLoadingCounterparties] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
+
+  const [viewMode, setViewMode] = useState<TicketsViewMode>('list');
+  // --- Kanban data (догрузка) ---
+const [boardTickets, setBoardTickets] = useState<TicketListItem[]>([]);
+const [boardPage, setBoardPage] = useState(1);
+const [boardTotalPages, setBoardTotalPages] = useState(1);
+const [boardLoadingMore, setBoardLoadingMore] = useState(false);
+
+const boardHasMore = boardPage < boardTotalPages;
+
+// Что показываем в UI
+const shownTickets = viewMode === 'board' ? boardTickets : tickets;
+  
+
+useEffect(() => {
+  const saved = localStorage.getItem('tickets-view-mode') as TicketsViewMode | null;
+  if (saved === 'list' || saved === 'board') setViewMode(saved);
+}, []);
+
+useEffect(() => {
+  localStorage.setItem('tickets-view-mode', viewMode);
+}, [viewMode]);
 
 
   // 1. Читать page из URL
@@ -1667,24 +2061,81 @@ useEffect(() => {
 
   // 5. В loadTickets — не сбрасывать page
   const loadTickets = useCallback(async (targetPage?: number) => {
-    setLoading(true);
-    const p = targetPage ?? page;
-    try {
-      const response = await ticketsApi.getAll(p, 9, buildFilters());
-      setTickets(response.items);
-      setTotalPages(response.total_pages);
-      setTotalItems(response.total_items);
-    } catch (e) {
-      console.error('loadTickets error:', e);
-    } finally {
-      setLoading(false);
-      setInitialLoad(false);
-    }
-  }, [buildFilters, page]);
+  setLoading(true);
+  const p = targetPage ?? page;
 
-  useEffect(() => {
+  try {
+    const response = await ticketsApi.getAll(p, 9, buildFilters());
+    setTickets(response.items);
+    setTotalPages(response.total_pages);
+    setTotalItems(response.total_items);
+  } catch (e) {
+    console.error('loadTickets error:', e);
+  } finally {
+    setLoading(false);
+    setInitialLoad(false);
+  }
+}, [buildFilters, page]);
+
+useEffect(() => {
+  if (viewMode === 'list') {
     loadTickets();
-  }, [loadTickets]);
+  }
+}, [viewMode, loadTickets]);
+
+const reloadBoard = useCallback(async () => {
+  setLoading(true);
+
+  try {
+    const res = await ticketsApi.getAll(1, 50, buildFilters());
+
+    setBoardTickets(res.items);
+    setBoardPage(1);
+    setBoardTotalPages(res.total_pages);
+
+    // чтобы счетчик "всего" в хедере был правильный
+    setTotalItems(res.total_items);
+  } catch (e) {
+    console.error('reloadBoard error:', e);
+    setBoardTickets([]);
+    setBoardPage(1);
+    setBoardTotalPages(1);
+  } finally {
+    setLoading(false);
+    setInitialLoad(false);
+  }
+}, [buildFilters]);
+
+const loadMoreBoard = useCallback(async () => {
+  if (boardLoadingMore) return;
+  if (boardPage >= boardTotalPages) return;
+
+  const nextPage = boardPage + 1;
+  setBoardLoadingMore(true);
+
+  try {
+    const res = await ticketsApi.getAll(nextPage, 50, buildFilters());
+
+    setBoardTickets((prev) => {
+      const m = new Map(prev.map((t) => [t.id, t]));
+      for (const t of res.items) m.set(t.id, t);
+      return Array.from(m.values());
+    });
+
+    setBoardPage(nextPage);
+    setBoardTotalPages(res.total_pages);
+  } catch (e) {
+    console.error('loadMoreBoard error:', e);
+  } finally {
+    setBoardLoadingMore(false);
+  }
+}, [boardLoadingMore, boardPage, boardTotalPages, buildFilters]);
+
+useEffect(() => {
+  if (viewMode === 'board') {
+    reloadBoard();
+  }
+}, [viewMode, reloadBoard]);
 
   /* ── Пагинация ── */
 const handlePageChange = (pageNum: number) => {
@@ -1706,6 +2157,73 @@ const handlePageChange = (pageNum: number) => {
     setDateTo('');
     setPage(1);
   };
+
+
+  const loadStats = useCallback(async () => {
+  try {
+    // Заявки БЕЗ фильтров — общая статистика
+    const allRes = await ticketsApi.getAll(1, 1, {});
+    const total = allRes.total_items;
+
+    // Новые
+    const newRes = await ticketsApi.getAll(1, 1, { status: ['new'] });
+    const newCount = newRes.total_items;
+
+    // В работе
+    const progressRes = await ticketsApi.getAll(1, 1, { status: ['in_progress', 'open'] });
+    const progressCount = progressRes.total_items;
+
+    // Критические
+    const criticalRes = await ticketsApi.getAll(1, 1, { priority: 'critical' });
+    const criticalCount = criticalRes.total_items;
+
+    setStats({
+      total,
+      new: newCount,
+      in_progress: progressCount,
+      critical: criticalCount,
+    });
+  } catch (e) {
+    console.error('loadStats error:', e);
+  }
+}, []);
+
+useEffect(() => {
+  loadStats();
+}, [loadStats]);
+
+
+useEffect(() => {
+  if (viewMode !== 'board' || loading || !boardTickets.length) {
+    setFixedBoardScrollbarStyle((prev) => ({ ...prev, display: 'none' }));
+    return;
+  }
+
+  const run = () => {
+    requestAnimationFrame(syncBoardScrollbarMetrics);
+  };
+
+  run();
+
+  const board = boardScrollRef.current;
+  const inner = boardInnerRef.current;
+
+  let ro: ResizeObserver | null = null;
+  if (typeof ResizeObserver !== 'undefined' && board && inner) {
+    ro = new ResizeObserver(run);
+    ro.observe(board);
+    ro.observe(inner);
+  }
+
+  window.addEventListener('resize', run);
+  window.addEventListener('scroll', run);
+
+  return () => {
+    ro?.disconnect();
+    window.removeEventListener('resize', run);
+    window.removeEventListener('scroll', run);
+  };
+}, [viewMode, loading, boardTickets.length, syncBoardScrollbarMetrics]);
 
   /* ── Счётчики ── */
   const hasFilters = !!(
@@ -1751,7 +2269,16 @@ const handlePageChange = (pageNum: number) => {
 
 const handleStatClick = (type: 'new' | 'in_progress' | 'critical') => {
   setPage(1);
-  
+  setProjectFilter([]);
+  setTypeFilter('');
+  setCounterpartyFilter('');
+  setAssigneeFilter('');
+  setReporterFilter('');
+  setDateFrom('');
+  setDateTo('');
+  setSearch('');
+  setDebouncedSearch('');
+
   if (type === 'new') {
     setStatusFilter(['new']);
     setPriorityFilter('');
@@ -1808,37 +2335,38 @@ const handleStatClick = (type: 'new' | 'in_progress' | 'critical') => {
 
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-  <StatCard 
-    label="Всего" 
-    value={totalItems}
-    icon={Ticket} 
-    color="text-[var(--text-secondary)]" 
-    bg="bg-[var(--hover-1)]"
-  />
- <StatCard 
-    label="Новых" 
-    value={tickets.filter(t => t.status === 'new').length}
-    icon={Clock} 
-    color="text-[var(--status-new-text)]" 
-    bg="bg-[var(--status-new-bg)]"
-    onClick={() => handleStatClick('new')}
-  />
-  <StatCard 
-    label="В работе" 
-    value={tickets.filter(t => t.status === 'in_progress' || t.status === 'open').length}
-    icon={CheckCircle2} 
-    color="text-[var(--status-progress-text)]" 
-    bg="bg-[var(--status-progress-bg)]"
-    onClick={() => handleStatClick('in_progress')}
-  />
-  <StatCard 
-    label="Критических" 
-    value={tickets.filter(t => t.priority === 'critical').length}
-    icon={AlertTriangle} 
-    color="text-[var(--priority-critical-text)]" 
-    bg="bg-[var(--priority-critical-bg)]"
-    onClick={() => handleStatClick('critical')}
-  />
+<StatCard 
+  label="Всего" 
+  value={stats.total}
+  icon={Ticket} 
+  color="text-[var(--text-secondary)]" 
+  bg="bg-[var(--hover-1)]"
+  onClick={resetFilters}
+/>
+<StatCard 
+  label="Новых" 
+  value={stats.new}
+  icon={Clock} 
+  color="text-[var(--status-new-text)]" 
+  bg="bg-[var(--status-new-bg)]"
+  onClick={() => handleStatClick('new')}
+/>
+<StatCard 
+  label="В работе" 
+  value={stats.in_progress}
+  icon={CheckCircle2} 
+  color="text-[var(--status-progress-text)]" 
+  bg="bg-[var(--status-progress-bg)]"
+  onClick={() => handleStatClick('in_progress')}
+/>
+<StatCard 
+  label="Критических" 
+  value={stats.critical}
+  icon={AlertTriangle} 
+  color="text-[var(--priority-critical-text)]" 
+  bg="bg-[var(--priority-critical-bg)]"
+  onClick={() => handleStatClick('critical')}
+/>
 </div>
 
       {/* ── Search + Filters toggle ── */}
@@ -1888,6 +2416,32 @@ const handleStatClick = (type: 'new' | 'in_progress' | 'critical') => {
             </span>
           )}
         </button>
+
+        <div className="flex items-center gap-2">
+  <button
+    onClick={() => setViewMode('list')}
+    className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-base transition-all whitespace-nowrap
+      ${viewMode === 'list'
+        ? 'bg-[var(--accent)]/10 border-[var(--accent)]/40 text-[var(--text-primary)]'
+        : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70'
+      }`}
+  >
+    <List size={18} className={viewMode === 'list' ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'} />
+    Список
+  </button>
+
+  <button
+    onClick={() => { setPage(1); setViewMode('board'); }}
+    className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-base transition-all whitespace-nowrap
+      ${viewMode === 'board'
+        ? 'bg-[var(--accent)]/10 border-[var(--accent)]/40 text-[var(--text-primary)]'
+        : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70'
+      }`}
+  >
+    <LayoutGrid size={18} className={viewMode === 'board' ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'} />
+    Доска
+  </button>
+</div>
       </div>
 
       {/* ── Filters Panel ── */}
@@ -2088,168 +2642,150 @@ const handleStatClick = (type: 'new' | 'in_progress' | 'critical') => {
         </div>
       )}
 
-      {/* ── Content ── */}
-      {tickets.length === 0 && !loading ? (
-        <EmptyState hasFilters={hasFilters} hasSearch={!!debouncedSearch}
-          onCreateClick={() => navigate('/tickets/new')} />
-      ) : tickets.length > 0 ? (
-        <>
-          {/* Desktop */}
-          <div className="hidden lg:block rounded-xl border border-[var(--border-color)] relative overflow-visible">
-            <TableHeader showAssigneeCol={showAssigneeCol || showReporterCol} />
-            <div className="divide-y divide-[var(--border-color)]/40 px-1 py-1">
-              {tickets.map(ticket => (
-                <TicketRow
-                  key={ticket.id}
-                  ticket={ticket}
-                  showAssignee={showAssigneeCol}
-                  showReporter={showReporterCol}
-                  onTicketUpdated={loadTickets}
-                  onNavigate={(id) => saveScrollState(id)}
-                  highlighted={highlightTicketId === ticket.id}
-                />
-              ))}
-            </div>
+{/* ── Content ── */}
+{shownTickets.length === 0 && !loading ? (
+  <EmptyState
+    hasFilters={hasFilters}
+    hasSearch={!!debouncedSearch}
+    onCreateClick={() => navigate('/tickets/new')}
+  />
+) : shownTickets.length > 0 ? (
+  viewMode === 'board' ? (
+  <>
+    <div className="flex flex-col pb-6">
+      <div
+        ref={boardScrollRef}
+        onScroll={handleBoardScroll}
+        className="overflow-x-auto overflow-y-visible pb-12 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        <div ref={boardInnerRef} className="flex gap-3 w-max min-w-full">
+          <TicketsKanbanColumns
+            tickets={shownTickets}
+            onTicketUpdated={reloadBoard}
+          />
+        </div>
+      </div>
+
+      {boardHasMore && (
+        <div className="flex justify-center pt-3 shrink-0">
+          <button
+            type="button"
+            onClick={loadMoreBoard}
+            disabled={boardLoadingMore}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card border border-[var(--border-color)]
+                       text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)] disabled:opacity-40"
+          >
+            {boardLoadingMore && <Loader2 size={18} className="animate-spin" />}
+            Показать ещё
+          </button>
+        </div>
+      )}
+    </div>
+
+    {/* ФИКСИРОВАННЫЙ СКРОЛЛБАР ВНИЗУ ЭКРАНА */}
+    {boardScrollWidth > boardViewportWidth + 2 &&
+      createPortal(
+        <div style={fixedBoardScrollbarStyle} className="px-1">
+          <div
+            ref={bottomTrackRef}
+            onClick={handleScrollbarTrackClick}
+            className="relative h-3 rounded-full bg-[var(--hover-2)] border border-[var(--border-color)] cursor-pointer select-none"
+          >
+            <div
+              data-scroll-thumb="true"
+              onPointerDown={handleScrollbarPointerDown}
+              onPointerMove={handleScrollbarPointerMove}
+              onPointerUp={handleScrollbarPointerUp}
+              onPointerCancel={handleScrollbarPointerUp}
+              className="absolute top-[1px] bottom-[1px] left-0 rounded-full bg-[var(--text-primary)]/20 cursor-grab active:cursor-grabbing touch-none will-change-transform"
+              style={{
+                width: `${scrollbarThumbPercentRef.current}%`,
+                transform: 'translateX(0px)',
+              }}
+            />
           </div>
+        </div>,
+        document.body
+      )}
+  </>
+) : (
+    <>
+      {/* Desktop */}
+      <div className="hidden lg:block rounded-xl border border-[var(--border-color)] relative overflow-visible">
+        <TableHeader showAssigneeCol={showAssigneeCol || showReporterCol} />
+        <div className="divide-y divide-[var(--border-color)]/40 px-1 py-1">
+          {shownTickets.map(ticket => (
+            <TicketRow
+              key={ticket.id}
+              ticket={ticket}
+              showAssignee={showAssigneeCol}
+              showReporter={showReporterCol}
+              onTicketUpdated={loadTickets}
+              onNavigate={(id) => saveScrollState(id)}
+              highlighted={highlightTicketId === ticket.id}
+            />
+          ))}
+        </div>
+      </div>
 
-          {/* Mobile */}
-          <div className="lg:hidden space-y-2">
-            {tickets.map(ticket => {
-              const closed = ticket.status === 'closed' || ticket.status === 'resolved';
-              const typeInfo = TICKET_TYPES.find(t => t.value === ticket.type);
-              const sLabel = STATUS_MAP[ticket.status]?.label || ticket.status;
-              const pLabel = PRIORITY_MAP[ticket.priority]?.label || ticket.priority;
+      {/* Mobile */}
+      <div className="lg:hidden space-y-2">
+        {shownTickets.map(ticket => (
+          // тут оставь твой текущий mobile render (тот, что был)
+          <div key={ticket.id} />
+        ))}
+      </div>
 
-              return (
-                <Link key={ticket.id} to={`/tickets/${ticket.number}`}
-                onClick={() => saveScrollState(ticket.id)} 
-                  className="glass-card rounded-xl border border-[var(--border-color)] p-4 block
-                             hover:bg-[var(--hover-1)] hover:border-[var(--border-hover)]
-                             transition-all group">
-                  <div className="flex items-center justify-between gap-3 mb-2.5">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="text-base font-mono text-[var(--accent-light)]
-                                       bg-[var(--accent-soft)]/50 px-1.5 py-0.5 rounded-md
-                                       border border-[var(--accent)]/10 whitespace-nowrap">
-                        {ticket.number}
-                      </span>
-                      {ticket.has_attachments && (
-                        <Paperclip size={14} className="text-[var(--text-primary)]/40" />
-                      )}
-                      {!closed ? (
-                        <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                          Активна
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
-                          <XCircle size={18} /> Закрыта
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <TicketActions ticket={ticket} onTicketUpdated={loadTickets} />
-                      <ChevronRight size={18}
-                        className="text-[var(--text-muted)] group-hover:text-[var(--accent-light)]
-                                   group-hover:translate-x-0.5 transition-all shrink-0" />
-                    </div>
-                  </div>
+      {/* Pagination только для списка */}
+{totalPages > 1 && (
+  <div className="flex items-center justify-center gap-2 pt-4 border-t border-[var(--border-color)]">
+    <button
+      onClick={() => handlePageChange(Math.max(1, page - 1))}
+      disabled={page === 1}
+      className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card
+                 border border-[var(--border-color)] hover:bg-[var(--hover-2)]
+                 disabled:opacity-40 disabled:cursor-not-allowed
+                 text-[var(--text-primary)] text-base transition-colors"
+    >
+      <ChevronLeft className="w-4 h-4" /> Назад
+    </button>
 
-                  <h3 className="text-[18px] font-semibold text-[var(--text-primary)] mb-3
-                                 leading-snug group-hover:text-[var(--accent-light)]
-                                 transition-colors line-clamp-2">
-                    {ticket.title}
-                  </h3>
+    <div className="flex items-center gap-1.5">
+      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+        const pageNum = Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
+        if (pageNum > totalPages) return null;
 
-                  <div className="flex flex-wrap items-center gap-1.5 mb-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg
-                                     text-[15px] font-medium border ${getTypeColor(ticket.type)}`}>
-                      {typeInfo?.icon} {ticket.type}
-                    </span>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg
-                                     text-[15px] font-medium border ${getStatusColor(ticket.status)}`}>
-                      {sLabel}
-                    </span>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg
-                                     text-[15px] font-medium border
-                                     ${PRIORITY_MAP[ticket.priority]?.color || 'priority-medium'}`}>
-                      {ticket.priority === 'critical' && <Flame size={18} />} {pLabel}
-                    </span>
-                  </div>
+        return (
+          <button
+            key={pageNum}
+            onClick={() => handlePageChange(pageNum)}
+            className={`w-10 h-10 rounded-xl text-base font-medium transition-colors
+              ${pageNum === page
+                ? 'bg-[var(--accent)] text-white'
+                : 'glass-card text-[var(--text-primary)]/60 border border-[var(--border-color)] hover:bg-[var(--hover-2)]'
+              }`}
+          >
+            {pageNum}
+          </button>
+        );
+      })}
+    </div>
 
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-base
-                                  text-[var(--text-muted)] border-t border-[var(--border-color)] pt-2.5">
-                    <span className="flex items-center gap-1">
-                      <Calendar size={18} />{formatDate(ticket.created_at)}
-                    </span>
-                    {ticket.counterparty?.name && (
-                      <span className="flex items-center gap-1 truncate max-w-[150px]">
-                        <Building2 size={18} />{ticket.counterparty.name}
-                      </span>
-                    )}
-                    {ticket.project?.key && (
-                      <span className="flex items-center gap-1 font-mono">
-                        <FolderOpen size={18} />{ticket.project.key}
-                      </span>
-                    )}
-                    {showAssigneeCol && ticket.assignee?.full_name && (
-                      <span className="flex items-center gap-1 truncate max-w-[130px]">
-                        <UserCheck size={18} />{toShortName(ticket.assignee.full_name)}
-                      </span>
-                    )}
-                    {showReporterCol && ticket.reporter?.full_name && (
-                      <span className="flex items-center gap-1 truncate max-w-[130px]">
-                        <User size={18} />{toShortName(ticket.reporter.full_name)}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 pt-4
-                            border-t border-[var(--border-color)]">
-              <button
-                onClick={() => handlePageChange(Math.max(1, page - 1))}
-                disabled={page === 1}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card
-                           border border-[var(--border-color)] hover:bg-[var(--hover-2)]
-                           disabled:opacity-40 disabled:cursor-not-allowed
-                           text-[var(--text-primary)] text-base transition-colors">
-                <ChevronLeft className="w-4 h-4" /> Назад
-              </button>
-              <div className="flex items-center gap-1.5">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const pageNum = Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
-                  if (pageNum > totalPages) return null;
-                  return (
-                    <button key={pageNum} onClick={() => handlePageChange(pageNum)}
-                      className={`w-10 h-10 rounded-xl text-base font-medium transition-colors
-                        ${pageNum === page
-                          ? 'bg-[var(--accent)] text-white'
-                          : 'glass-card text-[var(--text-primary)]/60 border border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                        }`}>
-                      {pageNum}
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
-                disabled={page === totalPages}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card
-                           border border-[var(--border-color)] hover:bg-[var(--hover-2)]
-                           disabled:opacity-40 disabled:cursor-not-allowed
-                           text-[var(--text-primary)] text-base transition-colors">
-                Вперёд <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-        </>
-      ) : null}
+    <button
+      onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
+      disabled={page === totalPages}
+      className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card
+                 border border-[var(--border-color)] hover:bg-[var(--hover-2)]
+                 disabled:opacity-40 disabled:cursor-not-allowed
+                 text-[var(--text-primary)] text-base transition-colors"
+    >
+      Вперёд <ChevronRight className="w-4 h-4" />
+    </button>
+  </div>
+)}
+    </>
+  )
+) : null}
     </div>
   );
 }
