@@ -643,39 +643,45 @@ export default function TicketDetailPage() {
   /* ═══════════════════════════════════════════════════════════════════
      FEEDBACK BANNER LOGIC
      ═══════════════════════════════════════════════════════════════════ */
-useEffect(() => {
-  if (!ticket || !user) return;
 
-  if (ticket.status !== 'closed') {
-    setFeedbackBannerState('hidden');
-    return;
-  }
+  useEffect(() => {
+    if (!ticket || !user) return;
 
-  // Проверяем только: является ли пользователь автором заявки
-  const isAuthor = user.id === ticket.created_by || user.id === ticket.reporter_id;
-  if (!isAuthor) {
-    setFeedbackBannerState('hidden');
-    return;
-  }
-
-  setFeedbackBannerState('loading');
-
-  feedbacksApi.getAll(1, 10, {
-    ticketId: ticket.id,
-    author_id: user.id,
-  }).then(res => {
-    if (res.items.length > 0) {
-      setExistingFeedback(res.items[0]);
-      setFeedbackBannerState('hidden'); // уже есть отзыв — не показываем
-    } else {
-      setFeedbackBannerState('show');
-      // ✅ АВТОМАТИЧЕСКИ ОТКРЫВАЕМ МОДАЛКУ
-      setShowFeedbackForm(true);
+    if (ticket.status !== 'closed') {
+      setFeedbackBannerState('hidden');
+      return;
     }
-  }).catch(() => {
-    setFeedbackBannerState('hidden');
-  });
-}, [ticket?.id, ticket?.status, user?.id]);
+
+    // Только клиент видит баннер, стафф — нет
+    const isClient = !hasAnyRole(userRoles, ['admin', 'support_manager', 'support_agent', 'executor']);
+    if (!isClient) {
+      setFeedbackBannerState('hidden');
+      return;
+    }
+
+    // Только автор тикета
+    const isAuthor = user.id === ticket.created_by || user.id === ticket.reporter_id;
+    if (!isAuthor) {
+      setFeedbackBannerState('hidden');
+      return;
+    }
+
+    setFeedbackBannerState('loading');
+
+
+
+    feedbacksApi.getAll(1, 10, {
+      ticketId: ticket.id,
+      author_id: user.id,
+    }).then(res => {
+      if (res.items.length > 0) {
+        setExistingFeedback(res.items[0]);
+      }
+      setFeedbackBannerState('show');
+    }).catch(() => {
+      setFeedbackBannerState('hidden');
+    });
+  }, [ticket?.id, ticket?.status, user?.id]);
 
   /* ═══════════════════════════════════════════════════════════════════
      HANDLERS
@@ -1179,7 +1185,7 @@ useEffect(() => {
                     <textarea
                       value={feedbackComment}
                       onChange={(e) => setFeedbackComment(e.target.value)}
-                      placeholder="Расскажите подробнее..."
+                      placeholder="Расскажите подробнее (необязательно)..."
                       rows={3}
                       className="w-full px-4 py-3 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl
                                text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/20
@@ -1212,7 +1218,7 @@ useEffect(() => {
                         ) : (
                           <Check className="w-4 h-4" />
                         )}
-                        Отправить отзыв
+                        Отправить оценку
                       </button>
                     </div>
                   </div>
@@ -1274,8 +1280,8 @@ useEffect(() => {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-6 py-3 rounded-t-xl transition-all whitespace-nowrap ${activeTab === tab.id
-                    ? 'bg-[var(--accent)]/50 text-white border-b-2 border-[var(--accent)]'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-1)]'
+                      ? 'bg-[var(--accent)]/50 text-white border-b-2 border-[var(--accent)]'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-1)]'
                     }`}
                 >
                   <tab.icon className="w-5 h-5" />
@@ -1313,8 +1319,8 @@ useEffect(() => {
                               key={order}
                               onClick={() => setCommentSortOrder(order)}
                               className={`px-3 py-1.5 text-base rounded-md transition-colors ${commentSortOrder === order
-                                ? 'bg-[var(--accent)]/50 text-white'
-                                : 'text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60'
+                                  ? 'bg-[var(--accent)]/50 text-white'
+                                  : 'text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60'
                                 }`}
                             >
                               {order === 'newest'
@@ -1917,7 +1923,9 @@ useEffect(() => {
                   className="group block rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 hover:bg-[var(--hover-2)] hover:border-[var(--border-hover)] transition-colors"
                 >
                   <div className="flex items-start gap-3">
-
+                    <div className="flex w-10 h-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
+                      <FolderOpen className="w-5 h-5 text-amber-400" />
+                    </div>
 
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-base font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
@@ -1933,7 +1941,7 @@ useEffect(() => {
 
                         <span
                           className={[
-                            'rounded-md border px-2 py-0.5 text-[15px] font-medium',
+                            'rounded-md border px-2 py-0.5 text-xs font-medium',
                             project.status === 'active'
                               ? 'status-resolved'
                               : 'status-closed',
@@ -2309,8 +2317,8 @@ useEffect(() => {
                       type="button"
                       onClick={() => setEditPriority(p.value)}
                       className={`px-3 py-2.5 rounded-xl text-base font-medium border transition-all ${editPriority === p.value
-                        ? p.cls
-                        : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--hover-2)]'
+                          ? p.cls
+                          : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--hover-2)]'
                         }`}
                     >
                       {p.label}

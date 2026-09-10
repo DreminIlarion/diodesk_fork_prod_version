@@ -49,7 +49,7 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
 
         return stmt
 
-    def _apply_ticket_filters(  # noqa: C901
+    def _apply_ticket_filters(
             self, stmt: Select[tuple[TicketOrm]], filters: TicketFilters,
     ) -> Select[tuple[TicketOrm]]:
         if filters.statuses:
@@ -96,7 +96,7 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
     async def paginate(
             self, pagination: Pagination, filters: TicketFilters | None = None,
     ) -> Page[Ticket]:
-        stmt = select(self.model)
+        stmt = select(self.model).options(selectinload(self.model.attachments))
 
         if filters is not None:
             stmt = self._apply_ticket_filters(stmt, filters)

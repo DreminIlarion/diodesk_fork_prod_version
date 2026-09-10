@@ -220,11 +220,11 @@ class Ticket(AggregateRoot):
         # if stage_id is not None:
         #     if self.project_id is None:
         #         raise InvalidStateError("Ticket stage requires a project")
-
+        #
         #     if stage_id != self.stage_id:
         #         old_stage_id = self.stage_id
         #         self.stage_id = stage_id
-
+        #
         #         changes["stage_id"] = [
         #             str(old_stage_id) if old_stage_id else "",
         #             str(stage_id),

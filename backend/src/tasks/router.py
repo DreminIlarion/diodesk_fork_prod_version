@@ -9,7 +9,6 @@ from .dependencies import (
     KanbanFiltersDep,
     TaskBoardServiceDep,
     TaskServiceDep,
-    get_task_or_404,
 )
 from .schemas import (
     AssigneeId,
@@ -46,9 +45,10 @@ async def create_task(
     summary="Получить задачу",
 )
 async def get_task(
-        task: TaskResponse = Depends(get_task_or_404),
+        task_id: UUID,
+        service: TaskServiceDep,
 ) -> TaskResponse:
-    return task
+    return await service.get(task_id)
 
 
 @router.patch(

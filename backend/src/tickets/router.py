@@ -1,8 +1,9 @@
 from typing import Annotated
 
+from collections.abc import Awaitable, Callable
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Query, status, HTTPException
+from fastapi import APIRouter, Body, Depends, Query, status
 
 from src.activity_logs.dependencies import ActivityLogPaginatorFunc, get_activity_logs_paginator
 from src.activity_logs.schemas import ActivityLogResponse
@@ -11,20 +12,19 @@ from src.iam.dependencies import (
     CurrentUserDep,
     get_current_subject,
 )
+from src.iam.domain.authz import Subject
 from src.shared.dependencies import PaginationDep
 from src.shared.schemas import Page
 
 from .dependencies import (
     CommentServiceDep,
     ReactionServiceDep,
-    TicketFiltersBodyDep,
     TicketQueryServiceDep,
     TicketServiceDep,
     get_ticket_or_404,
-    paginate_tickets,
 )
 from .domain.activity_logs import AGGREGATE_TYPE
-from .domain.vo import ReactionType
+from .domain.vo import ReactionType, TicketStatus
 from .infra.ai import suggest_ticket_fields
 from .schemas import (
     CommentCreate,
@@ -36,13 +36,36 @@ from .schemas import (
     TicketAssign,
     TicketCreate,
     TicketEdit,
+    TicketFiltersRequest,
     TicketParticipant,
     TicketPredict,
     TicketResponse,
+    TicketStatusChange,
     TicketViewResponse,
 )
+from .services import TicketService
 
 router = APIRouter(prefix="/tickets", tags=["Заявки"])
+
+type TicketStatusStrategy = Callable[
+    [TicketService, UUID, Subject], Awaitable[TicketResponse]
+]
+
+TICKET_STATUS_STRATEGIES: dict[TicketStatus, TicketStatusStrategy] = {
+    TicketStatus.PENDING_APPROVAL: lambda service, ticket_id, subject: (
+        service.submit_for_approval(ticket_id, subject)
+    ),
+    TicketStatus.OPEN: lambda service, ticket_id, subject: service.approve(ticket_id, subject),
+    TicketStatus.IN_PROGRESS: lambda service, ticket_id, subject: service.start_progress(
+        ticket_id, subject
+    ),
+    TicketStatus.WAITING: lambda service, ticket_id, subject: service.wait(ticket_id, subject),
+    TicketStatus.RESOLVED: lambda service, ticket_id, subject: service.resolve(ticket_id, subject),
+    TicketStatus.CLOSED: lambda service, ticket_id, subject: service.close(ticket_id, subject),
+    TicketStatus.CANCELED: lambda service, ticket_id, subject: service.cancel(ticket_id, subject),
+    TicketStatus.REJECTED: lambda service, ticket_id, subject: service.reject(ticket_id, subject),
+    TicketStatus.REOPENED: lambda service, ticket_id, subject: service.reopen(ticket_id, subject),
+}
 
 
 @router.post(
@@ -65,12 +88,16 @@ async def create_ticket(
     summary="Получить список тикетов",
 )
 async def search_tickets(
-        filters: TicketFiltersBodyDep,
-        current_subject: CurrentSubjectDep, 
+        filters: TicketFiltersRequest,
+        current_subject: CurrentSubjectDep,
         pagination: PaginationDep,
         service: TicketQueryServiceDep,
 ) -> Page[TicketViewResponse]:
-    return await service.get_tickets(pagination, filters=filters, current_subject=current_subject)
+    return await service.get_tickets(
+        pagination,
+        filters=filters.to_domain(),
+        current_subject=current_subject,
+    )
 
 
 @router.get(
@@ -328,28 +355,16 @@ async def get_comment_reactions(
 )
 async def change_ticket_status(
         ticket_id: UUID,
-        new_status: Annotated[str, Body(..., embed=True)],
+        data: TicketStatusChange,
         current_subject: CurrentSubjectDep,
         service: TicketServiceDep,
 ) -> TicketResponse:
-    status_map = {
-        "pending_approval": service.submit_for_approval,
-        "open": service.approve,
-        "in_progress": service.start_progress,
-        "waiting": service.start_progress,
-        "resolved": service.resolve,
-        "closed": service.close,
-        "canceled": service.cancel,
-        "rejected": service.reject,
-        "reopened": service.reopen,
-        "waiting": service.wait,
-    }
-    
-    handler = status_map.get(new_status)
+    handler = TICKET_STATUS_STRATEGIES.get(data.status)
     if handler is None:
-        raise HTTPException(status_code=400, detail=f"Unsupported status: {new_status}")
-    
-    return await handler(ticket_id, current_subject)
+        raise ValueError(f"Unsupported target status: {data.status.value}")
+
+    return await handler(service, ticket_id, current_subject)
+
 
 @router.post(
     path="/predict",

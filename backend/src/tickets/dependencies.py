@@ -2,7 +2,7 @@ from typing import Annotated
 
 from uuid import UUID
 
-from fastapi import Body, Depends, Query
+from fastapi import Depends, Query
 
 from src.activity_logs.dependencies import ActivityLogRecorderDep
 from src.core.database import session_factory
@@ -27,7 +27,7 @@ from src.shared.schemas import Page
 from ..shared.domain.repos import get_or_raise_404
 from .data_loaders import ReferenceLoader
 from .domain.authz import TicketAuthZService
-from .domain.dtos import ActorsFilters, TicketFilters
+from .domain.dtos import TicketFilters
 from .domain.entities import Ticket
 from .domain.repos import CommentRepository, ReactionRepository, TicketRepository
 from .domain.vo import TicketStatus, TicketType
@@ -182,39 +182,6 @@ def get_ticket_filters(
 
 
 TicketFiltersDep = Annotated[TicketFilters, Depends(get_ticket_filters)]
-
-
-def get_ticket_filters_from_body(
-        time_range: TimeRangeFiltersDep,
-        search_query: Annotated[str | None, Body()] = None,
-        tags: Annotated[list[str] | None, Body()] = None,
-        counterparty_id: Annotated[UUID | None, Body()] = None,
-        project_ids: Annotated[list[UUID] | None, Body()] = None,
-        # stage_ids: Annotated[list[UUID] | None, Body()] = None,
-        statuses: Annotated[list[TicketStatus] | None, Body()] = None,
-        priorities: Annotated[Priority | None, Body()] = None,
-        ticket_type: Annotated[TicketType | None, Body(alias="type")] = None,
-        actors: Annotated[dict | None, Body()] = None,
-) -> TicketFilters:
-    return TicketFilters(
-        search_query=search_query,
-        counterparty_id=counterparty_id,
-        project_ids=set(project_ids) if project_ids else None,
-        # stage_ids=set(stage_ids) if stage_ids else None,
-        statuses=statuses,
-        priorities=[priorities] if priorities else None,
-        type=ticket_type,
-        tags=tags,
-        actors=ActorsFilters(
-            assignee_id=actors.get("assignee_id"),
-            reporter_id=actors.get("reporter_id"),
-            creator_id=actors.get("creator_id"),
-        ) if actors else None,
-        time_range=time_range,
-    )
-
-
-TicketFiltersBodyDep = Annotated[TicketFilters, Depends(get_ticket_filters_from_body)]
 
 
 async def get_ticket_or_404(ticket_id: UUID, ticket_repo: TicketRepoDep) -> TicketResponse:

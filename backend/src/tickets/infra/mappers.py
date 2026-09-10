@@ -107,8 +107,7 @@ class TicketMapper(ModelMapper[Ticket, TicketOrm]):
             closed_at=model.closed_at,
             tags=[Tag(name=tag["name"], color=tag["color"]) for tag in model.tags],
             attachments=[],
-            has_attachments=bool(model.has_attachments),
-
+            has_attachments=len(model.attachments) > 0,
         )
 
     @staticmethod

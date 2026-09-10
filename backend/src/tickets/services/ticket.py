@@ -13,7 +13,6 @@ from src.iam.domain.repos import UserRepository
 from src.projects.domain.entities import Project
 from src.projects.domain.repos import ProjectRepository
 from src.shared.domain.events import EventPublisher
-from src.shared.domain.exceptions import NotFoundError
 from src.shared.domain.repos import UnitOfWork, finalize, get_or_raise_404
 from src.shared.domain.vo import Tag
 
@@ -172,13 +171,13 @@ class TicketService:
         # if data.stage_id is not None:
         #     if ticket.project_id is None:
         #         raise ValueError("Stage cannot be specified for ticket without project")
-
+        #
         #     project = await get_or_raise_404(
         #         self.project_repo.read,
         #         ticket.project_id,
         #         Project,
         #     )
-
+        #
         #     if project.find_stage(data.stage_id) is None:
         #         raise NotFoundError(
         #             f"Stage with ID {data.stage_id} does not exist "
@@ -334,8 +333,8 @@ class TicketService:
         return await self._execute(
             ticket_id=ticket_id,
             current_subject=current_subject,
-            authz=self.ticket_authz_service.can_track_ticket,
-            action=lambda t: t.resolve(current_subject.id),
+            authz=self.ticket_authz_service.can_resolve_ticket,
+            action=lambda ticket: ticket.resolve(current_subject.id),
         )
 
     async def reopen(self, ticket_id: UUID, current_subject: Subject) -> TicketResponse:
