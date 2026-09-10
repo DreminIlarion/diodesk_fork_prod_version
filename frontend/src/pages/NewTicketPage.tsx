@@ -1930,7 +1930,7 @@ useEffect(() => {
 
               {/* Binding */}
 
-              {canSelectCounterparty && (
+              {canSelectCounterparty && (<>
                 {/* Вид заявки */}
 <section>
   <div className="mb-4">
@@ -2307,10 +2307,11 @@ useEffect(() => {
           </div>
         </div>
       </div>
+   )}
+      </section>
     )}
-  </section>
+  </>
 )}
-              )}
 
               {/* Customer */}
 
