@@ -1333,40 +1333,42 @@ useEffect(() => {
   // =============================================================================
 
   const validateStep1 = () => {
-    const errors: string[] = [];
+  const errors: string[] = [];
 
-    if (!title.trim()) {
-      errors.push('Укажите тему заявки');
+  if (!title.trim()) {
+    errors.push('Укажите тему заявки');
+  }
+
+  if (!hasDescription) {
+    errors.push('Добавьте описание заявки');
+  }
+
+  if (canSelectCounterparty) {
+    if (ticketViewType === null) {
+      errors.push('Выберите вид заявки');
     }
 
-    if (!hasDescription) {
-      errors.push('Добавьте описание заявки');
-    }
-
-    if (
-      canSelectCounterparty &&
-      selectionType === 'counterparty' &&
-      !selectedCounterparty
-    ) {
+    if (ticketViewType === 'counterparty' && !selectedCounterparty) {
       errors.push('Выберите контрагента');
     }
 
-    if (
-      canSelectCounterparty &&
-      selectionType === 'project' &&
-      !selectedProject
-    ) {
+    if (ticketViewType !== null && selectionType === null) {
+      errors.push('Выберите привязку заявки');
+    }
+
+    if (selectionType === 'project' && !selectedProject) {
       errors.push('Выберите проект');
     }
+  }
 
-    if (!actualReporter?.id) {
-      errors.push('Укажите инициатора');
-    }
+  if (!actualReporter?.id) {
+    errors.push('Укажите инициатора');
+  }
 
-    setValidationErrors(errors);
+  setValidationErrors(errors);
 
-    return errors.length === 0;
-  };
+  return errors.length === 0;
+};
 
   const goToNextStep = () => {
     if (step === 1 && !validateStep1()) return;
@@ -1383,44 +1385,27 @@ useEffect(() => {
   };
 
   useEffect(() => {
-    setValidationErrors((current) =>
-      current.filter((error) => {
-        if (error === 'Укажите тему заявки' && title.trim()) {
-          return false;
-        }
-
-        if (
-          error === 'Добавьте описание заявки' &&
-          hasDescription
-        ) {
-          return false;
-        }
-
-        if (
-          error === 'Выберите контрагента' &&
-          selectedCounterparty
-        ) {
-          return false;
-        }
-
-        if (error === 'Выберите проект' && selectedProject) {
-          return false;
-        }
-
-        if (error === 'Укажите инициатора' && actualReporter?.id) {
-          return false;
-        }
-
-        return true;
-      }),
-    );
-  }, [
-    title,
-    descriptionBlocks,
-    selectedCounterparty,
-    selectedProject,
-    actualReporter?.id,
-  ]);
+  setValidationErrors((current) =>
+    current.filter((error) => {
+      if (error === 'Укажите тему заявки' && title.trim()) return false;
+      if (error === 'Добавьте описание заявки' && hasDescription) return false;
+      if (error === 'Выберите вид заявки' && ticketViewType !== null) return false;
+      if (error === 'Выберите контрагента' && selectedCounterparty) return false;
+      if (error === 'Выберите привязку заявки' && selectionType !== null) return false;
+      if (error === 'Выберите проект' && selectedProject) return false;
+      if (error === 'Укажите инициатора' && actualReporter?.id) return false;
+      return true;
+    }),
+  );
+}, [
+  title,
+  descriptionBlocks,
+  ticketViewType,
+  selectedCounterparty,
+  selectionType,
+  selectedProject,
+  actualReporter?.id,
+]);
 
   // =============================================================================
   // Files
@@ -1756,13 +1741,18 @@ useEffect(() => {
   );
 
   const nextButtonDisabled =
-    step === 1 &&
-    (!title.trim() ||
-      !hasDescription ||
-      !actualReporter?.id ||
-      (selectionType === 'counterparty' &&
-        !selectedCounterparty) ||
-      (selectionType === 'project' && !selectedProject));
+  step === 1 &&
+  (!title.trim() ||
+    !hasDescription ||
+    !actualReporter?.id ||
+    // для не-клиента требуем выбранный вид
+    (canSelectCounterparty && ticketViewType === null) ||
+    // если вид «контрагент» — нужен контрагент
+    (ticketViewType === 'counterparty' && !selectedCounterparty) ||
+    // привязка обязательна
+    (ticketViewType !== null && selectionType === null) ||
+    // если привязка «по проекту» — нужен проект
+    (selectionType === 'project' && !selectedProject));
 
   const backButtonLabel =
     step === 2 ? 'К описанию' : 'К классификации';
@@ -2106,24 +2096,36 @@ useEffect(() => {
       </section>
     )}
 
-    {/* ═══ Компания (просто показываем) ═══ */}
-    {ticketViewType === 'company' && (
-      <section>
-        <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-5 py-4">
-          <div className="flex items-center gap-3">
-            <Building2 className="h-5 w-5 text-emerald-400" />
-            <div>
-              <p className="text-base font-medium text-[var(--text-primary)]">
-                Дио-Консалт
-              </p>
-              <p className="text-sm text-[var(--text-primary)]/50">
-                Заявка будет привязана к компании
-              </p>
-            </div>
-          </div>
+    {/* ═══ Компания (с кнопкой «Перейти») ═══ */}
+{ticketViewType === 'company' && (
+  <section>
+    <div className="flex items-center gap-2">
+      <div className="flex flex-1 items-center gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-5 py-4">
+        <Building2 className="h-5 w-5 shrink-0 text-emerald-400" />
+        <div>
+          <p className="text-base font-medium text-[var(--text-primary)]">
+            Дио-Консалт
+          </p>
+          <p className="text-sm text-[var(--text-primary)]/50">
+            Заявка будет привязана к компании
+          </p>
         </div>
-      </section>
-    )}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => navigate(`/counterparties/${DIO_COMPANY_ID}`)}
+        title="Перейти к компании"
+        className="flex h-[68px] w-[52px] shrink-0 items-center justify-center
+                   rounded-xl border border-[var(--border-color)]
+                   bg-[var(--hover-1)] text-[var(--text-primary)]/60
+                   transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--accent)]"
+      >
+        <ArrowRight className="h-5 w-5" />
+      </button>
+    </div>
+  </section>
+)}
 
     {/* ═══ Привязка заявки ═══ */}
     {ticketViewType !== null && (
@@ -2318,7 +2320,7 @@ useEffect(() => {
     )}
 
     {/* ═══ Инициатор — всегда, если canSelectReporter ═══ */}
-    {canSelectReporter && (
+    {canSelectReporter && ticketViewType !== null && (
       <section>
         <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
           Инициатор <span className="ml-1 text-red-400">*</span>
