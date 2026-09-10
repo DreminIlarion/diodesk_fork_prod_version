@@ -68,7 +68,7 @@ class TaskAuthZService:
                         IsProjectStaffRule(project_member),
                     ),
                     TaskAssigneeStatusRule(subject, task, new_status),  # ← ДОБАВИl
-                    TaskReviewerStatusRule(subject, task, new_status),   # ← ДОБАВИl    
+                    TaskReviewerStatusRule(subject, task, new_status),   # ← ДОБАВИl
                 )
             )
 
@@ -89,7 +89,12 @@ class TaskAuthZService:
     async def can_assign_task(
             self, subject: Subject, task: Task, assignee: User
     ) -> PermissionResult:
-        rules = [IsAdminRule(subject), IsTaskCreator(subject, task), IsStaffRule(subject), IsStaffRule(assignee)]
+        rules = [
+            IsAdminRule(subject),
+            IsTaskCreator(subject, task),
+            IsStaffRule(subject),
+            IsStaffRule(assignee),
+        ]
 
         if task.project_id is not None:
             current_member = await self.project_membership_repo.find(task.project_id, subject.id)
@@ -139,8 +144,7 @@ class TaskAuthZService:
         requester_allowed = (
             subject.has_role(UserRole.ADMIN)
             or subject.has_role(UserRole.SUPPORT_MANAGER)
-            or str(subject.id) == str(task.created_by)
-            or str(subject.id) == str(task.assignee_id)
+            or subject.id in {task.created_by, task.assignee_id}
         )
 
         if task.project_id is not None:
@@ -191,6 +195,7 @@ class TaskAuthZService:
 
         auth_policy = AnyOf(*rules)
         return auth_policy.check()
+
     async def can_archive_task(self, subject: Subject, task: Task) -> PermissionResult:
         rules = [IsAdminRule(subject), IsTaskCreator(subject, task), IsStaffRule(subject)]
 
