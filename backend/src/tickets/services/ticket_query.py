@@ -77,6 +77,7 @@ class TicketQueryService:
                     tags=filters.tags,
                     counterparty_id=client_cp_id or filters.counterparty_id,
                     project_ids=filters.project_ids,
+                    # stage_ids=filters.stage_ids,
                     statuses=filters.statuses,
                     priorities=filters.priorities,
                     type=filters.type,

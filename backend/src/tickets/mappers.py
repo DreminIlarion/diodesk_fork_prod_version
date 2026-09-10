@@ -30,6 +30,7 @@ def map_ticket_to_preview(ticket: Ticket) -> TicketPreview:
         type=ticket.type,
         status=ticket.status,
         priority=ticket.priority,
+        # stage_id=ticket.stage_id,
     )
 
 
@@ -79,6 +80,7 @@ def map_ticket_to_view_response(
         assignee=assignee_ref,
         counterparty=counterparty_ref,
         project=project_ref,
+        # stage_id=ticket.stage_id,
         number=ticket.number.value,
         title=ticket.title,
         type=ticket.type,
@@ -132,6 +134,7 @@ def map_ticket_to_response(ticket: Ticket) -> TicketResponse:
         created_at=ticket.created_at,
         updated_at=ticket.updated_at,
         project_id=ticket.project_id,
+        # stage_id=ticket.stage_id,
         counterparty_id=ticket.counterparty_id,
         product_id=ticket.product_id,
         created_by=ticket.created_by,
