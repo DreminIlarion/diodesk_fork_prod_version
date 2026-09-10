@@ -2697,7 +2697,7 @@ const handleStatClick = (type: 'new' | 'in_progress' | 'critical') => {
               onPointerMove={handleScrollbarPointerMove}
               onPointerUp={handleScrollbarPointerUp}
               onPointerCancel={handleScrollbarPointerUp}
-              className="absolute top-[1px] bottom-[1px] left-0 rounded-full bg-[var(--accent)]/70 cursor-grab active:cursor-grabbing touch-none will-change-transform"
+              className="absolute top-[1px] bottom-[1px] left-0 rounded-full bg-[var(--text-primary)]/20 cursor-grab active:cursor-grabbing touch-none will-change-transform"
               style={{
                 width: `${scrollbarThumbPercentRef.current}%`,
                 transform: 'translateX(0px)',
