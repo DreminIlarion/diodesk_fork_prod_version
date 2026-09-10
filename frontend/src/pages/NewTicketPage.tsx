@@ -189,7 +189,7 @@ type SelectionType = 'project' | 'counterparty' | null;
 
 type TicketViewType = 'counterparty' | 'company';
 
-const DIO_COMPANY_ID = process.env.REACT_APP_DIO_COMPANY_ID;
+const DIO_COMPANY_ID = '257a8c2a-0535-47b4-9094-a1e133bb00c9';
 
 
 
@@ -682,6 +682,8 @@ export default function NewTicketPage() {
           tags,
           selectionType,
 
+          ticketViewType, 
+
           selectedCounterpartyId: selectedCounterparty?.id || null,
 
           selectedCounterpartyName: selectedCounterparty
@@ -727,6 +729,7 @@ export default function NewTicketPage() {
     priority,
     type,
     tags,
+    ticketViewType,  
     selectionType,
     selectedCounterparty,
     selectedProject,
@@ -1930,384 +1933,492 @@ useEffect(() => {
 
               {/* Binding */}
 
-              {canSelectCounterparty && (<>
-                {/* Вид заявки */}
-<section>
-  <div className="mb-4">
-    <h2 className="text-xl font-semibold text-[var(--text-primary)]">
-      Вид заявки
-    </h2>
-    <p className="mt-1 text-base text-[var(--text-primary)]/50">
-      Кому относится заявка?
-    </p>
-  </div>
-
-  <div className="grid gap-3 sm:grid-cols-2">
-    {/* Заявка контрагента */}
-    <button
-      type="button"
-      onClick={() => {
-        setTicketViewType('counterparty');
-        setSelectionType(null);
-        setSelectedCounterparty(null);
-        setSelectedProject(null);
-        setCounterpartySearch('');
-        setProjectSearch('');
-      }}
-      className={`
-        flex min-h-[84px] items-center gap-4
-        rounded-xl border px-5 text-left transition
-        ${ticketViewType === 'counterparty'
-          ? 'border-blue-500/50 bg-blue-500/10'
-          : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'}
-      `}
-    >
-      <Building2
-        className={`h-7 w-7 shrink-0 ${
-          ticketViewType === 'counterparty'
-            ? 'text-blue-400'
-            : 'text-[var(--text-primary)]/45'
-        }`}
-      />
-      <div className="min-w-0 flex-1">
-        <div className="text-base font-semibold text-[var(--text-primary)]">
-          Заявка контрагента
-        </div>
-        <div className="text-sm text-[var(--text-primary)]/45">
-          Обращение от клиента
-        </div>
-      </div>
-      {ticketViewType === 'counterparty' && (
-        <CheckCircle2 className="h-5 w-5 shrink-0 text-blue-400" />
-      )}
-    </button>
-
-    {/* Заявка компании */}
-    <button
-      type="button"
-      onClick={() => {
-        setTicketViewType('company');
-        setSelectionType(null);
-        setSelectedCounterparty(null);
-        setSelectedProject(null);
-        setCounterpartySearch('');
-        setProjectSearch('');
-      }}
-      className={`
-        flex min-h-[84px] items-center gap-4
-        rounded-xl border px-5 text-left transition
-        ${ticketViewType === 'company'
-          ? 'border-emerald-500/50 bg-emerald-500/10'
-          : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'}
-      `}
-    >
-      <FolderOpen
-        className={`h-7 w-7 shrink-0 ${
-          ticketViewType === 'company'
-            ? 'text-emerald-400'
-            : 'text-[var(--text-primary)]/45'
-        }`}
-      />
-      <div className="min-w-0 flex-1">
-        <div className="text-base font-semibold text-[var(--text-primary)]">
-          Заявка компании
-        </div>
-        <div className="text-sm text-[var(--text-primary)]/45">
-          Внутренняя заявка
-        </div>
-      </div>
-      {ticketViewType === 'company' && (
-        <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
-      )}
-    </button>
-  </div>
-</section>
-
-{/* Привязка заявки — показываем только после выбора вида */}
-{ticketViewType !== null && (
-  <section>
-    <div className="mb-4">
-      <h2 className="text-xl font-semibold text-[var(--text-primary)]">
-        Привязка заявки
-      </h2>
-      <p className="mt-1 text-base text-[var(--text-primary)]/50">
-        {ticketViewType === 'company'
-          ? 'Проект компании или прочая заявка'
-          : 'Проект контрагента или прочая заявка'}
-      </p>
-    </div>
-
-    <div className="grid gap-3 sm:grid-cols-2">
-      {/* По проекту */}
-      <button
-        type="button"
-        onClick={() => {
-          setSelectionType('project');
-          setSelectedCounterparty(null);
-          setSelectedProject(null);
-        }}
-        className={`
-          flex min-h-[64px] items-center gap-3
-          rounded-xl border px-4 text-left transition
-          ${selectionType === 'project'
-            ? 'border-amber-500/50 bg-amber-500/10'
-            : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'}
-        `}
-      >
-        <FolderOpen
-          className={`h-6 w-6 shrink-0 ${
-            selectionType === 'project'
-              ? 'text-amber-400'
-              : 'text-[var(--text-primary)]/45'
-          }`}
-        />
-        <div className="min-w-0 flex-1">
-          <div className="text-base font-semibold text-[var(--text-primary)]">
-            Заявка по проекту
-          </div>
-          <div className="text-sm text-[var(--text-primary)]/45">
-            Привязать к проекту
-          </div>
-        </div>
-        {selectionType === 'project' && (
-          <CheckCircle2 className="h-5 w-5 shrink-0 text-amber-400" />
-        )}
-      </button>
-
-      {/* Прочая */}
-      <button
-        type="button"
-        onClick={() => {
-          setSelectionType('counterparty');   // для company будем использовать как "прочая"
-          setSelectedProject(null);
-        }}
-        className={`
-          flex min-h-[64px] items-center gap-3
-          rounded-xl border px-4 text-left transition
-          ${selectionType === 'counterparty'
-            ? 'border-blue-500/50 bg-blue-500/10'
-            : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'}
-        `}
-      >
-        <Building2
-          className={`h-6 w-6 shrink-0 ${
-            selectionType === 'counterparty'
-              ? 'text-blue-400'
-              : 'text-[var(--text-primary)]/45'
-          }`}
-        />
-        <div className="min-w-0 flex-1">
-          <div className="text-base font-semibold text-[var(--text-primary)]">
-            Прочая заявка
-          </div>
-          <div className="text-sm text-[var(--text-primary)]/45">
-            {ticketViewType === 'company'
-              ? 'Привязать к компании Дио-Консалт'
-              : 'Привязать к контрагенту'}
-          </div>
-        </div>
-        {selectionType === 'counterparty' && (
-          <CheckCircle2 className="h-5 w-5 shrink-0 text-blue-400" />
-        )}
-      </button>
-    </div>
-
-    {/* Далее — поле выбора проекта или контрагента */}
-    {selectionType === 'project' && (
-  <div className="mt-5">
-    <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
-      {ticketViewType === 'company' ? 'Проект компании' : 'Проект контрагента'}
-      <span className="ml-1 text-red-400">*</span>
-    </label>
-
-    <div className="flex items-center gap-2">
-      <div ref={projectDropdownRef} className="relative flex-1">
-        <SelectSearch
-          value={projectSearch}
-          loading={loadingProjects}
-          placeholder="Название или код проекта"
-          onChange={(value) => {
-            setProjectSearch(value);
-
-            if (selectedProject) {
-              setSelectedProject(null);
-            }
-
-            setShowProjectDropdown(true);
-          }}
-          onFocus={() => {
-            setShowProjectDropdown(true);
-
-            if (!projects.length) {
-              if (ticketViewType === 'company') {
-                loadProjects(DIO_COMPANY_ID);
-              } else if (selectedCounterparty) {
-                loadProjects(selectedCounterparty.id);
-              } else {
-                loadProjectsForAll();
-              }
-            }
-          }}
-        />
-
-        {showProjectDropdown && (
-          <Dropdown>
-            {loadingProjects ? (
-              <DropdownEmpty>Загружаем проекты...</DropdownEmpty>
-            ) : filteredProjects.length === 0 ? (
-              <DropdownEmpty>Проекты не найдены</DropdownEmpty>
-            ) : (
-              filteredProjects.map((project) => (
-                <button
-                  key={project.id}
-                  type="button"
-                  onClick={() => selectProject(project)}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center">
-                    <FolderOpen className="h-5 w-5 text-amber-400" />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-base font-medium text-[var(--text-primary)]">
-                      {project.name}
-                    </div>
-                    <div className="text-sm text-[var(--text-primary)]/45">
-                      {project.key}
-                    </div>
-                  </div>
-
-                  {selectedProject?.id === project.id && (
-                    <Check className="h-5 w-5 text-emerald-400" />
-                  )}
-                </button>
-              ))
-            )}
-          </Dropdown>
-        )}
+{canSelectCounterparty && (
+  <>
+    {/* ═══ Вид заявки ═══ */}
+    <section>
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold text-[var(--text-primary)]">
+          Вид заявки
+        </h2>
+        <p className="mt-1 text-base text-[var(--text-primary)]/50">
+          Кому относится заявка?
+        </p>
       </div>
 
-      {/* Иконка "Перейти к проекту" */}
-      {selectedProject && (
+      <div className="grid gap-3 sm:grid-cols-2">
+        {/* Заявка контрагента */}
         <button
           type="button"
-          onClick={() => navigate(`/projects/${selectedProject.id}`)}
-          title="Перейти к проекту"
-          className="flex h-[52px] w-[52px] shrink-0 items-center justify-center
-                     rounded-xl border border-[var(--border-color)]
-                     bg-[var(--hover-1)] text-[var(--text-primary)]/60
-                     transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--accent)]"
+          onClick={() => {
+            setTicketViewType('counterparty');
+            setSelectionType(null);
+            setSelectedCounterparty(null);
+            setSelectedProject(null);
+            setCounterpartySearch('');
+            setProjectSearch('');
+          }}
+          className={`
+            flex min-h-[84px] items-center gap-4
+            rounded-xl border px-5 text-left transition
+            ${ticketViewType === 'counterparty'
+              ? 'border-blue-500/50 bg-blue-500/10'
+              : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'}
+          `}
         >
-          <ArrowRight className="h-5 w-5" />
+          <Building2
+            className={`h-7 w-7 shrink-0 ${
+              ticketViewType === 'counterparty'
+                ? 'text-blue-400'
+                : 'text-[var(--text-primary)]/45'
+            }`}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="text-base font-semibold text-[var(--text-primary)]">
+              Заявка контрагента
+            </div>
+            <div className="text-sm text-[var(--text-primary)]/45">
+              Обращение от клиента
+            </div>
+          </div>
+          {ticketViewType === 'counterparty' && (
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-blue-400" />
+          )}
         </button>
-      )}
-    </div>
-  </div>
-)}
 
-    {selectionType === 'counterparty' && ticketViewType === 'counterparty' && (
-  <div className="mt-5">
-    <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
-      Контрагент <span className="ml-1 text-red-400">*</span>
-    </label>
-
-    <div className="flex items-center gap-2">
-      <div ref={counterpartyDropdownRef} className="relative flex-1">
-        <SelectSearch
-          value={counterpartySearch}
-          loading={loadingCounterparties}
-          placeholder="Название или ИНН"
-          onChange={(value) => {
-            setCounterpartySearch(value);
-
-            if (selectedCounterparty) {
-              setSelectedCounterparty(null);
-            }
-
-            setShowCounterpartyDropdown(true);
-            loadCounterparties(value);
+        {/* Заявка компании */}
+        <button
+          type="button"
+          onClick={() => {
+            setTicketViewType('company');
+            setSelectionType(null);
+            setSelectedCounterparty(null);
+            setSelectedProject(null);
+            setCounterpartySearch('');
+            setProjectSearch('');
           }}
-          onFocus={() => {
-            setShowCounterpartyDropdown(true);
+          className={`
+            flex min-h-[84px] items-center gap-4
+            rounded-xl border px-5 text-left transition
+            ${ticketViewType === 'company'
+              ? 'border-emerald-500/50 bg-emerald-500/10'
+              : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'}
+          `}
+        >
+          <FolderOpen
+            className={`h-7 w-7 shrink-0 ${
+              ticketViewType === 'company'
+                ? 'text-emerald-400'
+                : 'text-[var(--text-primary)]/45'
+            }`}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="text-base font-semibold text-[var(--text-primary)]">
+              Заявка компании
+            </div>
+            <div className="text-sm text-[var(--text-primary)]/45">
+              Внутренняя заявка
+            </div>
+          </div>
+          {ticketViewType === 'company' && (
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
+          )}
+        </button>
+      </div>
+    </section>
 
-            if (!counterparties.length) {
-              loadCounterparties();
-            }
-          }}
-        />
+    {/* ═══ Контрагент (сразу после выбора "Заявка контрагента") ═══ */}
+    {ticketViewType === 'counterparty' && (
+      <section>
+        <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
+          Контрагент <span className="ml-1 text-red-400">*</span>
+        </label>
 
-        {showCounterpartyDropdown && (
-          <Dropdown>
-            {loadingCounterparties ? (
-              <DropdownEmpty>Загружаем контрагентов...</DropdownEmpty>
-            ) : counterparties.length === 0 ? (
-              <DropdownEmpty>Контрагенты не найдены</DropdownEmpty>
-            ) : (
-              counterparties.map((cp) => (
-                <button
-                  key={cp.id}
-                  type="button"
-                  onClick={() => selectCounterparty(cp)}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center">
-                    <Building2 className="h-5 w-5 text-blue-400" />
-                  </div>
+        <div className="flex items-center gap-2">
+          <div ref={counterpartyDropdownRef} className="relative flex-1">
+            <SelectSearch
+              value={counterpartySearch}
+              loading={loadingCounterparties}
+              placeholder="Название или ИНН"
+              onChange={(value) => {
+                setCounterpartySearch(value);
+                if (selectedCounterparty) setSelectedCounterparty(null);
+                setShowCounterpartyDropdown(true);
+                loadCounterparties(value);
+              }}
+              onFocus={() => {
+                setShowCounterpartyDropdown(true);
+                if (!counterparties.length) loadCounterparties();
+              }}
+            />
 
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-base font-medium text-[var(--text-primary)]">
-                      {cpName(cp)}
-                    </div>
-                    {cp.inn && (
-                      <div className="text-sm text-[var(--text-primary)]/45">
-                        ИНН {cp.inn}
+            {showCounterpartyDropdown && (
+              <Dropdown>
+                {loadingCounterparties ? (
+                  <DropdownEmpty>Загружаем контрагентов...</DropdownEmpty>
+                ) : counterparties.length === 0 ? (
+                  <DropdownEmpty>Контрагенты не найдены</DropdownEmpty>
+                ) : (
+                  counterparties.map((cp) => (
+                    <button
+                      key={cp.id}
+                      type="button"
+                      onClick={() => selectCounterparty(cp)}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                        <Building2 className="h-5 w-5 text-blue-400" />
                       </div>
-                    )}
-                  </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-base font-medium text-[var(--text-primary)]">
+                          {cpName(cp)}
+                        </div>
+                        {cp.inn && (
+                          <div className="text-sm text-[var(--text-primary)]/45">
+                            ИНН {cp.inn}
+                          </div>
+                        )}
+                      </div>
+                      {selectedCounterparty?.id === cp.id && (
+                        <Check className="h-5 w-5 text-emerald-400" />
+                      )}
+                    </button>
+                  ))
+                )}
+              </Dropdown>
+            )}
+          </div>
 
-                  {selectedCounterparty?.id === cp.id && (
+          {selectedCounterparty && (
+            <button
+              type="button"
+              onClick={() => navigate(`/counterparties/${selectedCounterparty.id}`)}
+              title="Перейти к контрагенту"
+              className="flex h-[52px] w-[52px] shrink-0 items-center justify-center
+                         rounded-xl border border-[var(--border-color)]
+                         bg-[var(--hover-1)] text-[var(--text-primary)]/60
+                         transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--accent)]"
+            >
+              <ArrowRight className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+      </section>
+    )}
+
+    {/* ═══ Компания (просто показываем) ═══ */}
+    {ticketViewType === 'company' && (
+      <section>
+        <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-5 py-4">
+          <div className="flex items-center gap-3">
+            <Building2 className="h-5 w-5 text-emerald-400" />
+            <div>
+              <p className="text-base font-medium text-[var(--text-primary)]">
+                Дио-Консалт
+              </p>
+              <p className="text-sm text-[var(--text-primary)]/50">
+                Заявка будет привязана к компании
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    )}
+
+    {/* ═══ Привязка заявки ═══ */}
+    {ticketViewType !== null && (
+      <section>
+        <div className="mb-4">
+          <h2 className="text-xl font-semibold text-[var(--text-primary)]">
+            Привязка заявки
+          </h2>
+          <p className="mt-1 text-base text-[var(--text-primary)]/50">
+            {ticketViewType === 'company'
+              ? 'Проект компании или прочая заявка'
+              : 'Проект контрагента или прочая заявка'}
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => {
+              setSelectionType('project');
+              setSelectedProject(null);
+            }}
+            className={`
+              flex min-h-[64px] items-center gap-3
+              rounded-xl border px-4 text-left transition
+              ${selectionType === 'project'
+                ? 'border-amber-500/50 bg-amber-500/10'
+                : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'}
+            `}
+          >
+            <FolderOpen
+              className={`h-6 w-6 shrink-0 ${
+                selectionType === 'project'
+                  ? 'text-amber-400'
+                  : 'text-[var(--text-primary)]/45'
+              }`}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="text-base font-semibold text-[var(--text-primary)]">
+                Заявка по проекту
+              </div>
+              <div className="text-sm text-[var(--text-primary)]/45">
+                Привязать к проекту
+              </div>
+            </div>
+            {selectionType === 'project' && (
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-amber-400" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSelectionType('counterparty');
+              setSelectedProject(null);
+            }}
+            className={`
+              flex min-h-[64px] items-center gap-3
+              rounded-xl border px-4 text-left transition
+              ${selectionType === 'counterparty'
+                ? 'border-blue-500/50 bg-blue-500/10'
+                : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'}
+            `}
+          >
+            <Building2
+              className={`h-6 w-6 shrink-0 ${
+                selectionType === 'counterparty'
+                  ? 'text-blue-400'
+                  : 'text-[var(--text-primary)]/45'
+              }`}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="text-base font-semibold text-[var(--text-primary)]">
+                Прочая заявка
+              </div>
+              <div className="text-sm text-[var(--text-primary)]/45">
+                {ticketViewType === 'company'
+                  ? 'Привязать к компании Дио-Консалт'
+                  : 'Привязать к контрагенту'}
+              </div>
+            </div>
+            {selectionType === 'counterparty' && (
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-blue-400" />
+            )}
+          </button>
+        </div>
+
+        {/* Проект — если выбрали «по проекту» */}
+        {selectionType === 'project' && (
+          <div className="mt-5">
+            <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
+              {ticketViewType === 'company' ? 'Проект компании' : 'Проект контрагента'}
+              <span className="ml-1 text-red-400">*</span>
+            </label>
+
+            <div className="flex items-center gap-2">
+              <div ref={projectDropdownRef} className="relative flex-1">
+                <SelectSearch
+                  value={projectSearch}
+                  loading={loadingProjects}
+                  placeholder="Название или код проекта"
+                  onChange={(value) => {
+                    setProjectSearch(value);
+                    if (selectedProject) setSelectedProject(null);
+                    setShowProjectDropdown(true);
+                  }}
+                  onFocus={() => {
+                    setShowProjectDropdown(true);
+                    if (!projects.length) {
+                      if (ticketViewType === 'company') {
+                        loadProjects(DIO_COMPANY_ID);
+                      } else if (selectedCounterparty) {
+                        loadProjects(selectedCounterparty.id);
+                      } else {
+                        loadProjectsForAll();
+                      }
+                    }
+                  }}
+                />
+
+                {showProjectDropdown && (
+                  <Dropdown>
+                    {loadingProjects ? (
+                      <DropdownEmpty>Загружаем проекты...</DropdownEmpty>
+                    ) : filteredProjects.length === 0 ? (
+                      <DropdownEmpty>Проекты не найдены</DropdownEmpty>
+                    ) : (
+                      filteredProjects.map((project) => (
+                        <button
+                          key={project.id}
+                          type="button"
+                          onClick={() => selectProject(project)}
+                          className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
+                        >
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                            <FolderOpen className="h-5 w-5 text-amber-400" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-base font-medium text-[var(--text-primary)]">
+                              {project.name}
+                            </div>
+                            <div className="text-sm text-[var(--text-primary)]/45">
+                              {project.key}
+                            </div>
+                          </div>
+                          {selectedProject?.id === project.id && (
+                            <Check className="h-5 w-5 text-emerald-400" />
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </Dropdown>
+                )}
+              </div>
+
+              {selectedProject && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/projects/${selectedProject.id}`)}
+                  title="Перейти к проекту"
+                  className="flex h-[52px] w-[52px] shrink-0 items-center justify-center
+                             rounded-xl border border-[var(--border-color)]
+                             bg-[var(--hover-1)] text-[var(--text-primary)]/60
+                             transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--accent)]"
+                >
+                  <ArrowRight className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Если «Прочая» и вид = контрагент — показываем выбранного контрагента */}
+        {selectionType === 'counterparty' &&
+          ticketViewType === 'counterparty' &&
+          selectedCounterparty && (
+            <div className="mt-5 rounded-xl border border-blue-500/25 bg-blue-500/[0.06] px-5 py-4">
+              <div className="flex items-center gap-3">
+                <Building2 className="h-5 w-5 text-blue-400" />
+                <div>
+                  <p className="text-base font-medium text-[var(--text-primary)]">
+                    {cpName(selectedCounterparty)}
+                  </p>
+                  <p className="text-sm text-[var(--text-primary)]/50">
+                    Заявка будет привязана к этому контрагенту
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+      </section>
+    )}
+
+    {/* ═══ Инициатор — всегда, если canSelectReporter ═══ */}
+    {canSelectReporter && (
+      <section>
+        <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
+          Инициатор <span className="ml-1 text-red-400">*</span>
+        </label>
+
+        <div ref={reporterDropdownRef} className="relative">
+          <SelectSearch
+            value={
+              selectedReporter
+                ? reporterSearch
+                : reporterSearch ||
+                  actualReporter?.full_name ||
+                  actualReporter?.username ||
+                  actualReporter?.email ||
+                  ''
+            }
+            loading={loadingUsers}
+            placeholder="Выберите инициатора"
+            onChange={(value) => {
+              setReporterSearch(value);
+              if (selectedReporter) setSelectedReporter(null);
+              setShowReporterDropdown(true);
+            }}
+            onFocus={() => {
+              if (!selectedReporter) setReporterSearch('');
+              setShowReporterDropdown(true);
+            }}
+          />
+
+          {showReporterDropdown && (
+            <Dropdown>
+              {currentUserAsReporter && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedReporter(null);
+                    setReporterSearch(
+                      currentUserAsReporter.full_name ||
+                        currentUserAsReporter.username ||
+                        currentUserAsReporter.email,
+                    );
+                    setShowReporterDropdown(false);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                    <User className="h-5 w-5 text-emerald-400" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-base font-medium text-[var(--text-primary)]">
+                      {uName(currentUserAsReporter)}
+                    </div>
+                    <div className="truncate text-sm text-[var(--text-primary)]/45">
+                      {currentUserAsReporter.email}
+                    </div>
+                  </div>
+                  {!selectedReporter && (
                     <Check className="h-5 w-5 text-emerald-400" />
                   )}
                 </button>
-              ))
-            )}
-          </Dropdown>
-        )}
-      </div>
+              )}
 
-      {/* Иконка "Перейти к контрагенту" */}
-      {selectedCounterparty && (
-        <button
-          type="button"
-          onClick={() => navigate(`/counterparties/${selectedCounterparty.id}`)}
-          title="Перейти к контрагенту"
-          className="flex h-[52px] w-[52px] shrink-0 items-center justify-center
-                     rounded-xl border border-[var(--border-color)]
-                     bg-[var(--hover-1)] text-[var(--text-primary)]/60
-                     transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--accent)]"
-        >
-          <ArrowRight className="h-5 w-5" />
-        </button>
-      )}
-    </div>
-  </div>
-)}
-
-    {selectionType === 'counterparty' && ticketViewType === 'company' && (
-      <div className="mt-5 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-5 py-4">
-        <div className="flex items-center gap-3">
-          <Building2 className="h-5 w-5 text-emerald-400" />
-          <div>
-            <p className="text-base font-medium text-[var(--text-primary)]">
-              Дио-Консалт
-            </p>
-            <p className="text-sm text-[var(--text-primary)]/50">
-              Заявка будет привязана к компании
-            </p>
-          </div>
+              {loadingUsers ? (
+                <DropdownEmpty>Загружаем пользователей...</DropdownEmpty>
+              ) : filteredUsers.length === 0 ? (
+                reporterSearch ? (
+                  <DropdownEmpty>Пользователи не найдены</DropdownEmpty>
+                ) : null
+              ) : (
+                filteredUsers.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedReporter(item);
+                      setReporterSearch(uName(item));
+                      setShowReporterDropdown(false);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                      <User className="h-5 w-5 text-[var(--text-primary)]/45" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-base font-medium text-[var(--text-primary)]">
+                        {uName(item)}
+                      </div>
+                      <div className="truncate text-sm text-[var(--text-primary)]/45">
+                        {item.email}
+                      </div>
+                    </div>
+                    {selectedReporter?.id === item.id && (
+                      <Check className="h-5 w-5 text-emerald-400" />
+                    )}
+                  </button>
+                ))
+              )}
+            </Dropdown>
+          )}
         </div>
-      </div>
-   )}
       </section>
     )}
   </>
