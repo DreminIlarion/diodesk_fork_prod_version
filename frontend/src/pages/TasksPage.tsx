@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import React, { memo } from 'react';
 
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams,useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -9,7 +9,7 @@ import {
   ArrowUpRight, ChevronDown, Flag, AlertCircle, CheckCircle2, Ban, RotateCcw,
   RefreshCw, Archive, FolderOpen, Ticket, Zap, Star, User, Layers, UserCheck,
   GitPullRequest, ThumbsUp, ThumbsDown, Pencil, List, LayoutGrid, Clock3,
-  FileText, File as FileIcon, Download, BarChart3, Trash2,Paperclip ,
+  FileText, File as FileIcon, Download, BarChart3, Trash2,Paperclip ,ArrowRight, Mail
 } from 'lucide-react';
 import { tasksApi, projectsApi, ticketsApi, usersApi } from '../api/client';
 import { attachmentsApi } from '../api/attachments';
@@ -3479,6 +3479,7 @@ function DetailModal({
 /* ───────────────── main page ───────────────── */
 
 export default function TasksPage() {
+  const navigate = useNavigate();
   const [sp] = useSearchParams();
   const { user } = useAuthStore();
   const { toast } = useToast();
@@ -3529,6 +3530,7 @@ export default function TasksPage() {
   const [selT, setSelT] = useState(ut ?? '');
   const [selTLabel, setSelTLabel] = useState('');
   const ticketLabelsRef = useRef<Record<string, string>>({});
+  const ticketNumbersRef = useRef<Record<string, string>>({});
 
   const [umap, setUmap] = useState<Map<string, SimpleUser | CounterpartyCustomer>>(new Map());
   const [cols, setCols] = useState<TaskViewColumn[]>([]);
@@ -3614,6 +3616,7 @@ export default function TasksPage() {
 
   const [completeIntent, setCompleteIntent] = useState<CompleteIntent | null>(null);
   const [completeLd, setCompleteLd] = useState(false);
+  const [profileUser, setProfileUser] = useState<SimpleUser | CounterpartyCustomer | null>(null);
 
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
 
@@ -4085,10 +4088,11 @@ export default function TasksPage() {
         query: search || undefined,
       });
       const items = r.items.map((t: any) => {
-        const label = `${t.number} — ${t.title}`;
-        ticketLabelsRef.current[t.id] = label;
-        return { value: t.id, label };
-      });
+  const label = `${t.number} — ${t.title}`;
+  ticketLabelsRef.current[t.id] = label;
+  ticketNumbersRef.current[t.id] = t.number;
+  return { value: t.id, label };
+});
       return { items, hasNext: r.items.length === 20 };
     },
     [selP],
@@ -4348,42 +4352,94 @@ export default function TasksPage() {
           </div>
 
           {mode === 'project' && (
-            <div className="w-72">
-              <AsyncDD
-                value={selP}
-                onChange={setSelP}
-                loadFn={ldProjAsync}
-                placeholder="Выберите проект"
-                icon={FolderOpen}
-              />
-            </div>
-          )}
+  <div className="flex items-center gap-2">
+    <div className="w-72">
+      <AsyncDD
+        value={selP}
+        onChange={setSelP}
+        loadFn={ldProjAsync}
+        placeholder="Выберите проект"
+        icon={FolderOpen}
+      />
+    </div>
+
+    {selP && (
+      <button
+        type="button"
+        onClick={() => navigate(`/projects/${selP}`)}
+        title="Перейти к проекту"
+        className="flex h-[42px] w-[42px] shrink-0 items-center justify-center
+                   rounded-xl border border-[var(--border-color)]
+                   bg-[var(--hover-2)] text-[var(--text-primary)]/60
+                   transition-colors hover:bg-[var(--hover-3)] hover:text-[var(--accent)]"
+      >
+        <ArrowRight className="w-4 h-4" />
+      </button>
+    )}
+  </div>
+)}
           {mode === 'ticket' && (
-            <div className="w-80">
-              <AsyncDD
-                value={selT}
-                onChange={(v) => {
-                  setSelT(v);
-                  setSelTLabel(v ? ticketLabelsRef.current[v] ?? '' : '');
-                }}
-                loadFn={ldTicketsAsync}
-                placeholder="Выберите заявку"
-                icon={Ticket}
-                wide
-              />
-            </div>
-          )}
+  <div className="flex items-center gap-2">
+    <div className="w-80">
+      <AsyncDD
+        value={selT}
+        onChange={(v) => {
+          setSelT(v);
+          setSelTLabel(v ? ticketLabelsRef.current[v] ?? '' : '');
+        }}
+        loadFn={ldTicketsAsync}
+        placeholder="Выберите заявку"
+        icon={Ticket}
+        wide
+      />
+    </div>
+
+    {selT && ticketNumbersRef.current[selT] && (
+  <button
+    type="button"
+    onClick={() => navigate(`/tickets/${ticketNumbersRef.current[selT]}`)}
+    title="Перейти к заявке"
+    className="flex h-[42px] w-[42px] shrink-0 items-center justify-center
+               rounded-xl border border-[var(--border-color)]
+               bg-[var(--hover-2)] text-[var(--text-primary)]/60
+               transition-colors hover:bg-[var(--hover-3)] hover:text-[var(--accent)]"
+  >
+    <ArrowRight className="w-4 h-4" />
+  </button>
+)}
+  </div>
+)}
           {mode === 'assignee' && (
-            <div className="w-72">
-              <AsyncDD
-                value={selA}
-                onChange={setSelA}
-                loadFn={ldAssAsync}
-                placeholder="Выберите исполнителя"
-                icon={UserCheck}
-              />
-            </div>
-          )}
+  <div className="flex items-center gap-2">
+    <div className="w-72">
+      <AsyncDD
+        value={selA}
+        onChange={setSelA}
+        loadFn={ldAssAsync}
+        placeholder="Выберите исполнителя"
+        icon={UserCheck}
+      />
+    </div>
+
+    {selA && (() => {
+      const u = umap.get(selA);
+      if (!u) return null;
+      return (
+        <button
+          type="button"
+          onClick={() => setProfileUser(u)}
+          title="Показать профиль"
+          className="flex h-[42px] w-[42px] shrink-0 items-center justify-center
+                     rounded-xl border border-[var(--border-color)]
+                     bg-[var(--hover-2)] text-[var(--text-primary)]/60
+                     transition-colors hover:bg-[var(--hover-3)] hover:text-[var(--accent)]"
+        >
+          <User className="w-4 h-4" />
+        </button>
+      );
+    })()}
+  </div>
+)}
         </div>
 
         <div className="flex items-center gap-1 p-1 bg-[var(--hover-1)] rounded-lg border border-[var(--border-color)]">
@@ -4650,6 +4706,96 @@ export default function TasksPage() {
           onOk={handleComplete}
         />
       )}
+
+      {profileUser && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div
+      className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+      onClick={() => setProfileUser(null)}
+    />
+
+    <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl">
+      <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-4">
+        <h2 className="text-base font-bold text-[var(--text-primary)]">
+          Профиль исполнителя
+        </h2>
+        <button
+          type="button"
+          onClick={() => setProfileUser(null)}
+          className="rounded-lg p-2 text-[var(--text-primary)]/40 hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)]"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="space-y-4 p-5">
+        <div className="flex items-center gap-4">
+          {profileUser.avatar_url ? (
+            <img
+              src={profileUser.avatar_url}
+              alt=""
+              className="h-12 w-12 rounded-full object-cover"
+            />
+          ) : (
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)]/15 text-[var(--accent)]">
+              <User className="h-6 w-6" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-base font-semibold text-[var(--text-primary)]">
+              {profileUser.full_name || profileUser.username || '—'}
+            </p>
+            {profileUser.email && (
+              <p className="truncate text-sm text-[var(--text-primary)]/50">
+                {profileUser.email}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {'roles' in profileUser && profileUser.roles && profileUser.roles.length > 0 && (
+          <div>
+            <p className="mb-1.5 text-xs uppercase tracking-wider text-[var(--text-primary)]/40">
+              Роли
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {profileUser.roles.map((r) => (
+                <span
+                  key={r}
+                  className="rounded-lg border border-[var(--border-color)] bg-[var(--hover-1)] px-2 py-0.5 text-xs text-[var(--text-primary)]/70"
+                >
+                  {r}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {profileUser.email && (
+          <div className="flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)]/40 px-3 py-2.5">
+            <Mail className="h-4 w-4 shrink-0 text-[var(--text-primary)]/40" />
+            <a
+              href={`mailto:${profileUser.email}`}
+              className="truncate text-sm text-[var(--accent)] hover:underline"
+            >
+              {profileUser.email}
+            </a>
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end border-t border-[var(--border-color)] px-5 py-3">
+        <button
+          type="button"
+          onClick={() => setProfileUser(null)}
+          className="rounded-xl bg-[var(--hover-2)] px-4 py-2 text-sm font-medium text-[var(--text-primary)]/70 hover:bg-[var(--hover-3)]"
+        >
+          Закрыть
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
