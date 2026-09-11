@@ -11,8 +11,16 @@ from .domain.vo import ProductCategory, ProductStatus
 class ProductBase(BaseModel):
     """Базовая API схема программного продукта"""
 
-    name: str = Field(..., description="Полное наименование", examples=["1С УНФ"])
-    vendor: str = Field(..., description="Вендор ПО", examples=["1С"])
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str = Field(..., min_length=1, description="Полное наименование", examples=["1С УНФ"])
+    vendor: str = Field(..., min_length=1, description="Вендор ПО", examples=["1С"])
+    article: str | None = Field(
+        default=None,
+        min_length=1,
+        description="Артикул продукта",
+        examples=["11913728"]
+    )
     category: ProductCategory = Field(..., description="Категория программного продукта")
     description: str | None = Field(None, description="Описание")
     version: str | None = Field(None, description="Версия", examples=["3.0.1"])

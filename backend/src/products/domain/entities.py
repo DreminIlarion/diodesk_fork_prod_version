@@ -20,6 +20,7 @@ class SoftwareProduct(Entity):
     name: str
     vendor: str
     category: ProductCategory
+    article: str | None = None
     description: str | None = None
     version: str | None = None
     status: ProductStatus = field(default=ProductStatus.ACTIVE)
@@ -32,13 +33,7 @@ class SoftwareProduct(Entity):
     updated_by: UUID | None = None
 
     def __post_init__(self) -> None:
-        # 1. Наименование и вендор нен могут быть пустыми
-        if not self.name.strip():
-            raise ValueError("Product name cannot be empty")
-        if not self.vendor.strip():
-            raise ValueError("Product vendor cannot be empty")
-
-        # 2. Нормализация данных
+        # 1. Нормализация данных
         self.name = self.name.strip()
         self.vendor = self.vendor.strip()
 

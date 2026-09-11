@@ -34,6 +34,7 @@ class ProductService:
         product = SoftwareProduct(
             name=data.name,
             vendor=data.vendor,
+            article=data.article,
             version=data.version,
             description=data.description,
             category=data.category,
