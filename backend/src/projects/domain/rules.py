@@ -22,7 +22,19 @@ class IsProjectStaffRule:
         self.membership = membership
 
     def check(self) -> PermissionResult:
-        return PermissionResult(True)
+        if self.membership is None:
+            return PermissionResult(False, "You are not member of this project")
+
+        for allowed_project_role in self.ALLOWED_PROJECT_ROLES:
+            if self.membership.has_role(allowed_project_role):
+                return PermissionResult(True)
+
+        return PermissionResult(
+            False,
+            "Project role must be one of: "
+            f"{', '.join(r.value for r in self.ALLOWED_PROJECT_ROLES)}",
+        )
+
 
 class IsMemberExistsRule:
 
@@ -30,6 +42,9 @@ class IsMemberExistsRule:
         self.member = member
 
     def check(self) -> PermissionResult:
+        if self.member is None:
+            return PermissionResult(False, "You are not member of the project")
+
         return PermissionResult(True)
 
 
