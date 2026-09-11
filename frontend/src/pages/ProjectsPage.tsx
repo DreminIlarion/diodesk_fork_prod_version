@@ -446,6 +446,12 @@ const canCreateProject = isSupport || isAdmin;
   try {
     const isCustomerOrAdmin = isCustomer || isCustomerAdmin;
 
+    const hasActiveFiltersCount = [
+  statusFilters.length > 0,
+  !!counterpartyFilter,
+  quickFilter !== 'all',
+].filter(Boolean).length;
+
     // Объединяем: статусы из обычных фильтров + из quickFilter
     const effectiveStatuses = [
       ...statusFilters,
@@ -480,6 +486,8 @@ const canCreateProject = isSupport || isAdmin;
   /* ── Локальный поиск  */
   const normalizedSearch = debouncedSearch.trim().toLowerCase();
   const isSearching = search !== debouncedSearch;
+
+  const [showFilters, setShowFilters] = useState(false);
 
   const filteredProjects = projects; // фильтрация теперь на сервере
 
