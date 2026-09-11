@@ -42,9 +42,6 @@ class IsMemberExistsRule:
         self.member = member
 
     def check(self) -> PermissionResult:
-        if self.member is None:
-            return PermissionResult(False, "You are not member of the project")
-
         return PermissionResult(True)
 
 
