@@ -3,14 +3,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus, FolderOpen, Search, Loader2, Users,
   X, ChevronDown, Filter, ChevronRight, ChevronLeft,
-  Calendar, Check, Archive, Crown, UserCheck, Building2,
+  Calendar, Check, Archive, Crown, UserCheck, Building2,AlertCircle,ArrowRight,
   Hash, FileText,
 } from 'lucide-react';
-import { projectsApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import type { Project } from '../types';
 
 import type { ElementType, ReactNode } from 'react';
+
+import { projectsApi, counterpartiesApi } from '../api/client';
 
 /* 
    ROLE DROPDOWN
@@ -21,6 +22,15 @@ const ROLE_OPTIONS = [
   { value: 'owner', label: 'Где я владелец' },
   { value: 'member', label: 'Где я участник' },
 ] as const;
+
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Активные', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+  { value: 'on_hold', label: 'На паузе', color: 'text-amber-400', bg: 'bg-amber-500/10' },
+  { value: 'completed', label: 'Завершённые', color: 'text-blue-400', bg: 'bg-blue-500/10' },
+  { value: 'archived', label: 'В архиве', color: 'text-[var(--text-muted)]', bg: 'bg-[var(--hover-1)]' },
+] as const;
+
+type ProjectStatus = typeof STATUS_OPTIONS[number]['value'];
 
 type ProjectRole = typeof ROLE_OPTIONS[number]['value'];
 
@@ -155,7 +165,7 @@ function ProjectsTableHeader() {
     <div
       className="hidden lg:grid px-5 py-3 text-[13px] uppercase tracking-widest
                  font-semibold text-[var(--text-primary)]/25 border-b border-[var(--border-color)]"
-      style={{ gridTemplateColumns: 'minmax(0,2.2fr) minmax(0,2fr) 160px 220px 160px 44px' }}
+      style={{ gridTemplateColumns: 'minmax(0,2.2fr) minmax(0,2fr) 160px 220px 44px' }}
     >
       {cols.map((c, i) => (
         <div key={i} className={c.align || ''}>{c.label}</div>
@@ -168,31 +178,34 @@ function ProjectRow({
   project,
   userRole,
   formatDate,
-  participantsCount,
 }: {
   project: Project;
   userRole: string | null;
   formatDate: (d: string) => string;
-  participantsCount: number;
 }) {
+  const navigate = useNavigate();
   const isActive = project.status === 'active';
 
-  const roleBadge =
-    userRole === 'owner'
-      ? { label: 'Владелец', cls: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: <Crown size={14} /> }
-      : userRole === 'member'
-        ? { label: 'Участник', cls: 'bg-blue-500/10 text-[var(--info)] border-blue-500/20', icon: <UserCheck size={14} /> }
-        : null;
+  const openProject = () => navigate(`/projects/${project.id}`);
 
   return (
-    <Link
-      to={`/projects/${project.id}`}
+    <div
+      onClick={openProject}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openProject();
+        }
+      }}
       className="
-        grid items-start px-5 py-4 rounded-xl
+        grid items-start px-5 py-4 rounded-xl cursor-pointer
         hover:bg-[var(--hover-1)] active:bg-[var(--hover-2)]
         transition-colors duration-100 group
+        focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40
       "
-      style={{ gridTemplateColumns: 'minmax(0,2.2fr) minmax(0,2fr) 160px 220px 160px 44px' }}
+      style={{ gridTemplateColumns: 'minmax(0,2.2fr) minmax(0,2fr) 160px 220px 44px' }}
     >
       {/* Проект / ключ */}
       <div className="min-w-0 pr-4">
@@ -225,7 +238,7 @@ function ProjectRow({
         </div>
       </div>
 
-      {/* Описание */}
+      {/* Описание + проформа контрагента */}
       <div className="min-w-0 pr-4 self-center">
         {project.description ? (
           <p className="text-[16px] text-[var(--text-primary)]/55 leading-snug line-clamp-2">
@@ -236,10 +249,19 @@ function ProjectRow({
         )}
 
         {project.counterparty_id && (
-          <div className="mt-1 flex items-center gap-2 text-[14px] text-[var(--text-primary)]/35">
+          <Link
+            to={`/counterparties/${project.counterparty_id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="
+              mt-1.5 inline-flex items-center gap-1.5
+              text-[14px] text-[var(--text-primary)]/50
+              hover:text-[var(--accent)] transition-colors
+            "
+          >
             <Building2 size={16} className="shrink-0" />
-            <span className="truncate">Привязан к контрагенту</span>
-          </div>
+            <span className="truncate">Перейти к контрагенту</span>
+            <ArrowRight size={14} className="shrink-0" />
+          </Link>
         )}
       </div>
 
@@ -258,8 +280,6 @@ function ProjectRow({
         </span>
       </div>
 
-      
-
       {/* Создан */}
       <div className="self-center text-right">
         <span className="text-[15px] text-[var(--text-primary)]/45 whitespace-nowrap">
@@ -274,7 +294,7 @@ function ProjectRow({
           className="text-[var(--text-primary)]/20 group-hover:text-[var(--accent-light)] group-hover:translate-x-0.5 transition-all shrink-0"
         />
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -282,12 +302,10 @@ function ProjectMobileCard({
   project,
   userRole,
   formatDate,
-  participantsCount,
 }: {
   project: Project;
   userRole: string | null;
   formatDate: (d: string) => string;
-  participantsCount: number;
 }) {
   const isActive = project.status === 'active';
 
@@ -336,11 +354,7 @@ function ProjectMobileCard({
           </span>
         )}
 
-        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[14px] font-semibold
-                         bg-[var(--hover-2)] text-[var(--text-primary)]/60 border border-[var(--border-color)]">
-          <Users size={14} />
-          {participantsCount}
-        </span>
+       
 
         <span className="ml-auto text-[14px] text-[var(--text-primary)]/40 flex items-center gap-2">
           <Calendar size={14} />
@@ -394,6 +408,13 @@ export default function ProjectsPage() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
 
+
+  const [statusFilters, setStatusFilters] = useState<ProjectStatus[]>([]);
+const [counterpartyFilter, setCounterpartyFilter] = useState<string>('');
+const [counterparties, setCounterparties] = useState<{id: string; name: string}[]>([]);
+const [quickFilter, setQuickFilter] = useState<'all' | 'active' | 'archived' | 'on_hold' | 'completed'>('all');
+
+
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true);
@@ -420,27 +441,39 @@ const canCreateProject = isSupport || isAdmin;
   useEffect(() => { setPage(1); }, [projectRole, debouncedSearch]);
 
   /* ── Загрузка ─── */
-  const loadProjects = useCallback(async () => {
-    setLoading(true);
-    try {
-      let response;
-      const isCustomerOrAdmin = isCustomer || isCustomerAdmin;
-      if (isCustomerOrAdmin) {
-        response = await projectsApi.getMyProjects(projectRole, page, 20);
-      } else {
-        response = await projectsApi.getAll(page, 20);
-      }
-      setProjects(response.items || []);
-      setTotalPages(response.total_pages || 1);
-      setTotalItems(response.total_items || 0);
-    } catch (e) {
-      console.error(e);
-      setProjects([]);
-    } finally {
-      setLoading(false);
-      setInitialLoad(false);
-    }
-  }, [page, projectRole, isCustomer]);
+ const loadProjects = useCallback(async () => {
+  setLoading(true);
+  try {
+    const isCustomerOrAdmin = isCustomer || isCustomerAdmin;
+
+    // Объединяем: статусы из обычных фильтров + из quickFilter
+    const effectiveStatuses = [
+      ...statusFilters,
+      ...(quickFilter !== 'all' ? [quickFilter] : []),
+    ];
+
+    const filters = {
+      counterparty_id: counterpartyFilter || undefined,
+      statuses: effectiveStatuses.length ? effectiveStatuses : undefined,
+      q: debouncedSearch || undefined,
+    };
+
+    const response = isCustomerOrAdmin
+      ? await projectsApi.getMyProjects(projectRole, page, 20)
+      : await projectsApi.getAll(page, 20, filters);
+
+    setProjects(response.items || []);
+    setTotalPages(response.total_pages || 1);
+    setTotalItems(response.total_items || 0);
+  } catch (e) {
+    console.error(e);
+    setProjects([]);
+  } finally {
+    setLoading(false);
+    setInitialLoad(false);
+  }
+}, [page, projectRole, isCustomer, isCustomerAdmin, statusFilters, counterpartyFilter, quickFilter, debouncedSearch]);
+
 
   useEffect(() => { loadProjects(); }, [loadProjects]);
 
@@ -448,14 +481,20 @@ const canCreateProject = isSupport || isAdmin;
   const normalizedSearch = debouncedSearch.trim().toLowerCase();
   const isSearching = search !== debouncedSearch;
 
-  const filteredProjects = useMemo(() => {
-    if (!normalizedSearch) return projects;
-    return projects.filter(p =>
-      (p.name || '').toLowerCase().includes(normalizedSearch) ||
-      (p.key || '').toLowerCase().includes(normalizedSearch) ||
-      (p.description || '').toLowerCase().includes(normalizedSearch)
-    );
-  }, [projects, normalizedSearch]);
+  const filteredProjects = projects; // фильтрация теперь на сервере
+
+
+useEffect(() => {
+  if (isCustomer || isCustomerAdmin) return;  // ← не грузим для клиента
+  counterpartiesApi.getAll(1, 100)
+    .then(res => setCounterparties(res.items))
+    .catch(() => setCounterparties([]));
+}, [isCustomer, isCustomerAdmin]);
+
+
+  useEffect(() => {
+  setPage(1);
+}, [projectRole, debouncedSearch, statusFilters, counterpartyFilter, quickFilter]);
 
   /* ── Helpers ───── */
   const formatDate = (d: string) => {
@@ -469,20 +508,32 @@ const canCreateProject = isSupport || isAdmin;
   const getTotalParticipants = () =>
     projects.reduce((sum, p) => sum + getParticipantsCount(p), 0);
 
-  const getActiveCount = () => projects.filter(p => p?.status === 'active').length;
+const getActiveCount = () => projects.filter(p => p?.status === 'active').length;
+const getOnHoldCount = () => projects.filter(p => p?.status === 'on_hold').length;
+const getArchivedCount = () => projects.filter(p => p?.status === 'archived').length;
 
   const getUserRoleInProject = (project: Project) => {
     if (!user?.id) return null;
     return project.memberships?.find(m => m.user_id === user.id)?.project_role ?? null;
   };
   
-  const hasFilters = !!(search || (isCustomer && projectRole !== 'all'));
 
   const resetFilters = () => {
-    setSearch('');
-    setProjectRole('all');
-    setPage(1);
-  };
+  setSearch('');
+  setProjectRole('all');
+  setStatusFilters([]);
+  setCounterpartyFilter('');
+  setQuickFilter('all');
+  setPage(1);
+};
+
+const hasFilters = !!(
+  search ||
+  (isCustomer && projectRole !== 'all') ||
+  statusFilters.length ||
+  counterpartyFilter ||
+  quickFilter !== 'all'
+);
 
   /* ── Initial loader ─ */
   if (initialLoad) {
@@ -521,17 +572,40 @@ const canCreateProject = isSupport || isAdmin;
         )}
       </div>
 
-      {/* ── Stats ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Всего" value={totalItems}
-          icon={FolderOpen} color="text-[var(--status-open-text)]/70" bg="bg-gradient-to-br from-[var(--status-open-bg)] to-[var(--status-agreement-bg)]  " />
-        <StatCard label="Активных" value={getActiveCount()}
-          icon={Check} color="text-[var(--success)]" bg="bg-emerald-500/10" />
-        <StatCard label="В архиве" value={totalItems - getActiveCount()}
-          icon={Archive} color="text-[var(--text-muted)]" bg="bg-[var(--hover-1)]" />
-        <StatCard label="Участников" value={getTotalParticipants()}
-          icon={Users} color="text-[var(--info)]" bg="bg-blue-500/10" />
-      </div>
+  {[
+    { key: 'all' as const, label: 'Всего', value: totalItems, icon: FolderOpen },
+    { key: 'active' as const, label: 'Активных', value: getActiveCount(), icon: Check },
+{ key: 'on_hold' as const, label: 'На паузе', value: getOnHoldCount(), icon: AlertCircle },
+{ key: 'archived' as const, label: 'В архиве', value: getArchivedCount(), icon: Archive },
+  ].map(stat => {
+    const isActive = quickFilter === stat.key;
+    return (
+      <button
+        key={stat.key}
+        type="button"
+        onClick={() => {
+          setQuickFilter(stat.key);
+          setPage(1);
+        }}
+        className={`rounded-xl border p-4 flex items-center gap-3 text-left transition-all
+          hover:border-[var(--border-hover)] hover:-translate-y-0.5
+          ${isActive
+            ? 'border-[var(--accent)]/50 bg-[var(--accent-soft)]'
+            : 'border-[var(--border-color)]'}`}
+      >
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
+          ${isActive ? 'bg-[var(--accent)]/15' : 'bg-[var(--hover-1)]'}`}>
+          <stat.icon className={`w-5 h-5 ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`} />
+        </div>
+        <div>
+          <p className="text-2xl font-bold text-[var(--text-primary)] leading-none mb-0.5">{stat.value}</p>
+          <p className="text-base text-[var(--text-secondary)]">{stat.label}</p>
+        </div>
+      </button>
+    );
+  })}
+</div>
 
       {/* ── Search + Filters ───────────────────────────────────────── */}
       <div className="space-y-3">
@@ -564,14 +638,56 @@ const canCreateProject = isSupport || isAdmin;
                 <X size={14} />
               </button>
             )}
+
+
+              {/* Фильтр по статусу */}
+  <div className="relative">
+    <select
+      value={statusFilters[0] || ''}
+      onChange={e => {
+        const v = e.target.value as ProjectStatus | '';
+        setStatusFilters(v ? [v] : []);
+        setPage(1);
+      }}
+      className="appearance-none pl-4 pr-10 py-3 rounded-xl border border-[var(--border-color)]
+                 bg-[var(--hover-1)] text-[var(--text-primary)] text-base cursor-pointer
+                 focus:outline-none focus:border-[var(--accent)]/30"
+    >
+      <option value="">Все статусы</option>
+      {STATUS_OPTIONS.map(opt => (
+        <option key={opt.value} value={opt.value}>{opt.label}</option>
+      ))}
+    </select>
+    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
+  </div>
+
+  {/* Фильтр по контрагенту */}
+  <div className="relative">
+    <select
+      value={counterpartyFilter}
+      onChange={e => {
+        setCounterpartyFilter(e.target.value);
+        setPage(1);
+      }}
+      className="appearance-none pl-4 pr-10 py-3 rounded-xl border border-[var(--border-color)]
+                 bg-[var(--hover-1)] text-[var(--text-primary)] text-base cursor-pointer
+                 focus:outline-none focus:border-[var(--accent)]/30 max-w-[220px]"
+    >
+      <option value="">Все контрагенты</option>
+      {counterparties.map(cp => (
+        <option key={cp.id} value={cp.id}>{cp.name}</option>
+      ))}
+    </select>
+    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
+  </div>
+
+  {/* Роль (только для клиентов) */}
+  {isCustomer && (
+    <RoleDropdown value={projectRole} onChange={v => { setProjectRole(v); setPage(1); }} />
+  )}
           </div>
 
-          {isCustomer && (
-            <RoleDropdown
-              value={projectRole}
-              onChange={v => { setProjectRole(v); setPage(1); }}
-            />
-          )}
+          
         </div>
 
         {/* Активные фильтры */}
@@ -593,6 +709,27 @@ const canCreateProject = isSupport || isAdmin;
                 onRemove={() => { setProjectRole('all'); setPage(1); }}
               />
             )}
+
+            {statusFilters.map(s => {
+  const opt = STATUS_OPTIONS.find(o => o.value === s);
+  return (
+    <FilterTag
+      key={s}
+      label={opt?.label || s}
+      icon={<Filter size={14} />}
+      colorClass="bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/15"
+      onRemove={() => setStatusFilters(prev => prev.filter(x => x !== s))}
+    />
+  );
+})}
+
+{counterpartyFilter && (
+  <FilterTag
+    label={counterparties.find(c => c.id === counterpartyFilter)?.name || 'Контрагент'}
+    icon={<Building2 size={14} />}
+    onRemove={() => setCounterpartyFilter('')}
+  />
+)}
 
             <button onClick={resetFilters}
               className="text-base text-[var(--accent)]/60 hover:text-[var(--accent)] transition-colors ml-1">
@@ -647,7 +784,6 @@ const canCreateProject = isSupport || isAdmin;
         project={project}
         userRole={getUserRoleInProject(project)}
         formatDate={formatDate}
-        participantsCount={getParticipantsCount(project)}
       />
     ))}
   </div>
@@ -661,7 +797,6 @@ const canCreateProject = isSupport || isAdmin;
       project={project}
       userRole={getUserRoleInProject(project)}
       formatDate={formatDate}
-      participantsCount={getParticipantsCount(project)}
     />
   ))}
 </div>
