@@ -661,38 +661,28 @@ const [quickFilter, setQuickFilter] = useState<'all' | 'head' | 'branches' | 'ac
   ].map(stat => {
     const active = quickFilter === stat.key;
 
-    return (
-      <button
-        key={stat.key}
-        type="button"
-        onClick={() => handleQuickFilter(stat.key)}
-        className={`
-          glass-card rounded-2xl border p-4 flex items-center gap-3.5 text-left transition-all
-          hover:border-[var(--border-hover)] hover:-translate-y-0.5
-          ${active
-            ? 'border-[var(--accent)]/50 bg-[var(--accent-soft)]'
-            : 'border-[var(--border-color)]'}
-        `}
-      >
-        <div
-          className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
-            active ? 'bg-[var(--accent)]/15' : 'bg-[var(--hover-2)]'
-          }`}
-        >
-          <stat.icon
-            className={`w-5 h-5 ${
-              active ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'
-            }`}
-          />
-        </div>
-        <div>
-          <p className="text-2xl font-bold text-[var(--text-primary)]">
-            {stat.value}
-          </p>
-          <p className="text-sm text-[var(--text-primary)]/40">{stat.label}</p>
-        </div>
-      </button>
-    );
+return (
+  <button
+    key={stat.key}
+    type="button"
+    onClick={() => handleQuickFilter(stat.key)}
+    className="
+      glass-card rounded-2xl border p-4 flex items-center gap-3.5 text-left transition-all
+      hover:border-[var(--border-hover)] hover:-translate-y-0.5
+      border-[var(--border-color)]
+    "
+  >
+    <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors bg-[var(--hover-2)]">
+      <stat.icon className="w-5 h-5 text-[var(--text-secondary)]" />
+    </div>
+    <div>
+      <p className="text-2xl font-bold text-[var(--text-primary)]">
+        {stat.value}
+      </p>
+      <p className="text-sm text-[var(--text-primary)]/40">{stat.label}</p>
+    </div>
+  </button>
+);
   })}
 </div>
 

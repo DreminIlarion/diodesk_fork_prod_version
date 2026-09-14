@@ -580,45 +580,40 @@ export default function ProjectsPage() {
         )}
       </div>
 
-      {/* Быстрые фильтры */}
       {!isCustomerOrAdmin && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[
-            { key: 'all' as const, label: 'Всего', value: stats.total, icon: FolderOpen },
-            { key: 'active' as const, label: 'Активных', value: stats.active, icon: Check },
-            { key: 'on_hold' as const, label: 'На паузе', value: stats.on_hold, icon: AlertCircle },
-            { key: 'archived' as const, label: 'В архиве', value: stats.archived, icon: Archive },
-          ].map(stat => {
-            const isActive = quickFilter === stat.key;
-            return (
-              <button
-                key={stat.key}
-                type="button"
-                onClick={() => {
-                  setQuickFilter(stat.key);
-                  setPage(1);
-                }}
-                className={`rounded-xl border p-4 flex items-center gap-3 text-left transition-all
-                  hover:border-[var(--border-hover)] hover:-translate-y-0.5
-                  ${isActive
-                    ? 'border-[var(--accent)]/50 bg-[var(--accent-soft)]'
-                    : 'border-[var(--border-color)]'}`}
-              >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
-                  ${isActive ? 'bg-[var(--accent)]/15' : 'bg-[var(--hover-1)]'}`}>
-                  <stat.icon className={`w-5 h-5 ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`} />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-[var(--text-primary)] leading-none mb-0.5">
-                    {stat.value}
-                  </p>
-                  <p className="text-base text-[var(--text-secondary)]">{stat.label}</p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
+  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    {[
+      { key: 'all' as const, label: 'Всего', value: stats.total, icon: FolderOpen },
+      { key: 'active' as const, label: 'Активных', value: stats.active, icon: Check },
+      { key: 'on_hold' as const, label: 'На паузе', value: stats.on_hold, icon: AlertCircle },
+      { key: 'archived' as const, label: 'В архиве', value: stats.archived, icon: Archive },
+    ].map(stat => {
+      return (
+        <button
+          key={stat.key}
+          type="button"
+          onClick={() => {
+            setQuickFilter(stat.key);
+            setPage(1);
+          }}
+          className="rounded-xl border p-4 flex items-center gap-3 text-left transition-all
+            hover:border-[var(--border-hover)] hover:-translate-y-0.5
+            border-[var(--border-color)]"
+        >
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-[var(--hover-1)]">
+            <stat.icon className="w-5 h-5 text-[var(--text-muted)]" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-[var(--text-primary)] leading-none mb-0.5">
+              {stat.value}
+            </p>
+            <p className="text-base text-[var(--text-secondary)]">{stat.label}</p>
+          </div>
+        </button>
+      );
+    })}
+  </div>
+)}
 
       {/* Search + Filters */}
       <div className="space-y-3">
