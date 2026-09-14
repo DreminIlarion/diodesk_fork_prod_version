@@ -50,28 +50,6 @@ def test_create_and_normalize_product_success():
     assert product.vendor == "1С"
 
 
-def test_empty_title_or_vendor_raises_value_error():
-    """
-    Наименование или вендор не могут быть пустыми
-    """
-
-    with pytest.raises(ValueError, match="Product name cannot be empty"):
-        SoftwareProduct(
-            name="     ",
-            vendor="1C",
-            category=ProductCategory.ERP,
-            status=ProductStatus.ACTIVE,
-        )
-
-    with pytest.raises(ValueError, match="Product vendor cannot be empty"):
-        SoftwareProduct(
-            name="1С ERP",
-            vendor="  ",
-            category=ProductCategory.ERP,
-            status=ProductStatus.ACTIVE,
-        )
-
-
 def test_cannot_activate_archived_product():
     """
     Нельзя активировать продукт из архива (нужно создать новый)

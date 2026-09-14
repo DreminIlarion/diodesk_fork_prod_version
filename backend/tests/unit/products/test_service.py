@@ -24,6 +24,7 @@ class TestCreate:
         return ProductCreate(
             name="1C УНФ",
             vendor="1C",
+            article="11913728",
             version="3.0.5",
             category=ProductCategory.ERP,
             status=ProductStatus.ACTIVE,
@@ -80,6 +81,8 @@ class TestCreate:
 
         assert response.name == valid_create_data.name
         assert response.vendor == valid_create_data.vendor
+        assert response.article == valid_create_data.article
+        assert created_product.article == valid_create_data.article
         assert response.version == valid_create_data.version
         assert response.description == valid_create_data.description
         assert response.category == valid_create_data.category

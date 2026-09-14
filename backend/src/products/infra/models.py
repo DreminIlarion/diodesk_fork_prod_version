@@ -15,6 +15,7 @@ class SoftwareProductOrm(Base):
 
     name: Mapped[str]
     vendor: Mapped[str]
+    article: Mapped[str | None] = mapped_column(nullable=True)
     category: Mapped[ProductCategory] = mapped_column(Enum(ProductCategory))
     description: Mapped[str | None] = mapped_column(TEXT, nullable=True)
     version: Mapped[str | None] = mapped_column(nullable=True)
