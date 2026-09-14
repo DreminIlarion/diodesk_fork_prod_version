@@ -124,6 +124,436 @@ function FilterTag({ label, icon, colorClass, onRemove }: {
   );
 }
 
+/* ═══ FILTER DROPDOWN ═══ */
+
+interface DropdownOption {
+  value: string;
+  label: string;
+  sublabel?: string;
+  color?: string;
+}
+
+interface FilterDropdownProps {
+  label: string;
+  icon?: ReactNode;
+  options: DropdownOption[];
+  value: string | string[];
+  onChange: (value: string | string[]) => void;
+  placeholder?: string;
+  searchable?: boolean;
+  loading?: boolean;
+  multiple?: boolean;
+}
+
+function FilterDropdown({
+  label,
+  icon,
+  options,
+  value,
+  onChange,
+  placeholder = 'Все',
+  searchable = false,
+  loading = false,
+  multiple = false,
+}: FilterDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  useEffect(() => {
+    if (open && searchable) setTimeout(() => inputRef.current?.focus(), 50);
+    if (!open) setQuery('');
+  }, [open, searchable]);
+
+  const selectedValues = multiple
+    ? (Array.isArray(value) ? value : [])
+    : [value as string].filter(Boolean);
+
+  const selected = multiple
+    ? options.filter(o => selectedValues.includes(o.value))
+    : options.find(o => o.value === value);
+
+  const filtered = query
+    ? options.filter(o =>
+      o.label.toLowerCase().includes(query.toLowerCase()) ||
+      o.sublabel?.toLowerCase().includes(query.toLowerCase()))
+    : options;
+
+  const hasValue = selectedValues.length > 0;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5
+          rounded-xl border text-base transition-all whitespace-nowrap cursor-pointer
+          ${open
+            ? 'bg-[var(--hover-2)] border-[var(--accent)]/40 text-[var(--text-primary)]'
+            : hasValue
+              ? 'bg-[var(--hover-2)] border-[var(--border-color)] text-[var(--text-primary)]/90'
+              : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70'
+          }`}
+      >
+        <span className="flex items-center gap-2 truncate min-w-0">
+          {icon && (
+            <span className={`flex-shrink-0 ${hasValue ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'}`}>
+              {icon}
+            </span>
+          )}
+          {hasValue ? (
+            <span className="flex items-center gap-2 truncate min-w-0">
+              {multiple ? (
+                (selected as DropdownOption[]).length === 1 ? (
+                  <span className="truncate">{(selected as DropdownOption[])[0].label}</span>
+                ) : (
+                  <>
+                    <span className="truncate">{(selected as DropdownOption[])[0].label}</span>
+                    <span className="text-[var(--text-primary)]/40 flex-shrink-0">
+                      +{(selected as DropdownOption[]).length - 1}
+                    </span>
+                  </>
+                )
+              ) : (
+                <span className="truncate">{(selected as DropdownOption)?.label}</span>
+              )}
+            </span>
+          ) : (
+            <span className="truncate">{label}</span>
+          )}
+        </span>
+
+        {loading ? (
+          <Loader2 size={18} className="text-[var(--text-primary)]/40 animate-spin flex-shrink-0" />
+        ) : hasValue ? (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={e => { e.stopPropagation(); onChange(multiple ? [] : ''); setOpen(false); }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation(); onChange(multiple ? [] : ''); setOpen(false);
+              }
+            }}
+            className="ml-1 p-0.5 rounded-md hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40
+                       hover:text-[var(--text-primary)]/60 cursor-pointer transition-colors flex-shrink-0"
+          >
+            <X size={18} />
+          </span>
+        ) : (
+          <ChevronDown
+            size={18}
+            className={`text-[var(--text-primary)]/40 transition-transform duration-200 flex-shrink-0
+                        ${open ? 'rotate-180' : ''}`}
+          />
+        )}
+      </button>
+
+      {open && (
+        <div
+          className="absolute z-[100] top-full mt-2 left-0 w-[280px]
+                     bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl
+                     overflow-hidden"
+          style={{ boxShadow: 'var(--shadow-lg)' }}
+        >
+          {searchable && (
+            <div className="p-2 border-b border-[var(--border-color)]">
+              <div className="relative">
+                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                <input
+                  ref={inputRef}
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="Поиск..."
+                  className="w-full pl-7 pr-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)]
+                             border border-[var(--border-color)] text-base text-[var(--text-primary)]
+                             placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-hover)]"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="py-1.5 max-h-[300px] overflow-y-auto">
+            {!multiple && (
+              <button
+                type="button"
+                onClick={() => { onChange(''); setOpen(false); setQuery(''); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-left text-base transition-colors
+                  ${!value
+                    ? 'bg-[var(--accent)]/10 text-[var(--text-primary)]'
+                    : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)]'
+                  }`}
+              >
+                {!value
+                  ? <Check size={18} className="text-[var(--accent)] flex-shrink-0" />
+                  : <span className="w-4 flex-shrink-0" />}
+                <span>{placeholder}</span>
+              </button>
+            )}
+            <div className="h-px bg-[var(--hover-2)] mx-3 my-1" />
+            {loading ? (
+              <div className="px-4 py-6 text-center text-base text-[var(--text-muted)]">
+                <Loader2 size={18} className="animate-spin mx-auto mb-2" /> Загрузка...
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="px-4 py-6 text-center text-base text-[var(--text-muted)]">
+                Ничего не найдено
+              </div>
+            ) : filtered.map(option => {
+              const isSelected = selectedValues.includes(option.value);
+              return (
+                <button
+                  type="button"
+                  key={option.value}
+                  onClick={() => {
+                    if (multiple) {
+                      const current = Array.isArray(value) ? value : [];
+                      onChange(
+                        current.includes(option.value)
+                          ? current.filter(v => v !== option.value)
+                          : [...current, option.value]
+                      );
+                    } else {
+                      onChange(option.value);
+                      setOpen(false);
+                      setQuery('');
+                    }
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left text-base transition-colors
+                    ${isSelected
+                      ? 'bg-[var(--accent)]/10 text-[var(--text-primary)]'
+                      : 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)]'
+                    }`}
+                >
+                  {isSelected
+                    ? <Check size={18} className="text-[var(--accent)] flex-shrink-0" />
+                    : <span className="w-4 flex-shrink-0" />}
+                  <div className="min-w-0 overflow-hidden">
+                    <span className="block truncate">{option.label}</span>
+                    {option.sublabel && (
+                      <span className="block text-base text-[var(--text-muted)] truncate">
+                        {option.sublabel}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ═══ COUNTERPARTY FILTER (с поиском + проформа) ═══ */
+
+function CounterpartyFilter({
+  value,
+  options,
+  onChange,
+  onClear,
+  placeholder = 'Все контрагенты',
+}: {
+  value: string;
+  options: { id: string; name: string }[];
+  onChange: (id: string) => void;
+  onClear: () => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const selected = options.find(o => o.id === value);
+  const hasValue = !!value;
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 50);
+    if (!open) setQuery('');
+  }, [open]);
+
+  const filtered = query
+    ? options.filter(o => o.name.toLowerCase().includes(query.toLowerCase()))
+    : options;
+
+  const navigate = useNavigate();
+
+  return (
+    <div className="flex items-center gap-2">
+      <div ref={containerRef} className="relative flex-1">
+        {/* Кнопка */}
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5
+            rounded-xl border text-base transition-all whitespace-nowrap cursor-pointer
+            ${open
+              ? 'bg-[var(--hover-2)] border-[var(--accent)]/40 text-[var(--text-primary)]'
+              : hasValue
+                ? 'bg-[var(--hover-2)] border-[var(--border-color)] text-[var(--text-primary)]/90'
+                : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70'
+            }`}
+        >
+          <span className="flex items-center gap-2 truncate min-w-0">
+            <Building2
+              size={16}
+              className={`flex-shrink-0 ${hasValue ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'}`}
+            />
+            <span className="truncate">
+              {selected ? selected.name : placeholder}
+            </span>
+          </span>
+
+          {hasValue ? (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={e => {
+                e.stopPropagation();
+                onClear();
+                setOpen(false);
+              }}
+              className="ml-1 p-0.5 rounded-md hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40
+                         hover:text-[var(--text-primary)]/60 cursor-pointer transition-colors flex-shrink-0"
+            >
+              <X size={18} />
+            </span>
+          ) : (
+            <ChevronDown
+              size={18}
+              className={`text-[var(--text-primary)]/40 transition-transform duration-200 flex-shrink-0
+                          ${open ? 'rotate-180' : ''}`}
+            />
+          )}
+        </button>
+
+        {/* Дропдаун */}
+        {open && (
+          <div
+            className="absolute z-[100] top-full mt-2 left-0 w-[320px]
+                       bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl
+                       overflow-hidden"
+            style={{ boxShadow: 'var(--shadow-lg)' }}
+          >
+            {/* Поиск */}
+            <div className="p-2 border-b border-[var(--border-color)]">
+              <div className="relative">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                <input
+                  ref={inputRef}
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="Поиск контрагента..."
+                  className="w-full pl-8 pr-3 py-2 rounded-lg bg-[var(--bg-tertiary)]
+                             border border-[var(--border-color)] text-base text-[var(--text-primary)]
+                             placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-hover)]"
+                />
+              </div>
+            </div>
+
+            {/* Список */}
+            <div className="py-1.5 max-h-[280px] overflow-y-auto">
+              {/* «Все контрагенты» */}
+              <button
+                type="button"
+                onClick={() => {
+                  onClear();
+                  setOpen(false);
+                  setQuery('');
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-left text-base transition-colors
+                  ${!value
+                    ? 'bg-[var(--accent)]/10 text-[var(--text-primary)]'
+                    : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)]'
+                  }`}
+              >
+                {!value
+                  ? <Check size={18} className="text-[var(--accent)] flex-shrink-0" />
+                  : <span className="w-4 flex-shrink-0" />}
+                <span>Все контрагенты</span>
+              </button>
+
+              <div className="h-px bg-[var(--hover-2)] mx-3 my-1" />
+
+              {filtered.length === 0 ? (
+                <div className="px-4 py-6 text-center text-base text-[var(--text-muted)]">
+                  Ничего не найдено
+                </div>
+              ) : (
+                filtered.map(cp => {
+                  const isSelected = cp.id === value;
+                  return (
+                    <button
+                      key={cp.id}
+                      type="button"
+                      onClick={() => {
+                        onChange(cp.id);
+                        setOpen(false);
+                        setQuery('');
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left text-base transition-colors
+                        ${isSelected
+                          ? 'bg-[var(--accent)]/10 text-[var(--text-primary)]'
+                          : 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)]'
+                        }`}
+                    >
+                      {isSelected
+                        ? <Check size={18} className="text-[var(--accent)] flex-shrink-0" />
+                        : <span className="w-4 flex-shrink-0" />}
+                      <span className="truncate">{cp.name}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Проформа: перейти к контрагенту */}
+      {hasValue && selected && (
+        <button
+          type="button"
+          onClick={() => navigate(`/counterparties/${selected.id}`)}
+          title="Перейти к контрагенту"
+          className="flex h-[44px] w-[44px] shrink-0 items-center justify-center
+                     rounded-xl border border-[var(--border-color)]
+                     bg-[var(--hover-1)] text-[var(--text-primary)]/60
+                     transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--accent)]"
+        >
+          <ArrowRight size={18} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* ═══ TABLE HEADER ═══ */
 
 function ProjectsTableHeader() {
@@ -240,10 +670,9 @@ function ProjectRow({
       <div className="self-center">
         <span
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[14px] font-semibold border whitespace-nowrap
-            ${
-              isActive
-                ? 'bg-emerald-500/10 text-[var(--success)] border-emerald-500/20'
-                : 'bg-[var(--hover-1)] text-[var(--text-muted)] border-[var(--border-color)]'
+            ${isActive
+              ? 'bg-emerald-500/10 text-[var(--success)] border-emerald-500/20'
+              : 'bg-[var(--hover-1)] text-[var(--text-muted)] border-[var(--border-color)]'
             }`}
         >
           {isActive ? <Check size={14} /> : <Archive size={14} />}
@@ -581,39 +1010,39 @@ export default function ProjectsPage() {
       </div>
 
       {!isCustomerOrAdmin && (
-  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-    {[
-      { key: 'all' as const, label: 'Всего', value: stats.total, icon: FolderOpen },
-      { key: 'active' as const, label: 'Активных', value: stats.active, icon: Check },
-      { key: 'on_hold' as const, label: 'На паузе', value: stats.on_hold, icon: AlertCircle },
-      { key: 'archived' as const, label: 'В архиве', value: stats.archived, icon: Archive },
-    ].map(stat => {
-      return (
-        <button
-          key={stat.key}
-          type="button"
-          onClick={() => {
-            setQuickFilter(stat.key);
-            setPage(1);
-          }}
-          className="rounded-xl border p-4 flex items-center gap-3 text-left transition-all
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { key: 'all' as const, label: 'Всего', value: stats.total, icon: FolderOpen },
+            { key: 'active' as const, label: 'Активных', value: stats.active, icon: Check },
+            { key: 'on_hold' as const, label: 'На паузе', value: stats.on_hold, icon: AlertCircle },
+            { key: 'archived' as const, label: 'В архиве', value: stats.archived, icon: Archive },
+          ].map(stat => {
+            return (
+              <button
+                key={stat.key}
+                type="button"
+                onClick={() => {
+                  setQuickFilter(stat.key);
+                  setPage(1);
+                }}
+                className="rounded-xl border p-4 flex items-center gap-3 text-left transition-all
             hover:border-[var(--border-hover)] hover:-translate-y-0.5
             border-[var(--border-color)]"
-        >
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-[var(--hover-1)]">
-            <stat.icon className="w-5 h-5 text-[var(--text-muted)]" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-[var(--text-primary)] leading-none mb-0.5">
-              {stat.value}
-            </p>
-            <p className="text-base text-[var(--text-secondary)]">{stat.label}</p>
-          </div>
-        </button>
-      );
-    })}
-  </div>
-)}
+              >
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-[var(--hover-1)]">
+                  <stat.icon className="w-5 h-5 text-[var(--text-muted)]" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-[var(--text-primary)] leading-none mb-0.5">
+                    {stat.value}
+                  </p>
+                  <p className="text-base text-[var(--text-secondary)]">{stat.label}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Search + Filters */}
       <div className="space-y-3">
@@ -725,56 +1154,36 @@ export default function ProjectsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 items-start">
               {/* Статус */}
-              <div className="relative">
-                <select
-                  value={statusFilters[0] || ''}
-                  onChange={e => {
-                    const v = e.target.value as ProjectStatus | '';
-                    setStatusFilters(v ? [v] : []);
-                    setPage(1);
-                  }}
-                  className="appearance-none w-full pl-4 pr-10 py-3 rounded-xl
-                             border border-[var(--border-color)]
-                             bg-[var(--hover-1)] text-[var(--text-primary)] text-base cursor-pointer
-                             focus:outline-none focus:border-[var(--accent)]/30"
-                >
-                  <option value="">Все статусы</option>
-                  {STATUS_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={16}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none"
-                />
-              </div>
+              <FilterDropdown
+                label="Статус"
+                icon={<Filter size={16} />}
+                options={STATUS_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+                value={statusFilters[0] || ''}
+                onChange={v => {
+                  const val = v as string;
+                  setStatusFilters(val ? [val as ProjectStatus] : []);
+                  setPage(1);
+                }}
+                placeholder="Все статусы"
+              />
 
               {/* Контрагент — только для саппорта/админов */}
               {!isCustomerOrAdmin && (
-                <div className="relative">
-                  <select
+                <div className="sm:col-span-2 xl:col-span-2">
+                  <label className="text-sm font-medium text-[var(--text-primary)]/50 mb-1.5 block">
+                    Контрагент
+                  </label>
+                  <CounterpartyFilter
                     value={counterpartyFilter}
-                    onChange={e => {
-                      setCounterpartyFilter(e.target.value);
+                    options={counterparties}
+                    onChange={id => {
+                      setCounterpartyFilter(id);
                       setPage(1);
                     }}
-                    className="appearance-none w-full pl-4 pr-10 py-3 rounded-xl
-                               border border-[var(--border-color)]
-                               bg-[var(--hover-1)] text-[var(--text-primary)] text-base cursor-pointer
-                               focus:outline-none focus:border-[var(--accent)]/30"
-                  >
-                    <option value="">Все контрагенты</option>
-                    {counterparties.map(cp => (
-                      <option key={cp.id} value={cp.id}>
-                        {cp.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={16}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none"
+                    onClear={() => {
+                      setCounterpartyFilter('');
+                      setPage(1);
+                    }}
                   />
                 </div>
               )}
