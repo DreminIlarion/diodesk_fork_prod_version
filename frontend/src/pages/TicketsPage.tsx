@@ -1,5 +1,5 @@
 // pages/TicketsPage.tsx
-import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect  } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { ElementType, ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -420,8 +420,6 @@ function FilterTag({ label, icon, colorClass, onRemove }: {
   );
 }
 
-/* ═══ TICKET ACTIONS (троеточие) ═══ */
-
 function TicketActions({
   ticket,
   onTicketUpdated,
@@ -433,11 +431,7 @@ function TicketActions({
   const { toast } = useToast();
 
   const [open, setOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState<React.CSSProperties>({
-    top: 0,
-    left: 0,
-    display: 'none',
-  });
+  const [openUp, setOpenUp] = useState(false);
 
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [archiving, setArchiving] = useState(false);
@@ -449,13 +443,99 @@ function TicketActions({
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [updatingAssignee, setUpdatingAssignee] = useState(false);
 
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>(null); // контейнер кнопки
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  /* ────────────────────────────────────────────────────────────────────── */
-  /* Закрытие кликом снаружи                                               */
-  /* ────────────────────────────────────────────────────────────────────── */
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties | null>(null);
+
+  const closeMenu = useCallback(() => {
+    setOpen(false);
+    setShowAssigneeMenu(false);
+    setMenuStyle(null);
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Позиционирование меню (portal + fixed)
+  // ---------------------------------------------------------------------------
+
+  const recalcMenu = useCallback(() => {
+    const btn = buttonRef.current;
+    const menu = menuRef.current;
+
+    if (!btn) return;
+
+    const btnRect = btn.getBoundingClientRect();
+
+    const MENU_W = 270;
+    const GAP = 8;
+    const PAD = 8;
+
+    // если меню уже в DOM — берём реальную высоту, иначе fallback
+    const menuH = menu?.offsetHeight ?? 320;
+
+    const spaceBelow = window.innerHeight - btnRect.bottom - GAP;
+    const spaceAbove = btnRect.top - GAP;
+
+    const shouldOpenUp = menuH > spaceBelow && spaceAbove > spaceBelow;
+
+    let top = shouldOpenUp
+      ? btnRect.top - menuH - GAP
+      : btnRect.bottom + GAP;
+
+    let left = btnRect.right - MENU_W;
+
+    // clamp по экрану
+    left = Math.max(PAD, Math.min(left, window.innerWidth - MENU_W - PAD));
+    top = Math.max(PAD, Math.min(top, window.innerHeight - menuH - PAD));
+
+    setOpenUp(shouldOpenUp);
+    setMenuStyle({
+      position: 'fixed',
+      top,
+      left,
+      width: MENU_W,
+      zIndex: 2500,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    // 1) первичный расчёт
+    recalcMenu();
+
+    // 2) ещё раз после отрисовки (чтобы высота меню была реальная)
+    const raf = requestAnimationFrame(() => recalcMenu());
+
+    return () => cancelAnimationFrame(raf);
+  }, [open, showAssigneeMenu, recalcMenu]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const onAnyScrollOrResize = (e: Event) => {
+      const target = e.target;
+
+      // если скроллят внутри самого меню — не пересчитываем
+      if (target instanceof Node && menuRef.current?.contains(target)) return;
+
+      recalcMenu();
+    };
+
+    // capture=true, чтобы ловить скролл внутри колонок/контейнеров канбана
+    window.addEventListener('scroll', onAnyScrollOrResize, true);
+    window.addEventListener('resize', onAnyScrollOrResize);
+
+    return () => {
+      window.removeEventListener('scroll', onAnyScrollOrResize, true);
+      window.removeEventListener('resize', onAnyScrollOrResize);
+    };
+  }, [open, recalcMenu]);
+
+  // ---------------------------------------------------------------------------
+  // Закрытие кликом снаружи (учитываем portal)
+  // ---------------------------------------------------------------------------
 
   useEffect(() => {
     if (!open) return;
@@ -463,85 +543,40 @@ function TicketActions({
     const handler = (event: MouseEvent) => {
       const target = event.target as Node;
 
-      if (ref.current?.contains(target)) return;
-      if (menuRef.current?.contains(target)) return;
+      const inButton = ref.current?.contains(target);
+      const inMenu = menuRef.current?.contains(target);
 
-      setOpen(false);
-      setShowAssigneeMenu(false);
+      if (inButton || inMenu) return;
+
+      closeMenu();
     };
 
     document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open, closeMenu]);
 
-    return () => {
-      document.removeEventListener('mousedown', handler);
-    };
-  }, [open]);
-
-  /* ────────────────────────────────────────────────────────────────────── */
-  /* Закрытие по Escape                                                    */
-  /* ────────────────────────────────────────────────────────────────────── */
+  // ---------------------------------------------------------------------------
+  // Закрытие по Escape
+  // ---------------------------------------------------------------------------
 
   useEffect(() => {
     if (!open) return;
 
     const handler = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-
-      setOpen(false);
-      setShowAssigneeMenu(false);
+      closeMenu();
     };
 
     document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open, closeMenu]);
 
-    return () => {
-      document.removeEventListener('keydown', handler);
-    };
-  }, [open]);
-
-  /* ────────────────────────────────────────────────────────────────────── */
-  /* Расчёт позиции меню (портал)                                          */
-  /* ────────────────────────────────────────────────────────────────────── */
-
-  useLayoutEffect(() => {
-    if (!open) return;
-
-    const button = buttonRef.current;
-    const menu = menuRef.current;
-
-    if (!button || !menu) return;
-
-    const buttonRect = button.getBoundingClientRect();
-    const menuRect = menu.getBoundingClientRect();
-
-    const gap = 8;
-
-    const spaceBelow = window.innerHeight - buttonRect.bottom - gap;
-    const spaceAbove = buttonRect.top - gap;
-
-    const shouldOpenUp =
-      menuRect.height > spaceBelow && spaceAbove > spaceBelow;
-
-    const top = shouldOpenUp
-      ? buttonRect.top - menuRect.height - gap
-      : buttonRect.bottom + gap;
-
-    const left = buttonRect.right - menuRect.width;
-
-    setMenuPosition({
-      top: Math.max(gap, top),
-      left: Math.max(gap, left),
-      display: 'block',
-    });
-  }, [open, showAssigneeMenu]);
-
-  /* ────────────────────────────────────────────────────────────────────── */
-  /* Исполнители                                                           */
-  /* ────────────────────────────────────────────────────────────────────── */
+  // ---------------------------------------------------------------------------
+  // Исполнители
+  // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    if (!showAssigneeMenu || supportUsers.length > 0) {
-      return;
-    }
+    if (!showAssigneeMenu || supportUsers.length > 0) return;
 
     setLoadingUsers(true);
 
@@ -563,14 +598,12 @@ function TicketActions({
           variant: 'destructive',
         }),
       )
-      .finally(() => {
-        setLoadingUsers(false);
-      });
+      .finally(() => setLoadingUsers(false));
   }, [showAssigneeMenu, supportUsers.length, toast]);
 
-  /* ────────────────────────────────────────────────────────────────────── */
-  /* Архив                                                                 */
-  /* ────────────────────────────────────────────────────────────────────── */
+  // ---------------------------------------------------------------------------
+  // Архив
+  // ---------------------------------------------------------------------------
 
   const handleArchive = async () => {
     setArchiving(true);
@@ -581,17 +614,13 @@ function TicketActions({
       toast({ title: 'Заявка архивирована' });
 
       setShowArchiveConfirm(false);
-      setOpen(false);
-      setShowAssigneeMenu(false);
+      closeMenu();
 
       onTicketUpdated?.();
     } catch (error: any) {
       toast({
         title: 'Ошибка',
-        description:
-          error?.response?.status === 403
-            ? 'Нет прав'
-            : 'Не удалось архивировать',
+        description: error?.response?.status === 403 ? 'Нет прав' : 'Не удалось архивировать',
         variant: 'destructive',
       });
     } finally {
@@ -599,9 +628,9 @@ function TicketActions({
     }
   };
 
-  /* ────────────────────────────────────────────────────────────────────── */
-  /* Статус                                                                */
-  /* ────────────────────────────────────────────────────────────────────── */
+  // ---------------------------------------------------------------------------
+  // Статус
+  // ---------------------------------------------------------------------------
 
   const handleStatusChange = async (status: string) => {
     setUpdatingStatus(true);
@@ -614,17 +643,12 @@ function TicketActions({
         description: STATUS_MAP[status]?.label || status,
       });
 
-      setOpen(false);
-      setShowAssigneeMenu(false);
-
+      closeMenu();
       onTicketUpdated?.();
     } catch (error: any) {
       toast({
         title: 'Ошибка',
-        description:
-          error?.response?.status === 403
-            ? 'Нет прав'
-            : 'Не удалось обновить статус',
+        description: error?.response?.status === 403 ? 'Нет прав' : 'Не удалось обновить статус',
         variant: 'destructive',
       });
     } finally {
@@ -632,9 +656,9 @@ function TicketActions({
     }
   };
 
-  /* ────────────────────────────────────────────────────────────────────── */
-  /* Исполнитель                                                           */
-  /* ────────────────────────────────────────────────────────────────────── */
+  // ---------------------------------------------------------------------------
+  // Исполнитель
+  // ---------------------------------------------------------------------------
 
   const handleAssigneeChange = async (userId: string | null) => {
     setUpdatingAssignee(true);
@@ -646,17 +670,12 @@ function TicketActions({
         title: userId ? 'Исполнитель назначен' : 'Исполнитель снят',
       });
 
-      setOpen(false);
-      setShowAssigneeMenu(false);
-
+      closeMenu();
       onTicketUpdated?.();
     } catch (error: any) {
       toast({
         title: 'Ошибка',
-        description:
-          error?.response?.status === 403
-            ? 'Нет прав'
-            : 'Не удалось назначить исполнителя',
+        description: error?.response?.status === 403 ? 'Нет прав' : 'Не удалось назначить исполнителя',
         variant: 'destructive',
       });
     } finally {
@@ -664,9 +683,9 @@ function TicketActions({
     }
   };
 
-  /* ────────────────────────────────────────────────────────────────────── */
-  /* Доступные переходы                                                    */
-  /* ────────────────────────────────────────────────────────────────────── */
+  // ---------------------------------------------------------------------------
+  // Доступные переходы
+  // ---------------------------------------------------------------------------
 
   const getAvailableStatuses = (currentStatus: string): string[] => {
     const transitions: Record<string, string[]> = {
@@ -686,17 +705,16 @@ function TicketActions({
 
   const availableStatuses = getAvailableStatuses(ticket.status);
 
-  /* ────────────────────────────────────────────────────────────────────── */
-  /* Open                                                                  */
-  /* ────────────────────────────────────────────────────────────────────── */
+  // ---------------------------------------------------------------------------
+  // Open
+  // ---------------------------------------------------------------------------
 
   const handleToggleMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
 
     if (open) {
-      setOpen(false);
-      setShowAssigneeMenu(false);
+      closeMenu();
       return;
     }
 
@@ -707,7 +725,6 @@ function TicketActions({
   return (
     <>
       <div ref={ref} className="relative">
-        {/* Троеточие */}
         <button
           ref={buttonRef}
           type="button"
@@ -726,36 +743,37 @@ function TicketActions({
         </button>
       </div>
 
-      {/* Меню — через портал */}
+      {/* MENU (PORTAL) */}
       {open &&
         createPortal(
           <div
             ref={menuRef}
-            style={menuPosition}
-            className="
-              fixed z-[9999]
-              w-[270px]
-              overflow-hidden
-              rounded-xl
-              border border-[var(--border-color)]
-              bg-[var(--bg-card)]
-              shadow-2xl
-            "
+            style={
+              menuStyle ?? {
+                position: 'fixed',
+                top: -9999,
+                left: -9999,
+                width: 270,
+                zIndex: 2500,
+              }
+            }
+            className="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl"
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
             }}
           >
+            {/* ============================================================ */}
             {/* Задачи */}
+            {/* ============================================================ */}
+
             <div className="py-1.5">
               <button
                 type="button"
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
-
-                  setOpen(false);
-
+                  closeMenu();
                   navigate(`/tasks?ticket_id=${ticket.id}`);
                 }}
                 className="
@@ -767,10 +785,7 @@ function TicketActions({
                   hover:bg-[var(--hover-1)]
                 "
               >
-                <FolderOpen
-                  size={16}
-                  className="shrink-0 text-[var(--text-primary)]/40"
-                />
+                <FolderOpen size={16} className="shrink-0 text-[var(--text-primary)]/40" />
                 <span>Посмотреть задачи по заявке</span>
               </button>
 
@@ -779,9 +794,7 @@ function TicketActions({
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
-
-                  setOpen(false);
-
+                  closeMenu();
                   navigate(`/tasks?ticket_id=${ticket.id}&create=1`);
                 }}
                 className="
@@ -800,16 +813,17 @@ function TicketActions({
 
             <div className="mx-3 h-px bg-[var(--border-color)]" />
 
+            {/* ============================================================ */}
             {/* Статус */}
+            {/* ============================================================ */}
+
             <div className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)]/40">
               Изменить статус
             </div>
 
             <div className="px-2 pb-2">
               {availableStatuses.length === 0 ? (
-                <p className="px-2 py-2 text-sm text-[var(--text-primary)]/30">
-                  Нет доступных переходов
-                </p>
+                <p className="px-2 py-2 text-sm text-[var(--text-primary)]/30">Нет доступных переходов</p>
               ) : (
                 availableStatuses.map((status) => (
                   <button
@@ -819,7 +833,6 @@ function TicketActions({
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
-
                       handleStatusChange(status);
                     }}
                     className="
@@ -834,36 +847,19 @@ function TicketActions({
                       hover:bg-[var(--hover-2)]
                       hover:border-[var(--border-color)]
                       hover:text-[var(--text-primary)]
-                      focus-visible:outline-none
-                      focus-visible:bg-[var(--hover-2)]
-                      focus-visible:border-[var(--accent)]/40
                       disabled:opacity-50
                       disabled:cursor-not-allowed
                     "
                   >
-                    <span
-                      className={`
-                        w-2 h-2 rounded-full shrink-0
-                        ${STATUS_MAP[status]?.color || 'status-closed'}
-                      `}
-                    />
-
-                    <span className="flex-1 font-medium">
-                      {STATUS_MAP[status]?.label || status}
-                    </span>
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_MAP[status]?.color || 'status-closed'}`} />
+                    <span className="flex-1 font-medium">{STATUS_MAP[status]?.label || status}</span>
 
                     {updatingStatus ? (
                       <Loader2 size={14} className="animate-spin shrink-0" />
                     ) : (
                       <ChevronRight
                         size={14}
-                        className="
-                          shrink-0
-                          opacity-20
-                          transition-all duration-150
-                          group-hover/status:opacity-70
-                          group-hover/status:translate-x-0.5
-                        "
+                        className="shrink-0 opacity-20 transition-all duration-150 group-hover/status:opacity-70 group-hover/status:translate-x-0.5"
                       />
                     )}
                   </button>
@@ -873,14 +869,16 @@ function TicketActions({
 
             <div className="mx-3 h-px bg-[var(--border-color)]" />
 
+            {/* ============================================================ */}
             {/* Исполнитель */}
+            {/* ============================================================ */}
+
             <button
               type="button"
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-
-                setShowAssigneeMenu((value) => !value);
+                setShowAssigneeMenu((v) => !v);
               }}
               className="
                 flex w-full items-center
@@ -893,10 +891,7 @@ function TicketActions({
               "
             >
               <span className="flex min-w-0 items-center gap-3">
-                <UserCheck
-                  size={16}
-                  className="shrink-0 text-[var(--text-primary)]/40"
-                />
+                <UserCheck size={16} className="shrink-0 text-[var(--text-primary)]/40" />
                 <span>Исполнитель</span>
               </span>
 
@@ -912,22 +907,10 @@ function TicketActions({
             </button>
 
             {showAssigneeMenu && (
-              <div
-                className="
-                  max-h-[170px]
-                  overflow-y-auto
-                  overscroll-contain
-                  border-t border-[var(--border-color)]
-                  bg-[var(--hover-1)]/50
-                  py-1
-                "
-              >
+              <div className="max-h-[170px] overflow-y-auto overscroll-contain border-t border-[var(--border-color)] bg-[var(--hover-1)]/50 py-1">
                 {loadingUsers ? (
                   <div className="flex justify-center py-3">
-                    <Loader2
-                      size={16}
-                      className="animate-spin text-[var(--text-primary)]/40"
-                    />
+                    <Loader2 size={16} className="animate-spin text-[var(--text-primary)]/40" />
                   </div>
                 ) : (
                   <>
@@ -937,7 +920,6 @@ function TicketActions({
                       onClick={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
-
                         handleAssigneeChange(null);
                       }}
                       className="
@@ -950,10 +932,7 @@ function TicketActions({
                         disabled:opacity-50
                       "
                     >
-                      <X
-                        size={14}
-                        className="shrink-0 text-[var(--text-primary)]/40"
-                      />
+                      <X size={14} className="shrink-0 text-[var(--text-primary)]/40" />
                       <span>Снять исполнителя</span>
                     </button>
 
@@ -965,7 +944,6 @@ function TicketActions({
                         onClick={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
-
                           handleAssigneeChange(staffUser.id);
                         }}
                         className="
@@ -978,22 +956,13 @@ function TicketActions({
                           disabled:opacity-50
                         "
                       >
-                        <User
-                          size={14}
-                          className="shrink-0 text-[var(--text-primary)]/40"
-                        />
-
+                        <User size={14} className="shrink-0 text-[var(--text-primary)]/40" />
                         <span className="min-w-0 flex-1 truncate">
-                          {staffUser.full_name ||
-                            staffUser.username ||
-                            staffUser.email}
+                          {staffUser.full_name || staffUser.username || staffUser.email}
                         </span>
 
                         {ticket.assignee?.id === staffUser.id && (
-                          <Check
-                            size={14}
-                            className="ml-auto shrink-0 text-[var(--success)]"
-                          />
+                          <Check size={14} className="ml-auto shrink-0 text-[var(--success)]" />
                         )}
                       </button>
                     ))}
@@ -1004,15 +973,17 @@ function TicketActions({
 
             <div className="mx-3 h-px bg-[var(--border-color)]" />
 
+            {/* ============================================================ */}
             {/* Архив */}
+            {/* ============================================================ */}
+
             <button
               type="button"
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
 
-                setOpen(false);
-                setShowAssigneeMenu(false);
+                closeMenu();
                 setShowArchiveConfirm(true);
               }}
               className="
@@ -1024,43 +995,30 @@ function TicketActions({
                 hover:bg-[var(--hover-1)]
               "
             >
-              <Archive
-                size={16}
-                className="shrink-0 text-[var(--text-primary)]/40"
-              />
+              <Archive size={16} className="shrink-0 text-[var(--text-primary)]/40" />
               <span>В архив</span>
             </button>
           </div>,
-          document.body
+          document.body,
         )}
 
-      {/* Подтверждение архива */}
+      {/* ================================================================== */}
+      {/* Подтверждение архива (как у тебя, fixed и так поверх всего) */}
+      {/* ================================================================== */}
+
       {showArchiveConfirm && (
         <div
-          className="
-            fixed inset-0 z-[1000]
-            flex items-center justify-center
-            p-4
-          "
+          className="fixed inset-0 z-[1000] flex items-center justify-center p-4"
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
-
-            if (!archiving) {
-              setShowArchiveConfirm(false);
-            }
+            if (!archiving) setShowArchiveConfirm(false);
           }}
         >
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
           <div
-            className="
-              relative w-full max-w-sm
-              overflow-hidden rounded-2xl
-              border border-[var(--border-color)]
-              bg-[var(--bg-card)]
-              shadow-2xl
-            "
+            className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl"
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
@@ -1071,15 +1029,11 @@ function TicketActions({
                 <Archive className="h-6 w-6 text-amber-500" />
               </div>
 
-              <h3 className="mb-2 text-lg font-bold text-[var(--text-primary)]">
-                Переместить в архив?
-              </h3>
+              <h3 className="mb-2 text-lg font-bold text-[var(--text-primary)]">Переместить в архив?</h3>
 
               <p className="text-sm text-[var(--text-primary)]/50">
                 Заявка{' '}
-                <span className="font-mono text-[var(--accent)]">
-                  {ticket.number}
-                </span>{' '}
+                <span className="font-mono text-[var(--accent)]">{ticket.number}</span>{' '}
                 будет скрыта из основного списка
               </p>
             </div>
@@ -1091,17 +1045,9 @@ function TicketActions({
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
-
                   setShowArchiveConfirm(false);
                 }}
-                className="
-                  flex-1 py-3.5
-                  text-sm font-medium
-                  text-[var(--text-primary)]/60
-                  transition-colors
-                  hover:bg-[var(--hover-1)]
-                  disabled:opacity-50
-                "
+                className="flex-1 py-3.5 text-sm font-medium text-[var(--text-primary)]/60 transition-colors hover:bg-[var(--hover-1)] disabled:opacity-50"
               >
                 Отмена
               </button>
@@ -1112,26 +1058,11 @@ function TicketActions({
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
-
                   handleArchive();
                 }}
-                className="
-                  flex flex-1 items-center
-                  justify-center gap-2
-                  border-l border-[var(--border-color)]
-                  py-3.5
-                  text-sm font-semibold
-                  text-amber-500
-                  transition-colors
-                  hover:bg-amber-500/10
-                  disabled:opacity-50
-                "
+                className="flex flex-1 items-center justify-center gap-2 border-l border-[var(--border-color)] py-3.5 text-sm font-semibold text-amber-500 transition-colors hover:bg-amber-500/10 disabled:opacity-50"
               >
-                {archiving ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <Archive size={16} />
-                )}
+                {archiving ? <Loader2 size={16} className="animate-spin" /> : <Archive size={16} />}
                 В архив
               </button>
             </div>
