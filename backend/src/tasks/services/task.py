@@ -12,7 +12,7 @@ from src.shared.domain.exceptions import InvalidStateError, NotFoundError
 from src.shared.domain.repos import UnitOfWork, finalize, get_or_raise_404
 from src.shared.domain.vo import Priority, Tag
 from src.tickets.domain.entities import Ticket
-from src.tickets.domain.repos import TicketRepository
+from src.tickets.services.repos import TicketRepository
 
 from ..domain.authz import TaskAuthZService
 from ..domain.entities import Task

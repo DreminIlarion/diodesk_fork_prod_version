@@ -11,10 +11,10 @@ from src.comments.infra.models import CommentOrm, ReactionOrm
 from src.shared.infra.repos import SqlAlchemyRepository
 from src.shared.schemas import Page, Pagination
 
-from ..domain.dtos import ActorsFilters
 from ..domain.entities import Comment, Reaction, Ticket
-from ..domain.repos import ReactionStats, TicketFilters
+from ..domain.repos import ReactionStats
 from ..domain.vo import ReactionType
+from ..schemas import TicketActorsFilters, TicketFilters
 from .mappers import CommentMapper, ReactionMapper, TicketMapper
 from .models import TicketOrm
 
@@ -36,7 +36,7 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
         return None if model is None else self.model_mapper.to_entity(model)
 
     def _apply_actors_filters(
-            self, stmt: Select[tuple[TicketOrm]], filters: ActorsFilters,
+            self, stmt: Select[tuple[TicketOrm]], filters: TicketActorsFilters,
     ) -> Select[tuple[TicketOrm]]:
         if filters.assignee_id:
             stmt = stmt.where(self.model.assignee_id == filters.assignee_id)
@@ -69,10 +69,6 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
         if filters.project_ids:
             stmt = stmt.where(self.model.project_id.in_(filters.project_ids))
 
-        # фильтр по этапам проекта
-        # if filters.stage_ids:
-        #     stmt = stmt.where(self.model.stage_id.in_(filters.stage_ids))
-
         # фильтр по контрагенту
         if filters.counterparty_id:
             stmt = stmt.where(self.model.counterparty_id == filters.counterparty_id)
@@ -87,8 +83,11 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
         if filters.actors:
             stmt = self._apply_actors_filters(stmt, filters.actors)
 
-        if filters.time_range:
-            stmt = self._apply_time_range_filters(stmt, filters.time_range)
+        if filters.created_after is not None:
+            stmt = stmt.where(self.model.created_at >= filters.created_after)
+
+        if filters.created_before is not None:
+            stmt = stmt.where(self.model.created_at <= filters.created_before)
 
         return stmt
 

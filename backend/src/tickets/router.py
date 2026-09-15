@@ -36,7 +36,7 @@ from .schemas import (
     TicketAssign,
     TicketCreate,
     TicketEdit,
-    TicketFiltersRequest,
+    TicketFilters,
     TicketParticipant,
     TicketPredict,
     TicketResponse,
@@ -47,25 +47,125 @@ from .services import TicketService
 
 router = APIRouter(prefix="/tickets", tags=["Заявки"])
 
-type TicketStatusStrategy = Callable[
-    [TicketService, UUID, Subject], Awaitable[TicketResponse]
+type TicketStatusHandler = Callable[
+    [TicketService, UUID, Subject],
+    Awaitable[TicketResponse],
 ]
 
-TICKET_STATUS_STRATEGIES: dict[TicketStatus, TicketStatusStrategy] = {
-    TicketStatus.PENDING_APPROVAL: lambda service, ticket_id, subject: (
-        service.submit_for_approval(ticket_id, subject)
-    ),
-    TicketStatus.OPEN: lambda service, ticket_id, subject: service.approve(ticket_id, subject),
-    TicketStatus.IN_PROGRESS: lambda service, ticket_id, subject: service.start_progress(
-        ticket_id, subject
-    ),
-    TicketStatus.WAITING: lambda service, ticket_id, subject: service.wait(ticket_id, subject),
-    TicketStatus.RESOLVED: lambda service, ticket_id, subject: service.resolve(ticket_id, subject),
-    TicketStatus.CLOSED: lambda service, ticket_id, subject: service.close(ticket_id, subject),
-    TicketStatus.CANCELED: lambda service, ticket_id, subject: service.cancel(ticket_id, subject),
-    TicketStatus.REJECTED: lambda service, ticket_id, subject: service.reject(ticket_id, subject),
-    TicketStatus.REOPENED: lambda service, ticket_id, subject: service.reopen(ticket_id, subject),
-}
+_ticket_status_handlers: dict[TicketStatus, TicketStatusHandler] = {}
+
+
+def register_ticket_status_handler(
+        target_status: TicketStatus,
+) -> Callable[[TicketStatusHandler], TicketStatusHandler]:
+    """Зарегистрировать обработчик перехода тикета в указанный статус"""
+
+    def decorator(handler: TicketStatusHandler) -> TicketStatusHandler:
+        """Добавить обработчик в реестр и вернуть исходную функцию"""
+
+        _ticket_status_handlers[target_status] = handler
+        return handler
+
+    return decorator
+
+
+@register_ticket_status_handler(TicketStatus.PENDING_APPROVAL)
+async def transition_to_pending_approval(
+        service: TicketService,
+        ticket_id: UUID,
+        current_subject: Subject,
+) -> TicketResponse:
+    """Отправить тикет на согласование"""
+
+    return await service.submit_for_approval(ticket_id, current_subject)
+
+
+@register_ticket_status_handler(TicketStatus.OPEN)
+async def transition_to_open(
+        service: TicketService,
+        ticket_id: UUID,
+        current_subject: Subject,
+) -> TicketResponse:
+    """Согласовать тикет и перевести его в открытый статус"""
+
+    return await service.approve(ticket_id, current_subject)
+
+
+@register_ticket_status_handler(TicketStatus.IN_PROGRESS)
+async def transition_to_in_progress(
+        service: TicketService,
+        ticket_id: UUID,
+        current_subject: Subject,
+) -> TicketResponse:
+    """Взять тикет в работу"""
+
+    return await service.start_progress(ticket_id, current_subject)
+
+
+@register_ticket_status_handler(TicketStatus.WAITING)
+async def transition_to_waiting(
+        service: TicketService,
+        ticket_id: UUID,
+        current_subject: Subject,
+) -> TicketResponse:
+    """Перевести тикет в ожидание ответа"""
+
+    return await service.wait(ticket_id, current_subject)
+
+
+@register_ticket_status_handler(TicketStatus.RESOLVED)
+async def transition_to_resolved(
+        service: TicketService,
+        ticket_id: UUID,
+        current_subject: Subject,
+) -> TicketResponse:
+    """Отметить тикет как решённый"""
+
+    return await service.resolve(ticket_id, current_subject)
+
+
+@register_ticket_status_handler(TicketStatus.CLOSED)
+async def transition_to_closed(
+        service: TicketService,
+        ticket_id: UUID,
+        current_subject: Subject,
+) -> TicketResponse:
+    """Закрыть тикет"""
+
+    return await service.close(ticket_id, current_subject)
+
+
+@register_ticket_status_handler(TicketStatus.CANCELED)
+async def transition_to_canceled(
+        service: TicketService,
+        ticket_id: UUID,
+        current_subject: Subject,
+) -> TicketResponse:
+    """Отменить тикет"""
+
+    return await service.cancel(ticket_id, current_subject)
+
+
+@register_ticket_status_handler(TicketStatus.REJECTED)
+async def transition_to_rejected(
+        service: TicketService,
+        ticket_id: UUID,
+        current_subject: Subject,
+) -> TicketResponse:
+    """Отклонить тикет"""
+
+    return await service.reject(ticket_id, current_subject)
+
+
+@register_ticket_status_handler(TicketStatus.REOPENED)
+async def transition_to_reopened(
+        service: TicketService,
+        ticket_id: UUID,
+        current_subject: Subject,
+) -> TicketResponse:
+    """Переоткрыть тикет"""
+
+    return await service.reopen(ticket_id, current_subject)
 
 
 @router.post(
@@ -88,14 +188,14 @@ async def create_ticket(
     summary="Получить список тикетов",
 )
 async def search_tickets(
-        filters: TicketFiltersRequest,
+        filters: TicketFilters,
         current_subject: CurrentSubjectDep,
         pagination: PaginationDep,
         service: TicketQueryServiceDep,
 ) -> Page[TicketViewResponse]:
     return await service.get_tickets(
         pagination,
-        filters=filters.to_domain(),
+        filters=filters,
         current_subject=current_subject,
     )
 
@@ -359,7 +459,7 @@ async def change_ticket_status(
         current_subject: CurrentSubjectDep,
         service: TicketServiceDep,
 ) -> TicketResponse:
-    handler = TICKET_STATUS_STRATEGIES.get(data.status)
+    handler = _ticket_status_handlers.get(data.status)
     if handler is None:
         raise ValueError(f"Unsupported target status: {data.status.value}")
 

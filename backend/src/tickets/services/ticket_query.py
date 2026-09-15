@@ -10,9 +10,9 @@ from src.shared.schemas import Page, Pagination
 from ..consts import PARTICIPANT_FIELDS
 from ..data_loaders import ReferenceLoader
 from ..domain.entities import Ticket
-from ..domain.repos import TicketFilters, TicketRepository
 from ..mappers import map_ticket_to_view_response
-from ..schemas import TicketParticipant, TicketViewResponse
+from ..schemas import TicketFilters, TicketParticipant, TicketViewResponse
+from .repos import TicketRepository
 
 
 def _collect_participants_ids(ticket: Ticket) -> set[UUID]:
@@ -65,25 +65,20 @@ class TicketQueryService:
     ) -> Page[TicketViewResponse]:
         # Принудительный фильтр для клиентов
         if (
-                current_subject is not None
-                and current_subject.has_any_role(UserRole.customer_roles())
+            current_subject is not None
+            and current_subject.has_any_role(UserRole.customer_roles())
         ):
-            client_cp_id = current_subject.counterparty_id
-            if filters is None:
-                filters = TicketFilters(counterparty_id=client_cp_id)
-            else:
-                filters = TicketFilters(
-                    search_query=filters.search_query,
-                    tags=filters.tags,
-                    counterparty_id=client_cp_id or filters.counterparty_id,
-                    project_ids=filters.project_ids,
-                    # stage_ids=filters.stage_ids,
-                    statuses=filters.statuses,
-                    priorities=filters.priorities,
-                    type=filters.type,
-                    actors=filters.actors,
-                    time_range=filters.time_range,
-                )
+            client_counterparty_id = current_subject.counterparty_id
+            current_filters = filters or TicketFilters()
+
+            filters = current_filters.model_copy(
+                update={
+                    "counterparty_id": (
+                        client_counterparty_id or current_filters.counterparty_id
+                    )
+                }
+            )
+
         page = await self.ticket_repo.paginate(pagination, filters=filters)
 
         relations = await self.reference_loader.load(

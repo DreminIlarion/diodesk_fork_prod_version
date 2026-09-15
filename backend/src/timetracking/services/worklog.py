@@ -3,6 +3,8 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.tickets.services.repos import TicketRepository
+
 from ...iam.domain.exceptions import PermissionDeniedError
 from ...iam.schemas import CurrentUser
 from ...shared.domain.events import EventPublisher
@@ -10,7 +12,6 @@ from ...shared.domain.exceptions import NotFoundError
 from ...tasks.domain.entities import Task
 from ...tasks.domain.repos import TaskRepository
 from ...tickets.domain.entities import Ticket
-from ...tickets.domain.repos import TicketRepository
 from ..domain.authz import can_edit_worklog, can_log_time
 from ..domain.entities import Worklog
 from ..domain.repos import WorklogRepository

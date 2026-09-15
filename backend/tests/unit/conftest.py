@@ -26,9 +26,9 @@ from src.tickets.domain.entities import Ticket
 from src.tickets.domain.repos import (
     CommentRepository,
     ReactionRepository,
-    TicketRepository,
 )
 from src.tickets.domain.vo import TicketNumber, TicketStatus, TicketType
+from src.tickets.services.repos import TicketRepository
 
 from .in_memory_repos import (
     InMemoryCommentRepository,
