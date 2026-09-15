@@ -8,10 +8,11 @@ from src.shared.domain.exceptions import NotFoundError
 from src.shared.schemas import Page, Pagination
 
 from ..domain.entities import Comment, Ticket
-from ..domain.repos import CommentRepository, ReactionRepository, TicketRepository
+from ..domain.repos import CommentRepository, ReactionRepository
 from ..domain.vo import CommentType
 from ..mappers import map_comment_to_response, map_comment_with_reactions_to_response
 from ..schemas import CommentCreate, CommentEdit, CommentResponse, CommentWithReactionsResponse
+from .repos import TicketRepository
 
 
 class CommentService:

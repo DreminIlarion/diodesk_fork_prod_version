@@ -2,7 +2,7 @@ from typing import Annotated
 
 from uuid import UUID
 
-from fastapi import Body, Depends, Query
+from fastapi import Depends
 
 from src.activity_logs.dependencies import ActivityLogRecorderDep
 from src.core.database import session_factory
@@ -17,23 +17,18 @@ from src.projects.domain.entities import Project
 from src.projects.infra.repos import SqlProjectRepository
 from src.shared.dependencies import (
     EventPublisherDep,
-    PaginationDep,
     SessionDep,
-    TimeRangeFiltersDep,
 )
-from src.shared.domain.vo import Priority
-from src.shared.schemas import Page
+from src.tickets.services.repos import TicketRepository
 
 from ..shared.domain.repos import get_or_raise_404
 from .data_loaders import ReferenceLoader
 from .domain.authz import TicketAuthZService
-from .domain.dtos import ActorsFilters, TicketFilters
 from .domain.entities import Ticket
-from .domain.repos import CommentRepository, ReactionRepository, TicketRepository
-from .domain.vo import TicketStatus, TicketType
+from .domain.repos import CommentRepository, ReactionRepository
 from .infra.repos import SqlCommentRepository, SqlReactionRepository, SqlTicketRepository
 from .mappers import map_ticket_to_response
-from .schemas import TicketResponse, TicketViewResponse
+from .schemas import TicketResponse
 from .services import CommentService, ReactionService, TicketQueryService, TicketService
 
 
@@ -152,77 +147,6 @@ CommentServiceDep = Annotated[CommentService, Depends(get_comment_service)]
 ReactionServiceDep = Annotated[ReactionService, Depends(get_reaction_service)]
 
 
-def get_ticket_filters(
-        time_range: TimeRangeFiltersDep,
-        statuses: Annotated[
-            list[TicketStatus] | None, Query(max_length=5, description="По статусу")
-        ] = None,
-        priorities: Annotated[
-            Priority | None, Query(description="По приоритету")  # ИСПРАВЛЕНО
-        ] = None,
-        ticket_type: Annotated[
-            TicketType | None, Query(description="По виду заявки")
-        ] = None,
-        tags: Annotated[
-            list[str] | None, Query(max_length=10, description="По тегам")
-        ] = None,
-        q: Annotated[str | None, Query(description="Поисковый запрос")] = None,
-) -> TicketFilters:
-    return TicketFilters(
-        search_query=q,
-        counterparty_id=...,
-        project_ids=...,
-        statuses=statuses,
-        priorities=[priorities] if priorities else None,  # Оборачиваем в список
-        type=ticket_type,
-        tags=tags,
-        actors=...,
-        time_range=time_range,
-    )
-
-
-TicketFiltersDep = Annotated[TicketFilters, Depends(get_ticket_filters)]
-
-
-def get_ticket_filters_from_body(
-        time_range: TimeRangeFiltersDep,
-        search_query: Annotated[str | None, Body()] = None,
-        tags: Annotated[list[str] | None, Body()] = None,
-        counterparty_id: Annotated[UUID | None, Body()] = None,
-        project_ids: Annotated[list[UUID] | None, Body()] = None,
-        # stage_ids: Annotated[list[UUID] | None, Body()] = None,
-        statuses: Annotated[list[TicketStatus] | None, Body()] = None,
-        priorities: Annotated[Priority | None, Body()] = None,
-        ticket_type: Annotated[TicketType | None, Body(alias="type")] = None,
-        actors: Annotated[dict | None, Body()] = None,
-) -> TicketFilters:
-    return TicketFilters(
-        search_query=search_query,
-        counterparty_id=counterparty_id,
-        project_ids=set(project_ids) if project_ids else None,
-        # stage_ids=set(stage_ids) if stage_ids else None,
-        statuses=statuses,
-        priorities=[priorities] if priorities else None,
-        type=ticket_type,
-        tags=tags,
-        actors=ActorsFilters(
-            assignee_id=actors.get("assignee_id"),
-            reporter_id=actors.get("reporter_id"),
-            creator_id=actors.get("creator_id"),
-        ) if actors else None,
-        time_range=time_range,
-    )
-
-
-TicketFiltersBodyDep = Annotated[TicketFilters, Depends(get_ticket_filters_from_body)]
-
-
 async def get_ticket_or_404(ticket_id: UUID, ticket_repo: TicketRepoDep) -> TicketResponse:
     ticket = await get_or_raise_404(ticket_repo.read, ticket_id, Ticket)
     return map_ticket_to_response(ticket)
-
-
-async def paginate_tickets(
-        pagination: PaginationDep, filters: TicketFilters, service: TicketQueryServiceDep,
-) -> Page[TicketViewResponse]:
-    return await service.get_tickets(pagination, filters=filters)

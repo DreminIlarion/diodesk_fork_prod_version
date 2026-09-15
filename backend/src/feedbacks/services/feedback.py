@@ -7,7 +7,7 @@ from src.shared.domain.exceptions import AlreadyExistsError, NotFoundError
 from src.shared.domain.repos import UnitOfWork, finalize, get_or_raise_404
 from src.shared.schemas import Page, Pagination
 from src.tickets.domain.entities import Ticket
-from src.tickets.domain.repos import TicketRepository
+from src.tickets.services.repos import TicketRepository
 
 from ..domain.authz import FeedbackAuthZService
 from ..domain.entities import Feedback

@@ -684,7 +684,7 @@ export const ticketsApi = {
           : undefined,
 
         //  Приоритет
-        priorities: filters?.priority || undefined,
+        priorities: filters?.priority ? [filters.priority] : undefined,
 
         //  Тип
         type: filters?.ticket_type || undefined,
@@ -707,13 +707,12 @@ export const ticketsApi = {
           reporter_id: filters?.reporter_id || undefined,
         } : undefined,
 
-
+        created_after: filters?.created_after || undefined,
+        created_before: filters?.created_before || undefined,
       },
       {
         params: {
           page, size,
-          created_after: filters?.created_after || undefined,
-          created_before: filters?.created_before || undefined,
         }
       }
     );

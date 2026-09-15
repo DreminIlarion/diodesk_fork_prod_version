@@ -106,7 +106,14 @@ class TicketAuthZService:
                 SameCounterpartyRule(subject, ticket.counterparty_id)
             ),
         ]
-        return AnyOf(*rules).check()    
+        return AnyOf(*rules).check()
+
+    @staticmethod
+    def can_reject_ticket(
+        subject: Subject,
+        ticket: Ticket,
+    ) -> PermissionResult:
+        return TicketAuthZService.can_edit_ticket(subject, ticket)
 
     async def can_track_ticket(self, subject: Subject, ticket: Ticket) -> PermissionResult:
         """

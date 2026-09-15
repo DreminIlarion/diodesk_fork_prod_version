@@ -18,8 +18,9 @@ from src.shared.utils.time import current_datetime
 from src.tasks.domain.entities import Task
 from src.tasks.domain.vo import TaskNumber
 from src.tickets.domain.entities import Comment, Reaction, Ticket
-from src.tickets.domain.repos import ReactionStats, TicketFilters
+from src.tickets.domain.repos import ReactionStats
 from src.tickets.domain.vo import CommentType, ReactionType
+from src.tickets.schemas import TicketFilters
 
 
 class InMemoryCounterpartyRepository(InMemoryRepository[Counterparty]):

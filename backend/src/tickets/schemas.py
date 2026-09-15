@@ -73,10 +73,6 @@ class TicketBase(BaseModel):
     project_id: UUID | None = Field(
         None, description="ID проекта, к которому нужно привязать тикет"
     )
-    # stage_id: UUID | None = Field(
-    #     None,
-    #     description="ID этапа проекта, к которому относится заявка",
-    # )
     counterparty_id: UUID | None = Field(None, description="Контрагент к которому привязан тикет")
     product_id: UUID | None = Field(
         None, description="Программный продукт к которому привязан тикет"
@@ -101,10 +97,6 @@ class TicketPreview(BaseModel):
     type: TicketType = Field(..., description="Тип заявки")
     status: TicketStatus = Field(..., description="Текущий статус")
     priority: Priority = Field(..., description="Приоритет")
-    # stage_id: UUID | None = Field(
-    #     None,
-    #     description="ID этапа проекта",
-    # )
 
 
 class TicketViewResponse(BaseModel):
@@ -129,10 +121,6 @@ class TicketViewResponse(BaseModel):
     type: TicketType = Field(..., description="Тип заявки")
     status: TicketStatus = Field(..., description="Текущий статус")
     priority: Priority = Field(..., description="Приоритет")
-    # stage_id: UUID | None = Field(
-    #     None,
-    #     description="ID этапа проекта",
-    # )
     has_attachments: bool = Field(False, description="Есть ли прикреплённые файлы")
 
 
@@ -201,10 +189,6 @@ class TicketEdit(BaseModel):
     description: str | None = Field(None, description="Описание")
     priority: Priority | None = Field(None, description="Приоритет")
     tags: list[Tag] | None = Field(None, description="Теги")
-    # stage_id: UUID | None = Field(
-    #     None,
-    #     description="Новый этап проекта",
-    # )
 
 
 class TicketPredict(BaseModel):
@@ -263,3 +247,26 @@ class TicketParticipant(BaseModel):
     ticket_id: UUID = Field(description="Идентификатор заявки")
     user: UserReference = Field(description="Ссылка на пользователя")
     roles: set[TicketParticipantRole] = Field(description="Роль участника в рамках заявки")
+
+
+class TicketActorsFilters(BaseModel):
+    """Фильтры тикетов по участникам"""
+
+    assignee_id: UUID | None = None
+    reporter_id: UUID | None = None
+    creator_id: UUID | None = None
+
+
+class TicketFilters(BaseModel):
+    """Параметры фильтрации тикетов"""
+
+    search_query: str | None = None
+    tags: list[str] | None = Field(None, max_length=10)
+    counterparty_id: UUID | None = None
+    project_ids: set[UUID] | None = None
+    statuses: list[TicketStatus] | None = Field(None, max_length=5)
+    priorities: list[Priority] | None = None
+    type: TicketType | None = None
+    actors: TicketActorsFilters | None = None
+    created_after: datetime | None = None
+    created_before: datetime | None = None
