@@ -1,6 +1,6 @@
-from typing import Annotated
+from typing import Annotated, Any
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from uuid import UUID
 
 from fastapi import Depends, Query
@@ -14,7 +14,7 @@ from src.shared.domain.repos import get_or_raise_404
 from src.shared.infra.mail import SmtpMailSender
 from src.shared.schemas import Page
 
-from .domain.authz import Subject
+from .domain.authz import Subject, SubjectType
 from .domain.entities import Invitation
 from .domain.exceptions import PermissionDeniedError, UnauthorizedError
 from .domain.repos import InvitationRepository, TokenStore, UserFilters, UserRepository
@@ -89,27 +89,90 @@ AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 InvitationServiceDep = Annotated[InvitationService, Depends(get_invitation_service)]
 
 
+def _require_claim[T](
+    payload: dict[str, Any],
+    field: str,
+    expected_type: Callable[[Any], T],
+) -> T:
+    if field not in payload or payload[field] is None:
+        raise UnauthorizedError(
+            f"Missing required claim '{field}'."
+        )
+
+    try:
+        return expected_type(payload[field])
+    except (TypeError, ValueError):
+        raise UnauthorizedError(
+            f"Invalid claim '{field}' value."
+        ) from None
+
+
+def _optional_claim[T](
+    payload: dict[str, Any],
+    field: str,
+    expected_type: Callable[[Any], T],
+) -> T | None:
+    value = payload.get(field)
+
+    if value is None:
+        return None
+
+    try:
+        return expected_type(value)
+    except (TypeError, ValueError):
+        raise UnauthorizedError(
+            f"Invalid claim '{field}' value."
+        ) from None
+
+
+def _build_subject_from_payload(
+    payload: dict[str, Any],
+) -> Subject:
+    if payload.get("type") != "access":
+        raise UnauthorizedError("Invalid token type.")
+
+    raw_roles = _require_claim(payload, "roles", list)
+
+    try:
+        roles = [UserRole(role) for role in raw_roles]
+    except (TypeError, ValueError):
+        raise UnauthorizedError(
+            "Invalid claim 'roles' value."
+        ) from None
+
+    return Subject(
+        id=_require_claim(payload, "sub", UUID),
+        type=_require_claim(
+            payload,
+            "sub_type",
+            SubjectType,
+        ),
+        email=_optional_claim(
+            payload,
+            "email",
+            Email,
+        ),
+        roles=roles,
+        counterparty_id=_optional_claim(
+            payload,
+            "counterparty_id",
+            UUID,
+        ),
+        scopes=payload.get("scopes", []),
+    )
+
+
 async def get_current_subject(
         token: Annotated[str, Depends(oauth2_scheme)],
         blacklist: Annotated[TokenStore, Depends(get_token_store)],
 ) -> Subject:
     payload = validate_token(token)
-    jti, sub, type_ = payload.get("jti"), payload.get("sub"), payload.get("sub_type")
+    jti = payload.get("jti")
 
     if jti is None or await blacklist.is_revoked(jti):
         raise UnauthorizedError("Token has been revoked or missing jti")
 
-    if sub is None:
-        raise UnauthorizedError("Invalid token: missing sub claim")
-
-    return Subject(
-        id=sub,
-        type=type_,
-        email=Email(payload["email"]) if "email" in payload else None,
-        roles=payload.get("roles", []),
-        counterparty_id=payload.get("counterparty_id"),
-        scopes=payload.get("scopes", []),
-    )
+    return _build_subject_from_payload(payload)
 
 
 def get_current_user(current_subject: Subject = Depends(get_current_subject)) -> CurrentUser:
