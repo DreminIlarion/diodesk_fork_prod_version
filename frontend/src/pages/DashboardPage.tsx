@@ -787,7 +787,7 @@ const statCards = [
                     </div>
 
                     <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-sm text-[var(--text-primary)]">
+                      <span className="font-mono text-sm text-[var(--text-primary)]/45">
                         #{ticket.number}
                       </span>
 
