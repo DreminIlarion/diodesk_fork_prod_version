@@ -776,18 +776,18 @@ const statCards = [
                       </p>
 
                       <div className="hidden shrink-0 text-right sm:block">
-                        <p className="text-sm text-[var(--text-primary)]/50">
+                        <p className="text-sm text-[var(--text-primary)]">
                           {formatDate(ticket.created_at)}
                         </p>
 
-                        <p className="mt-0.5 text-xs text-[var(--text-primary)]/30">
+                        <p className="mt-0.5 text-xs text-[var(--text-primary)]">
                           {formatTime(ticket.created_at)}
                         </p>
                       </div>
                     </div>
 
                     <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-sm text-[var(--text-primary)]/45">
+                      <span className="font-mono text-sm text-[var(--text-primary)]">
                         #{ticket.number}
                       </span>
 
@@ -810,7 +810,7 @@ const statCards = [
                       </span>
                     </div>
 
-                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--text-primary)]/40">
+                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--text-primary)]">
                       {ticket.counterparty?.name && (
                         <span className="flex min-w-0 max-w-[180px] items-center gap-1.5">
                           <Building2 className="h-3.5 w-3.5 shrink-0" />

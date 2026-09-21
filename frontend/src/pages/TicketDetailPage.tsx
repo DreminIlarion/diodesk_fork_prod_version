@@ -339,6 +339,9 @@ export default function TicketDetailPage() {
   const [editNewTag, setEditNewTag] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
+
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+
   // Computed
   const sortedRootComments = useMemo(() => {
     const roots = normalizedComments.rootIds
@@ -357,7 +360,25 @@ export default function TicketDetailPage() {
     );
   }, [ticket?.history]);
 
-  const availableStatuses = (ticket?.status && STATUS_TRANSITIONS[ticket.status]) || [];
+  const availableStatuses = useMemo(
+    () => (ticket?.status ? STATUS_TRANSITIONS[ticket.status] || [] : []),
+    [ticket?.status]
+  );
+
+  const allStatuses = useMemo(
+    () => Object.keys(STATUS_LABELS),
+    []
+  );
+
+  const canTransitionToStatus = useCallback(
+    (status: string) => {
+      if (!canChangeStatus) return false;
+      if (status === ticket?.status) return false;
+
+      return availableStatuses.includes(status);
+    },
+    [canChangeStatus, ticket?.status, availableStatuses]
+  );
   const canWriteInternal = isStaff;
 
   const tabs = useMemo(() => {
@@ -414,13 +435,36 @@ export default function TicketDetailPage() {
     return ticket.assignee_id.slice(0, 8);
   }, [ticket?.assignee_id, supportUsers, user]);
 
-  const filteredUsers = useMemo(() =>
-    supportUsers.filter(u =>
-      !searchUser ||
-      u.full_name?.toLowerCase().includes(searchUser.toLowerCase()) ||
-      u.username?.toLowerCase().includes(searchUser.toLowerCase()) ||
-      u.email?.toLowerCase().includes(searchUser.toLowerCase())
-    ), [supportUsers, searchUser]);
+  const filteredUsers = useMemo(() => {
+    const query = searchUser.trim().toLowerCase();
+
+    return supportUsers
+      .filter(u =>
+        !query ||
+        u.full_name?.toLowerCase().includes(query) ||
+        u.username?.toLowerCase().includes(query) ||
+        u.email?.toLowerCase().includes(query)
+      )
+      .sort((a, b) => {
+        // Текущий пользователь всегда первый
+        if (a.id === user?.user_id) return -1;
+        if (b.id === user?.user_id) return 1;
+
+        // Текущий исполнитель — следующим
+        if (a.id === ticket?.assignee_id) return -1;
+        if (b.id === ticket?.assignee_id) return 1;
+
+        const nameA = a.full_name || a.username || a.email || '';
+        const nameB = b.full_name || b.username || b.email || '';
+
+        return nameA.localeCompare(nameB, 'ru');
+      });
+  }, [
+    supportUsers,
+    searchUser,
+    user?.user_id,
+    ticket?.assignee_id,
+  ]);
 
   const formatRelativeTime = useCallback((d: string) => {
     const ms = Date.now() - new Date(d).getTime();
@@ -643,39 +687,39 @@ export default function TicketDetailPage() {
   /* ═══════════════════════════════════════════════════════════════════
      FEEDBACK BANNER LOGIC
      ═══════════════════════════════════════════════════════════════════ */
-useEffect(() => {
-  if (!ticket || !user) return;
+  useEffect(() => {
+    if (!ticket || !user) return;
 
-  if (ticket.status !== 'closed') {
-    setFeedbackBannerState('hidden');
-    return;
-  }
-
-  // Проверяем только: является ли пользователь автором заявки
-  const isAuthor = user.id === ticket.created_by || user.id === ticket.reporter_id;
-  if (!isAuthor) {
-    setFeedbackBannerState('hidden');
-    return;
-  }
-
-  setFeedbackBannerState('loading');
-
-  feedbacksApi.getAll(1, 10, {
-    ticketId: ticket.id,
-    author_id: user.id,
-  }).then(res => {
-    if (res.items.length > 0) {
-      setExistingFeedback(res.items[0]);
-      setFeedbackBannerState('hidden'); // уже есть отзыв — не показываем
-    } else {
-      setFeedbackBannerState('show');
-      // ✅ АВТОМАТИЧЕСКИ ОТКРЫВАЕМ МОДАЛКУ
-      setShowFeedbackForm(true);
+    if (ticket.status !== 'closed') {
+      setFeedbackBannerState('hidden');
+      return;
     }
-  }).catch(() => {
-    setFeedbackBannerState('hidden');
-  });
-}, [ticket?.id, ticket?.status, user?.id]);
+
+    // Проверяем только: является ли пользователь автором заявки
+    const isAuthor = user.id === ticket.created_by || user.id === ticket.reporter_id;
+    if (!isAuthor) {
+      setFeedbackBannerState('hidden');
+      return;
+    }
+
+    setFeedbackBannerState('loading');
+
+    feedbacksApi.getAll(1, 10, {
+      ticketId: ticket.id,
+      author_id: user.id,
+    }).then(res => {
+      if (res.items.length > 0) {
+        setExistingFeedback(res.items[0]);
+        setFeedbackBannerState('hidden'); // уже есть отзыв — не показываем
+      } else {
+        setFeedbackBannerState('show');
+        // ✅ АВТОМАТИЧЕСКИ ОТКРЫВАЕМ МОДАЛКУ
+        setShowFeedbackForm(true);
+      }
+    }).catch(() => {
+      setFeedbackBannerState('hidden');
+    });
+  }, [ticket?.id, ticket?.status, user?.id]);
 
   /* ═══════════════════════════════════════════════════════════════════
      HANDLERS
@@ -1587,51 +1631,175 @@ useEffect(() => {
                   </div>
 
                   {/* Изменить статус */}
-                  <div className=" overflow-hidden">
+                  <div className="overflow-visible">
                     <div className="p-3">
-                      <div className="flex items-center gap-3 mb-4">
+                      <div className="flex items-center gap-3 mb-3">
                         <RefreshCw className="w-5 h-5 text-[var(--text-primary)]/40" />
-                        <span className="text-lg text-[var(--text-primary)]/70">
-                          Изменить статус на{' '}
-                        </span>
+
+                        <div>
+                          <span className="text-lg text-[var(--text-primary)]/70">
+                            Изменить статус
+                          </span>
+
+                          <p className="text-sm text-[var(--text-primary)]/35 mt-0.5">
+                            Доступные переходы подсвечены
+                          </p>
+                        </div>
                       </div>
 
                       {!canChangeStatus ? (
                         <div className="flex items-center gap-3 text-[var(--text-primary)]/50">
                           <AlertCircle className="w-5 h-5" />
                           <span className="text-base">
-                            Недостаточно прав
-                          </span>
-                        </div>
-                      ) : availableStatuses.length === 0 ? (
-                        <div className="flex items-center gap-3 text-[var(--text-primary)]/50">
-                          <CheckCircle2 className="w-5 h-5" />
-                          <span className="text-base">
-                            Нет доступных переходов
+                            Недостаточно прав для изменения статуса
                           </span>
                         </div>
                       ) : (
-                        <div className="space-y-2">
-                          {availableStatuses.map((status) => (
-                            <button
-                              key={status}
-                              onClick={() => handleStatusChange(status)}
-                              disabled={updatingStatus}
-                              className="w-full flex items-center justify-between px-4 py-3 rounded-lg bg-[var(--hover-2)] hover:bg-[var(--hover-3)] border border-[var(--border-color)] text-[var(--text-primary)]/80 hover:text-[var(--text-primary)] text-base font-medium disabled:opacity-50 transition-colors"
-                            >
-                              <span className="flex items-center gap-2">
-                                {updatingStatus ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <ChevronRight className="w-4 h-4 opacity-50" />
+                        <div className="relative">
+                          {/* Кнопка dropdown */}
+                          <button
+                            type="button"
+                            disabled={updatingStatus}
+                            onClick={() => setShowStatusDropdown(prev => !prev)}
+                            className="
+            w-full flex items-center justify-between gap-4
+            px-4 py-3.5 rounded-xl
+            bg-[var(--hover-2)]
+            hover:bg-[var(--hover-3)]
+            border border-[var(--border-color)]
+            transition-colors
+            disabled:opacity-50
+          "
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              {updatingStatus ? (
+                                <Loader2 className="w-5 h-5 animate-spin text-[var(--text-primary)]/50 shrink-0" />
+                              ) : (
+                                <span
+                                  className={`px-2.5 py-1 rounded-lg text-sm font-medium border ${getStatusColor(
+                                    ticket.status || '',
+                                  )}`}
+                                >
+                                  {STATUS_LABELS[ticket.status || ''] || ticket.status}
+                                </span>
+                              )}
+
+                              <span className="text-sm text-[var(--text-primary)]/40 truncate">
+                                Текущий статус
+                              </span>
+                            </div>
+
+                            <ChevronDown
+                              className={`w-5 h-5 text-[var(--text-primary)]/40 shrink-0 transition-transform ${showStatusDropdown ? 'rotate-180' : ''
+                                }`}
+                            />
+                          </button>
+
+                          {/* Выпадающий список */}
+                          <AnimatePresence>
+                            {showStatusDropdown && (
+                              <motion.div
+                                initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                                transition={{ duration: 0.15 }}
+                                className="
+                absolute z-30 left-0 right-0 mt-2
+                rounded-xl
+                bg-[var(--bg-card)]
+                border border-[var(--border-color)]
+                shadow-xl
+                overflow-hidden
+              "
+                              >
+                                <div className="px-4 py-2.5 border-b border-[var(--border-color)]">
+                                  <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-primary)]/30">
+                                    Все статусы
+                                  </span>
+                                </div>
+
+                                <div className="p-2 max-h-[420px] overflow-y-auto">
+                                  {allStatuses.map((status) => {
+                                    const isCurrent = ticket.status === status;
+                                    const isAvailable = canTransitionToStatus(status);
+
+                                    return (
+                                      <button
+                                        key={status}
+                                        type="button"
+                                        disabled={!isAvailable || updatingStatus}
+                                        onClick={async () => {
+                                          if (!isAvailable) return;
+
+                                          setShowStatusDropdown(false);
+                                          await handleStatusChange(status);
+                                        }}
+                                        className={`
+                        w-full flex items-center gap-3
+                        px-3 py-3 rounded-lg
+                        text-left transition-colors
+                        ${isCurrent
+                                            ? 'bg-[var(--hover-2)]'
+                                            : isAvailable
+                                              ? 'hover:bg-[var(--hover-2)] cursor-pointer'
+                                              : 'opacity-35 cursor-not-allowed'
+                                          }
+                      `}
+                                      >
+                                        {/* Индикатор */}
+                                        <div className="w-5 flex justify-center shrink-0">
+                                          {isCurrent ? (
+                                            <Check className="w-4 h-4 text-[var(--accent)]" />
+                                          ) : isAvailable ? (
+                                            <ChevronRight className="w-4 h-4 text-[var(--success)]" />
+                                          ) : (
+                                            <div className="w-1.5 h-1.5 rounded-full bg-[var(--text-primary)]/20" />
+                                          )}
+                                        </div>
+
+                                        <div className="min-w-0 flex-1">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span
+                                              className={`px-2.5 py-1 rounded-lg text-sm font-medium border ${getStatusColor(
+                                                status,
+                                              )}`}
+                                            >
+                                              {STATUS_LABELS[status] || status}
+                                            </span>
+
+                                            {isCurrent && (
+                                              <span className="text-xs text-[var(--text-primary)]/40">
+                                                текущий
+                                              </span>
+                                            )}
+
+                                            {isAvailable && (
+                                              <span className="text-xs font-medium text-emerald-500">
+                                                доступен
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          <p className="text-xs text-[var(--text-primary)]/35 mt-1.5 truncate">
+                                            {STATUS_DESCRIPTIONS[status]}
+                                          </p>
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                {availableStatuses.length === 0 && (
+                                  <div className="px-4 py-3 border-t border-[var(--border-color)]">
+                                    <div className="flex items-center gap-2 text-sm text-[var(--text-primary)]/40">
+                                      <CheckCircle2 className="w-4 h-4" />
+                                      Из текущего статуса нет доступных переходов
+                                    </div>
+                                  </div>
                                 )}
-                                {STATUS_LABELS[status] || status}
-                              </span>
-                              <span className="text-sm text-[var(--text-primary)]/50">
-                                {STATUS_DESCRIPTIONS[status] || ''}
-                              </span>
-                            </button>
-                          ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
                       )}
                     </div>
@@ -2210,9 +2378,25 @@ useEffect(() => {
                         <User className="w-5 h-5 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[var(--text-primary)] font-medium text-base truncate">
-                          {emp.full_name || emp.username}
-                        </p>
+                        <div className="flex items-center gap-2 min-w-0">
+  <p className="text-[var(--text-primary)] font-medium text-base truncate">
+    {emp.full_name || emp.username || emp.email}
+  </p>
+
+  {emp.id === user?.user_id && (
+    <span className="
+      shrink-0
+      px-2 py-0.5
+      rounded-md
+      bg-emerald-500/10
+      border border-emerald-500/20
+      text-emerald-500
+      text-xs font-medium
+    ">
+      Вы
+    </span>
+  )}
+</div>
                         <p className="text-[var(--text-primary)]/40 text-sm truncate">
                           {emp.email}
                         </p>
