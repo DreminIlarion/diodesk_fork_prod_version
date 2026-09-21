@@ -1715,7 +1715,7 @@ export default function TicketDetailPage() {
                   border border-[var(--border-color)]
                   bg-[var(--bg-card)]
                   shadow-xl
-                  max-h-[420px]
+                  max-h-[260px]
                   overflow-y-auto
                 "
                             >
