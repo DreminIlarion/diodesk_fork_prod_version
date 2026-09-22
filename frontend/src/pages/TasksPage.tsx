@@ -724,17 +724,30 @@ function SelectDD({ value, onChange, options, placeholder, icon: LI, searchable,
           </div>
           {fl.length === 0 && q && <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">Не найдено</div>}
           {fl.map((o) => (
-            <div key={o.value} role="button" tabIndex={0} onClick={() => { onChange(o.value); setOpen(false); }}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${o.value === value ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium' : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'}`}>
-              {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
-              {o.icon && <span className="shrink-0">{o.icon}</span>}
-              <div className="flex-1 min-w-0">
-                <span className="block truncate">{o.label}</span>
-                {o.sublabel && <span className="block text-xs text-[var(--text-primary)]/40 truncate">{o.sublabel}</span>}
-              </div>
-              {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
-            </div>
-          ))}
+  <div key={o.value} role="button" tabIndex={0} onClick={() => { onChange(o.value); setOpen(false); }}
+    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer ${
+      o.value === value
+        ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
+        : o.isMe
+          ? 'bg-emerald-500/[0.06] hover:bg-emerald-500/[0.12] text-[var(--text-primary)]'
+          : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'
+    }`}>
+    {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
+    {o.icon && <span className="shrink-0">{o.icon}</span>}
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center gap-1.5">
+        <span className="block truncate">{o.label}</span>
+        {o.isMe && (
+          <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
+            Вы
+          </span>
+        )}
+      </div>
+      {o.sublabel && <span className="block text-xs text-[var(--text-primary)]/40 truncate">{o.sublabel}</span>}
+    </div>
+    {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
+  </div>
+))}
         </div>
       </div>,
       document.body,
@@ -1448,10 +1461,28 @@ function AssignModal({ task, targetStatus, umap, loading, onClose, onOk }: {
   onClose: () => void;
   onOk: (id: string) => Promise<void>;
 }) {
+  const { user } = useAuthStore();
+  const currentUserId = user?.user_id;
+
   const [aid, setAid] = useState(task.assignee_id ?? '');
-  const opts: DDOpt[] = Array.from(umap.values()).map((u) => ({
-    value: u.id, label: u.full_name || u.username || u.email, sublabel: u.email,
-  }));
+
+  const opts: DDOpt[] = Array.from(umap.values())
+    .sort((a, b) => {
+      // Я всегда первый
+      if (a.id === currentUserId) return -1;
+      if (b.id === currentUserId) return 1;
+
+      // Остальные — по алфавиту
+      const nameA = a.full_name || a.username || '';
+      const nameB = b.full_name || b.username || '';
+      return nameA.localeCompare(nameB, 'ru');
+    })
+    .map((u) => ({
+      value: u.id,
+      label: u.full_name || u.username || u.email,
+      sublabel: u.email,
+      isMe: u.id === currentUserId,
+    }));
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) onClose(); };
@@ -1640,7 +1671,7 @@ function ConfirmModal({
           {/* Task */}
           <div className="mb-5">
             <div className="text-sm font-mono text-[var(--text-primary)]/45">
-              {task.number}
+              #{task.number}
             </div>
 
             <div className="mt-1.5 text-base font-medium leading-6 text-[var(--text-primary)]">
