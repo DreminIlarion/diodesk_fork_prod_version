@@ -8,7 +8,7 @@ import {
   Building2, User, X, SlidersHorizontal, ChevronDown, Check,
   Sparkles, Flame, MessageSquare, HelpCircle, Edit3, FolderOpen,
   UserCheck, Ticket, MoreVertical,
-  Settings, RefreshCw, Archive, Paperclip, LayoutGrid, List,
+  Settings, RefreshCw, Archive, Paperclip, LayoutGrid, List, Share2
 } from 'lucide-react';
 import { ticketsApi, counterpartiesApi, projectsApi, usersApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
@@ -601,6 +601,38 @@ function TicketActions({
       .finally(() => setLoadingUsers(false));
   }, [showAssigneeMenu, supportUsers.length, toast]);
 
+const handleCopyLink = async () => {
+  const url = `${window.location.origin}/tickets/${ticket.number}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast({
+      title: 'Ссылка скопирована',
+      description: ticket.number,
+    });
+  } catch {
+    // fallback для старых браузеров
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      toast({ title: 'Ссылка скопирована', description: ticket.number });
+    } catch {
+      toast({
+        title: 'Не удалось скопировать',
+        description: url,
+        variant: 'destructive',
+      });
+    } finally {
+      document.body.removeChild(ta);
+    }
+  }
+  closeMenu();
+};
+
   // ---------------------------------------------------------------------------
   // Архив
   // ---------------------------------------------------------------------------
@@ -763,6 +795,35 @@ function TicketActions({
               event.stopPropagation();
             }}
           >
+
+
+            {/* ============================================================ */}
+{/* Скопировать ссылку */}
+{/* ============================================================ */}
+
+<div className="py-1.5">
+  <button
+    type="button"
+    onClick={(event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      handleCopyLink();
+    }}
+    className="
+      flex w-full items-center gap-3
+      px-4 py-3
+      text-left text-sm
+      text-[var(--text-primary)]/80
+      transition-colors
+      hover:bg-[var(--hover-1)]
+    "
+  >
+    <Share2 size={16} className="shrink-0 text-[var(--text-primary)]/40" />
+    <span>Скопировать ссылку</span>
+  </button>
+</div>
+
+<div className="mx-3 h-px bg-[var(--border-color)]" />
             {/* ============================================================ */}
             {/* Задачи */}
             {/* ============================================================ */}

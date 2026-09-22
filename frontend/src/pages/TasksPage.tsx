@@ -3767,7 +3767,7 @@ export default function TasksPage() {
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     undoTimerRef.current = setTimeout(() => {
       setLastMove(null);
-    }, 10000);
+    }, 15000);
   }, []);
 
   const pauseUndoTimer = useCallback(() => {
@@ -4824,110 +4824,41 @@ export default function TasksPage() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 10, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="
-        fixed bottom-6 left-1/2 -translate-x-1/2 z-[120]
-        w-[min(520px,calc(100vw-24px))]
-        2xl:w-[min(820px,calc(100vw-24px))]
-      "
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120] w-[min(520px,calc(100vw-24px))]"
           >
             <div
               onMouseEnter={pauseUndoTimer}
               onMouseLeave={resumeUndoTimer}
-              className="
-          flex items-center gap-3
-          px-3.5 py-3
-          rounded-xl bg-[var(--bg-card)] border border-emerald-500/50 shadow-lg
-
-          2xl:gap-5
-          2xl:px-6
-          2xl:py-5
-          2xl:rounded-2xl
-        "
+              className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-[var(--bg-card)] border border-emerald-500/50 shadow-lg"
             >
-              {/* Иконка */}
-              <div
-                className="
-            w-8 h-8 rounded-lg bg-emerald-500/15
-            flex items-center justify-center shrink-0
-
-            2xl:w-14 2xl:h-14 2xl:rounded-2xl
-          "
-              >
-                <CheckCircle2
-                  className="
-              w-4 h-4 text-emerald-500
-
-              2xl:w-7 2xl:h-7
-            "
-                />
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
               </div>
 
-              {/* Текст */}
               <div className="flex-1 min-w-0">
-                <div
-                  className="
-              text-xs font-semibold text-[var(--text-primary)]
-
-              2xl:text-2xl
-            "
-                >
-                  Задача перенесена
-                </div>
-
-                <div
-                  className="
-              mt-0.5 text-xs text-[var(--text-primary)]/50 truncate
-
-              2xl:mt-1 2xl:text-lg
-            "
-                >
+                <div className="text-xs font-semibold text-[var(--text-primary)]">Задача перенесена</div>
+                <div className="mt-0.5 text-xs text-[var(--text-primary)]/50 truncate">
                   #{lastMove.number} · {ST_LABEL[lastMove.to]}
                 </div>
               </div>
 
-              {/* Кнопка "Вернуть" */}
               <button
                 type="button"
                 onClick={undoLastMove}
                 disabled={undoingMove}
-                className="
-            flex items-center gap-1.5
-            px-3 py-2
-            rounded-lg
-            bg-emerald-500 text-white text-xs font-semibold
-            hover:bg-emerald-600 transition-colors
-            disabled:opacity-50 shrink-0
-
-            2xl:gap-2.5
-            2xl:px-5 2xl:py-3
-            2xl:text-lg
-            2xl:rounded-xl
-          "
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-50 shrink-0"
               >
-                {undoingMove ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin 2xl:w-5 2xl:h-5" />
-                ) : (
-                  <RotateCcw className="w-3.5 h-3.5 2xl:w-5 2xl:h-5" />
-                )}
+                {undoingMove ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
                 {undoingMove ? 'Возвращаем...' : 'Вернуть'}
               </button>
 
-              {/* Кнопка "Скрыть" */}
               <button
                 type="button"
                 onClick={() => setLastMove(null)}
                 title="Скрыть"
-                className="
-            p-1.5
-            rounded-lg
-            text-[var(--text-primary)]/30
-            hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)]
-            transition-colors shrink-0
-
-            2xl:p-3 2xl:rounded-xl
-          "
+                className="p-1.5 rounded-lg text-[var(--text-primary)]/30 hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)] transition-colors shrink-0"
               >
-                <X className="w-3.5 h-3.5 2xl:w-6 2xl:h-6" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
           </motion.div>
