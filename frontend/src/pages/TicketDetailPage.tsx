@@ -326,7 +326,7 @@ export default function TicketDetailPage() {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
 
-  const canAssign = isStaff && ['open', 'in_progress', 'waiting', 'resolved'].includes(ticket?.status || '');
+  const canAssign = isStaff;
 
   const [counterparty, setCounterparty] = useState<any | null>(null);
   const [actorNames, setActorNames] = useState<Map<string, string>>(new Map());
@@ -1643,277 +1643,179 @@ export default function TicketDetailPage() {
                       </p>
                     </div>
 
-                    <div className="space-y-6">
-
-                      {/* =========================================================
-            СТАТУС
-        ========================================================= */}
-                      <div>
-                        <label className="block mb-2 text-sm font-medium text-[var(--text-primary)]/60">
+                    {/* =========================================================
+    СТАТУС
+========================================================= */}
+                    <div>
+                      <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+                        <label className="text-sm font-medium text-[var(--text-primary)]/60">
                           Статус
                         </label>
 
-                        <div
-                          ref={statusDropdownRef}
-                          className="relative"
-                        >
-                          {/* Основное поле */}
-                          <button
-                            type="button"
-                            disabled={!canChangeStatus || updatingStatus}
-                            onClick={() => setShowStatusDropdown(prev => !prev)}
-                            className="
-                w-full min-h-[50px]
-                flex items-center justify-between gap-4
-                px-4 py-3
-                rounded-xl
-                border border-[var(--border-color)]
-                bg-[var(--hover-1)]
-                hover:bg-[var(--hover-2)]
-                text-left
-                transition-colors
-                disabled:cursor-not-allowed
-                disabled:opacity-50
-              "
-                          >
-                            <span className="flex items-center gap-3 min-w-0">
-                              {updatingStatus ? (
-                                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                              ) : (
-                                <span
-                                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${availableStatuses.length
-                                    ? 'bg-emerald-500'
-                                    : 'bg-[var(--text-primary)]/25'
-                                    }`}
-                                />
-                              )}
-
-                              <span className="text-base font-medium text-[var(--text-primary)] truncate">
-                                {STATUS_LABELS[ticket.status || ''] || ticket.status}
-                              </span>
+                        {canChangeStatus && availableStatuses.length > 0 && (
+                          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                            <span className="text-xs text-[var(--text-primary)]/35">
+                              Допустимые:
                             </span>
-
-                            <ChevronDown
-                              className={`
-                  w-5 h-5 shrink-0
-                  text-[var(--text-primary)]/35
-                  transition-transform duration-150
-                  ${showStatusDropdown ? 'rotate-180' : ''}
-                `}
-                            />
-                          </button>
-
-                          {/* Dropdown */}
-                          {showStatusDropdown && (
-                            <div
-                              className="
-                  absolute z-50
-                  left-0 right-0 top-full
-                  mt-2
-                  p-1.5
-                  rounded-xl
-                  border border-[var(--border-color)]
-                  bg-[var(--bg-card)]
-                  shadow-xl
-                  max-h-[260px]
-                  overflow-y-auto
-                "
-                            >
-                              {allStatuses.map(status => {
-                                const isCurrent = ticket.status === status;
-                                const isAvailable = availableStatuses.includes(status);
-
-                                return (
-                                  <button
-                                    key={status}
-                                    type="button"
-                                    disabled={
-                                      isCurrent ||
-                                      !isAvailable ||
-                                      updatingStatus
-                                    }
-                                    onClick={async () => {
-                                      setShowStatusDropdown(false);
-                                      await handleStatusChange(status);
-                                    }}
-                                    className={`
-                        w-full min-h-[44px]
-                        flex items-center gap-3
-                        px-3 py-2.5
-                        rounded-lg
-                        text-left
-                        transition-colors
-
-                        ${isCurrent
-                                        ? 'bg-[var(--hover-2)]'
-                                        : isAvailable
-                                          ? 'hover:bg-[var(--hover-2)] cursor-pointer'
-                                          : 'cursor-not-allowed'
-                                      }
-                      `}
-                                  >
-                                    {/* Индикатор */}
-                                    <div className="w-5 shrink-0 flex justify-center">
-                                      {isCurrent ? (
-                                        <Check className="w-4 h-4 text-[var(--accent)]" />
-                                      ) : isAvailable ? (
-                                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                                      ) : null}
-                                    </div>
-
-                                    {/* Название */}
-                                    <span
-                                      className={`
-                          flex-1 text-base
-                          ${isCurrent
-                                          ? 'font-medium text-[var(--text-primary)]'
-                                          : isAvailable
-                                            ? 'text-[var(--text-primary)]'
-                                            : 'text-[var(--text-primary)]/25'
-                                        }
-                        `}
-                                    >
-                                      {STATUS_LABELS[status] || status}
-                                    </span>
-
-                                    {/* Справа только для текущего */}
-                                    {isCurrent && (
-                                      <span className="text-xs text-[var(--text-primary)]/35">
-                                        Текущий
-                                      </span>
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-
-                        {!canChangeStatus && (
-                          <p className="mt-2 text-sm text-[var(--text-primary)]/35">
-                            Недостаточно прав для изменения статуса
-                          </p>
-                        )}
-
-                        {canChangeStatus && availableStatuses.length === 0 && (
-                          <p className="mt-2 text-sm text-[var(--text-primary)]/35">
-                            Из текущего статуса нет доступных переходов
-                          </p>
-                        )}
-                      </div>
-
-                      {/* =========================================================
-            ИСПОЛНИТЕЛЬ
-        ========================================================= */}
-                      <div>
-                        <label className="block mb-2 text-sm font-medium text-[var(--text-primary)]/60">
-                          Исполнитель
-                        </label>
-
-                        {canAssign ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              loadSupportUsers();
-                              setShowAssigneeModal(true);
-                            }}
-                            className="
-                w-full min-h-[50px]
-                flex items-center justify-between gap-4
-                px-4 py-3
-                rounded-xl
-                border border-[var(--border-color)]
-                bg-[var(--hover-1)]
-                hover:bg-[var(--hover-2)]
-                text-left
-                transition-colors
-              "
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <User className="w-5 h-5 text-[var(--text-primary)]/35 shrink-0" />
-
+                            {availableStatuses.map((s) => (
                               <span
-                                className={`text-base truncate ${ticket.assignee_id
-                                  ? 'font-medium text-[var(--text-primary)]'
-                                  : 'text-[var(--text-primary)]/35'
-                                  }`}
+                                key={s}
+                                className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${getStatusColor(s)}`}
                               >
-                                {ticket.assignee_id
-                                  ? getAssigneeName() || 'Исполнитель'
-                                  : 'Не назначен'}
+                                {STATUS_LABELS[s] || s}
                               </span>
-                            </div>
-
-                            <ChevronDown className="w-5 h-5 text-[var(--text-primary)]/35 shrink-0" />
-                          </button>
-                        ) : (
-                          <div
-                            className="
-                min-h-[50px]
-                flex items-center gap-3
-                px-4 py-3
-                rounded-xl
-                border border-[var(--border-color)]
-                bg-[var(--hover-1)]
-              "
-                          >
-                            <User className="w-5 h-5 text-[var(--text-primary)]/30" />
-
-                            <span className="text-base text-[var(--text-primary)]/60">
-                              {ticket.assignee_id
-                                ? getAssigneeName()
-                                : 'Не назначен'}
-                            </span>
+                            ))}
                           </div>
                         )}
                       </div>
 
-                      {/* =========================================================
-            ДОПОЛНИТЕЛЬНЫЕ ДЕЙСТВИЯ
-        ========================================================= */}
-                      <div className="pt-6 border-t border-[var(--border-color)]">
-                        <p className="mb-3 text-sm font-medium text-[var(--text-primary)]/50">
-                          Дополнительные действия
-                        </p>
-
-                        {ticket.is_archived ? (
-                          <div className="flex items-center gap-2 text-sm text-amber-400">
-                            <Archive className="w-4 h-4" />
-                            Заявка находится в архиве
-                          </div>
-                        ) : canArchive() ? (
-                          <button
-                            type="button"
-                            onClick={() => setShowArchiveConfirm(true)}
-                            disabled={archiving}
-                            className="
-                inline-flex items-center gap-2
-                px-4 py-2.5
-                rounded-xl
-                border border-[var(--border-color)]
-                bg-transparent
-                hover:bg-[var(--hover-2)]
-                text-sm text-[var(--text-primary)]/60
-                hover:text-[var(--text-primary)]
-                transition-colors
-                disabled:opacity-50
-              "
-                          >
-                            {archiving ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
+                      <div
+                        ref={statusDropdownRef}
+                        className="relative"
+                      >
+                        {/* Основное поле */}
+                        <button
+                          type="button"
+                          disabled={!canChangeStatus || updatingStatus}
+                          onClick={() => setShowStatusDropdown(prev => !prev)}
+                          className="
+        w-full min-h-[50px]
+        flex items-center justify-between gap-4
+        px-4 py-3
+        rounded-xl
+        border border-[var(--border-color)]
+        bg-[var(--hover-1)]
+        hover:bg-[var(--hover-2)]
+        text-left
+        transition-colors
+        disabled:cursor-not-allowed
+        disabled:opacity-50
+      "
+                        >
+                          <span className="flex items-center gap-3 min-w-0">
+                            {updatingStatus ? (
+                              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                             ) : (
-                              <Archive className="w-4 h-4" />
+                              <span
+                                className={`w-2.5 h-2.5 rounded-full shrink-0 ${availableStatuses.length
+                                  ? 'bg-emerald-500'
+                                  : 'bg-[var(--text-primary)]/25'
+                                  }`}
+                              />
                             )}
 
-                            Переместить в архив
-                          </button>
-                        ) : (
-                          <p className="text-sm text-[var(--text-primary)]/35">
-                            Архивирование недоступно
-                          </p>
+                            <span className="text-base font-medium text-[var(--text-primary)] truncate">
+                              {STATUS_LABELS[ticket.status || ''] || ticket.status}
+                            </span>
+                          </span>
+
+                          <ChevronDown
+                            className={`
+          w-5 h-5 shrink-0
+          text-[var(--text-primary)]/35
+          transition-transform duration-150
+          ${showStatusDropdown ? 'rotate-180' : ''}
+        `}
+                          />
+                        </button>
+
+                        {/* Dropdown */}
+                        {showStatusDropdown && (
+                          <div
+                            className="
+          absolute z-50
+          left-0 right-0 top-full
+          mt-2
+          p-1.5
+          rounded-xl
+          border border-[var(--border-color)]
+          bg-[var(--bg-card)]
+          shadow-xl
+          max-h-[260px]
+          overflow-y-auto
+        "
+                          >
+                            {allStatuses.map(status => {
+                              const isCurrent = ticket.status === status;
+                              const isAvailable = availableStatuses.includes(status);
+
+                              return (
+                                <button
+                                  key={status}
+                                  type="button"
+                                  disabled={
+                                    isCurrent ||
+                                    !isAvailable ||
+                                    updatingStatus
+                                  }
+                                  onClick={async () => {
+                                    setShowStatusDropdown(false);
+                                    await handleStatusChange(status);
+                                  }}
+                                  className={`
+                w-full min-h-[44px]
+                flex items-center gap-3
+                px-3 py-2.5
+                rounded-lg
+                text-left
+                transition-colors
+
+                ${isCurrent
+                                      ? 'bg-[var(--hover-2)]'
+                                      : isAvailable
+                                        ? 'hover:bg-[var(--hover-2)] cursor-pointer'
+                                        : 'cursor-not-allowed'
+                                    }
+              `}
+                                >
+                                  {/* Индикатор */}
+                                  <div className="w-5 shrink-0 flex justify-center">
+                                    {isCurrent ? (
+                                      <Check className="w-4 h-4 text-[var(--accent)]" />
+                                    ) : isAvailable ? (
+                                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                    ) : null}
+                                  </div>
+
+                                  {/* Название */}
+                                  <span
+                                    className={`
+                  flex-1 text-base
+                  ${isCurrent
+                                        ? 'font-medium text-[var(--text-primary)]'
+                                        : isAvailable
+                                          ? 'text-[var(--text-primary)]'
+                                          : 'text-[var(--text-primary)]/25'
+                                      }
+                `}
+                                  >
+                                    {STATUS_LABELS[status] || status}
+                                  </span>
+
+                                  {/* Справа только для текущего */}
+                                  {isCurrent && (
+                                    <span className="text-xs text-[var(--text-primary)]/35">
+                                      Текущий
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
                         )}
                       </div>
 
+                      {!canChangeStatus && (
+                        <p className="mt-2 text-sm text-[var(--text-primary)]/35">
+                          Недостаточно прав для изменения статуса
+                        </p>
+                      )}
+
+                      {canChangeStatus && availableStatuses.length === 0 && (
+                        <p className="mt-2 text-sm text-[var(--text-primary)]/35">
+                          Из текущего статуса нет доступных переходов
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
