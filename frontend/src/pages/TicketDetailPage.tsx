@@ -1631,6 +1631,14 @@ export default function TicketDetailPage() {
                 <div className="p-6">
                   <div className="max-w-xl space-y-6">
 
+                    <div>
+                      <h2 className="text-xl font-semibold text-[var(--text-primary)]">
+                        Управление заявкой
+                      </h2>
+                      <p className="mt-1 text-sm text-[var(--text-primary)]/40">
+                        Изменение статуса и ответственного
+                      </p>
+                    </div>
                     {/* Статус */}
                     <div>
                       <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
@@ -2216,10 +2224,10 @@ export default function TicketDetailPage() {
 
                     <span
                       className={`flex-1 text-base ${isCurrent
-                          ? 'font-semibold text-[var(--text-primary)]'
-                          : isAvailable
-                            ? 'font-medium text-[var(--text-primary)]'
-                            : 'text-[var(--text-primary)]/25'
+                        ? 'font-semibold text-[var(--text-primary)]'
+                        : isAvailable
+                          ? 'font-medium text-[var(--text-primary)]'
+                          : 'text-[var(--text-primary)]/25'
                         }`}
                     >
                       {STATUS_LABELS[status] || status}
