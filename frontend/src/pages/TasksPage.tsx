@@ -4082,89 +4082,129 @@ export default function TasksPage() {
     [cols],
   );
 
-  const handleAssignAndMove = useCallback(
-    async (aid: string) => {
-      if (!assignIntent) return;
-      setAssignLd(true);
-      try {
-        await tasksApi.assign(assignIntent.task.id, { assignee_id: aid });
-        await tasksApi.changeStatus(assignIntent.task.id, assignIntent.targetStatus);
-        toast({ title: `Задача переведена в «${ST_LABEL[assignIntent.targetStatus]}»` });
-        setAssignIntent(null);
-        await fetchBoard(true);
-      } catch (e: any) {
-        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
-      } finally {
-        setAssignLd(false);
-      }
-    },
-    [assignIntent, fetchBoard, toast],
-  );
+ const handleAssignAndMove = useCallback(
+  async (aid: string) => {
+    if (!assignIntent) return;
+    setAssignLd(true);
+    const move = assignIntent;
+    try {
+      await tasksApi.assign(move.task.id, { assignee_id: aid });
+      await tasksApi.changeStatus(move.task.id, move.targetStatus);
+      showUndoMove({
+        taskId: move.task.id,
+        number: move.task.number,
+        title: move.task.title,
+        from: move.task.status,
+        to: move.targetStatus,
+      });
+      highlightMovedTask(move.task.id);
+      toast({ title: `Задача переведена в «${ST_LABEL[move.targetStatus]}»` });
+      setAssignIntent(null);
+      await fetchBoard(true);
+      setTimeout(() => revealTask(move.task.id), 100);
+    } catch (e: any) {
+      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+    } finally {
+      setAssignLd(false);
+    }
+  },
+  [assignIntent, fetchBoard, toast, showUndoMove, highlightMovedTask, revealTask],
+);
 
 
   const handleReviewAndMove = useCallback(
-    async (reviewerId: string) => {
-      if (!reviewIntent) return;
-      setReviewLd(true);
-      try {
-        await tasksApi.requestReview(reviewIntent.task.id, { reviewer_id: reviewerId });
-        toast({ title: 'Задача отправлена на ревью' });
-        setReviewIntent(null);
-        await fetchBoard(true);
-      } catch (e: any) {
-        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
-      } finally {
-        setReviewLd(false);
-      }
-    },
-    [reviewIntent, fetchBoard, toast],
-  );
+  async (reviewerId: string) => {
+    if (!reviewIntent) return;
+    setReviewLd(true);
+    const move = reviewIntent;
+    try {
+      await tasksApi.requestReview(move.task.id, { reviewer_id: reviewerId });
+      showUndoMove({
+        taskId: move.task.id,
+        number: move.task.number,
+        title: move.task.title,
+        from: move.from,
+        to: 'to_review',
+      });
+      highlightMovedTask(move.task.id);
+      toast({ title: 'Задача отправлена на ревью' });
+      setReviewIntent(null);
+      await fetchBoard(true);
+      setTimeout(() => revealTask(move.task.id), 100);
+    } catch (e: any) {
+      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+    } finally {
+      setReviewLd(false);
+    }
+  },
+  [reviewIntent, fetchBoard, toast, showUndoMove, highlightMovedTask, revealTask],
+);
 
   const handleConfirmMove = useCallback(
-    async () => {
-      if (!confirmIntent) return;
-      setConfirmLd(true);
-      try {
-        await tasksApi.changeStatus(confirmIntent.task.id, confirmIntent.to);
-        toast({
-          title: `Задача перемещена в «${ST_LABEL[confirmIntent.to]}»`,
-          description: `${confirmIntent.task.number} — ${confirmIntent.task.title}`,
-        });
-        setConfirmIntent(null);
-        await fetchBoard(true);
-      } catch (e: any) {
-        const message = statusErr(e, confirmIntent.task, confirmIntent.to);
-        toast({ title: message.title, description: message.description, variant: 'destructive' });
-      } finally {
-        setConfirmLd(false);
-      }
-    },
-    [confirmIntent, fetchBoard, toast],
-  );
+  async () => {
+    if (!confirmIntent) return;
+    setConfirmLd(true);
+    const move = confirmIntent;
+    try {
+      await tasksApi.changeStatus(move.task.id, move.to);
+      showUndoMove({
+        taskId: move.task.id,
+        number: move.task.number,
+        title: move.task.title,
+        from: move.from,
+        to: move.to,
+      });
+      highlightMovedTask(move.task.id);
+      toast({
+        title: `Задача перемещена в «${ST_LABEL[move.to]}»`,
+        description: `${move.task.number} — ${move.task.title}`,
+      });
+      setConfirmIntent(null);
+      await fetchBoard(true);
+      setTimeout(() => revealTask(move.task.id), 100);
+    } catch (e: any) {
+      const message = statusErr(e, move.task, move.to);
+      toast({ title: message.title, description: message.description, variant: 'destructive' });
+    } finally {
+      setConfirmLd(false);
+    }
+  },
+  [confirmIntent, fetchBoard, toast, showUndoMove, highlightMovedTask, revealTask],
+);
 
   const handleComplete = useCallback(
-    async (actualHours: number) => {
-      if (!completeIntent) return;
-      setCompleteLd(true);
-      try {
-        await tasksApi.update(completeIntent.task.id, { actual_hours: actualHours } as any);
-        if (completeIntent.mode === 'review_done') {
-          await tasksApi.review(completeIntent.task.id, { decision: 'done' });
-          toast({ title: 'Задача принята' });
-        } else {
-          await tasksApi.changeStatus(completeIntent.task.id, 'done');
-          toast({ title: 'Задача выполнена' });
-        }
-        setCompleteIntent(null);
-        await fetchBoard(true);
-      } catch (e: any) {
-        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
-      } finally {
-        setCompleteLd(false);
+  async (actualHours: number) => {
+    if (!completeIntent) return;
+    setCompleteLd(true);
+    const move = completeIntent;
+    try {
+      await tasksApi.update(move.task.id, { actual_hours: actualHours } as any);
+      if (move.mode === 'review_done') {
+        await tasksApi.review(move.task.id, { decision: 'done' });
+        toast({ title: 'Задача принята' });
+      } else {
+        await tasksApi.changeStatus(move.task.id, 'done');
+        toast({ title: 'Задача выполнена' });
       }
-    },
-    [completeIntent, fetchBoard, toast],
-  );
+      showUndoMove({
+        taskId: move.task.id,
+        number: move.task.number,
+        title: move.task.title,
+        from: move.task.status,
+        to: 'done',
+      });
+      highlightMovedTask(move.task.id);
+      setCompleteIntent(null);
+      await fetchBoard(true);
+      setTimeout(() => revealTask(move.task.id), 100);
+    } catch (e: any) {
+      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+    } finally {
+      setCompleteLd(false);
+    }
+  },
+  [completeIntent, fetchBoard, toast, showUndoMove, highlightMovedTask, revealTask],
+);
 
   const onDS = useCallback((id: string, from: TaskStatus) => setDrag({ id, from }), []);
   const onDE = useCallback(() => {
