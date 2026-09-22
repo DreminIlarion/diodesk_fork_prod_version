@@ -140,6 +140,7 @@ class TaskAuthZService:
         requester_allowed = (
             subject.has_role(UserRole.ADMIN)
             or subject.has_role(UserRole.SUPPORT_MANAGER)
+            or subject.has_role(UserRole.SUPPORT_AGENT)   
             or subject.id == task.created_by
             or subject.id == task.assignee_id
         )
