@@ -1555,7 +1555,14 @@ function CompleteModal({ task, loading, onClose, onOk }: {
 }
 
 
-function ConfirmModal({ task, from, to, loading, onClose, onOk }: {
+function ConfirmModal({
+  task,
+  from,
+  to,
+  loading,
+  onClose,
+  onOk,
+}: {
   task: TaskViewItem;
   from: TaskStatus;
   to: TaskStatus;
@@ -1564,69 +1571,190 @@ function ConfirmModal({ task, from, to, loading, onClose, onOk }: {
   onOk: () => Promise<void>;
 }) {
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) onClose(); };
-    document.addEventListener('keydown', h);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !loading) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
     document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
   }, [onClose, loading]);
 
   const fromMeta = CM[from];
   const toMeta = CM[to];
+
   const FromIcon = fromMeta.icon;
   const ToIcon = toMeta.icon;
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !loading && onClose()} />
-      <div className="relative w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
-              <AlertCircle className="w-5 h-5 text-[var(--accent)]" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-[var(--text-primary)]">Подтвердите действие</h2>
-              <p className="text-sm text-[var(--text-primary)]/50">Перемещение задачи</p>
-            </div>
-          </div>
-        </div>
+      {/* Overlay */}
+      <div
+        className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
+        onClick={() => !loading && onClose()}
+      />
 
-        <div className="p-5 space-y-4">
-          <div className="rounded-xl bg-[var(--hover-2)] p-3 border border-[var(--border-color)]">
-            <span className="text-xs font-mono text-[var(--text-primary)]/50">{task.number}</span>
-            <p className="text-sm font-medium text-[var(--text-primary)] mt-1.5">{task.title}</p>
-          </div>
+      {/* Modal */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-modal-title"
+        className="
+          relative
+          w-full max-w-[480px]
+          overflow-hidden
+          rounded-2xl
+          border border-[var(--border-color)]
+          bg-[var(--bg-card)]
+          shadow-2xl
+        "
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-6 pt-6">
+          <h2
+            id="confirm-modal-title"
+            className="text-xl font-semibold tracking-tight text-[var(--text-primary)]"
+          >
+            Переместить задачу?
+          </h2>
 
-          <div className="flex items-center justify-center gap-3 py-2">
-            <div className="flex flex-col items-center gap-1.5">
-              <span className={`w-9 h-9 rounded-xl flex items-center justify-center border ${fromMeta.brd} bg-[var(--hover-1)]`}>
-                <FromIcon className={`w-4 h-4 ${fromMeta.tc}`} />
-              </span>
-              <span className="text-xs text-[var(--text-primary)]/50">{ST_LABEL[from]}</span>
-            </div>
-
-            <ArrowRight className="w-4 h-4 text-[var(--text-primary)]/30 shrink-0" />
-
-            <div className="flex flex-col items-center gap-1.5">
-              <span className={`w-9 h-9 rounded-xl flex items-center justify-center border ${toMeta.brd} bg-[var(--hover-1)]`}>
-                <ToIcon className={`w-4 h-4 ${toMeta.tc}`} />
-              </span>
-              <span className="text-xs text-[var(--text-primary)]/50">{ST_LABEL[to]}</span>
-            </div>
-          </div>
-
-          <p className="text-sm text-center text-[var(--text-primary)]/60">
-            Переместить задачу в «<span className="font-medium text-[var(--text-primary)]">{ST_LABEL[to]}</span>»?
+          <p className="mt-1.5 text-base text-[var(--text-primary)]/55">
+            Статус задачи будет изменён.
           </p>
         </div>
 
-        <div className="flex justify-end gap-2.5 px-5 py-3.5 border-t border-[var(--border-color)] bg-[var(--hover-1)]">
-          <button onClick={onClose} disabled={loading} className="px-4 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 text-sm font-medium hover:bg-[var(--hover-3)] disabled:opacity-50">
+        {/* Content */}
+        <div className="px-6 pb-6 pt-5">
+          {/* Task */}
+          <div className="mb-5">
+            <div className="text-sm font-mono text-[var(--text-primary)]/45">
+              {task.number}
+            </div>
+
+            <div className="mt-1.5 text-base font-medium leading-6 text-[var(--text-primary)]">
+              {task.title}
+            </div>
+          </div>
+
+          {/* Status transition */}
+          <div
+            className="
+              flex items-center gap-4
+              rounded-xl
+              border border-[var(--border-color)]
+              bg-[var(--hover-1)]
+              p-4
+            "
+          >
+            {/* From */}
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <span
+                className={`
+                  flex h-10 w-10 shrink-0
+                  items-center justify-center
+                  rounded-lg border
+                  bg-[var(--bg-card)]
+                  ${fromMeta.brd}
+                `}
+              >
+                <FromIcon className={`h-5 w-5 ${fromMeta.tc}`} />
+              </span>
+
+              <span className="truncate text-base font-medium text-[var(--text-primary)]/65">
+                {ST_LABEL[from]}
+              </span>
+            </div>
+
+            {/* Arrow */}
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--hover-2)]">
+              <ArrowRight className="h-4 w-4 text-[var(--text-primary)]/40" />
+            </div>
+
+            {/* To */}
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <span
+                className={`
+                  flex h-10 w-10 shrink-0
+                  items-center justify-center
+                  rounded-lg border
+                  bg-[var(--bg-card)]
+                  ${toMeta.brd}
+                `}
+              >
+                <ToIcon className={`h-5 w-5 ${toMeta.tc}`} />
+              </span>
+
+              <span className="truncate text-base font-semibold text-[var(--text-primary)]">
+                {ST_LABEL[to]}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div
+          className="
+            flex items-center justify-end gap-3
+            border-t border-[var(--border-color)]
+            bg-[var(--hover-1)]
+            px-6 py-4
+          "
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="
+              rounded-xl
+              px-5 py-2.5
+              text-base font-medium
+              text-[var(--text-primary)]/70
+              transition-colors
+              hover:bg-[var(--hover-2)]
+              hover:text-[var(--text-primary)]
+              disabled:pointer-events-none
+              disabled:opacity-50
+            "
+          >
             Отмена
           </button>
-          <button onClick={onOk} disabled={loading} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-40 hover:bg-[var(--accent)]/90">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-            Подтвердить
+
+          <button
+            type="button"
+            onClick={onOk}
+            disabled={loading}
+            className="
+              flex min-w-[145px]
+              items-center justify-center gap-2
+              rounded-xl
+              bg-[var(--accent)]
+              px-5 py-2.5
+              text-base font-medium
+              text-white
+              transition-colors
+              hover:bg-[var(--accent)]/90
+              disabled:pointer-events-none
+              disabled:opacity-50
+            "
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Перемещение...
+              </>
+            ) : (
+              <>
+                <ArrowRight className="h-5 w-5" />
+                Переместить
+              </>
+            )}
           </button>
         </div>
       </div>
