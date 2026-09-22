@@ -771,7 +771,7 @@ const statCards = [
 
                   <div className="min-w-0 flex-1 pl-2">
                     <div className="flex items-start justify-between gap-4">
-                      <p className="min-w-0 flex-1 truncate text-base font-semibold text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent)]">
+                      <p className="min-w-0 flex-1 truncate text-base font-semibold text-[var(--text-primary)] transition-colors group-hover:text-[var(--text-primary)]/70">
                         {ticket.title}
                       </p>
 
@@ -913,9 +913,9 @@ const statCards = [
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-base font-medium text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent)]">
-                        {project.name}
-                      </p>
+                      <p className="truncate text-base font-medium text-[var(--text-primary)] transition-colors group-hover:text-[var(--text-primary)]/70">
+  {project.name}
+</p>
 
                       <div className="mt-1 flex items-center gap-2">
                         <span className="font-mono text-sm text-[var(--text-primary)]/40">
@@ -979,9 +979,9 @@ const statCards = [
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-base font-medium text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent)]">
-                        {item.name}
-                      </p>
+                      <p className="truncate text-base font-medium text-[var(--text-primary)] transition-colors group-hover:text-[var(--text-primary)]/70">
+  {item.name}
+</p>
 
                       {item.inn && (
                         <p className="mt-1 font-mono text-sm text-[var(--text-primary)]/40">

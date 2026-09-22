@@ -601,37 +601,37 @@ function TicketActions({
       .finally(() => setLoadingUsers(false));
   }, [showAssigneeMenu, supportUsers.length, toast]);
 
-const handleCopyLink = async () => {
-  const url = `${window.location.origin}/tickets/${ticket.number}`;
-  try {
-    await navigator.clipboard.writeText(url);
-    toast({
-      title: 'Ссылка скопирована',
-      description: ticket.number,
-    });
-  } catch {
-    // fallback для старых браузеров
-    const ta = document.createElement('textarea');
-    ta.value = url;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
+  const handleCopyLink = async () => {
+    const url = `${window.location.origin}/tickets/${ticket.number}`;
     try {
-      document.execCommand('copy');
-      toast({ title: 'Ссылка скопирована', description: ticket.number });
-    } catch {
+      await navigator.clipboard.writeText(url);
       toast({
-        title: 'Не удалось скопировать',
-        description: url,
-        variant: 'destructive',
+        title: 'Ссылка скопирована',
+        description: ticket.number,
       });
-    } finally {
-      document.body.removeChild(ta);
+    } catch {
+      // fallback для старых браузеров
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        toast({ title: 'Ссылка скопирована', description: ticket.number });
+      } catch {
+        toast({
+          title: 'Не удалось скопировать',
+          description: url,
+          variant: 'destructive',
+        });
+      } finally {
+        document.body.removeChild(ta);
+      }
     }
-  }
-  closeMenu();
-};
+    closeMenu();
+  };
 
   // ---------------------------------------------------------------------------
   // Архив
@@ -798,18 +798,18 @@ const handleCopyLink = async () => {
 
 
             {/* ============================================================ */}
-{/* Скопировать ссылку */}
-{/* ============================================================ */}
+            {/* Скопировать ссылку */}
+            {/* ============================================================ */}
 
-<div className="py-1.5">
-  <button
-    type="button"
-    onClick={(event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      handleCopyLink();
-    }}
-    className="
+            <div className="py-1.5">
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  handleCopyLink();
+                }}
+                className="
       flex w-full items-center gap-3
       px-4 py-3
       text-left text-sm
@@ -817,13 +817,13 @@ const handleCopyLink = async () => {
       transition-colors
       hover:bg-[var(--hover-1)]
     "
-  >
-    <Share2 size={16} className="shrink-0 text-[var(--text-primary)]/40" />
-    <span>Скопировать ссылку</span>
-  </button>
-</div>
+              >
+                <Share2 size={16} className="shrink-0 text-[var(--text-primary)]/40" />
+                <span>Скопировать ссылку</span>
+              </button>
+            </div>
 
-<div className="mx-3 h-px bg-[var(--border-color)]" />
+            <div className="mx-3 h-px bg-[var(--border-color)]" />
             {/* ============================================================ */}
             {/* Задачи */}
             {/* ============================================================ */}
@@ -1161,7 +1161,7 @@ function TicketRow({ ticket, showAssignee, showReporter, onTicketUpdated, onNavi
     >
       <div className="min-w-0 pr-3">
         <span className="text-[17px] font-semibold text-[var(--text-primary)] block leading-snug
-                         group-hover:text-[var(--accent-light)] transition-colors line-clamp-1">
+                 group-hover:text-[var(--text-primary)]/70 transition-colors line-clamp-1">
           {ticket.title}
         </span>
         <span className="text-[15px] font-mono text-[var(--text-primary)]/65 mt-0.5 block">
@@ -1176,7 +1176,7 @@ function TicketRow({ ticket, showAssignee, showReporter, onTicketUpdated, onNavi
 
       <div className="min-w-0 pr-2 self-center">
         {ticket.counterparty?.name ? (
-          <span className="flex items-center gap-1 text-[16px] text-[var(--text-primary)]/60 truncate">
+          <span className="flex items-center gap-1 text-[16px] text-[var(--text-primary)]/90 truncate">
             <Building2 size={18} className="shrink-0 text-[var(--text-primary)]/40" />
             <span className="truncate">{ticket.counterparty.name}</span>
           </span>
@@ -1194,7 +1194,7 @@ function TicketRow({ ticket, showAssignee, showReporter, onTicketUpdated, onNavi
       <div className="min-w-0 pr-2 self-center">
         {showAssignee && (
           (ticket.assignee?.full_name || ticket.assignee?.username) ? (
-            <span className="flex items-center gap-1 text-[16px] text-[var(--text-primary)]/60 truncate">
+            <span className="flex items-center gap-1 text-[16px] text-[var(--text-primary)]/80 truncate">
               <UserCheck size={18} className="shrink-0 text-[var(--text-primary)]/40" />
               <span className="truncate">
                 {toShortName(ticket.assignee.full_name || ticket.assignee.username)}
@@ -1206,7 +1206,7 @@ function TicketRow({ ticket, showAssignee, showReporter, onTicketUpdated, onNavi
         )}
         {showReporter && (
           (ticket.reporter?.full_name || ticket.reporter?.username) ? (
-            <span className="flex items-center gap-1 text-[16px] text-[var(--text-primary)]/35 mt-0.5 truncate">
+            <span className="flex items-center gap-1 text-[16px] text-[var(--text-primary)]/55 mt-0.5 truncate">
               <User size={18} className="shrink-0" />
               <span className="truncate">
                 {toShortName(ticket.reporter.full_name || ticket.reporter.username)}
