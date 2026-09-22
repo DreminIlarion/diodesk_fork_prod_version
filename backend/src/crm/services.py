@@ -49,6 +49,8 @@ class CounterpartyService:
                 phone=contact_person.phone,
                 email=contact_person.email,
                 messengers=contact_person.messengers,
+                position=contact_person.position,      # ← добавить
+                extension=contact_person.extension,
             )
             for contact_person in data.contact_persons
         ]
@@ -142,6 +144,8 @@ class CounterpartyService:
             phone=data.phone,
             email=data.email,
             messengers=data.messengers,
+            position=data.position,      # ← добавил
+            extension=data.extension,
         )
         await self.repository.update(counterparty)
         await self.session.commit()
@@ -178,7 +182,7 @@ class CounterpartyService:
         await self.session.commit()
 
     async def delete_contact_person(
-            self, counterparty_id: UUID, phone: str, email: str
+            self, counterparty_id: UUID, phone: str, email: str | None = None
     ) -> CounterpartyResponse:
         """Удаление контактного лица контрагента"""
 

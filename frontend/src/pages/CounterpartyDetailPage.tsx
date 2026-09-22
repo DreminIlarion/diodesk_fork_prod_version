@@ -334,7 +334,11 @@ function ContactsTab({ counterpartyId, persons, onRefresh }: {
   counterpartyId: string; persons: any[]; onRefresh: () => void;
 }) {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ last_name: '', first_name: '', middle_name: '', phone: '', email: '', telegram: '', vk: '' });
+  const [form, setForm] = useState({
+    last_name: '', first_name: '', middle_name: '',
+    phone: '', extension: '', position: '',
+    email: '', telegram: '', vk: '',
+  });
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<any | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -342,7 +346,11 @@ function ContactsTab({ counterpartyId, persons, onRefresh }: {
   const set = (f: string) => (v: string) => setForm(p => ({ ...p, [f]: v }));
 
   const resetForm = () => {
-    setForm({ last_name: '', first_name: '', middle_name: '', phone: '', email: '', telegram: '', vk: '' });
+    setForm({
+      last_name: '', first_name: '', middle_name: '',
+      phone: '', extension: '', position: '',
+      email: '', telegram: '', vk: '',
+    });
     setShowForm(false);
   };
 
@@ -358,6 +366,8 @@ function ContactsTab({ counterpartyId, persons, onRefresh }: {
         last_name: form.last_name.trim(),
         middle_name: form.middle_name.trim() || undefined,
         phone: form.phone.trim() ? phoneToApi(form.phone) : undefined,
+        extension: form.extension.trim() || undefined,
+        position: form.position.trim() || undefined,
         email: form.email.trim() || undefined,
         messengers: Object.keys(messengers).length > 0 ? messengers : undefined,
       });
@@ -431,6 +441,26 @@ function ContactsTab({ counterpartyId, persons, onRefresh }: {
                 </div>
               </div>
             </div>
+            <div className="grid md:grid-cols-2 gap-3">
+  <div>
+    <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">Должность</label>
+    <input
+      value={form.position}
+      onChange={e => set('position')(e.target.value)}
+      placeholder="Главный бухгалтер"
+      className={inputCls}
+    />
+  </div>
+  <div>
+    <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">Добавочный номер</label>
+    <input
+      value={form.extension}
+      onChange={e => set('extension')(e.target.value)}
+      placeholder="1234"
+      className={inputCls}
+    />
+  </div>
+</div>
             <div className="grid md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">Telegram</label>
@@ -506,9 +536,11 @@ function ContactsTab({ counterpartyId, persons, onRefresh }: {
                   <div className="flex items-center gap-3">
                     <Avatar name={person.full_name} size="md" />
                     <div>
-                      <p className="text-base font-semibold text-[var(--text-primary)]">{person.full_name}</p>
-                      <p className="text-sm text-[var(--text-primary)]/40">Контактное лицо</p>
-                    </div>
+  <p className="text-base font-semibold text-[var(--text-primary)]">{person.full_name}</p>
+  <p className="text-sm text-[var(--text-primary)]/40">
+    {person.position || 'Контактное лицо'}
+  </p>
+</div>
                   </div>
                   <button onClick={() => setConfirmDelete(confirmDelete?.full_name === person.full_name ? null : person)}
                     className="p-2 bg-[var(--text-primary)]/10 rounded-xl hover:bg-[var(--accent)]/10 text-[var(--text-primary)]/40 hover:text-[var(--accent)] transition-colors flex-shrink-0" title="Удалить">
@@ -517,14 +549,21 @@ function ContactsTab({ counterpartyId, persons, onRefresh }: {
                 </div>
                 <div className="p-4 grid md:grid-cols-2 gap-3">
                   {person.phone && (
-                    <div className="flex items-start gap-3 p-3.5 ">
-                      <Phone size={15} className="text-[var(--text-primary)]/40 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs text-[var(--text-primary)]/40 mb-0.5">Телефон</p>
-                        <a href={`tel:${person.phone}`} className="text-sm text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors">{person.phone}</a>
-                      </div>
-                    </div>
-                  )}
+  <div className="flex items-start gap-3 p-3.5 ">
+    <Phone size={15} className="text-[var(--text-primary)]/40 mt-0.5 flex-shrink-0" />
+    <div>
+      <p className="text-xs text-[var(--text-primary)]/40 mb-0.5">Телефон</p>
+      <a href={`tel:${person.phone}`} className="text-sm text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors">
+        {person.phone}
+        {person.extension && (
+          <span className="text-[var(--text-primary)]/40 ml-1.5">
+            доб. {person.extension}
+          </span>
+        )}
+      </a>
+    </div>
+  </div>
+)}
                   {person.email && (
                     <div className="flex items-start gap-3 p-3.5 ">
                       <Mail size={15} className="text-[var(--text-primary)]/40 mt-0.5 flex-shrink-0" />
@@ -995,36 +1034,36 @@ function ProductsTab({ counterpartyId }: { counterpartyId: string }) {
                       )}
 
                       {unlinkingProduct?.id === product.id ? (
-  <div className="px-4 py-3 rounded-xl bg-[var(--accent)]/5 border border-[var(--accent)]/20">
-    <p className="text-sm text-[var(--text-primary)] mb-3">
-      Отвязать <span className="font-semibold">{product.display_name || product.name}</span>?
-    </p>
-    <div className="flex gap-2">
-      <button
-        onClick={() => setUnlinkingProduct(null)}
-        className="flex-1 px-3 py-2 rounded-lg bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-sm font-medium transition-colors"
-      >
-        Отмена
-      </button>
-      <button
-        onClick={() => handleUnlink(product)}
-        disabled={unlinking}
-        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[var(--accent)]/20 hover:bg-[var(--accent)]/30 border border-[var(--accent)]/30 text-[var(--accent)] text-sm font-medium transition-colors disabled:opacity-50"
-      >
-        {unlinking ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-        Отвязать
-      </button>
-    </div>
-  </div>
-) : (
-  <button
-    onClick={() => setUnlinkingProduct(product)}
-    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/20 text-[var(--accent)] text-sm font-medium transition-colors"
-  >
-    <Trash2 size={16} />
-    Отвязать
-  </button>
-)}
+                        <div className="px-4 py-3 rounded-xl bg-[var(--accent)]/5 border border-[var(--accent)]/20">
+                          <p className="text-sm text-[var(--text-primary)] mb-3">
+                            Отвязать <span className="font-semibold">{product.display_name || product.name}</span>?
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setUnlinkingProduct(null)}
+                              className="flex-1 px-3 py-2 rounded-lg bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-sm font-medium transition-colors"
+                            >
+                              Отмена
+                            </button>
+                            <button
+                              onClick={() => handleUnlink(product)}
+                              disabled={unlinking}
+                              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[var(--accent)]/20 hover:bg-[var(--accent)]/30 border border-[var(--accent)]/30 text-[var(--accent)] text-sm font-medium transition-colors disabled:opacity-50"
+                            >
+                              {unlinking ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                              Отвязать
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setUnlinkingProduct(product)}
+                          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/20 text-[var(--accent)] text-sm font-medium transition-colors"
+                        >
+                          <Trash2 size={16} />
+                          Отвязать
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

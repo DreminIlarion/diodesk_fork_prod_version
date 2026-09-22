@@ -14,10 +14,10 @@ def map_counterparty_to_response(counterparty: Counterparty) -> CounterpartyResp
         counterparty_type=counterparty.counterparty_type,
         name=counterparty.name,
         legal_name=counterparty.legal_name,
-        inn=f"{counterparty.inn}",
-        kpp=f"{counterparty.kpp}",
-        okpo=f"{counterparty.okpo}",
-        phone=f"{counterparty.phone}",
+        inn=str(counterparty.inn) if counterparty.inn else None,
+        kpp=str(counterparty.kpp) if counterparty.kpp else None,
+        okpo=str(counterparty.okpo) if counterparty.okpo else None,
+        phone=str(counterparty.phone) if counterparty.phone else None,
         email=counterparty.email,
         address=counterparty.address,
         avatar_url=counterparty.avatar_url,
@@ -27,9 +27,11 @@ def map_counterparty_to_response(counterparty: Counterparty) -> CounterpartyResp
         is_active=counterparty.is_active,
         contact_persons=[
             ContactPersonOut(
-                full_name=f"{contact_person.full_name}",
-                phone=f"{contact_person.phone}",
-                email=contact_person.email,
+                full_name=str(contact_person.full_name) if contact_person.full_name else None,
+                phone=str(contact_person.phone) if contact_person.phone else None,
+                email=str(contact_person.email) if contact_person.email else None,
+                position=contact_person.position,
+                extension=contact_person.extension,
                 messengers=contact_person.messengers,
             )
             for contact_person in counterparty.contact_persons

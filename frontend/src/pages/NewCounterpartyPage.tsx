@@ -318,6 +318,7 @@ function isKppRequired(type: CounterpartyType) { return type === 'Юридиче
 
 const emptyContactPerson = (): ContactPersonInput => ({
   first_name: '', last_name: '', middle_name: '', phone: '', email: '',
+  position: '', extension: '',
   messengers: { telegram: '', vk: '' },
 });
 
@@ -595,16 +596,18 @@ export default function NewCounterpartyPage() {
 
       if (includeContacts && contactPersons.length > 0) {
         payload.contact_persons = contactPersons.map(cp => {
-          const p: any = { first_name: cp.first_name, last_name: cp.last_name };
-          if (cp.middle_name) p.middle_name = cp.middle_name;
-          if (cp.phone) p.phone = cp.phone;
-          if (cp.email?.trim()) p.email = cp.email.trim();
-          const m: any = {};
-          if (cp.messengers?.telegram) m.telegram = cp.messengers.telegram;
-          if (cp.messengers?.vk) m.vk = cp.messengers.vk;
-          if (Object.keys(m).length) p.messengers = m;
-          return p;
-        });
+  const p: any = { first_name: cp.first_name, last_name: cp.last_name };
+  if (cp.middle_name) p.middle_name = cp.middle_name;
+  if (cp.phone) p.phone = cp.phone;
+  if (cp.extension?.trim()) p.extension = cp.extension.trim();   // ← добавить
+  if (cp.position?.trim()) p.position = cp.position.trim();       // ← добавить
+  if (cp.email?.trim()) p.email = cp.email.trim();
+  const m: any = {};
+  if (cp.messengers?.telegram) m.telegram = cp.messengers.telegram;
+  if (cp.messengers?.vk) m.vk = cp.messengers.vk;
+  if (Object.keys(m).length) p.messengers = m;
+  return p;
+});
       }
 
       // ── 2. Создание контрагента ───────────────────────────
@@ -1116,6 +1119,33 @@ export default function NewCounterpartyPage() {
                   />
                 </div>
               </div>
+
+              {/* Должность + Добавочный */}
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div>
+    <label className={labelCls}>
+      <Briefcase className="w-3.5 h-3.5 inline mr-1.5 text-[var(--text-primary)]/40" />
+      Должность <span className="text-[var(--text-primary)]/40 text-sm font-normal">(необяз.)</span>
+    </label>
+    <input
+      type="text"
+      value={cp.position ?? ''}
+      onChange={e => updateContactPerson(i, { ...cp, position: e.target.value })}
+      placeholder="Главный бухгалтер"
+      className={inputCls()}
+    />
+  </div>
+  <div>
+    <label className={labelCls}>Добавочный номер <span className="text-[var(--text-primary)]/40 text-sm font-normal">(необяз.)</span></label>
+    <input
+      type="text"
+      value={cp.extension ?? ''}
+      onChange={e => updateContactPerson(i, { ...cp, extension: e.target.value })}
+      placeholder="1234"
+      className={inputCls()}
+    />
+  </div>
+</div>
 
               {/* Мессенджеры */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

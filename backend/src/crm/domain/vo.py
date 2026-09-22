@@ -198,8 +198,10 @@ class ContactPerson(ValueObject):
     })
 
     full_name: FullName
-    phone: Phone | None
-    email: EmailStr | None
+    phone: Phone | None = None
+    email: EmailStr | None = None
+    position: str | None = None          # ← добавил
+    extension: str | None = None         # ← добавил
     messengers: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -214,12 +216,19 @@ class ContactPerson(ValueObject):
             if not value or not isinstance(value, str):
                 raise ValueError(f"Value for {key} must be non empty string")
 
+        if self.position is not None and not self.position.strip():
+            raise ValueError("Position cannot be empty string")
+        if self.extension is not None and not self.extension.strip():
+            raise ValueError("Extension cannot be empty string")
+
     def __repr__(self) -> str:
         return (
             f"ContactPerson("
             f"full_name={self.full_name!r}, "
             f"phone={self.phone!r}, "
             f"email={self.email!r}, "
+            f"position={self.position!r}, "
+            f"extension={self.extension!r}, "
             f"messengers={self.messengers!r})"
         )
 
@@ -232,12 +241,18 @@ class ContactPerson(ValueObject):
             phone: str | None,
             email: str | None,
             messengers: dict[str, str],
+            position: str | None = None,      # ← добавил
+            extension: str | None = None,     # ← добавил
     ) -> "ContactPerson":
+        # Формируем ФИО аккуратно, без "None" в строке
+        parts = [p for p in (last_name, first_name, middle_name) if p]
+        full_name_str = " ".join(parts)
+
         return cls(
-            full_name=FullName(
-                f"{last_name} {first_name} {middle_name if middle_name is not None else ''}"
-            ),
+            full_name=FullName(full_name_str),
             phone=Phone(phone) if phone else None,
             email=email,
+            position=position.strip() if position and position.strip() else None,
+            extension=extension.strip() if extension and extension.strip() else None,
             messengers=messengers,
         )
