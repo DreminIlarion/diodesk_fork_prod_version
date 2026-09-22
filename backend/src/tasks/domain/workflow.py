@@ -12,6 +12,18 @@ from .vo import TaskStatus
 
 TransitionAction = Callable[[Task, UUID], None] | Callable[[Task], None]
 
+# Порядок статусов (от начала к концу)
+STATUS_ORDER: list[TaskStatus] = [
+        TaskStatus.BACKLOG,
+        TaskStatus.TODO,
+        TaskStatus.IN_PROGRESS,
+        TaskStatus.PAUSED,
+        TaskStatus.BLOCKED,
+        TaskStatus.TO_FIX,
+        TaskStatus.TO_REVIEW,
+        TaskStatus.TO_TEST,
+        TaskStatus.DONE,
+    ]
 
 @dataclass(frozen=True)
 class StatusTransition:
@@ -46,18 +58,7 @@ class TaskWorkflow:
 
         return self
 
-    # Порядок статусов (от начала к концу)
-    STATUS_ORDER: list[TaskStatus] = [
-        TaskStatus.BACKLOG,
-        TaskStatus.TODO,
-        TaskStatus.IN_PROGRESS,
-        TaskStatus.PAUSED,
-        TaskStatus.BLOCKED,
-        TaskStatus.TO_FIX,
-        TaskStatus.TO_REVIEW,
-        TaskStatus.TO_TEST,
-        TaskStatus.DONE,
-    ]
+    
 
     def resolve(self, old_status: TaskStatus, new_status: TaskStatus) -> StatusTransition:
         transition = (old_status, new_status)
@@ -79,8 +80,8 @@ class TaskWorkflow:
             )
         
         # Автоматический возврат назад
-        if old_status in self.STATUS_ORDER and new_status in self.STATUS_ORDER:
-            if self.STATUS_ORDER.index(new_status) < self.STATUS_ORDER.index(old_status):
+        if old_status in STATUS_ORDER and new_status in STATUS_ORDER:
+            if STATUS_ORDER.index(new_status) < STATUS_ORDER.index(old_status):
                 actions = []
                 if old_status == TaskStatus.IN_PROGRESS:
                     actions.append(Task.finish_work)
