@@ -1375,11 +1375,13 @@ function ReviewModal({ task, umap, loading, onClose, onOk }: {
   onOk: (reviewerId: string) => Promise<void>;
 }) {
   const [rid, setRid] = useState('');
-  const opts: DDOpt[] = Array.from(umap.values()).map((u) => ({
-    value: u.id,
-    label: u.full_name || u.username || u.email,
-    sublabel: u.email,
-  }));
+  const opts: DDOpt[] = Array.from(umap.values())
+    .filter((u) => u.id !== task.assignee_id)  // ← исключаем исполнителя
+    .map((u) => ({
+      value: u.id,
+      label: u.full_name || u.username || u.email,
+      sublabel: u.email,
+    }));
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) onClose(); };
@@ -2627,6 +2629,14 @@ function DetailModal({
     sublabel: u.email,
   }));
 
+  const rvOpts: DDOpt[] = users
+    .filter((u) => u.id !== t.assignee_id)
+    .map((u) => ({
+      value: u.id,
+      label: u.full_name || u.username || u.email,
+      sublabel: u.email,
+    }));
+
   const isStaff =
     user?.roles?.some((r) =>
       [
@@ -3469,9 +3479,7 @@ function DetailModal({
                           onChange={
                             setRvId
                           }
-                          options={
-                            uOpts
-                          }
+                          options={rvOpts}
                           placeholder="Выберите ревьюера"
                           searchable
                         />
@@ -4082,129 +4090,129 @@ export default function TasksPage() {
     [cols],
   );
 
- const handleAssignAndMove = useCallback(
-  async (aid: string) => {
-    if (!assignIntent) return;
-    setAssignLd(true);
-    const move = assignIntent;
-    try {
-      await tasksApi.assign(move.task.id, { assignee_id: aid });
-      await tasksApi.changeStatus(move.task.id, move.targetStatus);
-      showUndoMove({
-        taskId: move.task.id,
-        number: move.task.number,
-        title: move.task.title,
-        from: move.task.status,
-        to: move.targetStatus,
-      });
-      highlightMovedTask(move.task.id);
-      toast({ title: `Задача переведена в «${ST_LABEL[move.targetStatus]}»` });
-      setAssignIntent(null);
-      await fetchBoard(true);
-      setTimeout(() => revealTask(move.task.id), 100);
-    } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
-    } finally {
-      setAssignLd(false);
-    }
-  },
-  [assignIntent, fetchBoard, toast, showUndoMove, highlightMovedTask, revealTask],
-);
+  const handleAssignAndMove = useCallback(
+    async (aid: string) => {
+      if (!assignIntent) return;
+      setAssignLd(true);
+      const move = assignIntent;
+      try {
+        await tasksApi.assign(move.task.id, { assignee_id: aid });
+        await tasksApi.changeStatus(move.task.id, move.targetStatus);
+        showUndoMove({
+          taskId: move.task.id,
+          number: move.task.number,
+          title: move.task.title,
+          from: move.task.status,
+          to: move.targetStatus,
+        });
+        highlightMovedTask(move.task.id);
+        toast({ title: `Задача переведена в «${ST_LABEL[move.targetStatus]}»` });
+        setAssignIntent(null);
+        await fetchBoard(true);
+        setTimeout(() => revealTask(move.task.id), 100);
+      } catch (e: any) {
+        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      } finally {
+        setAssignLd(false);
+      }
+    },
+    [assignIntent, fetchBoard, toast, showUndoMove, highlightMovedTask, revealTask],
+  );
 
 
   const handleReviewAndMove = useCallback(
-  async (reviewerId: string) => {
-    if (!reviewIntent) return;
-    setReviewLd(true);
-    const move = reviewIntent;
-    try {
-      await tasksApi.requestReview(move.task.id, { reviewer_id: reviewerId });
-      showUndoMove({
-        taskId: move.task.id,
-        number: move.task.number,
-        title: move.task.title,
-        from: move.from,
-        to: 'to_review',
-      });
-      highlightMovedTask(move.task.id);
-      toast({ title: 'Задача отправлена на ревью' });
-      setReviewIntent(null);
-      await fetchBoard(true);
-      setTimeout(() => revealTask(move.task.id), 100);
-    } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
-    } finally {
-      setReviewLd(false);
-    }
-  },
-  [reviewIntent, fetchBoard, toast, showUndoMove, highlightMovedTask, revealTask],
-);
+    async (reviewerId: string) => {
+      if (!reviewIntent) return;
+      setReviewLd(true);
+      const move = reviewIntent;
+      try {
+        await tasksApi.requestReview(move.task.id, { reviewer_id: reviewerId });
+        showUndoMove({
+          taskId: move.task.id,
+          number: move.task.number,
+          title: move.task.title,
+          from: move.from,
+          to: 'to_review',
+        });
+        highlightMovedTask(move.task.id);
+        toast({ title: 'Задача отправлена на ревью' });
+        setReviewIntent(null);
+        await fetchBoard(true);
+        setTimeout(() => revealTask(move.task.id), 100);
+      } catch (e: any) {
+        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      } finally {
+        setReviewLd(false);
+      }
+    },
+    [reviewIntent, fetchBoard, toast, showUndoMove, highlightMovedTask, revealTask],
+  );
 
   const handleConfirmMove = useCallback(
-  async () => {
-    if (!confirmIntent) return;
-    setConfirmLd(true);
-    const move = confirmIntent;
-    try {
-      await tasksApi.changeStatus(move.task.id, move.to);
-      showUndoMove({
-        taskId: move.task.id,
-        number: move.task.number,
-        title: move.task.title,
-        from: move.from,
-        to: move.to,
-      });
-      highlightMovedTask(move.task.id);
-      toast({
-        title: `Задача перемещена в «${ST_LABEL[move.to]}»`,
-        description: `${move.task.number} — ${move.task.title}`,
-      });
-      setConfirmIntent(null);
-      await fetchBoard(true);
-      setTimeout(() => revealTask(move.task.id), 100);
-    } catch (e: any) {
-      const message = statusErr(e, move.task, move.to);
-      toast({ title: message.title, description: message.description, variant: 'destructive' });
-    } finally {
-      setConfirmLd(false);
-    }
-  },
-  [confirmIntent, fetchBoard, toast, showUndoMove, highlightMovedTask, revealTask],
-);
+    async () => {
+      if (!confirmIntent) return;
+      setConfirmLd(true);
+      const move = confirmIntent;
+      try {
+        await tasksApi.changeStatus(move.task.id, move.to);
+        showUndoMove({
+          taskId: move.task.id,
+          number: move.task.number,
+          title: move.task.title,
+          from: move.from,
+          to: move.to,
+        });
+        highlightMovedTask(move.task.id);
+        toast({
+          title: `Задача перемещена в «${ST_LABEL[move.to]}»`,
+          description: `${move.task.number} — ${move.task.title}`,
+        });
+        setConfirmIntent(null);
+        await fetchBoard(true);
+        setTimeout(() => revealTask(move.task.id), 100);
+      } catch (e: any) {
+        const message = statusErr(e, move.task, move.to);
+        toast({ title: message.title, description: message.description, variant: 'destructive' });
+      } finally {
+        setConfirmLd(false);
+      }
+    },
+    [confirmIntent, fetchBoard, toast, showUndoMove, highlightMovedTask, revealTask],
+  );
 
   const handleComplete = useCallback(
-  async (actualHours: number) => {
-    if (!completeIntent) return;
-    setCompleteLd(true);
-    const move = completeIntent;
-    try {
-      await tasksApi.update(move.task.id, { actual_hours: actualHours } as any);
-      if (move.mode === 'review_done') {
-        await tasksApi.review(move.task.id, { decision: 'done' });
-        toast({ title: 'Задача принята' });
-      } else {
-        await tasksApi.changeStatus(move.task.id, 'done');
-        toast({ title: 'Задача выполнена' });
+    async (actualHours: number) => {
+      if (!completeIntent) return;
+      setCompleteLd(true);
+      const move = completeIntent;
+      try {
+        await tasksApi.update(move.task.id, { actual_hours: actualHours } as any);
+        if (move.mode === 'review_done') {
+          await tasksApi.review(move.task.id, { decision: 'done' });
+          toast({ title: 'Задача принята' });
+        } else {
+          await tasksApi.changeStatus(move.task.id, 'done');
+          toast({ title: 'Задача выполнена' });
+        }
+        showUndoMove({
+          taskId: move.task.id,
+          number: move.task.number,
+          title: move.task.title,
+          from: move.task.status,
+          to: 'done',
+        });
+        highlightMovedTask(move.task.id);
+        setCompleteIntent(null);
+        await fetchBoard(true);
+        setTimeout(() => revealTask(move.task.id), 100);
+      } catch (e: any) {
+        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      } finally {
+        setCompleteLd(false);
       }
-      showUndoMove({
-        taskId: move.task.id,
-        number: move.task.number,
-        title: move.task.title,
-        from: move.task.status,
-        to: 'done',
-      });
-      highlightMovedTask(move.task.id);
-      setCompleteIntent(null);
-      await fetchBoard(true);
-      setTimeout(() => revealTask(move.task.id), 100);
-    } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
-    } finally {
-      setCompleteLd(false);
-    }
-  },
-  [completeIntent, fetchBoard, toast, showUndoMove, highlightMovedTask, revealTask],
-);
+    },
+    [completeIntent, fetchBoard, toast, showUndoMove, highlightMovedTask, revealTask],
+  );
 
   const onDS = useCallback((id: string, from: TaskStatus) => setDrag({ id, from }), []);
   const onDE = useCallback(() => {
@@ -4816,41 +4824,110 @@ export default function TasksPage() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 10, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120] w-[min(520px,calc(100vw-24px))]"
+            className="
+        fixed bottom-6 left-1/2 -translate-x-1/2 z-[120]
+        w-[min(520px,calc(100vw-24px))]
+        2xl:w-[min(820px,calc(100vw-24px))]
+      "
           >
             <div
               onMouseEnter={pauseUndoTimer}
               onMouseLeave={resumeUndoTimer}
-              className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-[var(--bg-card)] border border-emerald-500/50 shadow-lg"
+              className="
+          flex items-center gap-3
+          px-3.5 py-3
+          rounded-xl bg-[var(--bg-card)] border border-emerald-500/50 shadow-lg
+
+          2xl:gap-5
+          2xl:px-6
+          2xl:py-5
+          2xl:rounded-2xl
+        "
             >
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              {/* Иконка */}
+              <div
+                className="
+            w-8 h-8 rounded-lg bg-emerald-500/15
+            flex items-center justify-center shrink-0
+
+            2xl:w-14 2xl:h-14 2xl:rounded-2xl
+          "
+              >
+                <CheckCircle2
+                  className="
+              w-4 h-4 text-emerald-500
+
+              2xl:w-7 2xl:h-7
+            "
+                />
               </div>
 
+              {/* Текст */}
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-[var(--text-primary)]">Задача перенесена</div>
-                <div className="mt-0.5 text-xs text-[var(--text-primary)]/50 truncate">
+                <div
+                  className="
+              text-xs font-semibold text-[var(--text-primary)]
+
+              2xl:text-2xl
+            "
+                >
+                  Задача перенесена
+                </div>
+
+                <div
+                  className="
+              mt-0.5 text-xs text-[var(--text-primary)]/50 truncate
+
+              2xl:mt-1 2xl:text-lg
+            "
+                >
                   #{lastMove.number} · {ST_LABEL[lastMove.to]}
                 </div>
               </div>
 
+              {/* Кнопка "Вернуть" */}
               <button
                 type="button"
                 onClick={undoLastMove}
                 disabled={undoingMove}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-50 shrink-0"
+                className="
+            flex items-center gap-1.5
+            px-3 py-2
+            rounded-lg
+            bg-emerald-500 text-white text-xs font-semibold
+            hover:bg-emerald-600 transition-colors
+            disabled:opacity-50 shrink-0
+
+            2xl:gap-2.5
+            2xl:px-5 2xl:py-3
+            2xl:text-lg
+            2xl:rounded-xl
+          "
               >
-                {undoingMove ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                {undoingMove ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin 2xl:w-5 2xl:h-5" />
+                ) : (
+                  <RotateCcw className="w-3.5 h-3.5 2xl:w-5 2xl:h-5" />
+                )}
                 {undoingMove ? 'Возвращаем...' : 'Вернуть'}
               </button>
 
+              {/* Кнопка "Скрыть" */}
               <button
                 type="button"
                 onClick={() => setLastMove(null)}
                 title="Скрыть"
-                className="p-1.5 rounded-lg text-[var(--text-primary)]/30 hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)] transition-colors shrink-0"
+                className="
+            p-1.5
+            rounded-lg
+            text-[var(--text-primary)]/30
+            hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)]
+            transition-colors shrink-0
+
+            2xl:p-3 2xl:rounded-xl
+          "
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-3.5 h-3.5 2xl:w-6 2xl:h-6" />
               </button>
             </div>
           </motion.div>

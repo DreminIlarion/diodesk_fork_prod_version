@@ -667,7 +667,7 @@ return (
     type="button"
     onClick={() => handleQuickFilter(stat.key)}
     className="
-      glass-card rounded-2xl border p-4 flex items-center gap-3.5 text-left transition-all
+     rounded-2xl border p-4 flex items-center gap-3.5 text-left transition-all
       hover:border-[var(--border-hover)] hover:-translate-y-0.5
       border-[var(--border-color)]
     "
