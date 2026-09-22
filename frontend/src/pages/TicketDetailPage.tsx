@@ -1817,6 +1817,118 @@ export default function TicketDetailPage() {
                         </p>
                       )}
                     </div>
+
+                    {/* =========================================================
+    ИСПОЛНИТЕЛЬ
+========================================================= */}
+                    <div>
+                      <label className="block mb-2 text-sm font-medium text-[var(--text-primary)]/60">
+                        Исполнитель
+                      </label>
+
+                      {canAssign ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            loadSupportUsers();
+                            setShowAssigneeModal(true);
+                          }}
+                          className="
+        w-full min-h-[50px]
+        flex items-center justify-between gap-4
+        px-4 py-3
+        rounded-xl
+        border border-[var(--border-color)]
+        bg-[var(--hover-1)]
+        hover:bg-[var(--hover-2)]
+        text-left
+        transition-colors
+      "
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <User className="w-5 h-5 text-[var(--text-primary)]/35 shrink-0" />
+
+                            <span
+                              className={`text-base truncate ${ticket.assignee_id
+                                ? 'font-medium text-[var(--text-primary)]'
+                                : 'text-[var(--text-primary)]/35'
+                                }`}
+                            >
+                              {ticket.assignee_id
+                                ? getAssigneeName() || 'Исполнитель'
+                                : 'Не назначен'}
+                            </span>
+                          </div>
+
+                          <ChevronDown className="w-5 h-5 text-[var(--text-primary)]/35 shrink-0" />
+                        </button>
+                      ) : (
+                        <div
+                          className="
+        min-h-[50px]
+        flex items-center gap-3
+        px-4 py-3
+        rounded-xl
+        border border-[var(--border-color)]
+        bg-[var(--hover-1)]
+      "
+                        >
+                          <User className="w-5 h-5 text-[var(--text-primary)]/30" />
+
+                          <span className="text-base text-[var(--text-primary)]/60">
+                            {ticket.assignee_id
+                              ? getAssigneeName()
+                              : 'Не назначен'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* =========================================================
+    ДОПОЛНИТЕЛЬНЫЕ ДЕЙСТВИЯ
+========================================================= */}
+                    <div className="pt-6 border-t border-[var(--border-color)]">
+                      <p className="mb-3 text-sm font-medium text-[var(--text-primary)]/50">
+                        Дополнительные действия
+                      </p>
+
+                      {ticket.is_archived ? (
+                        <div className="flex items-center gap-2 text-sm text-amber-400">
+                          <Archive className="w-4 h-4" />
+                          Заявка находится в архиве
+                        </div>
+                      ) : canArchive() ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowArchiveConfirm(true)}
+                          disabled={archiving}
+                          className="
+        inline-flex items-center gap-2
+        px-4 py-2.5
+        rounded-xl
+        border border-[var(--border-color)]
+        bg-transparent
+        hover:bg-[var(--hover-2)]
+        text-sm text-[var(--text-primary)]/60
+        hover:text-[var(--text-primary)]
+        transition-colors
+        disabled:opacity-50
+      "
+                        >
+                          {archiving ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Archive className="w-4 h-4" />
+                          )}
+
+                          Переместить в архив
+                        </button>
+                      ) : (
+                        <p className="text-sm text-[var(--text-primary)]/35">
+                          Архивирование недоступно
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
