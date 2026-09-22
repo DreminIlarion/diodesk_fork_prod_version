@@ -5,10 +5,11 @@ from src.iam.domain.entities import User
 from src.iam.domain.rules import IsAdminRule, IsStaffRule
 from src.iam.domain.vo import UserRole
 from src.projects.domain.repos import ProjectMemberRepository
-from src.projects.domain.rules import IsMemberExistsRule, IsProjectOwnerOrManagerRule
+from src.projects.domain.rules import IsProjectOwnerOrManagerRule
 
 from .entities import Task
 from .rules import (
+    IsMemberExistsRule,      # ← добавиL
     IsProjectStaffRule,
     IsTaskCreator,
     IsTaskReviewer,
