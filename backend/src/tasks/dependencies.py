@@ -7,7 +7,7 @@ from fastapi import Depends, Query
 
 from src.activity_logs.dependencies import ActivityLogRecorderDep
 from src.iam.dependencies import UserRepoDep
-from src.projects.dependencies import ProjectMemberRepoDep, ProjectRepoDep
+from src.projects.dependencies import ProjectRepoDep
 from src.shared.dependencies import EventPublisherDep, SessionDep
 from src.shared.domain.repos import get_or_raise_404
 from src.shared.domain.vo import Priority
@@ -43,7 +43,6 @@ def get_task_service(
         ticket_repo: TicketRepoDep,
         user_repo: UserRepoDep,
         project_repo: ProjectRepoDep,
-        project_member_repo: ProjectMemberRepoDep,
         activity_log_recorder: ActivityLogRecorderDep,
         event_publisher: EventPublisherDep,
 ) -> TaskService:
@@ -53,7 +52,7 @@ def get_task_service(
         ticket_repo=ticket_repo,
         user_repo=user_repo,
         project_repo=project_repo,
-        task_authz_service=TaskAuthZService(project_membership_repo=project_member_repo),
+        task_authz_service=TaskAuthZService(),
         activity_log_recorder=activity_log_recorder,
         event_publisher=event_publisher,
     )

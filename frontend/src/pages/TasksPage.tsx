@@ -1607,7 +1607,7 @@ function ConfirmModal({
         aria-labelledby="confirm-modal-title"
         className="
           relative
-          w-full max-w-[480px]
+          w-full max-w-[500px]
           overflow-hidden
           rounded-2xl
           border border-[var(--border-color)]
@@ -1620,7 +1620,12 @@ function ConfirmModal({
         <div className="px-6 pt-6">
           <h2
             id="confirm-modal-title"
-            className="text-xl font-semibold tracking-tight text-[var(--text-primary)]"
+            className="
+              text-xl
+              font-semibold
+              tracking-tight
+              text-[var(--text-primary)]
+            "
           >
             Переместить задачу?
           </h2>
@@ -1646,54 +1651,107 @@ function ConfirmModal({
           {/* Status transition */}
           <div
             className="
-              flex items-center gap-4
-              rounded-xl
+              rounded-2xl
               border border-[var(--border-color)]
               bg-[var(--hover-1)]
               p-4
             "
           >
             {/* From */}
-            <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="flex items-center gap-3">
               <span
                 className={`
-                  flex h-10 w-10 shrink-0
+                  flex h-11 w-11
+                  shrink-0
                   items-center justify-center
-                  rounded-lg border
+                  rounded-xl
+                  border
                   bg-[var(--bg-card)]
                   ${fromMeta.brd}
                 `}
               >
-                <FromIcon className={`h-5 w-5 ${fromMeta.tc}`} />
+                <FromIcon
+                  className={`h-5 w-5 ${fromMeta.tc}`}
+                />
               </span>
 
-              <span className="truncate text-base font-medium text-[var(--text-primary)]/65">
-                {ST_LABEL[from]}
-              </span>
+              <div className="min-w-0">
+                <div className="mb-0.5 text-sm text-[var(--text-primary)]/40">
+                  Текущий статус
+                </div>
+
+                <div
+                  className="
+                    text-base
+                    font-medium
+                    leading-6
+                    break-words
+                    text-[var(--text-primary)]/70
+                  "
+                >
+                  {ST_LABEL[from]}
+                </div>
+              </div>
             </div>
 
-            {/* Arrow */}
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--hover-2)]">
-              <ArrowRight className="h-4 w-4 text-[var(--text-primary)]/40" />
+            {/* Transition line */}
+            <div className="ml-[21px] my-2 flex h-7 items-center">
+              <div className="h-full w-px bg-[var(--border-color)]" />
+
+              <div
+                className="
+                  -ml-[14px]
+                  flex h-7 w-7
+                  items-center justify-center
+                  rounded-full
+                  border border-[var(--border-color)]
+                  bg-[var(--bg-card)]
+                "
+              >
+                <ArrowDown
+                  className="
+                    h-3.5 w-3.5
+                    text-[var(--text-primary)]/40
+                  "
+                />
+              </div>
             </div>
 
             {/* To */}
-            <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="flex items-center gap-3">
               <span
                 className={`
-                  flex h-10 w-10 shrink-0
+                  flex h-11 w-11
+                  shrink-0
                   items-center justify-center
-                  rounded-lg border
+                  rounded-xl
+                  border
                   bg-[var(--bg-card)]
                   ${toMeta.brd}
                 `}
               >
-                <ToIcon className={`h-5 w-5 ${toMeta.tc}`} />
+                <ToIcon
+                  className={`h-5 w-5 ${toMeta.tc}`}
+                />
               </span>
 
-              <span className="truncate text-base font-semibold text-[var(--text-primary)]">
-                {ST_LABEL[to]}
-              </span>
+              <div className="min-w-0">
+                <div className="mb-0.5 text-sm text-[var(--text-primary)]/40">
+                  Новый статус
+                </div>
+
+                <div
+                  className="
+                    text-base
+                    font-semibold
+                    leading-6
+                    break-words
+                    text-[var(--text-primary)]
+                  "
+                >
+                  {ST_LABEL[to]}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1701,7 +1759,7 @@ function ConfirmModal({
         {/* Footer */}
         <div
           className="
-            flex items-center justify-end gap-3
+            grid grid-cols-2 gap-3
             border-t border-[var(--border-color)]
             bg-[var(--hover-1)]
             px-6 py-4
@@ -1712,12 +1770,16 @@ function ConfirmModal({
             onClick={onClose}
             disabled={loading}
             className="
+              flex h-11
+              items-center justify-center
               rounded-xl
-              px-5 py-2.5
+              border border-[var(--border-color)]
+              bg-[var(--hover-2)]
+              px-5
               text-base font-medium
-              text-[var(--text-primary)]/70
+              text-[var(--text-primary)]/75
               transition-colors
-              hover:bg-[var(--hover-2)]
+              hover:bg-[var(--hover-3)]
               hover:text-[var(--text-primary)]
               disabled:pointer-events-none
               disabled:opacity-50
@@ -1731,11 +1793,11 @@ function ConfirmModal({
             onClick={onOk}
             disabled={loading}
             className="
-              flex min-w-[145px]
+              flex h-11
               items-center justify-center gap-2
               rounded-xl
               bg-[var(--accent)]
-              px-5 py-2.5
+              px-5
               text-base font-medium
               text-white
               transition-colors
