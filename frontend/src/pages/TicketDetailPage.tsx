@@ -1682,8 +1682,8 @@ export default function TicketDetailPage() {
                               ) : (
                                 <span
                                   className={`w-2.5 h-2.5 rounded-full shrink-0 ${availableStatuses.length
-                                      ? 'bg-emerald-500'
-                                      : 'bg-[var(--text-primary)]/25'
+                                    ? 'bg-emerald-500'
+                                    : 'bg-[var(--text-primary)]/25'
                                     }`}
                                 />
                               )}
@@ -1834,8 +1834,8 @@ export default function TicketDetailPage() {
 
                               <span
                                 className={`text-base truncate ${ticket.assignee_id
-                                    ? 'font-medium text-[var(--text-primary)]'
-                                    : 'text-[var(--text-primary)]/35'
+                                  ? 'font-medium text-[var(--text-primary)]'
+                                  : 'text-[var(--text-primary)]/35'
                                   }`}
                               >
                                 {ticket.assignee_id

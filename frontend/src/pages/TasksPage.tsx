@@ -123,15 +123,15 @@ const ST_LABEL: Record<TaskStatus, string> = {
 
 const TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   backlog: ['todo', 'cancelled'],
-  todo: ['in_progress', 'paused', 'cancelled'],
-  in_progress: ['paused', 'to_review', 'done', 'cancelled'],
-  paused: ['in_progress', 'cancelled'],
-  blocked: ['in_progress', 'cancelled'],
-  to_review: ['in_progress', 'done', 'to_fix', 'to_test', 'cancelled'],
+  todo: ['backlog', 'in_progress', 'paused', 'cancelled'],       // + backward: backlog
+  in_progress: ['todo', 'paused', 'to_review', 'done', 'cancelled'], // + backward: todo
+  paused: ['in_progress', 'todo', 'cancelled'],                   // + backward: todo
+  blocked: ['in_progress', 'todo', 'paused', 'cancelled'],        // + backward
+  to_review: ['in_progress', 'to_fix', 'to_test', 'done', 'cancelled'], // + backward: in_progress
   to_fix: ['in_progress', 'to_review', 'cancelled'],
   to_test: ['in_progress', 'to_review', 'done', 'cancelled'],
-  done: ['in_progress', 'to_fix'],
-  cancelled: [],
+  done: ['in_progress', 'to_fix', 'to_review', 'to_test'],        // + backward
+  cancelled: ['backlog', 'todo'],                                 // можно вернуть
 };
 
 const ASSIGN_OK: Set<TaskStatus> = new Set([
@@ -1367,6 +1367,75 @@ function DragPanel({
   );
 }
 
+function ReviewModal({ task, umap, loading, onClose, onOk }: {
+  task: TaskViewItem;
+  umap: Map<string, SimpleUser | CounterpartyCustomer>;
+  loading: boolean;
+  onClose: () => void;
+  onOk: (reviewerId: string) => Promise<void>;
+}) {
+  const [rid, setRid] = useState('');
+  const opts: DDOpt[] = Array.from(umap.values()).map((u) => ({
+    value: u.id,
+    label: u.full_name || u.username || u.email,
+    sublabel: u.email,
+  }));
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) onClose(); };
+    document.addEventListener('keydown', h);
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
+  }, [onClose, loading]);
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !loading && onClose()} />
+      <div className="relative w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
+              <Eye className="w-5 h-5 text-violet-500" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-[var(--text-primary)]">Отправить на ревью</h2>
+              <p className="text-sm text-[var(--text-primary)]/50">Выберите ревьювера</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="rounded-xl bg-[var(--hover-2)] p-3 border border-[var(--border-color)]">
+            <span className="text-xs font-mono text-violet-500 bg-violet-500/10 px-1.5 py-0.5 rounded border border-violet-500/20">{task.number}</span>
+            <p className="text-sm font-medium text-[var(--text-primary)] mt-1.5">{task.title}</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">
+              Ревьювер <span className="text-red-400">*</span>
+            </label>
+            <SelectDD
+              value={rid}
+              onChange={setRid}
+              options={opts}
+              placeholder="Выберите ревьювера"
+              icon={UserCheck}
+              searchable
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2.5 px-5 py-3.5 border-t border-[var(--border-color)] bg-[var(--hover-1)]">
+          <button onClick={onClose} disabled={loading} className="px-4 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 text-sm font-medium hover:bg-[var(--hover-3)] disabled:opacity-50">
+            Отмена
+          </button>
+          <button onClick={() => onOk(rid)} disabled={!rid || loading} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-violet-500 text-white text-sm font-medium disabled:opacity-40 hover:bg-violet-500/90">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+            Отправить
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ───────────────── assign modal ───────────────── */
 
 function AssignModal({ task, targetStatus, umap, loading, onClose, onOk }: {
@@ -1476,6 +1545,86 @@ function CompleteModal({ task, loading, onClose, onOk }: {
           <button onClick={onClose} disabled={loading} className="px-4 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 text-sm font-medium hover:bg-[var(--hover-3)] disabled:opacity-50">Отмена</button>
           <button onClick={() => valid && onOk(actualNum)} disabled={!valid || loading} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-500 text-white text-sm font-medium disabled:opacity-40 hover:bg-emerald-500/90">
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}Завершить
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function ConfirmModal({ task, from, to, loading, onClose, onOk }: {
+  task: TaskViewItem;
+  from: TaskStatus;
+  to: TaskStatus;
+  loading: boolean;
+  onClose: () => void;
+  onOk: () => Promise<void>;
+}) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) onClose(); };
+    document.addEventListener('keydown', h);
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
+  }, [onClose, loading]);
+
+  const fromMeta = CM[from];
+  const toMeta = CM[to];
+  const FromIcon = fromMeta.icon;
+  const ToIcon = toMeta.icon;
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !loading && onClose()} />
+      <div className="relative w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
+              <AlertCircle className="w-5 h-5 text-[var(--accent)]" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-[var(--text-primary)]">Подтвердите действие</h2>
+              <p className="text-sm text-[var(--text-primary)]/50">Перемещение задачи</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="rounded-xl bg-[var(--hover-2)] p-3 border border-[var(--border-color)]">
+            <span className="text-xs font-mono text-[var(--text-primary)]/50">{task.number}</span>
+            <p className="text-sm font-medium text-[var(--text-primary)] mt-1.5">{task.title}</p>
+          </div>
+
+          <div className="flex items-center justify-center gap-3 py-2">
+            <div className="flex flex-col items-center gap-1.5">
+              <span className={`w-9 h-9 rounded-xl flex items-center justify-center border ${fromMeta.brd} bg-[var(--hover-1)]`}>
+                <FromIcon className={`w-4 h-4 ${fromMeta.tc}`} />
+              </span>
+              <span className="text-xs text-[var(--text-primary)]/50">{ST_LABEL[from]}</span>
+            </div>
+
+            <ArrowRight className="w-4 h-4 text-[var(--text-primary)]/30 shrink-0" />
+
+            <div className="flex flex-col items-center gap-1.5">
+              <span className={`w-9 h-9 rounded-xl flex items-center justify-center border ${toMeta.brd} bg-[var(--hover-1)]`}>
+                <ToIcon className={`w-4 h-4 ${toMeta.tc}`} />
+              </span>
+              <span className="text-xs text-[var(--text-primary)]/50">{ST_LABEL[to]}</span>
+            </div>
+          </div>
+
+          <p className="text-sm text-center text-[var(--text-primary)]/60">
+            Переместить задачу в «<span className="font-medium text-[var(--text-primary)]">{ST_LABEL[to]}</span>»?
+          </p>
+        </div>
+
+        <div className="flex justify-end gap-2.5 px-5 py-3.5 border-t border-[var(--border-color)] bg-[var(--hover-1)]">
+          <button onClick={onClose} disabled={loading} className="px-4 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 text-sm font-medium hover:bg-[var(--hover-3)] disabled:opacity-50">
+            Отмена
+          </button>
+          <button onClick={onOk} disabled={loading} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-40 hover:bg-[var(--accent)]/90">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            Подтвердить
           </button>
         </div>
       </div>
@@ -3662,6 +3811,12 @@ export default function TasksPage() {
   const [assignIntent, setAssignIntent] = useState<AssignIntent | null>(null);
   const [assignLd, setAssignLd] = useState(false);
 
+  const [reviewIntent, setReviewIntent] = useState<{ task: TaskViewItem; from: TaskStatus } | null>(null);
+  const [reviewLd, setReviewLd] = useState(false);
+
+  const [confirmIntent, setConfirmIntent] = useState<{ task: TaskViewItem; from: TaskStatus; to: TaskStatus } | null>(null);
+  const [confirmLd, setConfirmLd] = useState(false);
+
   const [completeIntent, setCompleteIntent] = useState<CompleteIntent | null>(null);
   const [completeLd, setCompleteLd] = useState(false);
   const [profileUser, setProfileUser] = useState<SimpleUser | CounterpartyCustomer | null>(null);
@@ -3899,88 +4054,32 @@ export default function TasksPage() {
       const task = src?.tasks.items.find((x) => x.id === id);
       if (!task) return;
 
+      // 1. Нужен исполнитель
       if (to === 'todo' && from === 'backlog' && !task.assignee_id) {
         setAssignIntent({ task, targetStatus: 'todo' });
         return;
       }
-
       if (to === 'in_progress' && !task.assignee_id) {
         setAssignIntent({ task, targetStatus: 'in_progress' });
         return;
       }
 
+      // 2. Отправка на ревью — выбор ревьювера
+      if (to === 'to_review') {
+        setReviewIntent({ task, from });
+        return;
+      }
+
+      // 3. Выполнено — факт. часы
       if (to === 'done') {
         setCompleteIntent({ task, mode: 'status_done' });
         return;
       }
 
-      const snap = snapCols(cols);
-      let moved: TaskViewItem | undefined;
-
-      setCols((prev) => {
-        const next = prev.map((c) => {
-          if (c.status !== from) return c;
-          const items = c.tasks.items.filter((x) => {
-            if (x.id === id) {
-              moved = x;
-              return false;
-            }
-            return true;
-          });
-          return {
-            ...c,
-            tasks: {
-              ...c.tasks,
-              items,
-              total_items: Math.max(c.tasks.total_items - 1, 0),
-            },
-          };
-        });
-
-        if (!moved) return prev;
-
-        const updated: TaskViewItem = { ...moved, status: to };
-
-        return next.map((c) =>
-          c.status === to
-            ? {
-              ...c,
-              tasks: {
-                ...c.tasks,
-                items: [updated, ...c.tasks.items.filter((x) => x.id !== id)],
-                total_items: c.tasks.total_items + 1,
-              },
-            }
-            : c,
-        );
-      });
-
-      try {
-        await tasksApi.changeStatus(id, to);
-        showUndoMove({
-          taskId: id,
-          number: task.number,
-          title: task.title,
-          from,
-          to,
-        });
-        highlightMovedTask(id);
-        revealTask(id);
-        toast({
-          title: `Задача перенесена в «${ST_LABEL[to]}»`,
-          description: `${task.number} — ${task.title}`,
-        });
-      } catch (e: any) {
-        setCols(snap);
-        const message = statusErr(e, task, to);
-        toast({
-          title: message.title,
-          description: message.description,
-          variant: 'destructive',
-        });
-      }
+      // 4. Остальные — подтверждение
+      setConfirmIntent({ task, from, to });
     },
-    [cols, toast, highlightMovedTask, revealTask, showUndoMove],
+    [cols],
   );
 
   const handleAssignAndMove = useCallback(
@@ -4000,6 +4099,47 @@ export default function TasksPage() {
       }
     },
     [assignIntent, fetchBoard, toast],
+  );
+
+
+  const handleReviewAndMove = useCallback(
+    async (reviewerId: string) => {
+      if (!reviewIntent) return;
+      setReviewLd(true);
+      try {
+        await tasksApi.requestReview(reviewIntent.task.id, { reviewer_id: reviewerId });
+        toast({ title: 'Задача отправлена на ревью' });
+        setReviewIntent(null);
+        await fetchBoard(true);
+      } catch (e: any) {
+        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      } finally {
+        setReviewLd(false);
+      }
+    },
+    [reviewIntent, fetchBoard, toast],
+  );
+
+  const handleConfirmMove = useCallback(
+    async () => {
+      if (!confirmIntent) return;
+      setConfirmLd(true);
+      try {
+        await tasksApi.changeStatus(confirmIntent.task.id, confirmIntent.to);
+        toast({
+          title: `Задача перемещена в «${ST_LABEL[confirmIntent.to]}»`,
+          description: `${confirmIntent.task.number} — ${confirmIntent.task.title}`,
+        });
+        setConfirmIntent(null);
+        await fetchBoard(true);
+      } catch (e: any) {
+        const message = statusErr(e, confirmIntent.task, confirmIntent.to);
+        toast({ title: message.title, description: message.description, variant: 'destructive' });
+      } finally {
+        setConfirmLd(false);
+      }
+    },
+    [confirmIntent, fetchBoard, toast],
   );
 
   const handleComplete = useCallback(
@@ -4035,14 +4175,10 @@ export default function TasksPage() {
   const onDO = useCallback(
     (e: React.DragEvent, st: TaskStatus) => {
       e.preventDefault();
-      if (drag && !TRANSITIONS[drag.from].includes(st)) {
-        e.dataTransfer.dropEffect = 'none';
-        return;
-      }
       e.dataTransfer.dropEffect = 'move';
       setDragO(st);
     },
-    [drag],
+    [],
   );
 
   const onDL = useCallback(() => setDragO(null), []);
@@ -4752,6 +4888,27 @@ export default function TasksPage() {
             if (!completeLd) setCompleteIntent(null);
           }}
           onOk={handleComplete}
+        />
+      )}
+
+      {reviewIntent && (
+        <ReviewModal
+          task={reviewIntent.task}
+          umap={umap}
+          loading={reviewLd}
+          onClose={() => { if (!reviewLd) setReviewIntent(null); }}
+          onOk={handleReviewAndMove}
+        />
+      )}
+
+      {confirmIntent && (
+        <ConfirmModal
+          task={confirmIntent.task}
+          from={confirmIntent.from}
+          to={confirmIntent.to}
+          loading={confirmLd}
+          onClose={() => { if (!confirmLd) setConfirmIntent(null); }}
+          onOk={handleConfirmMove}
         />
       )}
 

@@ -46,15 +46,60 @@ class TaskWorkflow:
 
         return self
 
+    # Порядок статусов (от начала к концу)
+    STATUS_ORDER: list[TaskStatus] = [
+        TaskStatus.BACKLOG,
+        TaskStatus.TODO,
+        TaskStatus.IN_PROGRESS,
+        TaskStatus.PAUSED,
+        TaskStatus.BLOCKED,
+        TaskStatus.TO_FIX,
+        TaskStatus.TO_REVIEW,
+        TaskStatus.TO_TEST,
+        TaskStatus.DONE,
+    ]
+
     def resolve(self, old_status: TaskStatus, new_status: TaskStatus) -> StatusTransition:
         transition = (old_status, new_status)
-        if transition not in self.transitions:
-            raise NotAllowedStatusTransitionError(
-                f"Not allowed status transition from {old_status} to {new_status}."
+        
+        # Явный переход
+        if transition in self.transitions:
+            return StatusTransition(
+                from_status=old_status, 
+                to_status=new_status, 
+                actions=self.transitions[transition]
             )
-
-        actions = self.transitions[transition]
-        return StatusTransition(from_status=old_status, to_status=new_status, actions=actions)
+        
+        # Особый случай: возврат из CANCELLED — разрешаем в BACKLOG и TODO
+        if old_status == TaskStatus.CANCELLED and new_status in {TaskStatus.BACKLOG, TaskStatus.TODO}:
+            return StatusTransition(
+                from_status=old_status,
+                to_status=new_status,
+                actions=(Task.unassign, Task.reset_reviewer),
+            )
+        
+        # Автоматический возврат назад
+        if old_status in self.STATUS_ORDER and new_status in self.STATUS_ORDER:
+            if self.STATUS_ORDER.index(new_status) < self.STATUS_ORDER.index(old_status):
+                actions = []
+                if old_status == TaskStatus.IN_PROGRESS:
+                    actions.append(Task.finish_work)
+                if new_status == TaskStatus.IN_PROGRESS:
+                    actions.append(Task.start_work)
+                if old_status == TaskStatus.DONE:
+                    actions.append(Task.reopen)
+                if old_status in {TaskStatus.TO_REVIEW, TaskStatus.TO_FIX, TaskStatus.TO_TEST}:
+                    actions.append(Task.reset_reviewer)
+                
+                return StatusTransition(
+                    from_status=old_status, 
+                    to_status=new_status, 
+                    actions=tuple(actions)
+                )
+        
+        raise NotAllowedStatusTransitionError(
+            f"Not allowed status transition from {old_status} to {new_status}."
+        )
 
 task_workflow = (
     TaskWorkflow()
