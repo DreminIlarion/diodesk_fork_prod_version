@@ -9,7 +9,7 @@ import {
   ArrowUpRight, ChevronDown, Flag, AlertCircle, CheckCircle2, Ban, RotateCcw,
   RefreshCw, Archive, FolderOpen, Ticket, Zap, Star, User, Layers, UserCheck,
   GitPullRequest, ThumbsUp, ThumbsDown, Pencil, List, LayoutGrid, Clock3,
-  FileText, File as FileIcon, Download, BarChart3, Trash2, Paperclip, ArrowRight, Mail
+  FileText, File as FileIcon, Download, BarChart3, Trash2, Paperclip, ArrowRight, Mail,ArrowDown 
 } from 'lucide-react';
 import { tasksApi, projectsApi, ticketsApi, usersApi } from '../api/client';
 import { attachmentsApi } from '../api/attachments';
@@ -123,15 +123,15 @@ const ST_LABEL: Record<TaskStatus, string> = {
 
 const TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   backlog: ['todo', 'cancelled'],
-  todo: ['in_progress', 'paused', 'cancelled'],
-  in_progress: ['paused', 'to_review', 'done', 'cancelled'],
-  paused: ['in_progress', 'cancelled'],
-  blocked: ['in_progress', 'cancelled'],
-  to_review: ['in_progress', 'done', 'to_fix', 'to_test', 'cancelled'],
+  todo: ['backlog', 'in_progress', 'paused', 'cancelled'],       // + backward: backlog
+  in_progress: ['todo', 'paused', 'to_review', 'done', 'cancelled'], // + backward: todo
+  paused: ['in_progress', 'todo', 'cancelled'],                   // + backward: todo
+  blocked: ['in_progress', 'todo', 'paused', 'cancelled'],        // + backward
+  to_review: ['in_progress', 'to_fix', 'to_test', 'done', 'cancelled'], // + backward: in_progress
   to_fix: ['in_progress', 'to_review', 'cancelled'],
   to_test: ['in_progress', 'to_review', 'done', 'cancelled'],
-  done: ['in_progress', 'to_fix'],
-  cancelled: [],
+  done: ['in_progress', 'to_fix', 'to_review', 'to_test'],        // + backward
+  cancelled: ['backlog', 'todo'],                                 // можно вернуть
 };
 
 const ASSIGN_OK: Set<TaskStatus> = new Set([
@@ -848,20 +848,32 @@ function AsyncDD({ value, onChange, loadFn, placeholder, icon: LI, disabled, wid
           {ld && <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-[var(--text-primary)]/30" /></div>}
           {!ld && opts.length === 0 && <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">{q ? 'Не найдено' : 'Нет данных'}</div>}
           {!ld && opts.map((o) => (
-            <div key={o.value} role="button" tabIndex={0} onClick={() => { onChange(o.value); setSelLbl(o.label); setOpen(false); }}
-              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm cursor-pointer ${o.value === value ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium' : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'
-                }`}>
-              {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
-              {o.icon && <span className="shrink-0">{o.icon}</span>}
-              <div className="flex-1 min-w-0">
-                <span className="block leading-snug" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                  {o.label}
-                </span>
-                {o.sublabel && <span className="block text-xs text-[var(--text-primary)]/40 truncate mt-0.5">{o.sublabel}</span>}
-              </div>
-              {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
-            </div>
-          ))}
+  <div key={o.value} role="button" tabIndex={0} onClick={() => { onChange(o.value); setSelLbl(o.label); setOpen(false); }}
+    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm cursor-pointer ${
+      o.value === value
+        ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
+        : o.isMe
+          ? 'bg-emerald-500/[0.06] hover:bg-emerald-500/[0.12] text-[var(--text-primary)]'
+          : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'
+    }`}>
+    {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
+    {o.icon && <span className="shrink-0">{o.icon}</span>}
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center gap-1.5">
+        <span className="block leading-snug" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {o.label}
+        </span>
+        {o.isMe && (
+          <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
+            Вы
+          </span>
+        )}
+      </div>
+      {o.sublabel && <span className="block text-xs text-[var(--text-primary)]/40 truncate mt-0.5">{o.sublabel}</span>}
+    </div>
+    {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
+  </div>
+))}
           {!ld && more && (
             <div role="button" tabIndex={0} onClick={() => !ldMore && doLoad(q, pg + 1, true)}
               className="flex items-center justify-center gap-1.5 py-2 text-sm text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] rounded-lg cursor-pointer transition-colors">
@@ -1367,6 +1379,77 @@ function DragPanel({
   );
 }
 
+function ReviewModal({ task, umap, loading, onClose, onOk }: {
+  task: TaskViewItem;
+  umap: Map<string, SimpleUser | CounterpartyCustomer>;
+  loading: boolean;
+  onClose: () => void;
+  onOk: (reviewerId: string) => Promise<void>;
+}) {
+  const [rid, setRid] = useState('');
+  const opts: DDOpt[] = Array.from(umap.values())
+    .filter((u) => u.id !== task.assignee_id)  // ← исключаем исполнителя
+    .map((u) => ({
+      value: u.id,
+      label: u.full_name || u.username || u.email,
+      sublabel: u.email,
+    }));
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) onClose(); };
+    document.addEventListener('keydown', h);
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
+  }, [onClose, loading]);
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !loading && onClose()} />
+      <div className="relative w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
+              <Eye className="w-5 h-5 text-violet-500" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-[var(--text-primary)]">Отправить на ревью</h2>
+              <p className="text-sm text-[var(--text-primary)]/50">Выберите ревьювера</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="rounded-xl bg-[var(--hover-2)] p-3 border border-[var(--border-color)]">
+            <span className="text-xs font-mono text-violet-500 bg-violet-500/10 px-1.5 py-0.5 rounded border border-violet-500/20">{task.number}</span>
+            <p className="text-sm font-medium text-[var(--text-primary)] mt-1.5">{task.title}</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-1.5">
+              Ревьювер <span className="text-red-400">*</span>
+            </label>
+            <SelectDD
+              value={rid}
+              onChange={setRid}
+              options={opts}
+              placeholder="Выберите ревьювера"
+              icon={UserCheck}
+              searchable
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2.5 px-5 py-3.5 border-t border-[var(--border-color)] bg-[var(--hover-1)]">
+          <button onClick={onClose} disabled={loading} className="px-4 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 text-sm font-medium hover:bg-[var(--hover-3)] disabled:opacity-50">
+            Отмена
+          </button>
+          <button onClick={() => onOk(rid)} disabled={!rid || loading} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-violet-500 text-white text-sm font-medium disabled:opacity-40 hover:bg-violet-500/90">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+            Отправить
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ───────────────── assign modal ───────────────── */
 
 function AssignModal({ task, targetStatus, umap, loading, onClose, onOk }: {
@@ -1476,6 +1559,276 @@ function CompleteModal({ task, loading, onClose, onOk }: {
           <button onClick={onClose} disabled={loading} className="px-4 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/70 text-sm font-medium hover:bg-[var(--hover-3)] disabled:opacity-50">Отмена</button>
           <button onClick={() => valid && onOk(actualNum)} disabled={!valid || loading} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-500 text-white text-sm font-medium disabled:opacity-40 hover:bg-emerald-500/90">
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}Завершить
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function ConfirmModal({
+  task,
+  from,
+  to,
+  loading,
+  onClose,
+  onOk,
+}: {
+  task: TaskViewItem;
+  from: TaskStatus;
+  to: TaskStatus;
+  loading: boolean;
+  onClose: () => void;
+  onOk: () => Promise<void>;
+}) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !loading) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [onClose, loading]);
+
+  const fromMeta = CM[from];
+  const toMeta = CM[to];
+
+  const FromIcon = fromMeta.icon;
+  const ToIcon = toMeta.icon;
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      {/* Overlay */}
+      <div
+        className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
+        onClick={() => !loading && onClose()}
+      />
+
+      {/* Modal */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-modal-title"
+        className="
+          relative
+          w-full max-w-[500px]
+          overflow-hidden
+          rounded-2xl
+          border border-[var(--border-color)]
+          bg-[var(--bg-card)]
+          shadow-2xl
+        "
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-6 pt-6">
+          <h2
+            id="confirm-modal-title"
+            className="
+              text-xl
+              font-semibold
+              tracking-tight
+              text-[var(--text-primary)]
+            "
+          >
+            Переместить задачу?
+          </h2>
+
+          <p className="mt-1.5 text-base text-[var(--text-primary)]/55">
+            Статус задачи будет изменён.
+          </p>
+        </div>
+
+        {/* Content */}
+        <div className="px-6 pb-6 pt-5">
+          {/* Task */}
+          <div className="mb-5">
+            <div className="text-sm font-mono text-[var(--text-primary)]/45">
+              #{task.number}
+            </div>
+
+            <div className="mt-1.5 text-base font-medium leading-6 text-[var(--text-primary)]">
+              {task.title}
+            </div>
+          </div>
+
+          {/* Status transition */}
+          <div
+            className="
+              rounded-2xl
+              border border-[var(--border-color)]
+              bg-[var(--hover-1)]
+              p-4
+            "
+          >
+            {/* From */}
+            <div className="flex items-center gap-3">
+              <span
+                className={`
+                  flex h-11 w-11
+                  shrink-0
+                  items-center justify-center
+                  rounded-xl
+                  border
+                  bg-[var(--bg-card)]
+                  ${fromMeta.brd}
+                `}
+              >
+                <FromIcon
+                  className={`h-5 w-5 ${fromMeta.tc}`}
+                />
+              </span>
+
+              <div className="min-w-0">
+                <div className="mb-0.5 text-sm text-[var(--text-primary)]/40">
+                  Текущий статус
+                </div>
+
+                <div
+                  className="
+                    text-base
+                    font-medium
+                    leading-6
+                    break-words
+                    text-[var(--text-primary)]/70
+                  "
+                >
+                  {ST_LABEL[from]}
+                </div>
+              </div>
+            </div>
+
+            {/* Transition line */}
+            <div className="ml-[21px] my-2 flex h-7 items-center">
+              <div className="h-full w-px bg-[var(--border-color)]" />
+
+              <div
+                className="
+                  -ml-[14px]
+                  flex h-7 w-7
+                  items-center justify-center
+                  rounded-full
+                  border border-[var(--border-color)]
+                  bg-[var(--bg-card)]
+                "
+              >
+                <ArrowDown
+                  className="
+                    h-3.5 w-3.5
+                    text-[var(--text-primary)]/40
+                  "
+                />
+              </div>
+            </div>
+
+            {/* To */}
+            <div className="flex items-center gap-3">
+              <span
+                className={`
+                  flex h-11 w-11
+                  shrink-0
+                  items-center justify-center
+                  rounded-xl
+                  border
+                  bg-[var(--bg-card)]
+                  ${toMeta.brd}
+                `}
+              >
+                <ToIcon
+                  className={`h-5 w-5 ${toMeta.tc}`}
+                />
+              </span>
+
+              <div className="min-w-0">
+                <div className="mb-0.5 text-sm text-[var(--text-primary)]/40">
+                  Новый статус
+                </div>
+
+                <div
+                  className="
+                    text-base
+                    font-semibold
+                    leading-6
+                    break-words
+                    text-[var(--text-primary)]
+                  "
+                >
+                  {ST_LABEL[to]}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div
+          className="
+            grid grid-cols-2 gap-3
+            border-t border-[var(--border-color)]
+            bg-[var(--hover-1)]
+            px-6 py-4
+          "
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="
+              flex h-11
+              items-center justify-center
+              rounded-xl
+              border border-[var(--border-color)]
+              bg-[var(--hover-2)]
+              px-5
+              text-base font-medium
+              text-[var(--text-primary)]/75
+              transition-colors
+              hover:bg-[var(--hover-3)]
+              hover:text-[var(--text-primary)]
+              disabled:pointer-events-none
+              disabled:opacity-50
+            "
+          >
+            Отмена
+          </button>
+
+          <button
+            type="button"
+            onClick={onOk}
+            disabled={loading}
+            className="
+              flex h-11
+              items-center justify-center gap-2
+              rounded-xl
+              bg-[var(--accent)]
+              px-5
+              text-base font-medium
+              text-white
+              transition-colors
+              hover:bg-[var(--accent)]/90
+              disabled:pointer-events-none
+              disabled:opacity-50
+            "
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Перемещение...
+              </>
+            ) : (
+              <>
+                <ArrowRight className="h-5 w-5" />
+                Переместить
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -1690,17 +2043,36 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
     };
   }, []);
 
-  const loadUsers = useCallback(async (q: string, p: number) => {
-    let items: any[] = [];
-    try { items = (await usersApi.getAllUsers(p, 20)).items; } catch { items = []; }
-    const f = q
-      ? items.filter((u) => (u.full_name || '').toLowerCase().includes(q.toLowerCase()) || u.email.toLowerCase().includes(q.toLowerCase()))
-      : items;
-    return {
-      items: f.map((u) => ({ value: u.id, label: u.full_name || u.username || u.email, sublabel: u.email })),
-      hasNext: items.length === 20,
-    };
-  }, []);
+  const { user } = useAuthStore();
+const currentUserId = user?.id;
+
+const loadUsers = useCallback(async (q: string, p: number) => {
+  let items: any[] = [];
+  try { items = (await usersApi.getAllUsers(p, 20)).items; } catch { items = []; }
+
+  const f = q
+    ? items.filter((u) => (u.full_name || '').toLowerCase().includes(q.toLowerCase()) || u.email.toLowerCase().includes(q.toLowerCase()))
+    : items;
+
+  // Сортировка: сначала я, потом остальные по алфавиту
+  const sorted = [...f].sort((a, b) => {
+    if (a.id === currentUserId) return -1;
+    if (b.id === currentUserId) return 1;
+    const nameA = a.full_name || a.username || '';
+    const nameB = b.full_name || b.username || '';
+    return nameA.localeCompare(nameB, 'ru');
+  });
+
+  return {
+    items: sorted.map((u) => ({
+      value: u.id,
+      label: u.full_name || u.username || u.email,
+      sublabel: u.email,
+      isMe: u.id === currentUserId,   // ← для бейджа "Вы"
+    })),
+    hasNext: items.length === 20,
+  };
+}, [currentUserId]);
 
   const loadTickets = useCallback(async (q: string, p: number) => {
     const r = await ticketsApi.getAll(p, 20, {
@@ -2477,6 +2849,14 @@ function DetailModal({
       u.email,
     sublabel: u.email,
   }));
+
+  const rvOpts: DDOpt[] = users
+    .filter((u) => u.id !== t.assignee_id)
+    .map((u) => ({
+      value: u.id,
+      label: u.full_name || u.username || u.email,
+      sublabel: u.email,
+    }));
 
   const isStaff =
     user?.roles?.some((r) =>
@@ -3320,9 +3700,7 @@ function DetailModal({
                           onChange={
                             setRvId
                           }
-                          options={
-                            uOpts
-                          }
+                          options={rvOpts}
                           placeholder="Выберите ревьюера"
                           searchable
                         />
@@ -3610,7 +3988,7 @@ export default function TasksPage() {
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     undoTimerRef.current = setTimeout(() => {
       setLastMove(null);
-    }, 10000);
+    }, 15000);
   }, []);
 
   const pauseUndoTimer = useCallback(() => {
@@ -3661,6 +4039,12 @@ export default function TasksPage() {
 
   const [assignIntent, setAssignIntent] = useState<AssignIntent | null>(null);
   const [assignLd, setAssignLd] = useState(false);
+
+  const [reviewIntent, setReviewIntent] = useState<{ task: TaskViewItem; from: TaskStatus } | null>(null);
+  const [reviewLd, setReviewLd] = useState(false);
+
+  const [confirmIntent, setConfirmIntent] = useState<{ task: TaskViewItem; from: TaskStatus; to: TaskStatus } | null>(null);
+  const [confirmLd, setConfirmLd] = useState(false);
 
   const [completeIntent, setCompleteIntent] = useState<CompleteIntent | null>(null);
   const [completeLd, setCompleteLd] = useState(false);
@@ -3899,131 +4283,156 @@ export default function TasksPage() {
       const task = src?.tasks.items.find((x) => x.id === id);
       if (!task) return;
 
+      // 1. Нужен исполнитель
       if (to === 'todo' && from === 'backlog' && !task.assignee_id) {
         setAssignIntent({ task, targetStatus: 'todo' });
         return;
       }
-
       if (to === 'in_progress' && !task.assignee_id) {
         setAssignIntent({ task, targetStatus: 'in_progress' });
         return;
       }
 
+      // 2. Отправка на ревью — выбор ревьювера
+      if (to === 'to_review') {
+        setReviewIntent({ task, from });
+        return;
+      }
+
+      // 3. Выполнено — факт. часы
       if (to === 'done') {
         setCompleteIntent({ task, mode: 'status_done' });
         return;
       }
 
-      const snap = snapCols(cols);
-      let moved: TaskViewItem | undefined;
-
-      setCols((prev) => {
-        const next = prev.map((c) => {
-          if (c.status !== from) return c;
-          const items = c.tasks.items.filter((x) => {
-            if (x.id === id) {
-              moved = x;
-              return false;
-            }
-            return true;
-          });
-          return {
-            ...c,
-            tasks: {
-              ...c.tasks,
-              items,
-              total_items: Math.max(c.tasks.total_items - 1, 0),
-            },
-          };
-        });
-
-        if (!moved) return prev;
-
-        const updated: TaskViewItem = { ...moved, status: to };
-
-        return next.map((c) =>
-          c.status === to
-            ? {
-              ...c,
-              tasks: {
-                ...c.tasks,
-                items: [updated, ...c.tasks.items.filter((x) => x.id !== id)],
-                total_items: c.tasks.total_items + 1,
-              },
-            }
-            : c,
-        );
-      });
-
-      try {
-        await tasksApi.changeStatus(id, to);
-        showUndoMove({
-          taskId: id,
-          number: task.number,
-          title: task.title,
-          from,
-          to,
-        });
-        highlightMovedTask(id);
-        revealTask(id);
-        toast({
-          title: `Задача перенесена в «${ST_LABEL[to]}»`,
-          description: `${task.number} — ${task.title}`,
-        });
-      } catch (e: any) {
-        setCols(snap);
-        const message = statusErr(e, task, to);
-        toast({
-          title: message.title,
-          description: message.description,
-          variant: 'destructive',
-        });
-      }
+      // 4. Остальные — подтверждение
+      setConfirmIntent({ task, from, to });
     },
-    [cols, toast, highlightMovedTask, revealTask, showUndoMove],
+    [cols],
   );
 
   const handleAssignAndMove = useCallback(
     async (aid: string) => {
       if (!assignIntent) return;
       setAssignLd(true);
+      const move = assignIntent;
       try {
-        await tasksApi.assign(assignIntent.task.id, { assignee_id: aid });
-        await tasksApi.changeStatus(assignIntent.task.id, assignIntent.targetStatus);
-        toast({ title: `Задача переведена в «${ST_LABEL[assignIntent.targetStatus]}»` });
+        await tasksApi.assign(move.task.id, { assignee_id: aid });
+        await tasksApi.changeStatus(move.task.id, move.targetStatus);
+        showUndoMove({
+          taskId: move.task.id,
+          number: move.task.number,
+          title: move.task.title,
+          from: move.task.status,
+          to: move.targetStatus,
+        });
+        highlightMovedTask(move.task.id);
+        toast({ title: `Задача переведена в «${ST_LABEL[move.targetStatus]}»` });
         setAssignIntent(null);
         await fetchBoard(true);
+        setTimeout(() => revealTask(move.task.id), 100);
       } catch (e: any) {
         toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
       } finally {
         setAssignLd(false);
       }
     },
-    [assignIntent, fetchBoard, toast],
+    [assignIntent, fetchBoard, toast, showUndoMove, highlightMovedTask, revealTask],
+  );
+
+
+  const handleReviewAndMove = useCallback(
+    async (reviewerId: string) => {
+      if (!reviewIntent) return;
+      setReviewLd(true);
+      const move = reviewIntent;
+      try {
+        await tasksApi.requestReview(move.task.id, { reviewer_id: reviewerId });
+        showUndoMove({
+          taskId: move.task.id,
+          number: move.task.number,
+          title: move.task.title,
+          from: move.from,
+          to: 'to_review',
+        });
+        highlightMovedTask(move.task.id);
+        toast({ title: 'Задача отправлена на ревью' });
+        setReviewIntent(null);
+        await fetchBoard(true);
+        setTimeout(() => revealTask(move.task.id), 100);
+      } catch (e: any) {
+        toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
+      } finally {
+        setReviewLd(false);
+      }
+    },
+    [reviewIntent, fetchBoard, toast, showUndoMove, highlightMovedTask, revealTask],
+  );
+
+  const handleConfirmMove = useCallback(
+    async () => {
+      if (!confirmIntent) return;
+      setConfirmLd(true);
+      const move = confirmIntent;
+      try {
+        await tasksApi.changeStatus(move.task.id, move.to);
+        showUndoMove({
+          taskId: move.task.id,
+          number: move.task.number,
+          title: move.task.title,
+          from: move.from,
+          to: move.to,
+        });
+        highlightMovedTask(move.task.id);
+        toast({
+          title: `Задача перемещена в «${ST_LABEL[move.to]}»`,
+          description: `${move.task.number} — ${move.task.title}`,
+        });
+        setConfirmIntent(null);
+        await fetchBoard(true);
+        setTimeout(() => revealTask(move.task.id), 100);
+      } catch (e: any) {
+        const message = statusErr(e, move.task, move.to);
+        toast({ title: message.title, description: message.description, variant: 'destructive' });
+      } finally {
+        setConfirmLd(false);
+      }
+    },
+    [confirmIntent, fetchBoard, toast, showUndoMove, highlightMovedTask, revealTask],
   );
 
   const handleComplete = useCallback(
     async (actualHours: number) => {
       if (!completeIntent) return;
       setCompleteLd(true);
+      const move = completeIntent;
       try {
-        await tasksApi.update(completeIntent.task.id, { actual_hours: actualHours } as any);
-        if (completeIntent.mode === 'review_done') {
-          await tasksApi.review(completeIntent.task.id, { decision: 'done' });
+        await tasksApi.update(move.task.id, { actual_hours: actualHours } as any);
+        if (move.mode === 'review_done') {
+          await tasksApi.review(move.task.id, { decision: 'done' });
           toast({ title: 'Задача принята' });
         } else {
-          await tasksApi.changeStatus(completeIntent.task.id, 'done');
+          await tasksApi.changeStatus(move.task.id, 'done');
           toast({ title: 'Задача выполнена' });
         }
+        showUndoMove({
+          taskId: move.task.id,
+          number: move.task.number,
+          title: move.task.title,
+          from: move.task.status,
+          to: 'done',
+        });
+        highlightMovedTask(move.task.id);
         setCompleteIntent(null);
         await fetchBoard(true);
+        setTimeout(() => revealTask(move.task.id), 100);
       } catch (e: any) {
         toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
       } finally {
         setCompleteLd(false);
       }
     },
-    [completeIntent, fetchBoard, toast],
+    [completeIntent, fetchBoard, toast, showUndoMove, highlightMovedTask, revealTask],
   );
 
   const onDS = useCallback((id: string, from: TaskStatus) => setDrag({ id, from }), []);
@@ -4035,14 +4444,10 @@ export default function TasksPage() {
   const onDO = useCallback(
     (e: React.DragEvent, st: TaskStatus) => {
       e.preventDefault();
-      if (drag && !TRANSITIONS[drag.from].includes(st)) {
-        e.dataTransfer.dropEffect = 'none';
-        return;
-      }
       e.dataTransfer.dropEffect = 'move';
       setDragO(st);
     },
-    [drag],
+    [],
   );
 
   const onDL = useCallback(() => setDragO(null), []);
@@ -4752,6 +5157,27 @@ export default function TasksPage() {
             if (!completeLd) setCompleteIntent(null);
           }}
           onOk={handleComplete}
+        />
+      )}
+
+      {reviewIntent && (
+        <ReviewModal
+          task={reviewIntent.task}
+          umap={umap}
+          loading={reviewLd}
+          onClose={() => { if (!reviewLd) setReviewIntent(null); }}
+          onOk={handleReviewAndMove}
+        />
+      )}
+
+      {confirmIntent && (
+        <ConfirmModal
+          task={confirmIntent.task}
+          from={confirmIntent.from}
+          to={confirmIntent.to}
+          loading={confirmLd}
+          onClose={() => { if (!confirmLd) setConfirmIntent(null); }}
+          onOk={handleConfirmMove}
         />
       )}
 

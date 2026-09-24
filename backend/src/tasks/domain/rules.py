@@ -131,3 +131,12 @@ class IsTaskCreator:
             return PermissionResult(True)
 
         return PermissionResult(False, "You are not the creator of this task")
+    
+class IsMemberExistsRule:
+    """Правило для задач: не проверяет наличие человека в проекте"""
+
+    def __init__(self, member: ProjectMember | None) -> None:
+        self.member = member
+
+    def check(self) -> PermissionResult:
+        return PermissionResult(True)

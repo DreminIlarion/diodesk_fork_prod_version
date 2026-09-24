@@ -267,6 +267,9 @@ export default function TicketDetailPage() {
   const [expandedHistory, setExpandedHistory] = useState(false);
 
   const [showAssigneeModal, setShowAssigneeModal] = useState(false);
+
+
+
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [updatingAssignee, setUpdatingAssignee] = useState(false);
   const [searchUser, setSearchUser] = useState('');
@@ -307,7 +310,7 @@ export default function TicketDetailPage() {
   const canArchive = useCallback(() => {
     if (!ticket || !user) return false;
     if (ticket.is_archived) return false;
-    const isCreatorOrReporter = user.user_id === ticket.created_by || user.user_id === ticket.reporter_id;
+    const isCreatorOrReporter = user.id === ticket.created_by || user.id === ticket.reporter_id;
     const staff = hasAnyRole(userRoles, ['admin', 'support_manager', 'support_agent']);
     return isCreatorOrReporter || staff;
   }, [ticket, user, userRoles]);
@@ -322,7 +325,7 @@ export default function TicketDetailPage() {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
 
-  const canAssign = isStaff && ['open', 'in_progress', 'waiting', 'resolved'].includes(ticket?.status || '');
+  const canAssign = isStaff;
 
   const [counterparty, setCounterparty] = useState<any | null>(null);
   const [actorNames, setActorNames] = useState<Map<string, string>>(new Map());
@@ -338,6 +341,10 @@ export default function TicketDetailPage() {
   const [editTags, setEditTags] = useState<Array<{ name: string; color: string }>>([]);
   const [editNewTag, setEditNewTag] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+
+  const [showStatusModal, setShowStatusModal] = useState(false);
+
+
 
   // Computed
   const sortedRootComments = useMemo(() => {
@@ -357,7 +364,25 @@ export default function TicketDetailPage() {
     );
   }, [ticket?.history]);
 
-  const availableStatuses = (ticket?.status && STATUS_TRANSITIONS[ticket.status]) || [];
+  const availableStatuses = useMemo(
+    () => (ticket?.status ? STATUS_TRANSITIONS[ticket.status] || [] : []),
+    [ticket?.status]
+  );
+
+  const allStatuses = useMemo(
+    () => Object.keys(STATUS_LABELS),
+    []
+  );
+
+  const canTransitionToStatus = useCallback(
+    (status: string) => {
+      if (!canChangeStatus) return false;
+      if (status === ticket?.status) return false;
+
+      return availableStatuses.includes(status);
+    },
+    [canChangeStatus, ticket?.status, availableStatuses]
+  );
   const canWriteInternal = isStaff;
 
   const tabs = useMemo(() => {
@@ -404,7 +429,7 @@ export default function TicketDetailPage() {
       const name = fromSupport.full_name || fromSupport.username || fromSupport.email;
       return name === 'None' ? 'ФИО Не указано' : name;
     }
-    if (user?.user_id === ticket.assignee_id) {
+    if (user?.id === ticket.assignee_id) {
       const name = user.full_name || user.username || user.email;
       return name === 'None' ? 'ФИО Не указано' : name;
     }
@@ -414,13 +439,36 @@ export default function TicketDetailPage() {
     return ticket.assignee_id.slice(0, 8);
   }, [ticket?.assignee_id, supportUsers, user]);
 
-  const filteredUsers = useMemo(() =>
-    supportUsers.filter(u =>
-      !searchUser ||
-      u.full_name?.toLowerCase().includes(searchUser.toLowerCase()) ||
-      u.username?.toLowerCase().includes(searchUser.toLowerCase()) ||
-      u.email?.toLowerCase().includes(searchUser.toLowerCase())
-    ), [supportUsers, searchUser]);
+  const filteredUsers = useMemo(() => {
+    const query = searchUser.trim().toLowerCase();
+
+    return supportUsers
+      .filter(u =>
+        !query ||
+        u.full_name?.toLowerCase().includes(query) ||
+        u.username?.toLowerCase().includes(query) ||
+        u.email?.toLowerCase().includes(query)
+      )
+      .sort((a, b) => {
+        // Текущий пользователь всегда первый
+        if (a.id === user?.id) return -1;
+        if (b.id === user?.id) return 1;
+
+        // Текущий исполнитель — следующим
+        if (a.id === ticket?.assignee_id) return -1;
+        if (b.id === ticket?.assignee_id) return 1;
+
+        const nameA = a.full_name || a.username || a.email || '';
+        const nameB = b.full_name || b.username || b.email || '';
+
+        return nameA.localeCompare(nameB, 'ru');
+      });
+  }, [
+    supportUsers,
+    searchUser,
+    user?.id,
+    ticket?.assignee_id,
+  ]);
 
   const formatRelativeTime = useCallback((d: string) => {
     const ms = Date.now() - new Date(d).getTime();
@@ -442,7 +490,7 @@ export default function TicketDetailPage() {
   const getAuthorName = useCallback((c: Comment) => {
     const nameFromCache = userNamesCache?.get(c.author_id);
     if (nameFromCache && nameFromCache !== 'None') return nameFromCache;
-    if (user?.user_id === c.author_id) {
+    if (user?.id === c.author_id) {
       const name = user?.full_name || user?.username || user?.email;
       return name === 'None' ? 'ФИО не указано' : name;
     }
@@ -485,7 +533,7 @@ export default function TicketDetailPage() {
     if (!actorIds.length) return;
 
     const names = new Map<string, string>();
-    if (user?.user_id) names.set(user.user_id, user.full_name || user.username || 'Вы');
+    if (user?.id) names.set(user.id, user.full_name || user.username || 'Вы');
 
     if (counterpartyId) {
       try {
@@ -640,42 +688,44 @@ export default function TicketDetailPage() {
     };
   }, [ticket?.project_id]);
 
+
+
   /* ═══════════════════════════════════════════════════════════════════
      FEEDBACK BANNER LOGIC
      ═══════════════════════════════════════════════════════════════════ */
-useEffect(() => {
-  if (!ticket || !user) return;
+  useEffect(() => {
+    if (!ticket || !user) return;
 
-  if (ticket.status !== 'closed') {
-    setFeedbackBannerState('hidden');
-    return;
-  }
-
-  // Проверяем только: является ли пользователь автором заявки
-  const isAuthor = user.id === ticket.created_by || user.id === ticket.reporter_id;
-  if (!isAuthor) {
-    setFeedbackBannerState('hidden');
-    return;
-  }
-
-  setFeedbackBannerState('loading');
-
-  feedbacksApi.getAll(1, 10, {
-    ticketId: ticket.id,
-    author_id: user.id,
-  }).then(res => {
-    if (res.items.length > 0) {
-      setExistingFeedback(res.items[0]);
-      setFeedbackBannerState('hidden'); // уже есть отзыв — не показываем
-    } else {
-      setFeedbackBannerState('show');
-      // ✅ АВТОМАТИЧЕСКИ ОТКРЫВАЕМ МОДАЛКУ
-      setShowFeedbackForm(true);
+    if (ticket.status !== 'closed') {
+      setFeedbackBannerState('hidden');
+      return;
     }
-  }).catch(() => {
-    setFeedbackBannerState('hidden');
-  });
-}, [ticket?.id, ticket?.status, user?.id]);
+
+    // Проверяем только: является ли пользователь автором заявки
+    const isAuthor = user.id === ticket.created_by || user.id === ticket.reporter_id;
+    if (!isAuthor) {
+      setFeedbackBannerState('hidden');
+      return;
+    }
+
+    setFeedbackBannerState('loading');
+
+    feedbacksApi.getAll(1, 10, {
+      ticketId: ticket.id,
+      author_id: user.id,
+    }).then(res => {
+      if (res.items.length > 0) {
+        setExistingFeedback(res.items[0]);
+        setFeedbackBannerState('hidden'); // уже есть отзыв — не показываем
+      } else {
+        setFeedbackBannerState('show');
+        // ✅ АВТОМАТИЧЕСКИ ОТКРЫВАЕМ МОДАЛКУ
+        setShowFeedbackForm(true);
+      }
+    }).catch(() => {
+      setFeedbackBannerState('hidden');
+    });
+  }, [ticket?.id, ticket?.status, user?.id]);
 
   /* ═══════════════════════════════════════════════════════════════════
      HANDLERS
@@ -779,14 +829,28 @@ useEffect(() => {
 
   const handleStatusChange = useCallback(async (s: string) => {
     if (!canChangeStatus || !ticket) return;
+
     setUpdatingStatus(true);
+
     try {
       const updated = await ticketsApi.updateTicketStatus(ticket.id, s as any);
+
       setTicket(updated);
-      // Сразу обновляем availableStatuses для нового статуса
-      toast({ title: 'Успешно', description: `Статус: ${STATUS_LABELS[s] || s}` });
+      setShowStatusModal(false);
+
+      toast({
+        title: 'Статус изменён',
+        description: `Новый статус: ${STATUS_LABELS[s] || s}`,
+      });
     } catch (e: any) {
-      toast({ title: 'Ошибка', description: e.response?.status === 403 ? 'Нет прав' : 'Ошибка', variant: 'destructive' });
+      toast({
+        title: 'Ошибка',
+        description:
+          e.response?.status === 403
+            ? 'Нет прав для изменения статуса'
+            : 'Не удалось изменить статус',
+        variant: 'destructive',
+      });
     } finally {
       setUpdatingStatus(false);
     }
@@ -1082,8 +1146,8 @@ useEffect(() => {
             <div className="flex items-center gap-2 shrink-0">
               {!ticket.is_archived &&
                 canEdit &&
-                (user?.user_id === ticket.created_by ||
-                  user?.user_id === ticket.reporter_id ||
+                (user?.id === ticket.created_by ||
+                  user?.id === ticket.reporter_id ||
                   isStaff) && (
                   <button
                     onClick={openEditModal}
@@ -1564,163 +1628,129 @@ useEffect(() => {
 
               {/* Manage */}
               {activeTab === 'manage' && canShowManage && (
-                <div className="p-4 space-y-4">
-                  {/* Статус */}
-                  <div className=" overflow-hidden">
-                    <div className="p-3">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <CheckCircle2 className="w-5 h-5 text-[var(--text-primary)]/40" />
-                          <span className="text-lg text-[var(--text-primary)]/70">
-                            Текущий статус
-                          </span>
-                        </div>
-                        <span
-                          className={`px-3 py-1 rounded-lg text-base font-medium border ${getStatusColor(
-                            ticket.status || '',
-                          )}`}
-                        >
-                          {STATUS_LABELS[ticket.status || ''] || ticket.status}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+  <div className="p-6">
+    <div className="max-w-xl space-y-6">
 
-                  {/* Изменить статус */}
-                  <div className=" overflow-hidden">
-                    <div className="p-3">
-                      <div className="flex items-center gap-3 mb-4">
-                        <RefreshCw className="w-5 h-5 text-[var(--text-primary)]/40" />
-                        <span className="text-lg text-[var(--text-primary)]/70">
-                          Изменить статус на{' '}
-                        </span>
-                      </div>
+      <div>
+        <h2 className="text-xl font-semibold text-[var(--text-primary)]">
+          Управление заявкой
+        </h2>
+        <p className="mt-1 text-sm text-[var(--text-primary)]/40">
+          Изменение статуса и ответственного
+        </p>
+      </div>
 
-                      {!canChangeStatus ? (
-                        <div className="flex items-center gap-3 text-[var(--text-primary)]/50">
-                          <AlertCircle className="w-5 h-5" />
-                          <span className="text-base">
-                            Недостаточно прав
-                          </span>
-                        </div>
-                      ) : availableStatuses.length === 0 ? (
-                        <div className="flex items-center gap-3 text-[var(--text-primary)]/50">
-                          <CheckCircle2 className="w-5 h-5" />
-                          <span className="text-base">
-                            Нет доступных переходов
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {availableStatuses.map((status) => (
-                            <button
-                              key={status}
-                              onClick={() => handleStatusChange(status)}
-                              disabled={updatingStatus}
-                              className="w-full flex items-center justify-between px-4 py-3 rounded-lg bg-[var(--hover-2)] hover:bg-[var(--hover-3)] border border-[var(--border-color)] text-[var(--text-primary)]/80 hover:text-[var(--text-primary)] text-base font-medium disabled:opacity-50 transition-colors"
-                            >
-                              <span className="flex items-center gap-2">
-                                {updatingStatus ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <ChevronRight className="w-4 h-4 opacity-50" />
-                                )}
-                                {STATUS_LABELS[status] || status}
-                              </span>
-                              <span className="text-sm text-[var(--text-primary)]/50">
-                                {STATUS_DESCRIPTIONS[status] || ''}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+      {/* Статус */}
+      <div>
+        <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+          <label className="text-sm font-medium text-[var(--text-primary)]/60">
+            Статус
+          </label>
 
-                  {/* Исполнитель */}
-                  {canAssign && (
-                    <div className=" overflow-hidden">
-                      <div className="p-3">
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <UserCheck className="w-5 h-5 text-[var(--text-primary)]/40 shrink-0" />
-                            <div className="min-w-0">
-                              {ticket.assignee_id ? (
-                                <>
-                                  <span className="text-lg text-[var(--text-primary)]/80 block truncate">
-                                    {getAssigneeName() || 'Исполнитель'}
-                                  </span>
-                                  <span className="text-sm text-[var(--text-primary)]/45">
-                                    Текущий исполнитель
-                                  </span>
-                                </>
-                              ) : (
-                                <span className="text-lg text-[var(--text-primary)]/50">
-                                  Не назначен
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => {
-                              loadSupportUsers();
-                              setShowAssigneeModal(true);
-                            }}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--hover-2)] hover:bg-[var(--hover-3)] border border-[var(--border-color)] text-[var(--text-primary)]/80 hover:text-[var(--text-primary)] text-base font-medium shrink-0 transition-colors"
-                          >
-                            {ticket.assignee_id ? 'Изменить' : 'Назначить'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+          {canChangeStatus && availableStatuses.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <span className="text-sm text-[var(--text-primary)]/45">
+                Допустимые:
+              </span>
+              {availableStatuses.map((s) => (
+                <span
+                  key={s}
+                  className={`px-2.5 py-1 rounded-md text-sm font-medium border ${getStatusColor(s)}`}
+                >
+                  {STATUS_LABELS[s] || s}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
 
-                  {/* Архивация */}
-                  <div className=" overflow-hidden">
-                    <div className="p-3">
-                      {ticket.is_archived ? (
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-3">
-                            <Archive className="w-5 h-5 text-amber-400" />
-                            <span className="text-lg font-medium text-[var(--text-primary)]">
-                              В архиве
-                            </span>
-                          </div>
-                          <span className="px-3 py-1.5 rounded-lg text-base font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                            Только чтение
-                          </span>
-                        </div>
-                      ) : canArchive() ? (
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-3">
-                            <Archive className="w-5 h-5 text-[var(--text-primary)]/40" />
-                            <span className="text-lg text-[var(--text-primary)]/70">
-                              Переместить в архив
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => setShowArchiveConfirm(true)}
-                            disabled={archiving}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--hover-2)] hover:bg-[var(--hover-3)] border border-[var(--border-color)] text-[var(--text-primary)]/80 hover:text-[var(--text-primary)] text-base font-medium disabled:opacity-50 shrink-0 transition-colors"
-                          >
-                            {archiving ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Archive className="w-4 h-4" />
-                            )}
-                            В архив
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-3 text-[var(--text-primary)]/50">
-                          <Archive className="w-5 h-5" />
-                          <span className="text-base">Недостаточно прав</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
+        <button
+          type="button"
+          disabled={!canChangeStatus || updatingStatus}
+          onClick={() => setShowStatusModal(true)}
+          className="w-full min-h-[50px] flex items-center justify-between gap-4 px-4 py-3 rounded-xl
+                     border border-[var(--border-color)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)]
+                     text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <span className="flex items-center gap-3 min-w-0">
+            {updatingStatus ? (
+              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+            ) : (
+              <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${availableStatuses.length ? 'bg-emerald-500' : 'bg-[var(--text-primary)]/25'}`} />
+            )}
+            <span className="text-base font-medium text-[var(--text-primary)] truncate">
+              {STATUS_LABELS[ticket.status || ''] || ticket.status}
+            </span>
+          </span>
+          <ChevronDown className="w-5 h-5 shrink-0 text-[var(--text-primary)]/35" />
+        </button>
+
+        {!canChangeStatus && (
+          <p className="mt-2 text-sm text-[var(--text-primary)]/35">
+            Недостаточно прав для изменения статуса
+          </p>
+        )}
+        {canChangeStatus && availableStatuses.length === 0 && (
+          <p className="mt-2 text-sm text-[var(--text-primary)]/35">
+            Из текущего статуса нет доступных переходов
+          </p>
+        )}
+      </div>
+
+      {/* Исполнитель */}
+      <div>
+        <label className="block mb-2 text-sm font-medium text-[var(--text-primary)]/60">
+          Исполнитель
+        </label>
+
+        <button
+          type="button"
+          disabled={!canAssign}
+          onClick={() => { loadSupportUsers(); setShowAssigneeModal(true); }}
+          className="w-full min-h-[50px] flex items-center justify-between gap-4 px-4 py-3 rounded-xl
+                     border border-[var(--border-color)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)]
+                     text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <span className="flex items-center gap-3 min-w-0">
+            <User className="w-5 h-5 text-[var(--text-primary)]/35 shrink-0" />
+            <span className={`text-base truncate ${ticket.assignee_id ? 'font-medium text-[var(--text-primary)]' : 'text-[var(--text-primary)]/35'}`}>
+              {ticket.assignee_id ? getAssigneeName() || 'Исполнитель' : 'Не назначен'}
+            </span>
+          </span>
+          <ChevronDown className="w-5 h-5 shrink-0 text-[var(--text-primary)]/35" />
+        </button>
+      </div>
+
+      {/* Дополнительно */}
+      <div className="pt-6 border-t border-[var(--border-color)]">
+        <p className="mb-3 text-sm font-medium text-[var(--text-primary)]/60">
+          Дополнительные действия
+        </p>
+
+        {ticket.is_archived ? (
+          <div className="flex items-center gap-2 text-sm text-amber-400">
+            <Archive className="w-4 h-4" /> Заявка находится в архиве
+          </div>
+        ) : canArchive() ? (
+          <button
+            type="button"
+            onClick={() => setShowArchiveConfirm(true)}
+            disabled={archiving}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border-color)]
+                       hover:bg-[var(--hover-2)] text-sm text-[var(--text-primary)]/60 hover:text-[var(--text-primary)]
+                       transition-colors disabled:opacity-50"
+          >
+            {archiving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+            Переместить в архив
+          </button>
+        ) : (
+          <p className="text-sm text-[var(--text-primary)]/35">Архивирование недоступно</p>
+        )}
+      </div>
+
+    </div>
+  </div>
+)}
             </div>
           </div>
         </div>
@@ -2069,7 +2099,7 @@ useEffect(() => {
                 );
               }
 
-              if (createdById === user?.user_id) {
+              if (createdById === user?.id) {
                 return (
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-xl bg-[var(--accent)] flex items-center justify-center">
@@ -2147,6 +2177,93 @@ useEffect(() => {
         </div>
       )}
 
+      {/* Модалка смены статуса */}
+      {showStatusModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => !updatingStatus && setShowStatusModal(false)}
+          />
+          <div
+            className="relative w-full max-w-md max-h-[80vh] flex flex-col bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden"
+            style={{ boxShadow: 'var(--shadow-lg)' }}
+          >
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border-color)] bg-[var(--hover-1)] flex-shrink-0">
+              <div>
+                <h2 className="text-lg font-bold text-[var(--text-primary)]">Изменить статус</h2>
+                <p className="text-sm text-[var(--text-primary)]/40 mt-0.5">#{ticket.number}</p>
+              </div>
+              <button
+                onClick={() => setShowStatusModal(false)}
+                disabled={updatingStatus}
+                className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-1">
+              {allStatuses.map((status) => {
+                const isCurrent = ticket.status === status;
+                const isAvailable = availableStatuses.includes(status);
+
+                return (
+                  <button
+                    key={status}
+                    type="button"
+                    disabled={isCurrent || !isAvailable || updatingStatus}
+                    onClick={() => handleStatusChange(status)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-colors
+                ${isCurrent
+                        ? 'bg-[var(--hover-2)]'
+                        : isAvailable
+                          ? 'hover:bg-[var(--hover-2)] cursor-pointer'
+                          : 'cursor-not-allowed'
+                      }`}
+                  >
+                    <span className="w-5 flex justify-center shrink-0">
+                      {isCurrent ? (
+                        <Check className="w-4 h-4 text-[var(--accent)]" />
+                      ) : isAvailable ? (
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      ) : null}
+                    </span>
+
+                    <span
+                      className={`flex-1 text-base ${isCurrent
+                        ? 'font-semibold text-[var(--text-primary)]'
+                        : isAvailable
+                          ? 'font-medium text-[var(--text-primary)]'
+                          : 'text-[var(--text-primary)]/25'
+                        }`}
+                    >
+                      {STATUS_LABELS[status] || status}
+                    </span>
+
+                    {isCurrent && (
+                      <span className="text-xs text-[var(--text-primary)]/35">Текущий</span>
+                    )}
+                    {isAvailable && updatingStatus && (
+                      <Loader2 className="w-4 h-4 animate-spin text-[var(--text-primary)]/30" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-end px-6 py-4 border-t border-[var(--border-color)] bg-[var(--hover-1)] flex-shrink-0">
+              <button
+                onClick={() => setShowStatusModal(false)}
+                disabled={updatingStatus}
+                className="px-5 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-base"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Модалка назначения исполнителя */}
       {showAssigneeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -2210,9 +2327,25 @@ useEffect(() => {
                         <User className="w-5 h-5 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[var(--text-primary)] font-medium text-base truncate">
-                          {emp.full_name || emp.username}
-                        </p>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <p className="text-[var(--text-primary)] font-medium text-base truncate">
+                            {emp.full_name || emp.username || emp.email}
+                          </p>
+
+                          {emp.id === user?.id && (
+                            <span className="
+      shrink-0
+      px-2 py-0.5
+      rounded-md
+      bg-emerald-500/10
+      border border-emerald-500/20
+      text-emerald-500
+      text-xs font-medium
+    ">
+                              Вы
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[var(--text-primary)]/40 text-sm truncate">
                           {emp.email}
                         </p>
@@ -2223,7 +2356,12 @@ useEffect(() => {
                         )}
                       </div>
                       {ticket.assignee_id === emp.id && (
-                        <UserCheck className="w-5 h-5 text-[var(--success)] flex-shrink-0" />
+                        <div className="flex items-center gap-1.5 text-[var(--success)] shrink-0">
+                          <Check className="w-4 h-4" />
+                          <span className="text-xs font-medium">
+                            Назначен
+                          </span>
+                        </div>
                       )}
                     </button>
                   ))}
