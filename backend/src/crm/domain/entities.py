@@ -181,6 +181,8 @@ class Counterparty(Entity):
             email: str,
             middle_name: str | None = None,
             messengers: dict[str, str] | None = None,
+            position: str | None = None,       # ← добавить
+            extension: str | None = None,
     ) -> Self:
         """Добавления контактного лица"""
 
@@ -209,6 +211,8 @@ class Counterparty(Entity):
                 middle_name=middle_name,
                 phone=phone,
                 email=email,
+                position=position,        # ← добавил
+                extension=extension, 
                 messengers=messengers,
             )
         )
