@@ -20,6 +20,31 @@ class ArticleVisibility(StrEnum):
     CUSTOMER_SPECIFIC = "customer_specific"
 
 
+class SourceType(StrEnum):
+    TICKET = "ticket"
+    INSTRUCTION = "instruction"
+    DOCUMENTATION = "documentation"
+
+
+class ChunkKind(StrEnum):
+    PROBLEM = "problem"
+    CAUSE = "cause"
+    SOLUTION = "solution"
+    VERIFICATION = "verification"
+    DOCUMENTATION = "documentation"
+
+
+class ChatRole(StrEnum):
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
+class ModelCapability(StrEnum):
+    TEXT = "text"
+    STRUCTURED_OUTPUT = "structured_output"
+    VISION = "vision"
+
+
 @dataclass(frozen=True, kw_only=True)
 class ArticleChunk:
     """
