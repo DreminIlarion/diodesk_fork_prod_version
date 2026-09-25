@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytz
 from dotenv import load_dotenv
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 TIMEZONE = "Asia/Yekaterinburg"
@@ -177,6 +178,52 @@ class AdminSettings(BaseSettings):
     password: str = "admin"
 
 
+class OpenSearchSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="OPENSEARCH_")
+
+    host: str = "opensearch"
+    port: int = 9200
+    use_ssl: bool = False
+    verify_certs: bool = False
+    username: str | None = None
+    password: SecretStr | None = None
+
+    articles_index: str = "kb_articles_v1"
+    chunks_index_prefix: str = "kb_chunks"
+    sessions_index: str = "kb_chat_sessions_v1"
+    messages_index: str = "kb_chat_messages_v1"
+
+    articles_read_alias: str = "kb_articles_read"
+    articles_write_alias: str = "kb_articles_write"
+    chunks_read_alias: str = "kb_chunks_read"
+    chunks_write_alias: str = "kb_chunks_write"
+
+    rrf_pipeline: str = "kb-rrf-v1"
+    number_of_shards: int = 1
+    number_of_replicas: int = 0
+
+
+class ProxyAPISettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="PROXYAPI_")
+
+    base_url: str = "https://api.proxyapi.ru/v1"
+
+    chat_api_key: SecretStr = SecretStr("<CHAT_API_KEY>")
+    embedding_api_key: SecretStr = SecretStr("<EMBEDDING_API_KEY>")
+
+    embedding_model: str = "baai/bge-m3"
+    model_catalog_ttl_seconds: int = 900
+    request_timeout_seconds: float = 90.0
+    max_retries: int = 3
+
+    auto_model_priority: list[str] = Field(
+        default_factory=list
+    )
+
+    default_context_window: int = 32_768
+    max_answer_tokens: int = 1_500
+
+
 class Settings(BaseSettings):
     secret_key: str = "<SECRET_KEY>"
     frontend_url: str = "http://localhost:3000"
@@ -193,6 +240,9 @@ class Settings(BaseSettings):
     language_tool: LanguageToolSettings = LanguageToolSettings()
     embeddings: EmbeddingsSettings = EmbeddingsSettings()
     admin: AdminSettings = AdminSettings()
+
+    opensearch: OpenSearchSettings = OpenSearchSettings()
+    proxy_api: ProxyAPISettings = ProxyAPISettings()
 
 
 settings = Settings()
