@@ -2,10 +2,60 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from .vo import (
+    ArticleVisibility,
     ChunkKind,
     ModelCapability,
     SourceType,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class ArticleChunk:
+    """
+    Фрагмент опубликованной статьи, подготовленный для индексации в OpenSearch
+    """
+
+    # Стабильные идентификаторы фрагмента и статьи
+    chunk_id: str
+    article_id: UUID
+    article_version: int
+    position: int
+
+    # Текст, участвующий в полнотекстовом и векторном поиске
+    title: str
+    content: str
+    context_headings: tuple[str, ...]
+    kind: ChunkKind
+
+    # Данные для фильтрации и формирования ссылки на источник
+    source_type: SourceType
+    source_ref: str
+    visibility: ArticleVisibility
+    tags: tuple[str, ...] = ()
+
+    # Связи с существующими сущностями проекта
+    product_id: UUID | None = None
+    project_id: UUID | None = None
+    counterparty_id: UUID | None = None
+
+    # Вектор и модель, которой он был рассчитан
+    embedding_model: str = ""
+    embedding: tuple[float, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class SearchFilters:
+    """Фильтры гибридного поиска по базе знаний"""
+
+    visibilities: tuple[ArticleVisibility, ...] = (
+        ArticleVisibility.INTERNAL,
+    )
+    source_types: tuple[SourceType, ...] = ()
+    tags: tuple[str, ...] = ()
+
+    product_id: UUID | None = None
+    project_id: UUID | None = None
+    counterparty_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,7 +100,7 @@ class SearchHit:
 @dataclass(frozen=True, slots=True)
 class Citation:
     """
-    Ссыылка на материал, использованный при формировании ответа
+    Ссылка на материал, использованный при формировании ответа
     """
 
     article_id: UUID
