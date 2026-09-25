@@ -130,6 +130,20 @@ services:
       MAIL_SMTP_PASSWORD: ${MAIL_SMTP_PASSWORD}
       MAIL_DEFAULT_FROM_EMAIL: ${MAIL_DEFAULT_FROM_EMAIL}
       MAIL_SUPPORT_EMAIL: ${MAIL_SUPPORT_EMAIL}
+
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: 9200
+      OPENSEARCH_USE_SSL: "false"
+      OPENSEARCH_VERIFY_CERTS: "false"
+      OPENSEARCH_NUMBER_OF_SHARDS: 1
+      OPENSEARCH_NUMBER_OF_REPLICAS: 0
+
+      PROXYAPI_BASE_URL: ${PROXYAPI_BASE_URL:-https://api.proxyapi.ru/v1}
+      PROXYAPI_CHAT_API_KEY: ${PROXYAPI_CHAT_API_KEY:-<CHAT_API_KEY>}
+      PROXYAPI_EMBEDDING_API_KEY: ${PROXYAPI_EMBEDDING_API_KEY:-<EMBEDDING_API_KEY>}
+      PROXYAPI_EMBEDDING_MODEL: ${PROXYAPI_EMBEDDING_MODEL:-baai/bge-m3}
+      PROXYAPI_AUTO_MODEL_PRIORITY: '${PROXYAPI_AUTO_MODEL_PRIORITY:-[]}'
+
     depends_on:
       postgres:
         condition: service_healthy
@@ -140,7 +154,9 @@ services:
       languagetool:
         condition: service_healthy
       rabbitmq:                          
-        condition: service_healthy       
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
 
   frontend:
     build:
@@ -171,6 +187,7 @@ services:
       - MINIO_SECRET_ACCESS_KEY=${MINIO_SECRET_ACCESS_KEY}
       - YANDEX_S3_BUCKET=backups
       - YANDEX_S3_ENDPOINT=https://storage.yandexcloud.net
+
     command: |
       /bin/sh -c "
       apk add --no-cache postgresql-client curl openssl
@@ -242,6 +259,34 @@ services:
     depends_on:
       - loki
 
+  opensearch:
+    image: opensearchproject/opensearch:3.8.0
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms1g -Xmx1g"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:9200/_cluster/health?wait_for_status=yellow"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
 volumes:
   postgres_data:
   redis_data:
@@ -250,3 +295,4 @@ volumes:
   prometheus_data:
   grafana_data:
   loki_data:
+  opensearch_data:
