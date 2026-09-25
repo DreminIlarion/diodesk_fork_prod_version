@@ -48,7 +48,7 @@ class SearchHit:
 
 
 @dataclass(frozen=True, slots=True)
-class Quoting:
+class Citation:
     """
     Ссыылка на материал, использованный при формировании ответа
     """
