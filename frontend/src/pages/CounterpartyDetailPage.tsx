@@ -1186,61 +1186,64 @@ function ContactsTab({
                 key={i}
                 className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] overflow-hidden"
               >
+                {/* Шапка карточки */}
                 <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-[var(--border-color)]">
-                  <div className="flex items-center gap-3">
-                    <Avatar
-                      name={person.full_name}
-                      size="md"
-                    />
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar name={person.full_name} size="md" />
 
-                    <div>
-                      <p className="text-base font-semibold text-[var(--text-primary)]">
+                    <div className="min-w-0">
+                      <p className="text-base font-semibold text-[var(--text-primary)] truncate">
                         {person.full_name}
                       </p>
 
-                      <p className="text-sm text-[var(--text-primary)]/40">
-                        {person.position || 'Контактное лицо'}
-                      </p>
+                      {person.position ? (
+                        <p className="text-sm font-medium text-[var(--accent)] truncate">
+                          {person.position}
+                        </p>
+                      ) : (
+                        <p className="text-sm italic text-[var(--text-primary)]/60 truncate">
+                          Контактное лицо
+                        </p>
+                      )}
                     </div>
                   </div>
 
                   <button
                     onClick={() =>
                       setConfirmDelete(
-                        confirmDelete?.full_name ===
-                          person.full_name
+                        confirmDelete?.full_name === person.full_name
                           ? null
                           : person,
                       )
                     }
-                    className="p-2 bg-[var(--text-primary)]/10 rounded-xl hover:bg-[var(--accent)]/10 text-[var(--text-primary)]/40 hover:text-[var(--accent)] transition-colors flex-shrink-0"
+                    className="p-2 bg-[var(--text-primary)]/10 rounded-xl hover:bg-[var(--accent)]/10 text-[var(--text-primary)]/60 hover:text-[var(--accent)] transition-colors flex-shrink-0"
                     title="Удалить"
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
 
+                {/* Контакты */}
                 <div className="p-4 grid md:grid-cols-2 gap-3">
                   {person.phone && (
-                    <div className="flex items-start gap-3 p-3.5">
+                    <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[var(--text-primary)]/[0.03]">
                       <Phone
                         size={15}
-                        className="text-[var(--text-primary)]/40 mt-0.5 flex-shrink-0"
+                        className="text-[var(--accent)] mt-0.5 flex-shrink-0"
                       />
 
-                      <div>
-                        <p className="text-xs text-[var(--text-primary)]/40 mb-0.5">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-primary)]/50 mb-0.5">
                           Телефон
                         </p>
 
                         <a
                           href={`tel:${person.phone}`}
-                          className="text-sm text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors"
+                          className="text-sm font-medium text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors"
                         >
                           {person.phone}
-
                           {person.extension && (
-                            <span className="text-[var(--text-primary)]/40 ml-1.5">
+                            <span className="ml-1.5 text-[var(--text-primary)]/60 font-normal">
                               доб. {person.extension}
                             </span>
                           )}
@@ -1250,20 +1253,20 @@ function ContactsTab({
                   )}
 
                   {person.email && (
-                    <div className="flex items-start gap-3 p-3.5">
+                    <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[var(--text-primary)]/[0.03]">
                       <Mail
                         size={15}
-                        className="text-[var(--text-primary)]/40 mt-0.5 flex-shrink-0"
+                        className="text-[var(--accent)] mt-0.5 flex-shrink-0"
                       />
 
-                      <div>
-                        <p className="text-xs text-[var(--text-primary)]/40 mb-0.5">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-primary)]/50 mb-0.5">
                           Email
                         </p>
 
                         <a
                           href={`mailto:${person.email}`}
-                          className="text-sm text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors break-all"
+                          className="text-sm font-medium text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors break-all"
                         >
                           {person.email}
                         </a>
@@ -1272,14 +1275,14 @@ function ContactsTab({
                   )}
 
                   {person.messengers?.telegram && (
-                    <div className="flex items-start gap-3 p-3.5">
+                    <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[var(--text-primary)]/[0.03]">
                       <MessageSquare
                         size={15}
-                        className="text-[var(--text-primary)]/40 mt-0.5 flex-shrink-0"
+                        className="text-[var(--accent)] mt-0.5 flex-shrink-0"
                       />
 
-                      <div>
-                        <p className="text-xs text-[var(--text-primary)]/40 mb-0.5">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-primary)]/50 mb-0.5">
                           Telegram
                         </p>
 
@@ -1287,12 +1290,12 @@ function ContactsTab({
                           href={`https://t.me/${person.messengers.telegram.replace('@', '')}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors flex items-center gap-1.5"
+                          className="text-sm font-medium text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors inline-flex items-center gap-1.5"
                         >
                           @{person.messengers.telegram.replace('@', '')}
                           <ExternalLink
                             size={12}
-                            className="text-[var(--text-primary)]/40"
+                            className="text-[var(--text-primary)]/50"
                           />
                         </a>
                       </div>
@@ -1300,14 +1303,14 @@ function ContactsTab({
                   )}
 
                   {person.messengers?.vk && (
-                    <div className="flex items-start gap-3 p-3.5">
+                    <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[var(--text-primary)]/[0.03]">
                       <Globe
                         size={15}
-                        className="text-[var(--text-primary)]/40 mt-0.5 flex-shrink-0"
+                        className="text-[var(--accent)] mt-0.5 flex-shrink-0"
                       />
 
-                      <div>
-                        <p className="text-xs text-[var(--text-primary)]/40 mb-0.5">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-primary)]/50 mb-0.5">
                           ВКонтакте
                         </p>
 
@@ -1315,12 +1318,12 @@ function ContactsTab({
                           href={`https://vk.com/${person.messengers.vk}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors flex items-center gap-1.5"
+                          className="text-sm font-medium text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors inline-flex items-center gap-1.5"
                         >
                           {person.messengers.vk}
                           <ExternalLink
                             size={12}
-                            className="text-[var(--text-primary)]/40"
+                            className="text-[var(--text-primary)]/50"
                           />
                         </a>
                       </div>
