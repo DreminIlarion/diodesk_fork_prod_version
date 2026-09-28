@@ -7,7 +7,7 @@ import {
   PhoneCall, UserPlus, Ticket, History, Info, UserCheck,
   Package, Server, Globe, Smartphone, Monitor, Cpu, Code, HelpCircle,
   X, Tag, Link2, Layers, RefreshCcw, AlertTriangle,
-  ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search, GitBranch, AlertCircle ,
+  ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search, GitBranch, AlertCircle,
   FolderOpen,
 } from 'lucide-react';
 import {
@@ -1250,28 +1250,7 @@ function ContactsTab({
                             {person.full_name}
                           </p>
 
-                          {person.position ? (
-                            <div className="mt-1.5">
-                              <span
-                                className="
-                                inline-flex
-                                max-w-full
-                                px-2 py-1
-                                rounded-md
-                                border border-[var(--border-color)]
-                                bg-[var(--hover-2)]
-                                text-xs font-medium
-                                text-[var(--text-primary)]/60
-                              "
-                              >
-                                {person.position}
-                              </span>
-                            </div>
-                          ) : (
-                            <p className="mt-1 text-xs text-[var(--text-primary)]/25">
-                              Должность не указана
-                            </p>
-                          )}
+
                         </div>
                       </div>
 
@@ -1378,6 +1357,29 @@ function ContactsTab({
                       Contact details
                   ----------------------------------------------- */}
                     <div className="border-t border-[var(--border-color)] px-5 py-2">
+
+
+                      {/* Position */}
+                      {person.position && (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 min-h-[48px] py-2">
+                          <div className="flex items-center gap-2 sm:w-32 shrink-0">
+                            <UserCheck
+                              size={15}
+                              className="text-[var(--text-primary)]/35"
+                            />
+
+                            <span className="text-sm text-[var(--text-primary)]/40">
+                              Должность
+                            </span>
+                          </div>
+
+                          <div className="sm:pl-0 pl-[23px] min-w-0">
+                            <span className="text-sm font-medium text-[var(--text-primary)]">
+                              {person.position}
+                            </span>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Phone */}
                       {person.phone && (
