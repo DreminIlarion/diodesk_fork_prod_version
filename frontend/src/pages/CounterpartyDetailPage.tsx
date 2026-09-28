@@ -852,32 +852,51 @@ function ContactsTab({
 
   return (
     <div className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] overflow-hidden">
-      <div className="px-6 py-5 border-b border-[var(--border-color)] bg-[var(--hover-1)] flex items-center justify-between">
-        <h2 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2.5">
+
+      {/* ============================================================
+        HEADER
+    ============================================================ */}
+      <div className="px-6 py-5 border-b border-[var(--border-color)] bg-[var(--hover-1)] flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2.5 min-w-0">
           <UserCheck
             size={18}
-            className="text-[var(--text-primary)]/40"
+            className="text-[var(--text-primary)]/40 shrink-0"
           />
 
-          Контактные лица
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">
+            Контактные лица
+          </h2>
 
           {persons.length > 0 && (
             <span className="px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-sm text-[var(--text-primary)]/50">
               {persons.length}
             </span>
           )}
-        </h2>
+        </div>
 
         <button
-          onClick={() =>
-            showForm
-              ? resetForm()
-              : setShowForm(true)
-          }
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-base font-medium transition-all ${showForm
-            ? 'bg-[var(--hover-2)] text-[var(--text-primary)]/70'
-            : 'bg-[var(--accent)] text-white shadow-md'
-            }`}
+          type="button"
+          onClick={() => {
+            if (showForm) {
+              resetForm();
+            } else {
+              setConfirmDelete(null);
+              setShowForm(true);
+            }
+          }}
+          className={`
+          flex items-center gap-2
+          px-3.5 py-2
+          rounded-xl
+          text-sm font-medium
+          transition-colors
+          shrink-0
+
+          ${showForm
+              ? 'bg-[var(--hover-2)] text-[var(--text-primary)]/70 hover:bg-[var(--hover-3)]'
+              : 'bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 shadow-md'
+            }
+        `}
         >
           {showForm ? (
             <X size={16} />
@@ -885,90 +904,155 @@ function ContactsTab({
             <Plus size={16} />
           )}
 
-          {showForm ? 'Отмена' : 'Добавить'}
+          <span className="hidden sm:inline">
+            {showForm ? 'Отмена' : 'Добавить'}
+          </span>
         </button>
       </div>
 
-      <div className="p-6 space-y-6">
+      {/* ============================================================
+        CONTENT
+    ============================================================ */}
+      <div className="p-4 sm:p-6">
+
+        {/* ==========================================================
+          ADD FORM
+      ========================================================== */}
         {showForm && (
-          <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] p-5 space-y-4">
-            <h3 className="text-base font-semibold text-[var(--text-primary)] flex items-center gap-2">
-              <UserPlus
-                size={16}
-                className="text-[var(--accent)]"
-              />
-              Новое контактное лицо
-            </h3>
-
-            <div className="grid md:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                  Фамилия{' '}
-                  <span className="text-[var(--accent)]">*</span>
-                </label>
-
-                <input
-                  value={form.last_name}
-                  onChange={e =>
-                    set('last_name')(e.target.value)
-                  }
-                  placeholder="Иванов"
-                  className={inputCls}
+          <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] p-5 sm:p-6 mb-6">
+            <div className="flex items-center gap-2.5 mb-6">
+              <div className="w-9 h-9 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center shrink-0">
+                <UserPlus
+                  size={17}
+                  className="text-[var(--accent)]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                  Имя{' '}
-                  <span className="text-[var(--accent)]">*</span>
-                </label>
+                <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                  Новое контактное лицо
+                </h3>
 
-                <input
-                  value={form.first_name}
-                  onChange={e =>
-                    set('first_name')(e.target.value)
-                  }
-                  placeholder="Иван"
-                  className={inputCls}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                  Отчество
-                </label>
-
-                <input
-                  value={form.middle_name}
-                  onChange={e =>
-                    set('middle_name')(e.target.value)
-                  }
-                  placeholder="Иванович"
-                  className={inputCls}
-                />
+                <p className="text-xs text-[var(--text-primary)]/35 mt-0.5">
+                  Укажите данные сотрудника
+                </p>
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-3">
+            <div className="space-y-5">
+
+              {/* ФИО */}
+              <div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
+                      Фамилия{' '}
+                      <span className="text-[var(--accent)]">*</span>
+                    </label>
+
+                    <input
+                      value={form.last_name}
+                      onChange={(e) =>
+                        set('last_name')(e.target.value)
+                      }
+                      placeholder="Иванов"
+                      autoComplete="family-name"
+                      className={inputCls}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
+                      Имя{' '}
+                      <span className="text-[var(--accent)]">*</span>
+                    </label>
+
+                    <input
+                      value={form.first_name}
+                      onChange={(e) =>
+                        set('first_name')(e.target.value)
+                      }
+                      placeholder="Иван"
+                      autoComplete="given-name"
+                      className={inputCls}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
+                      Отчество
+                    </label>
+
+                    <input
+                      value={form.middle_name}
+                      onChange={(e) =>
+                        set('middle_name')(e.target.value)
+                      }
+                      placeholder="Иванович"
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Должность */}
               <div>
                 <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                  Телефон
+                  Должность
                 </label>
 
-                <div className="relative">
-                  <Phone
-                    size={16}
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/25 pointer-events-none"
-                  />
+                <input
+                  value={form.position}
+                  onChange={(e) =>
+                    set('position')(e.target.value)
+                  }
+                  placeholder="Главный бухгалтер"
+                  autoComplete="organization-title"
+                  className={inputCls}
+                />
+              </div>
 
-                  <PhoneInput
-                    value={form.phone}
-                    onChange={set('phone')}
-                    className={inputWithIconCls}
+              {/* Телефон + добавочный */}
+              <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_170px] gap-3">
+                <div>
+                  <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
+                    Телефон
+                  </label>
+
+                  <div className="relative">
+                    <Phone
+                      size={16}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/25 pointer-events-none"
+                    />
+
+                    <PhoneInput
+                      value={form.phone}
+                      onChange={set('phone')}
+                      className={inputWithIconCls}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
+                    Добавочный
+                  </label>
+
+                  <input
+                    value={form.extension}
+                    onChange={(e) =>
+                      set('extension')(
+                        e.target.value.replace(/\D/g, ''),
+                      )
+                    }
+                    placeholder="1234"
+                    inputMode="numeric"
+                    className={inputCls}
                   />
                 </div>
               </div>
 
+              {/* Email */}
               <div>
                 <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
                   Email
@@ -983,111 +1067,106 @@ function ContactsTab({
                   <input
                     type="email"
                     value={form.email}
-                    onChange={e =>
+                    onChange={(e) =>
                       set('email')(e.target.value)
                     }
                     placeholder="contact@company.ru"
-                    className={inputWithIconCls}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                  Должность
-                </label>
-
-                <input
-                  value={form.position}
-                  onChange={e =>
-                    set('position')(e.target.value)
-                  }
-                  placeholder="Главный бухгалтер"
-                  className={inputCls}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                  Добавочный номер
-                </label>
-
-                <input
-                  value={form.extension}
-                  onChange={e =>
-                    set('extension')(e.target.value)
-                  }
-                  placeholder="1234"
-                  className={inputCls}
-                />
-              </div>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                  Telegram
-                </label>
-
-                <div className="relative">
-                  <MessageSquare
-                    size={16}
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/25 pointer-events-none"
-                  />
-
-                  <input
-                    value={form.telegram}
-                    onChange={e =>
-                      set('telegram')(e.target.value)
-                    }
-                    placeholder="username"
+                    autoComplete="email"
                     className={inputWithIconCls}
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                  ВКонтакте
-                </label>
+              {/* Мессенджеры */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
+                    Telegram
+                  </label>
 
-                <div className="relative">
-                  <Globe
-                    size={16}
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/25 pointer-events-none"
-                  />
+                  <div className="relative">
+                    <MessageSquare
+                      size={16}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/25 pointer-events-none"
+                    />
 
-                  <input
-                    value={form.vk}
-                    onChange={e =>
-                      set('vk')(e.target.value)
-                    }
-                    placeholder="id или username"
-                    className={inputWithIconCls}
-                  />
+                    <input
+                      value={form.telegram}
+                      onChange={(e) =>
+                        set('telegram')(e.target.value)
+                      }
+                      placeholder="username"
+                      className={inputWithIconCls}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
+                    ВКонтакте
+                  </label>
+
+                  <div className="relative">
+                    <Globe
+                      size={16}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/25 pointer-events-none"
+                    />
+
+                    <input
+                      value={form.vk}
+                      onChange={(e) =>
+                        set('vk')(e.target.value)
+                      }
+                      placeholder="id или username"
+                      className={inputWithIconCls}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-3 pt-1">
+            {/* Form actions */}
+            <div className="flex items-center justify-end gap-3 mt-6 pt-5 border-t border-[var(--border-color)]">
               <button
+                type="button"
                 onClick={resetForm}
                 disabled={saving}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-base font-medium transition-colors disabled:opacity-50"
+                className="
+                px-5 py-2.5
+                rounded-xl
+                bg-[var(--hover-2)]
+                hover:bg-[var(--hover-3)]
+                text-[var(--text-primary)]/70
+                text-sm font-medium
+                transition-colors
+                disabled:opacity-50
+              "
               >
                 Отмена
               </button>
 
               <button
+                type="button"
                 onClick={handleSave}
                 disabled={
                   saving ||
                   !form.last_name.trim() ||
                   !form.first_name.trim()
                 }
-                className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--accent)] text-white text-base font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+                className="
+                min-w-[135px]
+                flex items-center justify-center gap-2
+                px-5 py-2.5
+                rounded-xl
+                bg-[var(--accent)]
+                hover:bg-[var(--accent)]/90
+                text-white
+                text-sm font-medium
+                transition-colors
+                disabled:opacity-40
+                disabled:cursor-not-allowed
+                shadow-md
+              "
               >
                 {saving ? (
                   <Loader2
@@ -1104,235 +1183,372 @@ function ContactsTab({
           </div>
         )}
 
-        {confirmDelete && (
-          <div className="rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-5">
-            <div className="flex items-start gap-3">
-              <AlertTriangle
-                size={20}
-                className="text-[var(--accent)] flex-shrink-0 mt-0.5"
-              />
-
-              <div className="flex-1">
-                <p className="text-base font-semibold text-[var(--text-primary)] mb-1">
-                  Удалить контактное лицо?
-                </p>
-
-                <p className="text-sm text-[var(--text-primary)]/60 mb-4">
-                  <span className="font-medium text-[var(--text-primary)]">
-                    {confirmDelete.full_name}
-                  </span>{' '}
-                  будет удалён.
-                </p>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() =>
-                      setConfirmDelete(null)
-                    }
-                    className="flex-1 px-3 py-2 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-sm font-medium transition-colors"
-                  >
-                    Отмена
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      handleDelete(confirmDelete)
-                    }
-                    disabled={deleting}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[var(--accent)]/20 hover:bg-[var(--accent)]/30 border border-[var(--accent)]/30 text-[var(--accent)] text-sm font-medium transition-colors disabled:opacity-50"
-                  >
-                    {deleting ? (
-                      <Loader2
-                        size={14}
-                        className="animate-spin"
-                      />
-                    ) : (
-                      <Trash2 size={14} />
-                    )}
-                    Удалить
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
+        {/* ==========================================================
+          EMPTY
+      ========================================================== */}
         {persons.length === 0 && !showForm ? (
-          <div className="text-center py-16">
-            <User
-              size={36}
-              className="text-[var(--text-primary)]/15 mx-auto mb-4"
-            />
+          <div className="text-center py-14 sm:py-16">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-[var(--hover-1)] flex items-center justify-center">
+              <User
+                size={23}
+                className="text-[var(--text-primary)]/20"
+              />
+            </div>
 
-            <p className="text-[var(--text-primary)]/50 text-base font-semibold mb-1">
-              Контактные лица не указаны
+            <p className="text-[var(--text-primary)]/60 text-base font-semibold">
+              Контактных лиц пока нет
             </p>
 
-            <p className="text-[var(--text-primary)]/40 text-sm mb-5">
-              Добавьте контактное лицо для связи
+            <p className="text-[var(--text-primary)]/35 text-sm mt-1 mb-5">
+              Добавьте сотрудника для связи с контрагентом
             </p>
 
             <button
+              type="button"
               onClick={() => setShowForm(true)}
-              className="text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors text-base"
+              className="inline-flex items-center gap-1.5 text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors text-sm font-medium"
             >
-              Добавить контактное лицо →
+              <Plus size={15} />
+              Добавить контакт
             </button>
           </div>
         ) : (
-          <div className="space-y-4">
-            {persons.map((person, i) => (
-              <div
-                key={i}
-                className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] overflow-hidden"
-              >
-                {/* Шапка карточки */}
-                <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-[var(--border-color)]">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Avatar name={person.full_name} size="md" />
+          /* ========================================================
+              CONTACT LIST
+          ======================================================== */
+          persons.length > 0 && (
+            <div className="space-y-3">
+              {persons.map((person, i) => {
+                const telegram =
+                  person.messengers?.telegram?.replace('@', '');
 
-                    <div className="min-w-0">
-                      <p className="text-base font-semibold text-[var(--text-primary)] truncate">
-                        {person.full_name}
-                      </p>
+                const isConfirmingDelete =
+                  confirmDelete === person;
 
-                      {person.position ? (
-                        <p className="text-sm font-medium text-[var(--accent)] truncate">
-                          {person.position}
-                        </p>
-                      ) : (
-                        <p className="text-sm italic text-[var(--text-primary)]/60 truncate">
-                          Контактное лицо
-                        </p>
+                return (
+                  <div
+                    key={person.id || `${person.full_name}-${i}`}
+                    className="
+                    rounded-2xl
+                    border border-[var(--border-color)]
+                    bg-[var(--hover-1)]
+                    overflow-hidden
+                  "
+                  >
+                    {/* -----------------------------------------------
+                      Person header
+                  ----------------------------------------------- */}
+                    <div className="flex items-start justify-between gap-4 px-5 py-4">
+                      <div className="flex items-start gap-3.5 min-w-0">
+                        <Avatar
+                          name={person.full_name}
+                          size="md"
+                        />
+
+                        <div className="min-w-0 pt-0.5">
+                          <p className="text-base font-semibold text-[var(--text-primary)] break-words">
+                            {person.full_name}
+                          </p>
+
+                          {person.position ? (
+                            <div className="mt-1.5">
+                              <span
+                                className="
+                                inline-flex
+                                max-w-full
+                                px-2 py-1
+                                rounded-md
+                                border border-[var(--border-color)]
+                                bg-[var(--hover-2)]
+                                text-xs font-medium
+                                text-[var(--text-primary)]/60
+                              "
+                              >
+                                {person.position}
+                              </span>
+                            </div>
+                          ) : (
+                            <p className="mt-1 text-xs text-[var(--text-primary)]/25">
+                              Должность не указана
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setConfirmDelete(
+                            isConfirmingDelete
+                              ? null
+                              : person,
+                          )
+                        }
+                        disabled={deleting}
+                        className="
+                        p-2
+                        rounded-xl
+                        text-[var(--text-primary)]/30
+                        hover:text-[var(--accent)]
+                        hover:bg-[var(--accent)]/10
+                        transition-colors
+                        disabled:opacity-40
+                        shrink-0
+                      "
+                        title="Удалить"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+
+                    {/* -----------------------------------------------
+                      Delete confirmation
+                  ----------------------------------------------- */}
+                    {isConfirmingDelete && (
+                      <div className="mx-4 mb-4 rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/5 p-4">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle
+                            size={18}
+                            className="text-[var(--accent)] mt-0.5 shrink-0"
+                          />
+
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-[var(--text-primary)]">
+                              Удалить контактное лицо?
+                            </p>
+
+                            <p className="text-xs text-[var(--text-primary)]/45 mt-1">
+                              {person.full_name} будет удалён из списка контактов.
+                            </p>
+
+                            <div className="flex items-center gap-2 mt-3">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setConfirmDelete(null)
+                                }
+                                disabled={deleting}
+                                className="
+                                px-3 py-2
+                                rounded-lg
+                                bg-[var(--hover-2)]
+                                hover:bg-[var(--hover-3)]
+                                text-xs font-medium
+                                text-[var(--text-primary)]/65
+                                disabled:opacity-50
+                              "
+                              >
+                                Отмена
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDelete(person)
+                                }
+                                disabled={deleting}
+                                className="
+                                inline-flex items-center gap-1.5
+                                px-3 py-2
+                                rounded-lg
+                                bg-[var(--accent)]/15
+                                hover:bg-[var(--accent)]/25
+                                text-xs font-medium
+                                text-[var(--accent)]
+                                disabled:opacity-50
+                              "
+                              >
+                                {deleting ? (
+                                  <Loader2
+                                    size={13}
+                                    className="animate-spin"
+                                  />
+                                ) : (
+                                  <Trash2 size={13} />
+                                )}
+                                Удалить
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* -----------------------------------------------
+                      Contact details
+                  ----------------------------------------------- */}
+                    <div className="border-t border-[var(--border-color)] px-5 py-2">
+
+                      {/* Phone */}
+                      {person.phone && (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 min-h-[48px] py-2">
+                          <div className="flex items-center gap-2 sm:w-32 shrink-0">
+                            <Phone
+                              size={15}
+                              className="text-[var(--text-primary)]/35"
+                            />
+
+                            <span className="text-sm text-[var(--text-primary)]/40">
+                              Телефон
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-wrap sm:pl-0 pl-[23px] min-w-0">
+                            <a
+                              href={`tel:${person.phone}`}
+                              className="
+                              text-sm font-medium
+                              text-[var(--text-primary)]
+                              hover:text-[var(--accent)]
+                              transition-colors
+                            "
+                            >
+                              {person.phone}
+                            </a>
+
+                            {person.extension && (
+                              <span
+                                className="
+                                inline-flex items-center
+                                px-2 py-0.5
+                                rounded-md
+                                border border-[var(--border-color)]
+                                bg-[var(--hover-3)]
+                                text-xs font-semibold
+                                text-[var(--text-primary)]/65
+                              "
+                              >
+                                доб. {person.extension}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       )}
+
+                      {/* Email */}
+                      {person.email && (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 min-h-[48px] py-2">
+                          <div className="flex items-center gap-2 sm:w-32 shrink-0">
+                            <Mail
+                              size={15}
+                              className="text-[var(--text-primary)]/35"
+                            />
+
+                            <span className="text-sm text-[var(--text-primary)]/40">
+                              Email
+                            </span>
+                          </div>
+
+                          <div className="sm:pl-0 pl-[23px] min-w-0">
+                            <a
+                              href={`mailto:${person.email}`}
+                              className="
+                              text-sm font-medium
+                              text-[var(--text-primary)]
+                              hover:text-[var(--accent)]
+                              transition-colors
+                              break-all
+                            "
+                            >
+                              {person.email}
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Telegram */}
+                      {telegram && (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 min-h-[48px] py-2">
+                          <div className="flex items-center gap-2 sm:w-32 shrink-0">
+                            <MessageSquare
+                              size={15}
+                              className="text-[var(--text-primary)]/35"
+                            />
+
+                            <span className="text-sm text-[var(--text-primary)]/40">
+                              Telegram
+                            </span>
+                          </div>
+
+                          <div className="sm:pl-0 pl-[23px] min-w-0">
+                            <a
+                              href={`https://t.me/${telegram}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="
+                              inline-flex items-center gap-1.5
+                              text-sm font-medium
+                              text-[var(--text-primary)]
+                              hover:text-[var(--accent)]
+                              transition-colors
+                            "
+                            >
+                              @{telegram}
+
+                              <ExternalLink
+                                size={12}
+                                className="text-[var(--text-primary)]/30"
+                              />
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* VK */}
+                      {person.messengers?.vk && (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 min-h-[48px] py-2">
+                          <div className="flex items-center gap-2 sm:w-32 shrink-0">
+                            <Globe
+                              size={15}
+                              className="text-[var(--text-primary)]/35"
+                            />
+
+                            <span className="text-sm text-[var(--text-primary)]/40">
+                              ВКонтакте
+                            </span>
+                          </div>
+
+                          <div className="sm:pl-0 pl-[23px] min-w-0">
+                            <a
+                              href={`https://vk.com/${person.messengers.vk}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="
+                              inline-flex items-center gap-1.5
+                              text-sm font-medium
+                              text-[var(--text-primary)]
+                              hover:text-[var(--accent)]
+                              transition-colors
+                              break-all
+                            "
+                            >
+                              {person.messengers.vk}
+
+                              <ExternalLink
+                                size={12}
+                                className="text-[var(--text-primary)]/30"
+                              />
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Если вообще нет способов связи */}
+                      {!person.phone &&
+                        !person.email &&
+                        !telegram &&
+                        !person.messengers?.vk && (
+                          <div className="flex items-center gap-2 py-4 text-sm text-[var(--text-primary)]/30">
+                            <AlertCircle size={15} />
+                            Контактные данные не указаны
+                          </div>
+                        )}
                     </div>
                   </div>
-
-                  <button
-                    onClick={() =>
-                      setConfirmDelete(
-                        confirmDelete?.full_name === person.full_name
-                          ? null
-                          : person,
-                      )
-                    }
-                    className="p-2 bg-[var(--text-primary)]/10 rounded-xl hover:bg-[var(--accent)]/10 text-[var(--text-primary)]/60 hover:text-[var(--accent)] transition-colors flex-shrink-0"
-                    title="Удалить"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-
-                {/* Контакты */}
-                <div className="p-4 grid md:grid-cols-2 gap-3">
-                  {person.phone && (
-                    <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[var(--text-primary)]/[0.03]">
-                      <Phone
-                        size={15}
-                        className="text-[var(--accent)] mt-0.5 flex-shrink-0"
-                      />
-
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-primary)]/50 mb-0.5">
-                          Телефон
-                        </p>
-
-                        <a
-                          href={`tel:${person.phone}`}
-                          className="text-sm font-medium text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors"
-                        >
-                          {person.phone}
-                          {person.extension && (
-                            <span className="ml-1.5 text-[var(--text-primary)]/60 font-normal">
-                              доб. {person.extension}
-                            </span>
-                          )}
-                        </a>
-                      </div>
-                    </div>
-                  )}
-
-                  {person.email && (
-                    <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[var(--text-primary)]/[0.03]">
-                      <Mail
-                        size={15}
-                        className="text-[var(--accent)] mt-0.5 flex-shrink-0"
-                      />
-
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-primary)]/50 mb-0.5">
-                          Email
-                        </p>
-
-                        <a
-                          href={`mailto:${person.email}`}
-                          className="text-sm font-medium text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors break-all"
-                        >
-                          {person.email}
-                        </a>
-                      </div>
-                    </div>
-                  )}
-
-                  {person.messengers?.telegram && (
-                    <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[var(--text-primary)]/[0.03]">
-                      <MessageSquare
-                        size={15}
-                        className="text-[var(--accent)] mt-0.5 flex-shrink-0"
-                      />
-
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-primary)]/50 mb-0.5">
-                          Telegram
-                        </p>
-
-                        <a
-                          href={`https://t.me/${person.messengers.telegram.replace('@', '')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-medium text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors inline-flex items-center gap-1.5"
-                        >
-                          @{person.messengers.telegram.replace('@', '')}
-                          <ExternalLink
-                            size={12}
-                            className="text-[var(--text-primary)]/50"
-                          />
-                        </a>
-                      </div>
-                    </div>
-                  )}
-
-                  {person.messengers?.vk && (
-                    <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[var(--text-primary)]/[0.03]">
-                      <Globe
-                        size={15}
-                        className="text-[var(--accent)] mt-0.5 flex-shrink-0"
-                      />
-
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-primary)]/50 mb-0.5">
-                          ВКонтакте
-                        </p>
-
-                        <a
-                          href={`https://vk.com/${person.messengers.vk}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-medium text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors inline-flex items-center gap-1.5"
-                        >
-                          {person.messengers.vk}
-                          <ExternalLink
-                            size={12}
-                            className="text-[var(--text-primary)]/50"
-                          />
-                        </a>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          )
         )}
       </div>
     </div>
