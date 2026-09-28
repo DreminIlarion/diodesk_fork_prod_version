@@ -212,6 +212,8 @@ class ProxyAPISettings(BaseSettings):
     embedding_api_key: SecretStr = SecretStr("<EMBEDDING_API_KEY>")
 
     embedding_model: str = "baai/bge-m3"
+    embedding_dimensions: int = 1024
+
     model_catalog_ttl_seconds: int = 900
     request_timeout_seconds: float = 90.0
     max_retries: int = 3
