@@ -466,48 +466,76 @@ function EditCounterpartyModal({
     }));
 
   const handleSave = async () => {
-    if (!form.name.trim()) return;
+    if (
+      !form.last_name.trim() ||
+      !form.first_name.trim()
+    ) {
+      return;
+    }
 
     setSaving(true);
-    setError(null);
 
     try {
-      const payload: any = {
-        name: form.name.trim(),
+      const messengers: Record<string, string> = {};
+
+      if (form.telegram.trim()) {
+        messengers.telegram = form.telegram
+          .trim()
+          .replace('@', '');
+      }
+
+      if (form.vk.trim()) {
+        messengers.vk = form.vk.trim();
+      }
+
+      const payload = {
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        middle_name:
+          form.middle_name.trim() || undefined,
+        phone: form.phone.trim()
+          ? phoneToApi(form.phone)
+          : undefined,
+        extension:
+          form.extension.trim() || undefined,
+        position:
+          form.position.trim() || undefined,
+        email:
+          form.email.trim() || undefined,
+        messengers:
+          Object.keys(messengers).length > 0
+            ? messengers
+            : undefined,
       };
 
-      if (form.legal_name.trim()) {
-        payload.legal_name = form.legal_name.trim();
-      }
+      console.group('📤 [ContactsTab] POST /contact-persons');
+      console.log('counterpartyId:', counterpartyId);
+      console.log('form state:', form);
+      console.log('payload (will be sent):', payload);
+      console.log('payload JSON:', JSON.stringify(payload));
+      console.groupEnd();
 
-      if (form.okpo.trim()) {
-        payload.okpo = form.okpo.trim();
-      }
-
-      if (form.phone.trim()) {
-        payload.phone = phoneToApi(form.phone);
-      }
-
-      if (form.email.trim()) {
-        payload.email = form.email.trim();
-      }
-
-      if (form.address.trim()) {
-        payload.address = form.address.trim();
-      }
-
-      const updated = await counterpartiesApi.update(
-        counterparty.id,
+      const res = await counterpartiesApi.updateContactPerson(
+        counterpartyId,
         payload,
       );
 
-      onSave(updated);
+      console.group('📥 [ContactsTab] response from /contact-persons');
+      console.log('response:', res);
+      console.groupEnd();
+
+      resetForm();
+      onRefresh();
     } catch (e: any) {
-      setError(
-        typeof e?.response?.data?.detail === 'string'
-          ? e.response.data.detail
-          : 'Не удалось сохранить',
+      console.group('❌ [ContactsTab] error on /contact-persons');
+      console.error('error:', e);
+      console.log('status:', e?.response?.status);
+      console.log('response data:', e?.response?.data);
+      console.log(
+        'response data (stringified):',
+        JSON.stringify(e?.response?.data, null, 2),
       );
+      console.groupEnd();
     } finally {
       setSaving(false);
     }
@@ -847,8 +875,8 @@ function ContactsTab({
               : setShowForm(true)
           }
           className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-base font-medium transition-all ${showForm
-              ? 'bg-[var(--hover-2)] text-[var(--text-primary)]/70'
-              : 'bg-[var(--accent)] text-white shadow-md'
+            ? 'bg-[var(--hover-2)] text-[var(--text-primary)]/70'
+            : 'bg-[var(--accent)] text-white shadow-md'
             }`}
         >
           {showForm ? (
@@ -1465,8 +1493,8 @@ function BranchesTab({
                 : setShowForm(true)
             }
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-base font-medium transition-all ${showForm
-                ? 'bg-[var(--hover-2)] text-[var(--text-primary)]/70'
-                : 'bg-[var(--accent)] text-white shadow-md'
+              ? 'bg-[var(--hover-2)] text-[var(--text-primary)]/70'
+              : 'bg-[var(--accent)] text-white shadow-md'
               }`}
           >
             {showForm ? (
@@ -1731,8 +1759,8 @@ function BranchesTab({
 
                   <span
                     className={`px-2 py-0.5 rounded-md text-xs font-medium flex-shrink-0 ${branch.is_active
-                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
-                        : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40 border border-[var(--border-color)]'
+                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                      : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40 border border-[var(--border-color)]'
                       }`}
                   >
                     {branch.is_active
@@ -1985,8 +2013,8 @@ function ProductsTab({
                 : setShowForm(true)
             }
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-base font-medium transition-all ${showForm
-                ? 'bg-[var(--hover-2)] text-[var(--text-primary)]/70'
-                : 'bg-[var(--accent)] text-white shadow-md'
+              ? 'bg-[var(--hover-2)] text-[var(--text-primary)]/70'
+              : 'bg-[var(--accent)] text-white shadow-md'
               }`}
           >
             {showForm ? (
@@ -2162,8 +2190,8 @@ function ProductsTab({
                         setLinkEnv(env.value)
                       }
                       className={`px-3 py-3 rounded-xl text-base font-medium transition-all ${linkEnv === env.value
-                          ? envBadgeClass(env.value)
-                          : 'border border-[var(--border-color)] bg-[var(--hover-1)] text-[var(--text-primary)]/40 hover:bg-[var(--hover-2)]'
+                        ? envBadgeClass(env.value)
+                        : 'border border-[var(--border-color)] bg-[var(--hover-1)] text-[var(--text-primary)]/40 hover:bg-[var(--hover-2)]'
                         }`}
                     >
                       {env.label}
@@ -2188,14 +2216,14 @@ function ProductsTab({
                     setLinkPrimary(!linkPrimary)
                   }
                   className={`relative w-11 h-6 rounded-full transition-colors ${linkPrimary
-                      ? 'bg-[var(--accent)]'
-                      : 'bg-[var(--hover-1)]'
+                    ? 'bg-[var(--accent)]'
+                    : 'bg-[var(--hover-1)]'
                     }`}
                 >
                   <span
                     className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${linkPrimary
-                        ? 'translate-x-5'
-                        : ''
+                      ? 'translate-x-5'
+                      : ''
                       }`}
                   />
                 </button>
@@ -2856,8 +2884,8 @@ export default function CounterpartyDetailPage() {
 
                 <span
                   className={`px-3 py-1 rounded-lg text-base font-medium border ${counterparty.is_active
-                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                      : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40 border-[var(--border-color)]'
+                    ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                    : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40 border-[var(--border-color)]'
                     }`}
                 >
                   {counterparty.is_active
@@ -2928,8 +2956,8 @@ export default function CounterpartyDetailPage() {
                 setActiveTab(tab.id)
               }
               className={`flex items-center gap-2 px-5 py-3 rounded-t-xl transition-all whitespace-nowrap ${activeTab === tab.id
-                  ? 'bg-[var(--accent)]/50 text-white border-b-2 border-red-500'
-                  : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)]'
+                ? 'bg-[var(--accent)]/50 text-white border-b-2 border-red-500'
+                : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)]'
                 }`}
             >
               <tab.icon size={16} />
@@ -3159,9 +3187,9 @@ export default function CounterpartyDetailPage() {
 
                               <span
                                 className={`px-2.5 py-0.5 rounded-lg text-sm font-medium border ${project.status ===
-                                    'active'
-                                    ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                                    : 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15'
+                                  'active'
+                                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                                  : 'bg-neutral-500/15 text-[var(--text-muted)] border-[var(--text-muted)]/15'
                                   }`}
                               >
                                 {project.status ===
@@ -3284,8 +3312,8 @@ export default function CounterpartyDetailPage() {
 
                         <span
                           className={`px-3 py-1.5 rounded-lg text-sm font-medium border flex-shrink-0 ${c.is_active
-                              ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
-                              : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40 border-[var(--border-color)]'
+                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
+                            : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40 border-[var(--border-color)]'
                             }`}
                         >
                           {c.is_active

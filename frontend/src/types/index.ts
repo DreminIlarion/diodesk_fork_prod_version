@@ -67,6 +67,8 @@ export interface ContactPersonInput {
   middle_name?: string;
   phone?: string;
   email?: string;
+  position?: string;      // ← обязательно
+  extension?: string;
   messengers?: ContactMessengers;
 }
 
