@@ -7,7 +7,7 @@ import {
   PhoneCall, UserPlus, Ticket, History, Info, UserCheck,
   Package, Server, Globe, Smartphone, Monitor, Cpu, Code, HelpCircle,
   X, Tag, Link2, Layers, RefreshCcw, AlertTriangle,
-  ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search, GitBranch,
+  ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search, GitBranch, AlertCircle ,
   FolderOpen,
 } from 'lucide-react';
 import {
