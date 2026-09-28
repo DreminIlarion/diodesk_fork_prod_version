@@ -1417,7 +1417,7 @@ function ContactsTab({
                                 border border-[var(--border-color)]
                                 bg-[var(--hover-3)]
                                 text-xs font-semibold
-                                text-[var(--text-primary)]/65
+                                text-[var(--text-primary)]/85
                               "
                               >
                                 доб. {person.extension}
