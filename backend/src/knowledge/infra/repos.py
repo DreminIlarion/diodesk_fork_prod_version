@@ -8,9 +8,12 @@ from opensearchpy import NotFoundError as OpenSearchNotFoundError
 
 from src.shared.schemas import Page, Pagination
 
-from ..domain.entities import Article
+from ..domain.entities import Article, ChatSession
 from ..domain.vo import SourceType
-from .mappers import ArticleDocumentMapper
+from .mappers import (
+    ArticleDocumentMapper,
+    ChatSessionDocumentMapper,
+)
 
 
 class OpenSearchArticleRepository:
@@ -200,6 +203,213 @@ class OpenSearchArticleRepository:
             return None
 
         return _article_from_hit(hits[0])
+
+
+class OpenSearchChatSessionRepository:
+    """Хранилище сессий ии-чата в OpenSearch."""
+
+    def __init__(
+        self,
+        client: AsyncOpenSearch,
+        *,
+        index: str,
+    ) -> None:
+        self.client = client
+        self.index = index
+
+    async def create(
+        self,
+        entity: ChatSession,
+    ) -> ChatSession:
+        """Создаёт новую сессию ии-чата."""
+
+        await self.client.index(
+            index=self.index,
+            id=str(entity.id),
+            body=ChatSessionDocumentMapper.from_entity(entity),
+            params={
+                "op_type": "create",
+                "refresh": "wait_for",
+            },
+        )
+        return entity
+
+    async def read(
+        self,
+        uid: UUID,
+    ) -> ChatSession | None:
+        """Получает сессию по её ID."""
+
+        try:
+            response = await self.client.get(
+                index=self.index,
+                id=str(uid),
+            )
+        except OpenSearchNotFoundError:
+            return None
+
+        return _chat_session_from_hit(response)
+
+    async def paginate(
+        self,
+        params: Pagination,
+    ) -> Page[ChatSession]:
+        """Возвращает страницу сессий от новых к старым."""
+
+        response = await self.client.search(
+            index=self.index,
+            body={
+                "from": params.offset,
+                "size": params.size,
+                "track_total_hits": True,
+                "sort": [
+                    {
+                        "created_at": {
+                            "order": "desc",
+                        }
+                    }
+                ],
+                "query": {
+                    "match_all": {},
+                },
+            },
+        )
+
+        hits = response["hits"]
+        sessions = [
+            _chat_session_from_hit(hit)
+            for hit in hits["hits"]
+        ]
+
+        return Page.create(
+            items=sessions,
+            total_items=_total_hits(hits["total"]),
+            page=params.page,
+            size=params.size,
+        )
+
+    async def update(
+        self,
+        entity: ChatSession,
+    ) -> None:
+        """Полностью обновляет документы сессии."""
+
+        await self.client.index(
+            index=self.index,
+            id=str(entity.id),
+            body=ChatSessionDocumentMapper.from_entity(entity),
+            params={
+                "refresh": "wait_for",
+            },
+        )
+
+    async def delete(self, uid: UUID) -> None:
+        """Физически удаляет сессию, если она существует."""
+
+        try:
+            await self.client.delete(
+                index=self.index,
+                id=str(uid),
+                params={
+                    "refresh": "wait_for",
+                },
+            )
+        except OpenSearchNotFoundError:
+            return
+
+    async def exists(self, uid: UUID) -> bool:
+        """Проверяет существование сессии."""
+
+        return bool(
+            await self.client.exists(
+                index=self.index,
+                id=str(uid),
+            )
+        )
+
+    async def get_by_ids(
+        self,
+        ids: list[UUID],
+    ) -> list[ChatSession]:
+        """Получает несколько сессий одним запросом."""
+
+        if not ids:
+            return []
+
+        response = await self.client.mget(
+            index=self.index,
+            body={
+                "ids": [
+                    str(session_id)
+                    for session_id in ids
+                ],
+            },
+        )
+
+        return [
+            _chat_session_from_hit(document)
+            for document in response["docs"]
+            if document.get("found") is True
+        ]
+
+    async def get_by_ticket_and_user(
+        self,
+        ticket_id: UUID,
+        user_id: UUID,
+    ) -> ChatSession | None:
+        """Возвращает последнюю активную сессию сотрудника в тикете."""
+
+        response = await self.client.search(
+            index=self.index,
+            body={
+                "size": 1,
+                "sort": [
+                    {
+                        "updated_at": {
+                            "order": "desc",
+                        }
+                    }
+                ],
+                "query": {
+                    "bool": {
+                        "filter": [
+                            {
+                                "term": {
+                                    "ticket_id": str(ticket_id),
+                                }
+                            },
+                            {
+                                "term": {
+                                    "created_by": str(user_id),
+                                }
+                            },
+                        ],
+                        "must_not": [
+                            {
+                                "exists": {
+                                    "field": "deleted_at",
+                                }
+                            }
+                        ],
+                    }
+                },
+            },
+        )
+
+        hits = response["hits"]["hits"]
+        if not hits:
+            return None
+
+        return _chat_session_from_hit(hits[0])
+
+
+def _chat_session_from_hit(
+    hit: Mapping[str, Any],
+) -> ChatSession:
+    return ChatSessionDocumentMapper.to_entity(
+        document_id=str(hit["_id"]),
+        source=hit["_source"],
+    )
 
 
 def _article_from_hit(
