@@ -38,7 +38,7 @@ class Article(AggregateRoot):
 
     # Авторство и публикация
     author_id: UUID
-    reviewer_id: UUID | None = None
+    published_by: UUID | None = None
     published_at: datetime | None = None
 
     # Статус, видимость и версия
@@ -158,7 +158,7 @@ class Article(AggregateRoot):
         now = current_datetime()
 
         self.status = ArticleStatus.PUBLISHED
-        self.reviewer_id = published_by
+        self.published_by = published_by
         self.published_at = now
         self.updated_at = now
 

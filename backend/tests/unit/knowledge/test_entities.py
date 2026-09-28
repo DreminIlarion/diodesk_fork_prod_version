@@ -41,7 +41,7 @@ def test_publish_article(article: Article):
     events = list(article.collect_events())
 
     assert article.status == ArticleStatus.PUBLISHED
-    assert article.reviewer_id == published_by
+    assert article.published_by == published_by
     assert article.published_at is not None
     assert len(events) == 1
     assert isinstance(events[0], ArticlePublished)

@@ -76,7 +76,7 @@ def build_articles_index_body(
                 "source_ref": {"type": "keyword"},
                 "external_id": {"type": "keyword"},
                 "author_id": {"type": "keyword"},
-                "reviewer_id": {"type": "keyword"},
+                "published_by": {"type": "keyword"},
                 "published_at": {"type": "date"},
                 "status": {"type": "keyword"},
                 "visibility": {"type": "keyword"},

@@ -86,3 +86,15 @@ def test_all_document_mappings_are_strict():
         body["mappings"]["dynamic"] == "strict"
         for body in mappings
     )
+
+
+def test_article_mapping_contains_publication_author():
+    body = build_articles_index_body(
+        number_of_shards=1,
+        number_of_replicas=0,
+    )
+
+    properties = body["mappings"]["properties"]
+
+    assert "published_by" in properties
+    assert "reviewer_id" not in properties
