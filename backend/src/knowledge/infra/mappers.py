@@ -4,10 +4,11 @@ from collections.abc import Mapping
 from datetime import datetime
 from uuid import UUID
 
-from ..domain.entities import Article
+from ..domain.entities import Article, ChatMessage, ChatSession
 from ..domain.vo import (
     ArticleStatus,
     ArticleVisibility,
+    ChatRole,
     SourceType,
 )
 
@@ -114,6 +115,100 @@ class ArticleDocumentMapper:
         )
 
 
+class ChatSessionDocumentMapper:
+    """Преобразование ии-диалога в документ OpenSearch и обратно."""
+
+    @staticmethod
+    def from_entity(session: ChatSession) -> dict[str, Any]:
+        return {
+            "ticket_id": str(session.ticket_id),
+            "created_by": str(session.created_by),
+            "model_id": session.model_id,
+            "created_at": session.created_at.isoformat(),
+            "updated_at": session.updated_at.isoformat(),
+            "deleted_at": _optional_datetime_to_string(
+                session.deleted_at
+            ),
+        }
+
+    @staticmethod
+    def to_entity(
+        document_id: str,
+        source: Mapping[str, Any],
+    ) -> ChatSession:
+        return ChatSession(
+            id=UUID(document_id),
+            ticket_id=UUID(str(source["ticket_id"])),
+            created_by=UUID(str(source["created_by"])),
+            model_id=str(source["model_id"]),
+            created_at=_datetime(source["created_at"]),
+            updated_at=_datetime(source["updated_at"]),
+            deleted_at=_optional_datetime(
+                source.get("deleted_at")
+            ),
+        )
+
+
+class ChatMessageDocumentMapper:
+    """Преобразование сообщения ии-диалога в документ OpenSearch и обратно"""
+
+    @staticmethod
+    def from_entity(message: ChatMessage) -> dict[str, Any]:
+        return {
+            "session_id": str(message.session_id),
+            "role": message.role.value,
+            "content": message.content,
+            "requested_model_id": message.requested_model_id,
+            "actual_model_id": message.actual_model_id,
+            "confidence": message.confidence,
+            "citation_article_ids": [
+                str(article_id)
+                for article_id in message.citation_article_ids
+            ],
+            "provider_request_id": message.provider_request_id,
+            "created_at": message.created_at.isoformat(),
+            "updated_at": message.updated_at.isoformat(),
+            "deleted_at": _optional_datetime_to_string(
+                message.deleted_at
+            ),
+        }
+
+    @staticmethod
+    def to_entity(
+        document_id: str,
+        source: Mapping[str, Any],
+    ) -> ChatMessage:
+        return ChatMessage(
+            id=UUID(document_id),
+            session_id=UUID(str(source["session_id"])),
+            role=ChatRole(str(source["role"])),
+            content=str(source["content"]),
+            requested_model_id=_optional_string(
+                source.get("requested_model_id")
+            ),
+            actual_model_id=_optional_string(
+                source.get("actual_model_id")
+            ),
+            confidence=_optional_float(
+                source.get("confidence")
+            ),
+            citation_article_ids=[
+                UUID(str(article_id))
+                for article_id in (
+                    source.get("citation_article_ids") or []
+                )
+            ],
+            provider_request_id=_optional_string(
+                source.get("provider_request_id")
+            ),
+            created_at=_datetime(source["created_at"]),
+            updated_at=_datetime(source["updated_at"]),
+            deleted_at=_optional_datetime(
+                source.get("deleted_at")
+            ),
+        )
+
+
 def _optional_uuid_to_string(value: UUID | None) -> str | None:
     if value is None:
         return None
@@ -150,3 +245,9 @@ def _optional_datetime(value: object) -> datetime | None:
     if value is None:
         return None
     return _datetime(value)
+
+
+def _optional_float(value: object) -> float | None:
+    if value is None:
+        return None
+    return float(value)
