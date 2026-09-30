@@ -1,43 +1,84 @@
+from typing import Protocol
+
 from uuid import UUID
 
-from ...shared.domain.repo import Repository
-from .entities import Article, ArticleVersion
-from .vo import ArticleChunk, ArticleVisibility
+from src.shared.domain.repos import Repository
+
+from .dtos import ArticleChunk, SearchFilters, SearchHit
+from .entities import Article, ChatMessage, ChatSession
+from .vo import SourceType
 
 
 class ArticleRepository(Repository[Article]):
+    """Репозиторий агрегатов статей базы знаний"""
 
-    async def search(
-            self,
-            query: str,
-            category_id: UUID | None = None,
-            product_id: UUID | None = None,
-            tags: list[str] | None = None,
-            visibility: ArticleVisibility | None = None,
-            *,
-            top_k: int = 10,
-            semantic_weight: float = 0.7,
-            bm25_weight: float = 0.3,
-    ) -> list[tuple[Article, float]]:
+    async def get_by_external_id(
+        self,
+        source_type: SourceType,
+        external_id: str,
+    ) -> Article | None:
         """
-        Гибридный поиск по тексту запроса.
-        Возвращает список статей с релевантностью.
-        """
-
-    async def search_by_image(
-            self,
-            image_embedding: list[float],
-            visibility: ArticleVisibility | None = None,
-            *,
-            top_k: int = 10,
-    ) -> list[tuple[Article, float]]:
-        """
-        Поиск статей по релевантности изображения.
-        Использует ембеддинг изображения для сравнения с чанками (content_type='image/*').
+        Получение статьи по идентификатору во внешнем источнике
         """
 
 
-class ArticleVersionRepository(Repository[ArticleVersion]):
+class ArticleChunkRepository(Protocol):
+    """Порт индекса фрагментов статей в OpenSearch"""
 
-    async def add_chunks(self, chunks: list[ArticleChunk]) -> None:
-        """Сохранение проиндексированных чанков статей"""
+    async def replace_for_article(
+        self,
+        article_id: UUID,
+        chunks: list[ArticleChunk],
+    ) -> None:
+        """
+        Заменяет поисковые фрагменты конкретной статьи
+        """
+
+    async def delete_by_article(self, article_id: UUID) -> None:
+        """
+        Удаляет из поискового индекса все фрагменты статьи
+        """
+
+    async def hybrid_search(
+        self,
+        *,
+        query: str,
+        query_embedding: tuple[float, ...],
+        filters: SearchFilters,
+        top_k: int = 10,
+    ) -> list[SearchHit]:
+        """
+        Выполняет гибридный поиск BM25 и HNSW с объединением через RRF
+        """
+
+
+class ChatSessionRepository(Repository[ChatSession]):
+    """Репозиторий ии-диалогов, открытых в карточках тикетов"""
+
+    async def get_by_ticket_and_user(
+        self,
+        ticket_id: UUID,
+        user_id: UUID,
+    ) -> ChatSession | None:
+        """
+        Возвращает диалог сотрудника в указанном тикете
+        """
+
+
+class ChatMessageRepository(Repository[ChatMessage]):
+    """Репозиторий сообщений ии-диалога"""
+
+    async def list_by_session(
+        self,
+        session_id: UUID,
+        *,
+        limit: int = 50,
+    ) -> list[ChatMessage]:
+        """
+        Возвращает последние сообщения диалога в хронологическом порядке
+        """
+
+    async def delete_by_session(self, session_id: UUID) -> None:
+        """
+        Удаляет сообщения закрываемого диалога
+        """

@@ -1,6 +1,6 @@
 import logging
 import sys
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -12,16 +12,24 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from src.comments.router import router as comments_router
 from src.core.broker import broker_router
 from src.core.logging import configure_logging
+from src.core.opensearch import (
+    close_opensearch_client,
+    get_opensearch_client,
+)
+from src.core.proxyapi import close_proxyapi_clients
 from src.core.redis import redis_client
 from src.core.settings import settings
 from src.crm.router import router as counterparty_router
 from src.feedbacks.router import router as feedback_router
 from src.iam.routers import router as iam_router
 from src.iam.routers.invitations import broker_router as invitations_broker_router  # Добавить
+from src.knowledge.infra.indices import ensure_knowledge_indices
 from src.media.router import router as media_router
 from src.notifications.infra.handlers import router as notifications_broker_router
+from src.notifications.routers.notifications import (
+    broker_router as notifications_sse_broker_router,  # Добавить
+)
 from src.notifications.routers.notifications import router as notification_router
-from src.notifications.routers.notifications import broker_router as notifications_sse_broker_router  # Добавить
 from src.products.router import router as product_router
 from src.projects.routers import router as project_router
 from src.shared.domain.exceptions import AppError
@@ -36,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # Настройка логирования
     configure_logging(log_level="INFO")
 
@@ -48,9 +56,28 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Проверка доступности Redis
     await redis_client.ping()
 
-    # Запуск брокера сообщений
-    async with broker_router.lifespan_context(app):
-        yield
+    # Создание индексов базы знаний
+    opensearch_client = get_opensearch_client()
+
+    try:
+        await ensure_knowledge_indices(
+            opensearch_client,
+            settings.opensearch,
+            embedding_model=settings.proxy_api.embedding_model,
+            embedding_dimensions=(
+                settings.proxy_api.embedding_dimensions
+            ),
+        )
+
+        # Запуск брокера сообщений
+        async with broker_router.lifespan_context(app):
+            yield
+    finally:
+        # Освобождение HTTP-соединений с внешними сервисами
+        try:
+            await close_proxyapi_clients()
+        finally:
+            await close_opensearch_client()
 
 
 app = FastAPI(

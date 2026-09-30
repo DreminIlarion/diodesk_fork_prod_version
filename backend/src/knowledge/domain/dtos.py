@@ -1,0 +1,128 @@
+from dataclasses import dataclass, field
+from uuid import UUID
+
+from .vo import (
+    ArticleVisibility,
+    ChunkKind,
+    ModelCapability,
+    SourceType,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ArticleChunk:
+    """
+    Фрагмент опубликованной статьи, подготовленный для индексации в OpenSearch
+    """
+
+    # Стабильные идентификаторы фрагмента и статьи
+    chunk_id: str
+    article_id: UUID
+    article_version: int
+    position: int
+
+    # Текст, участвующий в полнотекстовом и векторном поиске
+    title: str
+    content: str
+    context_headings: tuple[str, ...]
+    kind: ChunkKind
+
+    # Данные для фильтрации и формирования ссылки на источник
+    source_type: SourceType
+    source_ref: str
+    visibility: ArticleVisibility
+    tags: tuple[str, ...] = ()
+
+    # Связи с существующими сущностями проекта
+    product_id: UUID | None = None
+    project_id: UUID | None = None
+    counterparty_id: UUID | None = None
+
+    # Вектор и модель, которой он был рассчитан
+    embedding_model: str = ""
+    embedding: tuple[float, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class SearchFilters:
+    """Фильтры гибридного поиска по базе знаний"""
+
+    visibilities: tuple[ArticleVisibility, ...] = (
+        ArticleVisibility.INTERNAL,
+    )
+    source_types: tuple[SourceType, ...] = ()
+    tags: tuple[str, ...] = ()
+
+    product_id: UUID | None = None
+    project_id: UUID | None = None
+    counterparty_id: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ModelSpec:
+    """
+    Описание возможностей модели без политики её выбора
+    """
+
+    id: str
+    provider: str
+    api_model: str
+    context_window: int
+    max_output_tokens: int | None = None
+
+    capabilities: frozenset[ModelCapability] = field(
+        default_factory=lambda: frozenset(
+            {ModelCapability.TEXT}
+        )
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class SearchHit:
+    """
+    Фрагмент базы знаний, найденный гибридным поиском
+    """
+
+    chunk_id: str
+    article_id: UUID
+
+    title: str
+    content: str
+
+    source_type: SourceType
+    source_ref: str
+    kind: ChunkKind
+
+    rank_score: float
+    exact_terms: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class Citation:
+    """
+    Ссылка на материал, использованный при формировании ответа
+    """
+
+    article_id: UUID
+    title: str
+
+    source_type: SourceType
+    source_ref: str
+
+    chunk_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ModelGeneration:
+    """
+    Результат обращения к генеративной модели
+    """
+
+    text: str
+
+    requested_model_id: str
+    actual_model_id: str
+
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    provider_request_id: str | None = None

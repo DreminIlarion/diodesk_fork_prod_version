@@ -32,9 +32,35 @@ class TaskAuthZService:
     async def can_change_status(
             self, subject: Subject, task: Task, new_status: TaskStatus
     ) -> PermissionResult:
+<<<<<<< HEAD
+        rules = [IsAdminRule(subject), IsTaskCreator(subject, task)]
+
+        if task.project_id is not None:
+            project_member = await self.project_membership_repo.find(task.project_id, subject.id)
+            rules.append(
+                AnyOf(
+                    AllOf(
+                        IsMemberExistsRule(project_member),
+                        IsProjectOwnerOrManagerRule(project_member),
+                    ),
+                    AllOf(
+                        IsMemberExistsRule(project_member),
+                        IsProjectStaffRule(project_member),
+                    ),
+                    TaskAssigneeStatusRule(subject, task, new_status),  # ← ДОБАВИl
+                    TaskReviewerStatusRule(subject, task, new_status),   # ← ДОБАВИl
+                )
+            )
+
+            auth_policy = AnyOf(*rules)
+            return auth_policy.check()
+
+        rules.extend((
+=======
         rules = [
             IsAdminRule(subject),
             IsTaskCreator(subject, task),
+>>>>>>> main
             IsStaffRule(subject),
             AnyOf(
                 TaskAssigneeStatusRule(subject, task, new_status),
@@ -53,6 +79,23 @@ class TaskAuthZService:
             IsStaffRule(subject),
             IsStaffRule(assignee),
         ]
+<<<<<<< HEAD
+
+        if task.project_id is not None:
+            current_member = await self.project_membership_repo.find(task.project_id, subject.id)
+            assignee_member = await self.project_membership_repo.find(task.project_id, assignee.id)
+
+            member_rules = []
+            for member in [current_member, assignee_member]:
+                member_rules.extend((
+                    IsMemberExistsRule(member),
+                    IsProjectStaffRule(member),
+                ))
+
+            rules.append(AllOf(*member_rules))
+
+=======
+>>>>>>> main
         auth_policy = AnyOf(*rules)
         return auth_policy.check()
 
@@ -89,8 +132,7 @@ class TaskAuthZService:
             subject.has_role(UserRole.ADMIN)
             or subject.has_role(UserRole.SUPPORT_MANAGER)
             or subject.has_role(UserRole.SUPPORT_AGENT)
-            or subject.id == task.created_by
-            or subject.id == task.assignee_id
+            or subject.id in {task.created_by, task.assignee_id}
         )
 
         if not requester_allowed:

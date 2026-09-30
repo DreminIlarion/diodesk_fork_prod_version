@@ -1,15 +1,13 @@
-from dataclasses import dataclass
 from enum import StrEnum
-from uuid import UUID
 
 
 class ArticleStatus(StrEnum):
     """Статус статьи базы знаний"""
 
-    DRAFT = "draft"  # черновик
-    IN_REVIEW = "in_review"  # на проверке
-    PUBLISHED = "published"  # опубликована
-    ARCHIVED = "archived"  # в архиве
+    DRAFT = "draft"
+    IN_REVIEW = "in_review"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
 
 
 class ArticleVisibility(StrEnum):
@@ -20,17 +18,34 @@ class ArticleVisibility(StrEnum):
     CUSTOMER_SPECIFIC = "customer_specific"
 
 
-@dataclass(frozen=True, kw_only=True)
-class ArticleChunk:
-    """
-    Часть (кусок) статьи.
-    Для индексирования системой.
-    """
+class SourceType(StrEnum):
+    """Тип источника знаний"""
 
-    version_id: UUID
-    attachment_id: UUID | None = None
+    TICKET = "ticket"
+    INSTRUCTION = "instruction"
+    DOCUMENTATION = "documentation"
 
-    content_type: str
-    content: str | None = None
 
-    embedding: list[float]
+class ChunkKind(StrEnum):
+    """Смысловая роль фрагмента статьи"""
+
+    PROBLEM = "problem"
+    CAUSE = "cause"
+    SOLUTION = "solution"
+    VERIFICATION = "verification"
+    DOCUMENTATION = "documentation"
+
+
+class ChatRole(StrEnum):
+    """Роль автора сообщения в ии-диалоге"""
+
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
+class ModelCapability(StrEnum):
+    """Возможность генеративной модели"""
+
+    TEXT = "text"
+    STRUCTURED_OUTPUT = "structured_output"
+    VISION = "vision"
