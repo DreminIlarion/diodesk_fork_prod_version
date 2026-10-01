@@ -5,7 +5,7 @@ from uuid import uuid4
 from opensearchpy import NotFoundError as OpenSearchNotFoundError
 
 from src.knowledge.domain.entities import Article
-from src.knowledge.domain.vo import SourceType
+from src.knowledge.domain.vo import ArticleSource
 from src.knowledge.infra.mappers import ArticleDocumentMapper
 from src.knowledge.infra.repos import OpenSearchArticleRepository
 from src.shared.schemas import Pagination
@@ -18,8 +18,10 @@ def build_article() -> Article:
     return Article.create(
         title="Ошибка проведения документа",
         content="Причина ошибки и последовательность исправления.",
-        source_type=SourceType.TICKET,
-        source_ref="/tickets/T-105",
+        source=ArticleSource(
+            kind="ticket",
+            ref="/tickets/T-105",
+        ),
         external_id="T-105",
         author_id=uuid4(),
     )
@@ -261,7 +263,7 @@ async def test_get_article_by_external_id():
     }
 
     restored = await repository.get_by_external_id(
-        SourceType.TICKET,
+        "ticket",
         "T-105",
     )
 

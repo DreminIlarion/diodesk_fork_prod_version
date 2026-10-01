@@ -2,7 +2,7 @@ from typing import Protocol
 
 from collections.abc import Sequence
 
-from .dtos import ModelSpec
+from .vo import ModelSpec
 
 
 class EmbeddingProvider(Protocol):

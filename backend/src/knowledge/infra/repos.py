@@ -9,7 +9,6 @@ from opensearchpy import NotFoundError as OpenSearchNotFoundError
 from src.shared.schemas import Page, Pagination
 
 from ..domain.entities import Article, ChatMessage, ChatSession
-from ..domain.vo import SourceType
 from .mappers import (
     ArticleDocumentMapper,
     ChatMessageDocumentMapper,
@@ -162,7 +161,7 @@ class OpenSearchArticleRepository:
 
     async def get_by_external_id(
         self,
-        source_type: SourceType,
+        source_type: str,
         external_id: str,
     ) -> Article | None:
         """
@@ -185,7 +184,7 @@ class OpenSearchArticleRepository:
                         "filter": [
                             {
                                 "term": {
-                                    "source_type": source_type.value,
+                                    "source_type": source_type,
                                 }
                             },
                             {

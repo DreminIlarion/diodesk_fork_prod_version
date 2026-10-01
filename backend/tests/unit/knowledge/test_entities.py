@@ -8,7 +8,7 @@ from src.knowledge.domain.events import (
     ArticleEdited,
     ArticlePublished,
 )
-from src.knowledge.domain.vo import ArticleStatus, SourceType
+from src.knowledge.domain.vo import ArticleSource, ArticleStatus
 from src.shared.domain.exceptions import InvalidStateError
 
 
@@ -17,8 +17,10 @@ def article() -> Article:
     return Article.create(
         title="Ошибка печати",
         content="Описание проблемы и решения",
-        source_type=SourceType.INSTRUCTION,
-        source_ref="/knowledge/instructions/printing",
+        source=ArticleSource(
+            kind="instruction",
+            ref="/knowledge/instructions/printing",
+        ),
         author_id=uuid4(),
     )
 

@@ -1,19 +1,12 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from uuid import UUID
 
-from .vo import (
-    ArticleVisibility,
-    ChunkKind,
-    ModelCapability,
-    SourceType,
-)
+from ..domain.vo import ArticleSource, ArticleVisibility, ChunkKind
 
 
 @dataclass(frozen=True, slots=True)
 class ArticleChunk:
-    """
-    Фрагмент опубликованной статьи, подготовленный для индексации в OpenSearch
-    """
+    """Фрагмент опубликованной статьи, подготовленный для индексации в OpenSearch."""
 
     # Стабильные идентификаторы фрагмента и статьи
     chunk_id: str
@@ -28,8 +21,7 @@ class ArticleChunk:
     kind: ChunkKind
 
     # Данные для фильтрации и формирования ссылки на источник
-    source_type: SourceType
-    source_ref: str
+    source: ArticleSource
     visibility: ArticleVisibility
     tags: tuple[str, ...] = ()
 
@@ -38,19 +30,15 @@ class ArticleChunk:
     project_id: UUID | None = None
     counterparty_id: UUID | None = None
 
-    # Вектор и модель, которой он был рассчитан
-    embedding_model: str = ""
-    embedding: tuple[float, ...] = ()
-
 
 @dataclass(frozen=True, slots=True)
 class SearchFilters:
-    """Фильтры гибридного поиска по базе знаний"""
+    """Фильтры гибридного поиска по базе знаний."""
 
     visibilities: tuple[ArticleVisibility, ...] = (
         ArticleVisibility.INTERNAL,
     )
-    source_types: tuple[SourceType, ...] = ()
+    source_kinds: tuple[str, ...] = ()
     tags: tuple[str, ...] = ()
 
     product_id: UUID | None = None
@@ -59,29 +47,8 @@ class SearchFilters:
 
 
 @dataclass(frozen=True, slots=True)
-class ModelSpec:
-    """
-    Описание возможностей модели без политики её выбора
-    """
-
-    id: str
-    provider: str
-    api_model: str
-    context_window: int
-    max_output_tokens: int | None = None
-
-    capabilities: frozenset[ModelCapability] = field(
-        default_factory=lambda: frozenset(
-            {ModelCapability.TEXT}
-        )
-    )
-
-
-@dataclass(frozen=True, slots=True)
 class SearchHit:
-    """
-    Фрагмент базы знаний, найденный гибридным поиском
-    """
+    """Фрагмент базы знаний, найденный гибридным поиском."""
 
     chunk_id: str
     article_id: UUID
@@ -89,8 +56,7 @@ class SearchHit:
     title: str
     content: str
 
-    source_type: SourceType
-    source_ref: str
+    source: ArticleSource
     kind: ChunkKind
 
     rank_score: float
@@ -99,24 +65,19 @@ class SearchHit:
 
 @dataclass(frozen=True, slots=True)
 class Citation:
-    """
-    Ссылка на материал, использованный при формировании ответа
-    """
+    """Ссылка на материал, использованный при формировании ответа."""
 
     article_id: UUID
     title: str
 
-    source_type: SourceType
-    source_ref: str
+    source: ArticleSource
 
     chunk_ids: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class ModelGeneration:
-    """
-    Результат обращения к генеративной модели
-    """
+    """Результат обращения к генеративной модели."""
 
     text: str
 

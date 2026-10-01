@@ -7,10 +7,10 @@ from src.knowledge.domain.entities import (
     ChatSession,
 )
 from src.knowledge.domain.vo import (
+    ArticleSource,
     ArticleStatus,
     ArticleVisibility,
     ChatRole,
-    SourceType,
 )
 from src.knowledge.infra.mappers import (
     ArticleDocumentMapper,
@@ -27,8 +27,10 @@ def build_article() -> Article:
         deleted_at=None,
         title="Ошибка проведения документа",
         content="Причина ошибки и последовательность исправления.",
-        source_type=SourceType.TICKET,
-        source_ref="/tickets/T-105",
+        source=ArticleSource(
+            kind="ticket",
+            ref="/tickets/T-105",
+        ),
         external_id="T-105",
         author_id=UUID("5538b196-f216-445c-a52a-08de70b65ae5"),
         published_by=UUID(
@@ -44,9 +46,6 @@ def build_article() -> Article:
         counterparty_id=UUID(
             "d2f3872c-d4d0-4d36-9a65-d760c46551e9"
         ),
-        attachment_ids=[
-            UUID("077b9e47-7448-450b-83b4-36ce5b76e405")
-        ],
         metadata={
             "imported": True,
             "priority": 10,
@@ -63,13 +62,10 @@ def test_article_mapper_builds_opensearch_document():
     assert document["author_id"] == str(article.author_id)
     assert document["published_by"] == str(article.published_by)
     assert document["source_type"] == "ticket"
+    assert document["source_ref"] == "/tickets/T-105"
     assert document["status"] == "published"
     assert document["visibility"] == "internal"
     assert document["created_at"] == article.created_at.isoformat()
-    assert document["attachment_ids"] == [
-        str(attachment_id)
-        for attachment_id in article.attachment_ids
-    ]
 
 
 def test_article_mapper_restores_domain_entity():
@@ -82,11 +78,10 @@ def test_article_mapper_restores_domain_entity():
     )
 
     assert restored.id == article.id
-    assert restored.source_type == SourceType.TICKET
+    assert restored.source == article.source
     assert restored.status == ArticleStatus.PUBLISHED
     assert restored.visibility == ArticleVisibility.INTERNAL
     assert restored.published_by == article.published_by
-    assert restored.attachment_ids == article.attachment_ids
     assert restored.metadata == article.metadata
     assert ArticleDocumentMapper.from_entity(restored) == document
     assert list(restored.collect_events()) == []
@@ -96,8 +91,10 @@ def test_article_mapper_preserves_empty_optional_fields():
     article = Article.create(
         title="Инструкция",
         content="Содержимое инструкции",
-        source_type=SourceType.INSTRUCTION,
-        source_ref="/knowledge/instructions/example",
+        source=ArticleSource(
+            kind="instruction",
+            ref="/knowledge/instructions/example",
+        ),
         author_id=uuid4(),
     )
     list(article.collect_events())

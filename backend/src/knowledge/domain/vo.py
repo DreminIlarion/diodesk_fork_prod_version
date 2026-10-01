@@ -1,4 +1,11 @@
+from dataclasses import dataclass, field
 from enum import StrEnum
+
+
+@dataclass(frozen=True, slots=True)
+class ArticleSource:
+    kind: str
+    ref: str
 
 
 class ArticleStatus(StrEnum):
@@ -16,14 +23,6 @@ class ArticleVisibility(StrEnum):
     PUBLIC = "public"
     INTERNAL = "internal"
     CUSTOMER_SPECIFIC = "customer_specific"
-
-
-class SourceType(StrEnum):
-    """Тип источника знаний"""
-
-    TICKET = "ticket"
-    INSTRUCTION = "instruction"
-    DOCUMENTATION = "documentation"
 
 
 class ChunkKind(StrEnum):
@@ -49,3 +48,18 @@ class ModelCapability(StrEnum):
     TEXT = "text"
     STRUCTURED_OUTPUT = "structured_output"
     VISION = "vision"
+
+
+@dataclass(frozen=True, slots=True)
+class ModelSpec:
+    """Описание возможностей модели без политики её выбора."""
+
+    id: str
+    provider: str
+    api_model: str
+    context_window: int
+    max_output_tokens: int | None = None
+
+    capabilities: frozenset[ModelCapability] = field(
+        default_factory=lambda: frozenset({ModelCapability.TEXT})
+    )

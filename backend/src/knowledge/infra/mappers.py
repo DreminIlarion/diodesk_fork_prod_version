@@ -6,10 +6,10 @@ from uuid import UUID
 
 from ..domain.entities import Article, ChatMessage, ChatSession
 from ..domain.vo import (
+    ArticleSource,
     ArticleStatus,
     ArticleVisibility,
     ChatRole,
-    SourceType,
 )
 
 
@@ -27,8 +27,8 @@ class ArticleDocumentMapper:
         return {
             "title": article.title,
             "content": article.content,
-            "source_type": article.source_type.value,
-            "source_ref": article.source_ref,
+            "source_type": article.source.kind,
+            "source_ref": article.source.ref,
             "external_id": article.external_id,
             "author_id": str(article.author_id),
             "published_by": _optional_uuid_to_string(
@@ -50,10 +50,6 @@ class ArticleDocumentMapper:
             "counterparty_id": _optional_uuid_to_string(
                 article.counterparty_id
             ),
-            "attachment_ids": [
-                str(attachment_id)
-                for attachment_id in article.attachment_ids
-            ],
             "metadata": dict(article.metadata),
             "created_at": article.created_at.isoformat(),
             "updated_at": article.updated_at.isoformat(),
@@ -73,8 +69,10 @@ class ArticleDocumentMapper:
             id=UUID(document_id),
             title=str(source["title"]),
             content=str(source["content"]),
-            source_type=SourceType(str(source["source_type"])),
-            source_ref=str(source["source_ref"]),
+            source=ArticleSource(
+                kind=str(source["source_type"]),
+                ref=str(source["source_ref"]),
+            ),
             external_id=_optional_string(
                 source.get("external_id")
             ),
@@ -100,12 +98,6 @@ class ArticleDocumentMapper:
             counterparty_id=_optional_uuid(
                 source.get("counterparty_id")
             ),
-            attachment_ids=[
-                UUID(str(attachment_id))
-                for attachment_id in (
-                    source.get("attachment_ids") or []
-                )
-            ],
             metadata=dict(source.get("metadata") or {}),
             created_at=_datetime(source["created_at"]),
             updated_at=_datetime(source["updated_at"]),

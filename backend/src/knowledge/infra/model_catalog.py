@@ -5,7 +5,7 @@ from time import monotonic
 from openai import AsyncOpenAI
 from openai.types import Model
 
-from ..domain.dtos import ModelSpec
+from ..domain.vo import ModelSpec
 
 
 class ProxyAPIModelCatalog:

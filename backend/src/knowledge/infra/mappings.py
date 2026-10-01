@@ -85,7 +85,6 @@ def build_articles_index_body(
                 "product_id": {"type": "keyword"},
                 "project_id": {"type": "keyword"},
                 "counterparty_id": {"type": "keyword"},
-                "attachment_ids": {"type": "keyword"},
                 "metadata": {
                     "type": "object",
                     "enabled": False,

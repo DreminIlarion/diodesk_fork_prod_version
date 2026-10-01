@@ -13,11 +13,12 @@ from .events import (
     ArticleEdited,
     ArticlePublished,
 )
+from .types import ArticleMetadata
 from .vo import (
+    ArticleSource,
     ArticleStatus,
     ArticleVisibility,
     ChatRole,
-    SourceType,
 )
 
 
@@ -32,8 +33,7 @@ class Article(AggregateRoot):
     content: str
 
     # Источник знания
-    source_type: SourceType
-    source_ref: str
+    source: ArticleSource
     external_id: str | None = None
 
     # Авторство и публикация
@@ -54,13 +54,8 @@ class Article(AggregateRoot):
     project_id: UUID | None = None
     counterparty_id: UUID | None = None
 
-    # Вложения хранятся в MinIO, здесь находятся только их ID
-    attachment_ids: list[UUID] = field(default_factory=list)
-
     # Дополнительные данные источника
-    metadata: dict[str, str | int | bool | None] = field(
-        default_factory=dict
-    )
+    metadata: ArticleMetadata = field(default_factory=dict)
 
     @classmethod
     def create(
@@ -68,8 +63,7 @@ class Article(AggregateRoot):
         *,
         title: str,
         content: str,
-        source_type: SourceType,
-        source_ref: str,
+        source: ArticleSource,
         author_id: UUID,
         visibility: ArticleVisibility = ArticleVisibility.INTERNAL,
         external_id: str | None = None,
@@ -77,16 +71,14 @@ class Article(AggregateRoot):
         product_id: UUID | None = None,
         project_id: UUID | None = None,
         counterparty_id: UUID | None = None,
-        attachment_ids: list[UUID] | None = None,
-        metadata: dict[str, str | int | bool | None] | None = None,
+        metadata: ArticleMetadata | None = None,
     ) -> Self:
         """Создание статьи базы знаний."""
 
         article = cls(
             title=title,
             content=content,
-            source_type=source_type,
-            source_ref=source_ref,
+            source=source,
             author_id=author_id,
             visibility=visibility,
             external_id=external_id,
@@ -94,7 +86,6 @@ class Article(AggregateRoot):
             product_id=product_id,
             project_id=project_id,
             counterparty_id=counterparty_id,
-            attachment_ids=attachment_ids or [],
             metadata=metadata or {},
         )
         article.register_event(
