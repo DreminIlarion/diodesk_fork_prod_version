@@ -67,3 +67,15 @@ class CounterpartyProductOrm(Base):
     product_id: Mapped[UUID] = mapped_column(ForeignKey("software_products.id"), unique=False)
 
     counterparty: Mapped["CounterpartyOrm"] = relationship(back_populates="products")
+
+    __table_args__ = (
+        Index(
+            "ix_counterparty_products_product_id",
+            "product_id",
+        ),
+        Index(
+            "ix_counterparty_products_counterparty_id_product_id",
+            "counterparty_id",
+            "product_id",
+        ),
+    )
