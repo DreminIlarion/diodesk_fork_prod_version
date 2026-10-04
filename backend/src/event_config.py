@@ -1,7 +1,7 @@
 from typing import TypeVar
 
 from .shared.domain.events import Event
-from .tickets.domain.events import TicketCreated, TicketStatusChanged
+from .tickets.domain.events import TicketAssigned, TicketCreated, TicketStatusChanged
 from .timetracking.domain.events import WorklogApproved
 from src.iam.domain.events import UserInvited
 
@@ -11,6 +11,7 @@ EventT = TypeVar("EventT", bound=Event)
 EVENT_TOPIC_MAP: dict[type[EventT], str] = {
     TicketCreated: "tickets.create",
     TicketStatusChanged: "tickets.status_changed",
+    TicketAssigned: "tickets.assigned",
     WorklogApproved: "worklogs.approve",
     UserInvited: "user.invite",
 }

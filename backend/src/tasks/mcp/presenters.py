@@ -8,7 +8,7 @@ from src.comments.schemas import CommentResponse
 from src.iam.domain.repos import UserRepository
 from src.iam.mcp.presenters import UserBriefs, load_user_briefs
 from src.iam.mcp.schemas import UserBrief
-from src.mcp.schemas import CommentBrief, ProjectLink, TicketLink, ticket_url
+from src.mcp.schemas import CommentBrief, ProjectLink, TicketLink, task_url, ticket_url
 from src.shared.schemas import Page
 from src.shared.utils.time import current_datetime
 
@@ -47,6 +47,7 @@ def _brief_fields(task: TaskView | TaskResponse, users: UserBriefs) -> dict[str,
     return {
         "id": task.id,
         "number": str(task.number),
+        "url": task_url(task.id),
         "title": task.title,
         "status": task.status,
         "priority": task.priority,

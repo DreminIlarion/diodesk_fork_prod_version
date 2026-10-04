@@ -1,18 +1,23 @@
 """
-Тестовые пользователи и демо-данные для разработки.
+Тестовые пользователи и демо-данные для разработки и демонстраций.
 
-Демо-данные дают историю выполненных задач и текущую загрузку, на которых
-можно проверить подбор исполнителей и задач через MCP.
+Демо-данные дают историю выполненных задач и текущую загрузку команды (на них
+работает подбор исполнителей через MCP), клиентов и заявки в разных статусах:
+часть заявок уже разобрана на пулы задач, часть ждёт планирования.
 """
 
 import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import session_factory
+from src.crm.domain.entities import Counterparty
+from src.crm.domain.vo import CounterpartyType, Inn, Kpp, Phone
+from src.crm.infra.repos import SqlCounterpartyRepository
 from src.iam.domain.entities import User
 from src.iam.domain.vo import Email, FullName, PasswordHash, UserRole
 from src.iam.infra.repos import SqlUserRepository
@@ -25,7 +30,7 @@ from src.tasks.domain.entities import Task
 from src.tasks.domain.vo import TaskNumber, TaskStatus
 from src.tasks.infra.repos import SqlTaskRepository
 from src.tickets.domain.entities import Ticket
-from src.tickets.domain.vo import TicketNumber, TicketType
+from src.tickets.domain.vo import TicketNumber, TicketStatus, TicketType
 from src.tickets.infra.repos import SqlTicketRepository
 
 logger = logging.getLogger(__name__)
@@ -43,8 +48,12 @@ class TestUser:
 
 TEST_USERS = (
     TestUser(
-        "manager", "test.testov@test.com", "Тестов Тест Тестович",
+        "manager", "andrey.medvedev@test.com", "Медведев Андрей Валерьевич",
         frozenset({UserRole.SUPPORT_MANAGER, UserRole.SUPPORT_AGENT}),
+    ),
+    TestUser(
+        "lead", "andrey.kosov@test.com", "Косов Андрей Сергеевич",
+        frozenset({UserRole.SUPPORT_MANAGER, UserRole.DEVELOPER}),
     ),
     TestUser("backend", "ivan.petrov@test.com", "Петров Иван Сергеевич",
              frozenset({UserRole.DEVELOPER})),
@@ -53,6 +62,8 @@ TEST_USERS = (
     TestUser("integrations", "oleg.kuznetsov@test.com", "Кузнецов Олег Петрович",
              frozenset({UserRole.DEVELOPER})),
     TestUser("support", "maria.volkova@test.com", "Волкова Мария Андреевна",
+             frozenset({UserRole.SUPPORT_AGENT})),
+    TestUser("support_senior", "elena.novikova@test.com", "Новикова Елена Игоревна",
              frozenset({UserRole.SUPPORT_AGENT})),
 )
 
@@ -127,8 +138,51 @@ DEMO_TASKS = (
              BACKLOG, priority=Priority.LOW, story_points=2),
 )
 
-DEMO_TICKET_TITLE = "Автоматическое создание заявок из обращений на портале"
-DEMO_TICKET_DESCRIPTION = """\
+@dataclass(frozen=True)
+class DemoCounterparty:
+    key: str
+    name: str
+    legal_name: str
+    inn: str
+    kpp: str
+    phone: str
+    email: str
+
+
+DEMO_COUNTERPARTIES = (
+    DemoCounterparty(
+        "north_wind", "Северный ветер", "ООО «Северный ветер»", "6658012345", "665801001",
+        "+73432001020", "it@north-wind.example",
+    ),
+    DemoCounterparty(
+        "ural_logistic", "Урал Логистик", "АО «Урал Логистик»", "6671098765", "667101001",
+        "+73432003040", "support@ural-logistic.example",
+    ),
+)
+
+NEW, OPEN, TICKET_IN_PROGRESS, RESOLVED = (
+    TicketStatus.NEW, TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED,
+)
+
+
+@dataclass(frozen=True)
+class DemoTicket:
+    title: str
+    description: str
+    ticket_type: TicketType
+    priority: Priority
+    status: TicketStatus
+    tags: tuple[str, ...]
+    counterparty: str | None = None
+    assignee: str | None = None
+    # Пул задач по заявке; без задач заявку можно спланировать через MCP
+    tasks: tuple[DemoTask, ...] = ()
+
+
+DEMO_TICKETS = (
+    DemoTicket(
+        "Автоматическое создание заявок из обращений на портале",
+        """\
 Клиенту нужно, чтобы обращения с корпоративного портала автоматически превращались в заявки.
 
 Требования:
@@ -137,7 +191,72 @@ DEMO_TICKET_DESCRIPTION = """\
 - уведомление автора обращения о номере созданной заявки;
 - выгрузка созданных заявок в 1С УФФ для учёта трудозатрат;
 - страница настроек интеграции в веб-интерфейсе (URL, секрет, включение/отключение).
-"""
+""",
+        TicketType.CHANGE, Priority.HIGH, NEW, ("интеграция", "портал"),
+        counterparty="north_wind",
+    ),
+    DemoTicket(
+        "Не выгружаются акты выполненных работ в 1С УФФ",
+        """\
+С понедельника акты за сентябрь не попадают в 1С УФФ, бухгалтерия не может закрыть месяц.
+В журнале обмена ошибка 500 на этапе отправки пакета. Нужно восстановить выгрузку
+и догрузить пропущенные акты.
+""",
+        TicketType.INCIDENT, Priority.CRITICAL, TICKET_IN_PROGRESS, ("1с", "интеграция"),
+        counterparty="ural_logistic", assignee="integrations",
+        tasks=(
+            DemoTask("Разобрать ошибки обмена в журнале 1С УФФ", ("1с", "интеграция"), DONE,
+                     "integrations", estimated_hours=Decimal(2), actual_hours=Decimal(2),
+                     story_points=2),
+            DemoTask("Исправить формирование пакета актов", ("1с", "интеграция", "python"),
+                     IN_PROGRESS, "integrations", estimated_hours=Decimal(6), due_in_days=1,
+                     story_points=5, priority=Priority.CRITICAL),
+            DemoTask("Догрузить пропущенные акты за сентябрь", ("1с", "обмен данными"), TODO,
+                     estimated_hours=Decimal(3), due_in_days=2, story_points=3,
+                     priority=Priority.HIGH),
+        ),
+    ),
+    DemoTicket(
+        "Медленно открывается канбан-доска заявок",
+        """\
+У операторов поддержки доска заявок открывается 10-15 секунд, с фильтром по контрагенту -
+ещё дольше. Проблема появилась после роста числа заявок до нескольких тысяч.
+""",
+        TicketType.PROBLEM, Priority.HIGH, OPEN, ("производительность", "postgresql", "ui"),
+        assignee="lead",
+    ),
+    DemoTicket(
+        "Отчёт по трудозатратам сотрудников в Excel",
+        """\
+Руководителю нужен ежемесячный отчёт по трудозатратам: сотрудник, задача, заявка, часы
+по оценке и фактические. Выгрузка в Excel из веб-интерфейса, фильтры по периоду и проекту.
+""",
+        TicketType.IMPROVEMENT, Priority.MEDIUM, OPEN, ("отчёты", "трудозатраты"),
+        counterparty="north_wind",
+    ),
+    DemoTicket(
+        "Не приходит письмо с приглашением в систему",
+        """\
+Новые сотрудники клиента не получают письмо со ссылкой-приглашением. В спаме письма нет,
+повторная отправка не помогает. Затронуто три приглашения за последнюю неделю.
+""",
+        TicketType.INCIDENT, Priority.HIGH, TICKET_IN_PROGRESS, ("уведомления", "доступ"),
+        counterparty="ural_logistic", assignee="support",
+        tasks=(
+            DemoTask("Проверить доставку писем в почтовом сервисе", ("уведомления", "почта"),
+                     IN_PROGRESS, "support", estimated_hours=Decimal(1), story_points=1),
+        ),
+    ),
+    DemoTicket(
+        "Как настроить роли для сотрудников филиала",
+        """\
+Клиент открыл филиал и просит помочь настроить роли: руководитель филиала должен видеть
+все заявки филиала, сотрудники - только свои.
+""",
+        TicketType.QUESTION, Priority.LOW, RESOLVED, ("консультация", "настройка"),
+        counterparty="north_wind", assignee="support_senior",
+    ),
+)
 
 
 async def _ensure_user(user_repo: SqlUserRepository, test_user: TestUser) -> User:
@@ -161,6 +280,28 @@ async def _ensure_users(session: AsyncSession) -> dict[str, User]:
     return {test_user.key: await _ensure_user(user_repo, test_user) for test_user in TEST_USERS}
 
 
+async def _ensure_counterparties(session: AsyncSession) -> dict[str, Counterparty]:
+    repo = SqlCounterpartyRepository(session)
+    counterparties: dict[str, Counterparty] = {}
+
+    for demo in DEMO_COUNTERPARTIES:
+        inn = Inn(demo.inn)
+        if (counterparty := await repo.get_by_inn(inn)) is None:
+            counterparty = Counterparty(
+                counterparty_type=CounterpartyType.LEGAL_ENTITY,
+                name=demo.name,
+                legal_name=demo.legal_name,
+                inn=inn,
+                kpp=Kpp(demo.kpp),
+                phone=Phone(demo.phone),
+                email=demo.email,
+            )
+            await repo.create(counterparty)
+        counterparties[demo.key] = counterparty
+
+    return counterparties
+
+
 async def create_test_users() -> None:
     """Создание тестовых сотрудников (пароль у всех - `test`)."""
 
@@ -169,7 +310,13 @@ async def create_test_users() -> None:
         await session.commit()
 
 
-def _build_task(demo: DemoTask, number: TaskNumber, users: dict[str, User], author: User) -> Task:
+def _build_task(
+        demo: DemoTask,
+        number: TaskNumber,
+        users: dict[str, User],
+        author: User,
+        ticket_id: UUID | None = None,
+) -> Task:
     today = current_datetime().date()
     task = Task.create(
         number=number,
@@ -177,6 +324,7 @@ def _build_task(demo: DemoTask, number: TaskNumber, users: dict[str, User], auth
         description=demo.description,
         created_by=author.id,
         priority=demo.priority,
+        ticket_id=ticket_id,
         estimated_hours=demo.estimated_hours,
         story_points=demo.story_points,
         due_date=None if demo.due_in_days is None else today + timedelta(days=demo.due_in_days),
@@ -201,10 +349,71 @@ def _build_task(demo: DemoTask, number: TaskNumber, users: dict[str, User], auth
     return task
 
 
+def _advance_ticket(ticket: Ticket, demo: DemoTicket, users: dict[str, User], author: User) -> None:
+    """Проводит заявку до нужного статуса теми же переходами workflow, что и в работе."""
+
+    if demo.status is NEW:
+        return
+
+    ticket.submit_for_approval(author.id)
+    ticket.approve(author.id)
+
+    assignee = author if demo.assignee is None else users[demo.assignee]
+    if demo.assignee is not None:
+        ticket.assign(assignee.id, assigned_by=author.id)
+
+    if demo.status in {TICKET_IN_PROGRESS, RESOLVED}:
+        ticket.start_progress(assignee.id)
+    if demo.status is RESOLVED:
+        ticket.resolve(assignee.id)
+
+
+async def _create_ticket(
+        session: AsyncSession,
+        demo: DemoTicket,
+        users: dict[str, User],
+        author: User,
+        counterparties: dict[str, Counterparty],
+) -> Ticket:
+    """Заявка с пулом задач; номера - как при создании через сервис."""
+
+    ticket_repo = SqlTicketRepository(session)
+    counterparty = None if demo.counterparty is None else counterparties[demo.counterparty]
+    counterparty_id = None if counterparty is None else counterparty.id
+
+    ticket = Ticket.create(
+        number=TicketNumber.create(
+            await ticket_repo.get_total(counterparty_id=counterparty_id),
+            counterparty_name=None if counterparty is None else counterparty.name,
+        ),
+        reporter_id=author.id,
+        created_by=author.id,
+        created_by_role=UserRole.SUPPORT_MANAGER,
+        title=demo.title,
+        description=demo.description,
+        ticket_type=demo.ticket_type,
+        priority=demo.priority,
+        counterparty_id=counterparty_id,
+        tags=[Tag(name=tag) for tag in demo.tags],
+    )
+    _advance_ticket(ticket, demo, users, author)
+    await ticket_repo.create(ticket)
+    # Сессия без autoflush: номер следующей заявки считается по уже записанным
+    await session.flush()
+
+    task_repo = SqlTaskRepository(session)
+    for demo_task in demo.tasks:
+        sequence = await task_repo.get_next_sequence(ticket_id=ticket.id)
+        number = TaskNumber.create(sequence, ticket_number=ticket.number)
+        await task_repo.create(_build_task(demo_task, number, users, author, ticket_id=ticket.id))
+
+    return ticket
+
+
 async def seed_demo_data() -> None:
     """
-    Демо-данные: история выполненных задач, текущая загрузка, свободные задачи
-    и заявка для декомпозиции. Повторный запуск ничего не дублирует.
+    Демо-данные: история выполненных задач, текущая загрузка, свободные задачи,
+    клиенты и заявки с пулами задач. Повторный запуск ничего не дублирует.
     """
 
     async with session_factory() as session:
@@ -223,19 +432,16 @@ async def seed_demo_data() -> None:
             sequence = await task_repo.get_next_sequence()
             await task_repo.create(_build_task(demo, TaskNumber.create(sequence), users, author))
 
-        ticket_repo = SqlTicketRepository(session)
-        ticket = Ticket.create(
-            number=TicketNumber.create(await ticket_repo.get_total()),
-            reporter_id=author.id,
-            created_by=author.id,
-            created_by_role=UserRole.SUPPORT_MANAGER,
-            title=DEMO_TICKET_TITLE,
-            description=DEMO_TICKET_DESCRIPTION,
-            ticket_type=TicketType.CHANGE,
-            priority=Priority.HIGH,
-            tags=[Tag(name="интеграция"), Tag(name="портал")],
-        )
-        await ticket_repo.create(ticket)
+        counterparties = await _ensure_counterparties(session)
+        tickets = [
+            await _create_ticket(session, demo, users, author, counterparties)
+            for demo in DEMO_TICKETS
+        ]
 
         await session.commit()
-        logger.info("Demo data created: %s tasks, ticket %s", len(DEMO_TASKS), ticket.number)
+        logger.info(
+            "Demo data created: %s tasks, tickets: %s",
+            len(DEMO_TASKS) + sum(len(demo.tasks) for demo in DEMO_TICKETS),
+            ", ".join(str(ticket.number) for ticket in tickets),
+        )
+

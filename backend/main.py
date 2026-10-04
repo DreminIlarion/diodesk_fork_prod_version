@@ -74,7 +74,6 @@ Instrumentator(
 ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 # Rabbit обработчики (все subscriber'ы)
-broker_router.include_router(notification_router)
 broker_router.include_router(notifications_broker_router)
 broker_router.include_router(task_broker_router)
 broker_router.include_router(invitations_broker_router)          # Добавить
@@ -93,6 +92,7 @@ router.include_router(product_router)
 router.include_router(project_router)
 router.include_router(task_router)
 router.include_router(feedback_router)
+router.include_router(notification_router)
 
 app.include_router(router)
 app.include_router(broker_router)

@@ -14,6 +14,12 @@ def ticket_url(number: str) -> str:
     return f"{settings.frontend_url.rstrip('/')}/tickets/{number}"
 
 
+def task_url(task_id: UUID) -> str:
+    """Ссылка на задачу в веб-интерфейсе: доска задач откроет её карточку."""
+
+    return f"{settings.frontend_url.rstrip('/')}/tasks?task_id={task_id}"
+
+
 class TicketLink(BaseModel):
     """Ссылка на заявку."""
 

@@ -12,7 +12,7 @@ Command = Callable[[], Coroutine[Any, Any, None]]
 COMMANDS: dict[str, tuple[Command, str]] = {
     "create-first-admin": (create_first_admin, "Создать первого администратора"),
     "create-test-users": (create_test_users, "Создать тестовых сотрудников (dev)"),
-    "seed-demo-data": (seed_demo_data, "Заполнить демо-задачами и заявкой (dev)"),
+    "seed-demo-data": (seed_demo_data, "Заполнить демо-данными: задачи, клиенты, заявки (dev)"),
     "init-s3-buckets": (init_s3_buckets, "Инициализация S3 хранилища"),
 }
 

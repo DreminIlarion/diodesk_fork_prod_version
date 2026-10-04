@@ -21,6 +21,7 @@ class TaskBrief(BaseModel):
 
     id: UUID = Field(description="ID задачи")
     number: str = Field(description="Номер задачи")
+    url: str = Field(description="Ссылка на задачу в веб-интерфейсе")
     title: str = Field(description="Тема")
     status: TaskStatus = Field(description="Статус")
     priority: Priority = Field(description="Приоритет")
