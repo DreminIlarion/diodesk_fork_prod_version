@@ -49,7 +49,7 @@ async def get_or_raise_404[EntityT: Entity](
 ) -> EntityT:
     obj = await loader(uid)
     if obj is None:
-        raise NotFoundError(f"{aggregate_type.__class__.__name__} with ID {uid} not found")
+        raise NotFoundError(f"{aggregate_type.__name__} with ID {uid} not found")
 
     return obj
 
