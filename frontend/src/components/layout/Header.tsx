@@ -142,41 +142,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 "
               />
 
-              {/* AI badge */}
-              <span
-                className="
-                  absolute
-                  -right-1
-                  -bottom-1
-
-                  min-w-[17px]
-                  h-[17px]
-
-                  px-1
-
-                  flex
-                  items-center
-                  justify-center
-
-                  rounded-md
-
-                  bg-[var(--accent)]
-                  text-white
-
-                  text-[9px]
-                  font-bold
-                  leading-none
-
-                  border-2
-                  border-[var(--bg-card)]
-
-                  group-hover:border-[var(--hover-1)]
-
-                  transition-colors
-                "
-              >
-                AI
-              </span>
+              
             </div>
 
             {/* Text */}
