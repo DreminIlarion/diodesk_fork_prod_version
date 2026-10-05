@@ -154,7 +154,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   text-[var(--text-primary)]
                 "
               >
-                DIOS AI
+                DIOS <span className="text-[var(--accent)]">AI </span> 
               </span>
 
               <span
