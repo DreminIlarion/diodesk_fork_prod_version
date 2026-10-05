@@ -12,7 +12,7 @@ import {
   Building,
   FolderOpen,
   Package,
-  ChevronLeft,Star,Workflow
+  ChevronLeft, Star, ArrowUpRight
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useNotifications } from '../../contexts/NotificationsContext';
@@ -20,6 +20,57 @@ import { useNotifications } from '../../contexts/NotificationsContext';
 interface SidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
+}
+
+// Замени href на реальный урл DIOS AI
+const DIOS_AI_URL = "https://ai.dios.ru"; 
+
+function DiosAiMark({ small = false }: { small?: boolean }) {
+  return (
+    <div className={`${small ? 'w-8 h-8 rounded-lg' : 'w-9 h-9 rounded-xl'} relative flex items-center justify-center shrink-0 bg-gradient-to-br from-violet-500 via-blue-500 to-cyan-400 shadow-md overflow-hidden`}>
+      <svg width={small ? 16 : 18} height={small ? 16 : 18} viewBox="0 0 24 24" fill="none">
+        <path d="M12 2.5L14.6 9.4L21.5 12L14.6 14.6L12 21.5L9.4 14.6L2.5 12L9.4 9.4L12 2.5Z" fill="white" fillOpacity="0.95"/>
+        <circle cx="12" cy="12" r="2.5" fill="white" fillOpacity="0.3"/>
+      </svg>
+    </div>
+  )
+}
+
+function DiosAiWidget({ collapsed }: { collapsed: boolean }) {
+  if (collapsed) {
+    return (
+      <a
+        href={DIOS_AI_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group relative flex items-center justify-center w-12 h-12 mx-auto rounded-xl bg-[var(--hover-1)] border border-[var(--border-color)] hover:border-violet-500/30 hover:bg-[var(--hover-2)] transition-all"
+      >
+        <DiosAiMark small />
+        <span className="pointer-events-none absolute left-full ml-3 px-2.5 py-1.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-medium text-[var(--text-primary)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-50">
+          DIOS AI — ИИ-ассистент
+        </span>
+      </a>
+    )
+  }
+
+  return (
+    <a
+      href={DIOS_AI_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex items-center gap-3 p-3 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)] hover:border-violet-500/20 transition-all"
+    >
+      <DiosAiMark />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-bold leading-none text-[var(--text-primary)]">DIOS AI</span>
+          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold leading-none bg-violet-500 text-white">AI</span>
+        </div>
+        <p className="text-xs leading-none text-[var(--text-primary)]/50 mt-1">ИИ-ассистент</p>
+      </div>
+      <ArrowUpRight className="w-4 h-4 shrink-0 text-[var(--text-primary)]/20 group-hover:text-[var(--text-primary)]/60 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+    </a>
+  )
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -36,8 +87,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
 
-const isCustomer = user?.roles?.some(r => r === 'customer' || r === 'customer_admin') ?? false;
-const canInvite = user?.roles?.some(r => ['support_agent', 'support_manager', 'executor', 'admin'].includes(r)) ?? false;;
+  const isCustomer = user?.roles?.some(r => r === 'customer' || r === 'customer_admin') ?? false;
+  const canInvite = user?.roles?.some(r => ['support_agent', 'support_manager', 'executor', 'admin'].includes(r)) ?? false;;
 
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('sidebarCollapsed') === 'true';
@@ -51,12 +102,7 @@ const canInvite = user?.roles?.some(r => ['support_agent', 'support_manager', 'e
     { to: '/dashboard', icon: LayoutDashboard, label: 'Главная' },
     { to: '/tickets', icon: Ticket, label: 'Заявки' },
     { to: '/feedbacks', icon: Star, label: 'Отзывы' },
-    // { to: '/workflows', icon: Workflow, label: 'Рабочие процессы' },
-
-    ...(isCustomer
-      ? [{ to: '/my-company', icon: Building, label: 'Моя компания' }]
-      : [{ to: '/counterparties', icon: Building2, label: 'Контрагенты' }]
-    ),
+    ...(isCustomer ? [{ to: '/my-company', icon: Building, label: 'Моя компания' }] : [{ to: '/counterparties', icon: Building2, label: 'Контрагенты' }]),
     { to: '/projects', icon: FolderOpen, label: 'Проекты' },
     ...(canInvite ? [{ to: '/products', icon: Package, label: 'Продукты' }] : []),
     ...(canInvite ? [{ to: '/tasks', icon: CheckSquare, label: 'Задачи сотрудников' }] : []),
@@ -68,92 +114,44 @@ const canInvite = user?.roles?.some(r => ['support_agent', 'support_manager', 'e
     { to: '/profile', icon: User, label: 'Профиль' },
   ];
 
-  // ─── Nav item ───
-  const NavItem = ({
-    to,
-    icon: Icon,
-    label,
-    badge,
-  }: {
-    to: string;
-    icon: any;
-    label: string;
-    badge?: number;
-  }) => (
+  const NavItem = ({ to, icon: Icon, label, badge }: { to: string; icon: any; label: string; badge?: number; }) => (
     <NavLink
       to={to}
       onClick={onClose}
       title={isCollapsed ? label : undefined}
       className={({ isActive }) =>
-        `group relative flex items-center rounded-xl font-medium
-         transition-all duration-200 
-         ${isCollapsed 
-           ? 'justify-center w-12 h-12 mx-auto' // Фиксированный квадрат 48px
-           : 'px-4 h-12 w-full' // Фиксированная высота 48px
-         }
-         ${isActive
-          ? 'bg-[var(--hover-1)] text-[var(--text-primary)]'
-          : 'text-[var(--text-secondary)] hover:bg-[var(--hover-1)] hover:text-[var(--text-primary)]'
-        }`
+        `group relative flex items-center rounded-xl font-medium transition-all duration-200 
+         ${isCollapsed ? 'justify-center w-12 h-12 mx-auto' : 'px-4 h-12 w-full'}
+         ${isActive ? 'bg-[var(--hover-1)] text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--hover-1)] hover:text-[var(--text-primary)]'}`
       }
     >
       {({ isActive }) => (
         <>
-          {/* Активный индикатор (полоска слева) */}
           {isActive && !isCollapsed && (
-            <span
-              className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full
-                         bg-gradient-to-b from-[var(--accent-light)] to-[var(--accent)]"
-              style={{ boxShadow: '0 0 8px var(--accent-glow)' }}
-            />
+            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-gradient-to-b from-[var(--accent-light)] to-[var(--accent)]" style={{ boxShadow: '0 0 8px var(--accent-glow)' }}/>
           )}
-
-          {/* Контейнер иконки */}
           <div className="relative flex-shrink-0 flex items-center justify-center w-6 h-6">
-            <Icon
-              className={`w-6 h-6 transition-transform duration-200 
-                         ${isActive ? 'text-[var(--accent-light)]' : ''}
-                         ${!isCollapsed ? 'group-hover:scale-110' : ''}`}
-            />
-            
-            {/* Бейдж в свернутом режиме */}
+            <Icon className={`w-6 h-6 transition-transform duration-200 ${isActive ? 'text-[var(--accent-light)]' : ''} ${!isCollapsed ? 'group-hover:scale-110' : ''}`} />
             {badge != null && badge > 0 && isCollapsed && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1
-                               flex items-center justify-center rounded-full
-                               bg-[var(--accent)] text-white text-[10px] font-bold
-                               ring-2 ring-[var(--bg-primary)] animate-pulse">
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-[var(--accent)] text-white text-[10px] font-bold ring-2 ring-[var(--bg-primary)] animate-pulse">
                 {badge > 99 ? '99+' : badge}
               </span>
             )}
           </div>
-
-          {/* Текст и бейдж в развернутом режиме */}
           {!isCollapsed && (
             <>
               <span className="truncate ml-3 flex-1">{label}</span>
               {badge != null && badge > 0 && (
-                <span className="ml-auto px-2 py-0.5 min-w-[22px] text-center
-                                 rounded-full bg-[var(--accent)] text-white
-                                 text-xs font-bold animate-pulse">
+                <span className="ml-auto px-2 py-0.5 min-w-[22px] text-center rounded-full bg-[var(--accent)] text-white text-xs font-bold animate-pulse">
                   {badge > 99 ? '99+' : badge}
                 </span>
               )}
             </>
           )}
-
-          {/* Тултип в свернутом режиме */}
           {isCollapsed && (
-            <span className="pointer-events-none absolute left-full ml-3 px-2.5 py-1.5 rounded-lg
-                             bg-[var(--bg-card)] border border-[var(--border-color)]
-                             text-xs font-medium text-[var(--text-primary)] whitespace-nowrap
-                             opacity-0 group-hover:opacity-100 transition-opacity duration-150
-                             shadow-lg z-50 flex items-center gap-2">
+            <span className="pointer-events-none absolute left-full ml-3 px-2.5 py-1.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-medium text-[var(--text-primary)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-lg z-50 flex items-center gap-2">
               {label}
-              {badge != null && badge > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full bg-[var(--accent)] text-white text-[10px] font-bold">
-                  {badge}
-                </span>
-              )}
+              {badge != null && badge > 0 && <span className="px-1.5 py-0.5 rounded-full bg-[var(--accent)] text-white text-[10px] font-bold">{badge}</span>}
             </span>
           )}
         </>
@@ -161,106 +159,52 @@ const canInvite = user?.roles?.some(r => ['support_agent', 'support_manager', 'e
     </NavLink>
   );
 
-  // ─── Section label ───
   const SectionLabel = ({ children }: { children: React.ReactNode }) => (
-    !isCollapsed ? (
-      <p className="px-4 mb-2 mt-4 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">
-        {children}
-      </p>
-    ) : (
-      <div className="mx-auto w-8 h-px bg-[var(--border-color)] my-4" />
-    )
+    !isCollapsed ? <p className="px-4 mb-2 mt-4 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">{children}</p> : <div className="mx-auto w-8 h-px bg-[var(--border-color)] my-4" />
   );
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
     <div className="sidebar-bg flex flex-col h-full relative">
-      {/* Header */}
-      <div className={`flex items-center border-b border-[var(--border-color)] transition-all duration-300
-                      ${isCollapsed && !isMobile ? 'p-5 justify-center ' : 'p-5 justify-between '}`}>
-        <NavLink
-          to="/dashboard"
-          onClick={onClose}
-          className={`flex items-center gap-3 min-w-0 group
-                     ${isCollapsed && !isMobile ? '' : 'flex-1'}`}
-        >
+      <div className={`flex items-center border-b border-[var(--border-color)] transition-all duration-300 ${isCollapsed && !isMobile ? 'p-5 justify-center ' : 'p-5 justify-between '}`}>
+        <NavLink to="/dashboard" onClick={onClose} className={`flex items-center gap-3 min-w-0 group ${isCollapsed && !isMobile ? '' : 'flex-1'}`}>
           <div className="relative flex-shrink-0 flex items-center justify-center">
             <div className="absolute inset-0 bg-[var(--accent)]/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-            <img
-              src="http://80.93.62.177:8000/media/images/Logo_bez_fona_bez_teksta.width-80.height-80.png"
-              alt="ДИО-Консалт"
-              className="relative w-10 h-10 object-contain"
-            />
+            <img src="http://80.93.62.177:8000/media/images/Logo_bez_fona_bez_teksta.width-80.height-80.png" alt="ДИО-Консалт" className="relative w-10 h-10 object-contain" />
           </div>
-          {(!isCollapsed || isMobile) && (
-            <div className="min-w-0 overflow-hidden">
-              <h1 className="text-[var(--text-primary)] text-xl font-bold truncate">ДИО Сервис </h1>
-            </div>
-          )}
+          {(!isCollapsed || isMobile) && <div className="min-w-0 overflow-hidden"><h1 className="text-[var(--text-primary)] text-xl font-bold truncate">ДИО Сервис </h1></div>}
         </NavLink>
-
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="lg:hidden p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-1)] transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
+        {onClose && <button onClick={onClose} className="lg:hidden p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-1)] transition-colors"><X className="w-5 h-5" /></button>}
       </div>
 
-      {/* Navigation */}
-      <nav className={`flex-1 overflow-y-auto overflow-x-hidden py-4
-                      ${isCollapsed && !isMobile ? 'px-2' : 'px-3'}`}>
+      <nav className={`flex-1 overflow-y-auto overflow-x-hidden py-4 ${isCollapsed && !isMobile ? 'px-2' : 'px-3'}`}>
         <SectionLabel>Меню</SectionLabel>
         <div className="space-y-1 mb-6">
-          {mainNavItems.map(item => (
-            <NavItem key={item.to} {...item} />
-          ))}
+          {mainNavItems.map(item => <NavItem key={item.to} {...item} />)}
         </div>
-
         <SectionLabel>Аккаунт</SectionLabel>
         <div className="space-y-1">
-          {accountItems.map(item => (
-            <NavItem key={item.to} {...item} />
-          ))}
+          {accountItems.map(item => <NavItem key={item.to} {...item} />)}
         </div>
       </nav>
+
+      {/* DIOS AI WIDGET */}
+      <div className={`shrink-0 border-t border-[var(--border-color)] ${isCollapsed && !isMobile ? 'p-2' : 'p-3'}`}>
+        <DiosAiWidget collapsed={isCollapsed && !isMobile} />
+      </div>
     </div>
   );
 
   return (
     <>
-      {/* Desktop */}
-      <aside
-        className={`hidden lg:flex z-40 flex-col h-screen sticky top-0 border-r border-[var(--border-color)]
-                   transition-all duration-300 sidebar-bg relative
-                   ${isCollapsed ? 'w-20' : 'w-66'}`}
-      >
+      <aside className={`hidden lg:flex z-40 flex-col h-screen sticky top-0 border-r border-[var(--border-color)] transition-all duration-300 sidebar-bg relative ${isCollapsed ? 'w-20' : 'w-66'}`}>
         <SidebarContent />
-
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          aria-label={isCollapsed ? 'Развернуть' : 'Свернуть'}
-          className="absolute top-7 -right-3 w-6 h-6 rounded-full
-                     bg-[var(--bg-card)] border border-[var(--border-color)]
-                     flex items-center justify-center
-                     text-[var(--text-muted)] hover:text-[var(--accent-light)]
-                     hover:border-[var(--accent)]/40 hover:scale-110
-                     shadow-md transition-all duration-200 z-50"
-        >
-          <ChevronLeft
-            className={`w-3.5 h-3.5 transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`}
-          />
+        <button onClick={() => setIsCollapsed(!isCollapsed)} aria-label={isCollapsed ? 'Развернуть' : 'Свернуть'} className="absolute top-7 -right-3 w-6 h-6 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent-light)] hover:border-[var(--accent)]/40 hover:scale-110 shadow-md transition-all duration-200 z-50">
+          <ChevronLeft className={`w-3.5 h-3.5 transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} />
         </button>
       </aside>
-
-      {/* Mobile */}
       {isOpen && (
         <>
-          <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 lg:hidden"
-            onClick={onClose}
-          />
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 lg:hidden" onClick={onClose} />
           <aside className="fixed right-0 top-0 h-full w-80 sidebar-bg border-l border-[var(--border-color)] z-50 lg:hidden overflow-y-auto">
             <SidebarContent isMobile />
           </aside>
