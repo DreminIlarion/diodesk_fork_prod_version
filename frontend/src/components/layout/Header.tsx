@@ -9,7 +9,6 @@ import {
   ChevronRight,
   Moon,
   Sun,
-  Sparkles,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -69,7 +68,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
     <header className="sticky py-3 top-0 z-30 bg-[var(--bg-sidebar)] backdrop-blur-xl border-b border-[var(--border-color)]">
       <div className="flex items-center justify-between px-6">
 
-        {/* Mobile logo */}
+        {/* =========================================================
+            MOBILE LOGO
+        ========================================================= */}
         <div className="flex items-center gap-4 lg:hidden">
           <img
             src="http://80.93.62.177:8000/media/images/Logo_bez_fona_bez_teksta.width-80.height-80.png"
@@ -85,52 +86,144 @@ export default function Header({ onMenuClick }: HeaderProps) {
         {/* Desktop spacer */}
         <div className="hidden lg:block" />
 
-        {/* Right controls */}
+        {/* =========================================================
+            RIGHT SIDE
+        ========================================================= */}
         <div className="flex items-center gap-2 md:gap-4">
 
-          {/* DIOS AI */}
+          {/* =======================================================
+              DIOS AI
+          ======================================================= */}
           <Link
             to="/dios-ai"
             className="
               group
-              flex items-center gap-2
-              px-3 py-2
+              flex items-center
+              gap-2.5
+              px-3
+              py-2
               rounded-xl
-              border border-[var(--border-color)]
+
+              border
+              border-[var(--border-color)]
+
               bg-[var(--bg-card)]
-              text-[var(--text-secondary)]
-              hover:text-[var(--text-primary)]
-              hover:border-[var(--accent)]/40
+
               hover:bg-[var(--hover-1)]
-              transition-all duration-200
+              hover:border-[var(--accent)]/40
+
+              transition-all
+              duration-200
             "
-            title="DIOS AI — ИИ-агент"
+            title="Открыть DIOS AI"
           >
-            <Sparkles
+            {/* Фирменный знак ДИО */}
+            <div
               className="
-                w-5 h-5
-                text-[var(--accent)]
-                transition-transform duration-200
-                group-hover:scale-110
+                relative
+                flex-shrink-0
+                w-8
+                h-8
+                flex
+                items-center
+                justify-center
               "
-            />
+            >
+              <img
+                src="https://storage.yandexcloud.net/b.fotovssylku.ru/2026/10/05/GLYNTEVYI-LOGOTIP-d_i-S-AI-SKEMAMI.png"
+                alt=""
+                className="
+                  w-8
+                  h-8
+                  object-contain
+                  transition-transform
+                  duration-200
+                  group-hover:scale-105
+                "
+              />
 
-            <span className="hidden sm:inline text-sm font-medium">
-              DIOS AI
-            </span>
+              {/* AI badge */}
+              <span
+                className="
+                  absolute
+                  -right-1
+                  -bottom-1
 
+                  min-w-[17px]
+                  h-[17px]
+
+                  px-1
+
+                  flex
+                  items-center
+                  justify-center
+
+                  rounded-md
+
+                  bg-[var(--accent)]
+                  text-white
+
+                  text-[9px]
+                  font-bold
+                  leading-none
+
+                  border-2
+                  border-[var(--bg-card)]
+
+                  group-hover:border-[var(--hover-1)]
+
+                  transition-colors
+                "
+              >
+                AI
+              </span>
+            </div>
+
+            {/* Text */}
+            <div className="hidden sm:flex flex-col leading-tight">
+              <span
+                className="
+                  text-sm
+                  font-semibold
+                  text-[var(--text-primary)]
+                "
+              >
+                DIOS AI
+              </span>
+
+              <span
+                className="
+                  text-[11px]
+                  text-[var(--text-muted)]
+                  mt-0.5
+                "
+              >
+                ИИ-агент
+              </span>
+            </div>
+
+            {/* Arrow */}
             <ChevronRight
               className="
                 hidden sm:block
-                w-4 h-4
+                w-4
+                h-4
+                ml-0.5
+
                 text-[var(--text-muted)]
-                transition-transform duration-200
+
+                transition-transform
+                duration-200
+
                 group-hover:translate-x-0.5
+                group-hover:text-[var(--text-primary)]
               "
             />
           </Link>
 
-          {/* Theme switcher */}
+          {/* =======================================================
+              THEME SWITCHER
+          ======================================================= */}
           <button
             onClick={toggleTheme}
             className="
@@ -139,12 +232,17 @@ export default function Header({ onMenuClick }: HeaderProps) {
               hover:bg-[var(--hover-1)]
               transition-colors
             "
-            title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+            title={
+              theme === 'dark'
+                ? 'Светлая тема'
+                : 'Тёмная тема'
+            }
           >
             {theme === 'dark' ? (
               <Sun
                 className="
-                  w-6 h-6
+                  w-6
+                  h-6
                   text-[var(--text-secondary)]
                   hover:text-[var(--text-primary)]
                   transition-colors
@@ -153,7 +251,8 @@ export default function Header({ onMenuClick }: HeaderProps) {
             ) : (
               <Moon
                 className="
-                  w-6 h-6
+                  w-6
+                  h-6
                   text-[var(--text-secondary)]
                   hover:text-[var(--text-primary)]
                   transition-colors
@@ -162,12 +261,20 @@ export default function Header({ onMenuClick }: HeaderProps) {
             )}
           </button>
 
-          {/* User dropdown */}
-          <div ref={dropdownRef} className="relative">
+          {/* =======================================================
+              USER
+          ======================================================= */}
+          <div
+            ref={dropdownRef}
+            className="relative"
+          >
             <button
               onClick={() => setShowDropdown(!showDropdown)}
               className="
-                flex items-center gap-2 md:gap-3
+                flex
+                items-center
+                gap-2
+                md:gap-3
                 p-2
                 rounded-xl
                 hover:bg-[var(--hover-1)]
@@ -179,67 +286,119 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   src={user.avatar_url}
                   alt=""
                   className="
-                    w-10 h-10
+                    w-10
+                    h-10
                     rounded-full
                     object-cover
-                    ring-2 ring-[var(--accent)]/20
+                    ring-2
+                    ring-[var(--accent)]/20
                   "
                 />
               ) : (
                 <div
                   className="
-                    w-10 h-10
+                    w-10
+                    h-10
                     rounded-full
                     bg-gradient-to-br
                     from-[var(--accent)]
                     to-[var(--accent-dark)]
-                    flex items-center justify-center
+
+                    flex
+                    items-center
+                    justify-center
                   "
                 >
                   <User className="w-5 h-5 text-white" />
                 </div>
               )}
 
+              {/* User information */}
               <div className="hidden md:block text-left">
-                <p className="text-[var(--text-primary)] font-medium text-base">
+                <p
+                  className="
+                    text-[var(--text-primary)]
+                    font-medium
+                    text-base
+                  "
+                >
                   {user?.full_name || user?.username}
                 </p>
 
-                <p className="text-sm text-[var(--text-muted)]">
+                <p
+                  className="
+                    text-sm
+                    text-[var(--text-muted)]
+                  "
+                >
                   {getRoleLabel(user?.roles)}
                 </p>
               </div>
 
               <ChevronDown
                 className="
-                  w-5 h-5
+                  w-5
+                  h-5
                   text-[var(--text-muted)]
-                  hidden md:block
+                  hidden
+                  md:block
                 "
               />
             </button>
 
-            {/* Dropdown */}
+            {/* =====================================================
+                USER DROPDOWN
+            ===================================================== */}
             {showDropdown && (
               <div
                 className="
-                  absolute right-0 top-full mt-2
+                  absolute
+                  right-0
+                  top-full
+                  mt-2
+
                   w-72
+
                   bg-[var(--bg-card)]
-                  border border-[var(--border-color)]
+
+                  border
+                  border-[var(--border-color)]
+
                   rounded-2xl
+
                   p-2
+
                   z-50
+
                   shadow-xl
                 "
               >
+
                 {/* User info */}
-                <div className="px-4 py-3 border-b border-[var(--border-color)]">
-                  <p className="font-semibold text-[var(--text-primary)] text-base">
+                <div
+                  className="
+                    px-4
+                    py-3
+                    border-b
+                    border-[var(--border-color)]
+                  "
+                >
+                  <p
+                    className="
+                      font-semibold
+                      text-[var(--text-primary)]
+                      text-base
+                    "
+                  >
                     {user?.full_name || user?.username}
                   </p>
 
-                  <p className="text-sm text-[var(--text-muted)]">
+                  <p
+                    className="
+                      text-sm
+                      text-[var(--text-muted)]
+                    "
+                  >
                     {user?.email}
                   </p>
                 </div>
@@ -251,13 +410,22 @@ export default function Header({ onMenuClick }: HeaderProps) {
                     to="/profile"
                     onClick={() => setShowDropdown(false)}
                     className="
-                      flex items-center gap-3
-                      px-4 py-3
+                      flex
+                      items-center
+                      gap-3
+
+                      px-4
+                      py-3
+
                       text-[var(--text-secondary)]
+
                       hover:text-[var(--text-primary)]
                       hover:bg-[var(--hover-1)]
+
                       rounded-xl
+
                       transition-colors
+
                       text-base
                     "
                   >
@@ -269,13 +437,22 @@ export default function Header({ onMenuClick }: HeaderProps) {
                     to="/notifications"
                     onClick={() => setShowDropdown(false)}
                     className="
-                      flex items-center gap-3
-                      px-4 py-3
+                      flex
+                      items-center
+                      gap-3
+
+                      px-4
+                      py-3
+
                       text-[var(--text-secondary)]
+
                       hover:text-[var(--text-primary)]
                       hover:bg-[var(--hover-1)]
+
                       rounded-xl
+
                       transition-colors
+
                       text-base
                     "
                   >
@@ -286,18 +463,34 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 </div>
 
                 {/* Logout */}
-                <div className="pt-2 border-t border-[var(--border-color)]">
+                <div
+                  className="
+                    pt-2
+                    border-t
+                    border-[var(--border-color)]
+                  "
+                >
                   <button
                     onClick={handleLogout}
                     className="
                       w-full
-                      flex items-center gap-3
-                      px-4 py-3
+
+                      flex
+                      items-center
+                      gap-3
+
+                      px-4
+                      py-3
+
                       text-[var(--error)]
+
                       hover:text-[var(--error)]/80
                       hover:bg-[var(--error)]/10
+
                       rounded-xl
+
                       transition-colors
+
                       text-base
                     "
                   >
@@ -309,7 +502,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
             )}
           </div>
 
-          {/* Mobile menu */}
+          {/* =======================================================
+              MOBILE MENU
+          ======================================================= */}
           <button
             onClick={onMenuClick}
             className="
@@ -320,7 +515,13 @@ export default function Header({ onMenuClick }: HeaderProps) {
               transition-colors
             "
           >
-            <Menu className="w-6 h-6 text-[var(--text-primary)]" />
+            <Menu
+              className="
+                w-6
+                h-6
+                text-[var(--text-primary)]
+              "
+            />
           </button>
 
         </div>
