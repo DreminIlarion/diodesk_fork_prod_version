@@ -469,7 +469,7 @@ export default function DashboardPage() {
       if (!user?.full_name) {
         return (
           user?.username ||
-          'коллега'
+          ''
         );
       }
 
@@ -1059,8 +1059,7 @@ export default function DashboardPage() {
               <GreetingIcon className="h-5 w-5 shrink-0 text-[var(--text-primary)]/40" />
 
               <h1 className="truncate text-2xl font-bold tracking-tight text-[var(--text-primary)] lg:text-3xl">
-                {greeting.text},{' '}
-                {greetingName}
+                {greeting.text}
               </h1>
             </div>
 
@@ -1342,13 +1341,13 @@ export default function DashboardPage() {
                         </p>
 
                         <div className="hidden shrink-0 text-right sm:block">
-                          <p className="text-sm text-[var(--text-primary)]/45">
+                          <p className="text-sm text-[var(--text-primary)]/90">
                             {formatDate(
                               ticket.created_at,
                             )}
                           </p>
 
-                          <p className="mt-0.5 text-xs text-[var(--text-primary)]/25">
+                          <p className="mt-0.5 text-xs text-[var(--text-primary)]/75">
                             {formatTime(
                               ticket.created_at,
                             )}
@@ -1397,7 +1396,7 @@ export default function DashboardPage() {
                       </div>
 
                       {/* META */}
-                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--text-primary)]/45">
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--text-primary)]/90">
 
                         {ticket
                           .counterparty
