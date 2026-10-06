@@ -6,6 +6,8 @@ import {
   User, Briefcase, HeadphonesIcon, Settings,
 } from 'lucide-react';
 import { invitationsApi, counterpartiesApi } from '../api/client';
+
+import { ActionButton } from '../components/ui/ActionButton';
 import type { Counterparty, Invitation, UserRole } from '../types';
 
 // ─── Роли ─────────
@@ -111,10 +113,10 @@ function CounterpartyDropdown({
 
   const filtered = query
     ? counterparties.filter(c =>
-        c.name.toLowerCase().includes(query.toLowerCase()) ||
-        (c.inn && c.inn.includes(query)) ||
-        (c.legal_name && c.legal_name.toLowerCase().includes(query.toLowerCase()))
-      )
+      c.name.toLowerCase().includes(query.toLowerCase()) ||
+      (c.inn && c.inn.includes(query)) ||
+      (c.legal_name && c.legal_name.toLowerCase().includes(query.toLowerCase()))
+    )
     : counterparties;
 
   return (
@@ -373,15 +375,15 @@ export default function InvitationsPage() {
       {/* ── Tabs  */}
       <div className="flex gap-2 border-b border-white/10">
         {[
-          { id: 'send' as const, label: 'Отправить', icon: Send },
+          { id: 'send' as const, label: 'Новое приглашение', icon: Send },
           { id: 'history' as const, label: 'История', icon: History, count: totalItems },
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-6 py-3.5 rounded-t-xl text-base font-medium transition-all ${activeTab === tab.id
-                ? 'bg-[var(--accent)]/50 text-white border-b-2 border-red-500'
-                : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)]'
+              ? 'bg-[var(--accent)]/50 text-white border-b-2 border-red-500'
+              : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)]'
               }`}
           >
             <tab.icon className="w-5 h-5" />
@@ -399,187 +401,421 @@ export default function InvitationsPage() {
 
           {/* ═══ Вкладка «Отправить» ═══ */}
           {activeTab === 'send' && (
-            <div className=" bg-[var(--hover-1)] backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden">
-              <div className="p-6 border-b border-white/10 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-[var(--accent)]/25 flex items-center justify-center">
-                  <UserPlus className="w-6 h-6 text-[var(--accent)]" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-[var(--text-primary)]">Новое приглашение</h2>
-                  <p className="text-l text-[var(--text-primary)]/50">Заполните данные для отправки</p>
+            <div className="bg-[var(--hover-1)] rounded-xl border border-[var(--border-color)] overflow-hidden">
+
+              {/* Header */}
+              <div className="px-6 py-5 border-b border-[var(--border-color)]">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
+                    <UserPlus className="w-5 h-5 text-[var(--accent)]" />
+                  </div>
+
+                  <div>
+                    <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                      Новое приглашение
+                    </h2>
+
+                    <p className="text-sm text-[var(--text-primary)]/40 mt-0.5">
+                      Заполните данные пользователя и выберите права доступа
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="p-6 space-y-7">
-                {/* Уведомления */}
+              <div className="p-6">
+
+                {/* Alerts */}
                 {success && (
-                  <div className="p-4 rounded-xl bg-[var(--success)]/8 border border-green-500/20 flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-[var(--success)] flex-shrink-0" />
-                    <p className="text-l text-[var(--success)]">Приглашение успешно отправлено!</p>
+                  <div className="mb-6 p-4 rounded-xl bg-[var(--success)]/8 border border-green-500/20 flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-[var(--success)] shrink-0" />
+
+                    <p className="text-sm text-[var(--success)]">
+                      Приглашение успешно отправлено
+                    </p>
                   </div>
                 )}
+
                 {error && (
-                  <div className="p-4 rounded-xl bg-[var(--accent-soft)] border border-[var(--accent)]/15 flex items-center gap-3">
-                    <AlertCircle className="w-5 h-5 text-[var(--accent)] flex-shrink-0" />
-                    <p className="text-l text-[var(--accent)]">{error}</p>
+                  <div className="mb-6 p-4 rounded-xl bg-[var(--accent-soft)] border border-[var(--accent)]/15 flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5 text-[var(--accent)] shrink-0" />
+
+                    <p className="text-sm text-[var(--accent)]">
+                      {error}
+                    </p>
                   </div>
                 )}
 
-                {/* Email */}
-                <div>
-                  <label className="block text-l font-medium text-[var(--text-primary)]/70 mb-2">
-                    Email адрес <span className="text-[var(--accent)]">*</span>
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-primary)]/40" />
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      placeholder="user@company.ru"
-                      className="w-full pl-12 pr-4 py-4 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] text-base transition-all"
-                    />
-                  </div>
-                </div>
+                {/* =====================================================
+          STEP 1
+      ===================================================== */}
+                <section>
+                  <div className="flex items-center gap-3 mb-4">
+                    <span
+                      className="
+              w-7 h-7
+              rounded-full
+              bg-[var(--accent)]/10
+              text-[var(--accent)]
+              flex items-center justify-center
+              text-xs font-bold
+            "
+                    >
+                      1
+                    </span>
 
-                {/* Роль — разделена на группы */}
-                <div>
-                  <label className="block text-l font-medium text-[var(--text-primary)]/70 mb-3">
-                    Роль пользователя <span className="text-[var(--accent)]">*</span>
-                  </label>
+                    <div>
+                      <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                        Получатель
+                      </h3>
 
-                  {/* Клиентские роли */}
-                  <div className="mb-3">
-                    <p className="text-l uppercase tracking-widest text-[var(--text-primary)]/25 mb-2 flex items-center gap-2">
-                      <Building2 className="w-3.5 h-3.5" />
-                      Клиент (привязка к контрагенту)
-                    </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {clientRoles.map(r => {
-                        const isSelected = role === r.value;
-                        return (
-                          <button
-                            key={r.value}
-                            onClick={() => {
-                              setRole(r.value);
-                              if (r.group !== 'client') setCounterpartyId('');
-                            }}
-                            className={`
-                              p-4 rounded-xl border-2 text-left transition-all
-                              ${isSelected
-                                ? `bg-[var(--hover-2)] ${r.borderColor}`
-                                : 'bg-[var(--hover-1)] border-[var(--border-color)] hover:bg-[var(--hover-2)] hover:border-[var(--border-color)]'
-                              }
-                            `}
-                          >
-                            <div className="flex items-center gap-2.5 mb-1.5">
-                              <span className={isSelected ? r.color : 'text-[var(--text-primary)]/40'}>{r.icon}</span>
-                              <span className={`text-l font-semibold ${isSelected ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/70'}`}>
-                                {r.label}
-                              </span>
-                            </div>
-                            <p className="text-l text-[var(--text-primary)]/40 leading-relaxed">{r.desc}</p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Сотрудники */}
-                  <div>
-                    <p className="text-l uppercase tracking-widest text-[var(--text-primary)]/25 mb-2 flex items-center gap-2">
-                      <Shield className="w-3.5 h-3.5" />
-                      Сотрудник (внутренний доступ)
-                    </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {staffRoles.map(r => {
-                        const isSelected = role === r.value;
-                        return (
-                          <button
-                            key={r.value}
-                            onClick={() => {
-                              setRole(r.value);
-                              setCounterpartyId('');
-                            }}
-                            className={`
-                              p-4 rounded-xl border-2 text-left transition-all
-                              ${isSelected
-                                ? `bg-[var(--hover-2)] ${r.borderColor}`
-                                : 'bg-[var(--hover-1)] border-[var(--border-color)] hover:bg-[var(--hover-2)] hover:border-[var(--border-color)]'
-                              }
-                            `}
-                          >
-                            <div className="flex items-center gap-2.5 mb-1.5">
-                              <span className={isSelected ? r.color : 'text-[var(--text-primary)]/40'}>{r.icon}</span>
-                              <span className={`text-l font-semibold ${isSelected ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/70'}`}>
-                                {r.label}
-                              </span>
-                            </div>
-                            <p className="text-l text-[var(--text-primary)]/40 leading-relaxed">{r.desc}</p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Контрагент (если клиентская роль) */}
-                {needsCounterparty && (
-                  <div>
-                    <label className="block text-l font-medium text-[var(--text-primary)]/70 mb-2">
-                      Контрагент <span className="text-[var(--accent)]">*</span>
-                    </label>
-                    <CounterpartyDropdown
-                      value={counterpartyId}
-                      onChange={setCounterpartyId}
-                      counterparties={counterparties}
-                    />
-                    {counterparties.length === 0 && (
-                      <p className="mt-2 text-l text-[var(--warning)]/70 flex items-center gap-1.5">
-                        <AlertCircle className="w-3.5 h-3.5" />
-                        Нет контрагентов. Сначала создайте контрагента.
+                      <p className="text-xs text-[var(--text-primary)]/35">
+                        На этот адрес будет отправлено приглашение
                       </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Превью: что будет отправлено */}
-                {isFormValid && (
-                  <div className="p-4 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-xl">
-                    <p className="text-l text-[var(--text-primary)]/40 mb-2">Будет отправлено:</p>
-                    <div className="flex flex-wrap items-center gap-2 text-l">
-                      <span className="px-2.5 py-1 rounded-lg bg-[var(--hover-1)] text-[var(--text-primary)]/70">{email}</span>
-                      <span className="text-[var(--text-primary)]/20">→</span>
-                      <span className={`px-2.5 py-1 rounded-lg bg-[var(--hover-1)] font-medium ${selectedRole?.color || 'text-[var(--text-primary)]/70'}`}>
-                        {selectedRole?.label}
-                      </span>
-                      {needsCounterparty && counterpartyId && (
-                        <>
-                          <span className="text-[var(--text-primary)]/20">@</span>
-                          <span className="px-2.5 py-1 rounded-lg bg-[var(--hover-1)] text-[var(--text-primary)]/70">
-                            {counterparties.find(c => c.id === counterpartyId)?.name}
-                          </span>
-                        </>
-                      )}
                     </div>
                   </div>
+
+                  <div className="pl-0 sm:pl-10">
+                    <label className="block text-sm font-medium text-[var(--text-primary)]/60 mb-2">
+                      Email адрес
+                      <span className="text-[var(--accent)] ml-1">*</span>
+                    </label>
+
+                    <div className="relative">
+                      <Mail
+                        className="
+                absolute left-4 top-1/2 -translate-y-1/2
+                w-5 h-5
+                text-[var(--text-primary)]/30
+                pointer-events-none
+              "
+                      />
+
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        placeholder="user@company.ru"
+                        className="
+                w-full
+                pl-12 pr-4 py-3.5
+                bg-[var(--bg-card)]
+                border border-[var(--border-color)]
+                rounded-xl
+                text-[var(--text-primary)]
+                placeholder-[var(--text-muted)]
+                focus:outline-none
+                focus:border-[var(--accent)]/50
+                focus:ring-2
+                focus:ring-[var(--accent-ring)]
+                text-base
+                transition-all
+              "
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <div className="my-7 border-t border-[var(--border-color)]" />
+
+                {/* =====================================================
+          STEP 2
+      ===================================================== */}
+                <section>
+                  <div className="flex items-center gap-3 mb-5">
+                    <span
+                      className="
+              w-7 h-7
+              rounded-full
+              bg-[var(--accent)]/10
+              text-[var(--accent)]
+              flex items-center justify-center
+              text-xs font-bold
+            "
+                    >
+                      2
+                    </span>
+
+                    <div>
+                      <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                        Права доступа
+                      </h3>
+
+                      <p className="text-xs text-[var(--text-primary)]/35">
+                        Выберите роль пользователя в системе
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pl-0 sm:pl-10 space-y-6">
+
+                    {/* Client roles */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Building2 className="w-4 h-4 text-[var(--text-primary)]/35" />
+
+                        <span className="text-sm font-medium text-[var(--text-primary)]/50">
+                          Клиенты
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {clientRoles.map(r => {
+                          const isSelected = role === r.value;
+
+                          return (
+                            <button
+                              key={r.value}
+                              type="button"
+                              onClick={() => {
+                                setRole(r.value);
+                              }}
+                              className={`
+                      relative
+                      p-4
+                      min-h-[100px]
+                      rounded-xl
+                      border
+                      text-left
+                      transition-all
+
+                      ${isSelected
+                                  ? `
+                            bg-[var(--accent)]/[0.06]
+                            border-[var(--accent)]/50
+                            ring-1 ring-[var(--accent)]/10
+                          `
+                                  : `
+                            bg-[var(--bg-card)]
+                            border-[var(--border-color)]
+                            hover:bg-[var(--hover-2)]
+                            hover:border-[var(--border-hover)]
+                          `
+                                }
+                    `}
+                            >
+                              {isSelected && (
+                                <div
+                                  className="
+                          absolute top-3 right-3
+                          w-5 h-5
+                          rounded-full
+                          bg-[var(--accent)]
+                          flex items-center justify-center
+                        "
+                                >
+                                  <Check className="w-3 h-3 text-white" />
+                                </div>
+                              )}
+
+                              <div className="flex items-center gap-2.5 mb-2 pr-7">
+                                <span
+                                  className={
+                                    isSelected
+                                      ? r.color
+                                      : 'text-[var(--text-primary)]/40'
+                                  }
+                                >
+                                  {r.icon}
+                                </span>
+
+                                <span className="text-sm font-semibold text-[var(--text-primary)]">
+                                  {r.label}
+                                </span>
+                              </div>
+
+                              <p className="text-sm leading-5 text-[var(--text-primary)]/40">
+                                {r.desc}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Staff roles */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Shield className="w-4 h-4 text-[var(--text-primary)]/35" />
+
+                        <span className="text-sm font-medium text-[var(--text-primary)]/50">
+                          Сотрудники
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {staffRoles.map(r => {
+                          const isSelected = role === r.value;
+
+                          return (
+                            <button
+                              key={r.value}
+                              type="button"
+                              onClick={() => {
+                                setRole(r.value);
+                                setCounterpartyId('');
+                              }}
+                              className={`
+                      relative
+                      p-4
+                      min-h-[100px]
+                      rounded-xl
+                      border
+                      text-left
+                      transition-all
+
+                      ${isSelected
+                                  ? `
+                            bg-[var(--accent)]/[0.06]
+                            border-[var(--accent)]/50
+                            ring-1 ring-[var(--accent)]/10
+                          `
+                                  : `
+                            bg-[var(--bg-card)]
+                            border-[var(--border-color)]
+                            hover:bg-[var(--hover-2)]
+                            hover:border-[var(--border-hover)]
+                          `
+                                }
+                    `}
+                            >
+                              {isSelected && (
+                                <div
+                                  className="
+                          absolute top-3 right-3
+                          w-5 h-5
+                          rounded-full
+                          bg-[var(--accent)]
+                          flex items-center justify-center
+                        "
+                                >
+                                  <Check className="w-3 h-3 text-white" />
+                                </div>
+                              )}
+
+                              <div className="flex items-center gap-2.5 mb-2 pr-7">
+                                <span
+                                  className={
+                                    isSelected
+                                      ? r.color
+                                      : 'text-[var(--text-primary)]/40'
+                                  }
+                                >
+                                  {r.icon}
+                                </span>
+
+                                <span className="text-sm font-semibold text-[var(--text-primary)]">
+                                  {r.label}
+                                </span>
+                              </div>
+
+                              <p className="text-sm leading-5 text-[var(--text-primary)]/40">
+                                {r.desc}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* =====================================================
+          STEP 3 — только клиент
+      ===================================================== */}
+                {needsCounterparty && (
+                  <>
+                    <div className="my-7 border-t border-[var(--border-color)]" />
+
+                    <section>
+                      <div className="flex items-center gap-3 mb-4">
+                        <span
+                          className="
+                  w-7 h-7
+                  rounded-full
+                  bg-[var(--accent)]/10
+                  text-[var(--accent)]
+                  flex items-center justify-center
+                  text-xs font-bold
+                "
+                        >
+                          3
+                        </span>
+
+                        <div>
+                          <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                            Контрагент
+                          </h3>
+
+                          <p className="text-xs text-[var(--text-primary)]/35">
+                            К какой организации относится пользователь
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="pl-0 sm:pl-10">
+                        <CounterpartyDropdown
+                          value={counterpartyId}
+                          onChange={setCounterpartyId}
+                          counterparties={counterparties}
+                        />
+
+                        {counterparties.length === 0 && (
+                          <p className="mt-2 text-sm text-[var(--warning)]/70 flex items-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            Нет контрагентов. Сначала создайте контрагента.
+                          </p>
+                        )}
+                      </div>
+                    </section>
+                  </>
                 )}
 
-                {/* Кнопка */}
-                <button
-                  onClick={handleSend}
-                  disabled={sending || !isFormValid}
-                  className="w-full flex items-center justify-center gap-3 py-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent)] text-white text-base font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {sending ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>
-                      <Send className="w-5 h-5" />
-                      Отправить приглашение
-                    </>
+                {/* =====================================================
+          FOOTER / SEND
+      ===================================================== */}
+                <div className="mt-8 pt-6 border-t border-[var(--border-color)]">
+                  {isFormValid && (
+                    <div className="mb-5 flex items-center gap-3 text-sm text-[var(--text-primary)]/50">
+                      <CheckCircle2 className="w-4 h-4 text-[var(--success)] shrink-0" />
+
+                      <span>
+                        Приглашение будет отправлено на{' '}
+                        <strong className="font-medium text-[var(--text-primary)]">
+                          {email}
+                        </strong>
+                      </span>
+                    </div>
                   )}
-                </button>
+
+                  <ActionButton
+                    type="button"
+                    onClick={handleSend}
+                    disabled={sending || !isFormValid}
+                    className="
+            w-full
+            py-4 px-6
+            text-base font-semibold
+          "
+                  >
+                    {sending ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Отправляем...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-5 h-5" />
+                        Отправить приглашение
+                      </>
+                    )}
+                  </ActionButton>
+
+                  {!isFormValid && (
+                    <p className="mt-3 text-center text-xs text-[var(--text-primary)]/30">
+                      Заполните обязательные поля, чтобы отправить приглашение
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -603,8 +839,8 @@ export default function InvitationsPage() {
                         key={f.id}
                         onClick={() => setStatusFilter(f.id)}
                         className={`px-3 py-1.5 rounded-md text-l font-medium transition-colors ${statusFilter === f.id
-                            ? 'bg-[var(--accent)]/60 text-white'
-                            : 'text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60'
+                          ? 'bg-[var(--accent)]/60 text-white'
+                          : 'text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60'
                           }`}
                       >
                         {f.label}
@@ -718,90 +954,156 @@ export default function InvitationsPage() {
           )}
         </div>
 
-        {/* ── Sidebar  */}
+        {/* ── Sidebar ── */}
         <div className="space-y-6">
 
-          {/* Статистика (видна на вкладке истории) */}
+          {/* =========================================================
+      Вкладка: Новое приглашение
+  ========================================================= */}
+          {activeTab === 'send' && (
+            <>
+              {/* Как это работает */}
+              <div className="bg-[var(--hover-1)] backdrop-blur-sm rounded-xl border border-[var(--border-color)] p-5">
+                <div className="flex items-center gap-2.5 mb-5">
+                  <HelpCircle className="w-5 h-5 text-[var(--info)]" />
+
+                  <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                    Как это работает?
+                  </h3>
+                </div>
+
+                <div className="space-y-5">
+                  {[
+                    {
+                      n: '1',
+                      title: 'Заполните данные',
+                      desc: 'Укажите email и выберите права доступа.',
+                    },
+                    {
+                      n: '2',
+                      title: 'Отправьте приглашение',
+                      desc: 'Пользователь получит письмо со ссылкой.',
+                    },
+                    {
+                      n: '3',
+                      title: 'Пользователь зарегистрируется',
+                      desc: 'После регистрации ему будут назначены выбранные права.',
+                    },
+                  ].map((step) => (
+                    <div key={step.n} className="flex gap-3">
+                      <div
+                        className="
+                  w-7 h-7 rounded-full shrink-0
+                  bg-[var(--accent)]/10
+                  text-[var(--accent)]
+                  flex items-center justify-center
+                  text-xs font-bold
+                "
+                      >
+                        {step.n}
+                      </div>
+
+                      <div>
+                        <p className="text-sm font-medium text-[var(--text-primary)]">
+                          {step.title}
+                        </p>
+
+                        <p className="mt-0.5 text-sm leading-5 text-[var(--text-primary)]/40">
+                          {step.desc}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Срок действия */}
+              <div className="rounded-xl border border-yellow-500/15 bg-yellow-500/5 p-5">
+                <div className="flex items-center gap-2.5 mb-2">
+                  <Clock className="w-5 h-5 text-[var(--warning)]" />
+
+                  <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                    Срок действия приглашения
+                  </h3>
+                </div>
+
+                <p className="text-sm leading-6 text-[var(--text-primary)]/50">
+                  Ссылка в письме действует{' '}
+                  <span className="font-medium text-[var(--text-primary)]">
+                    7 дней
+                  </span>
+                  . После истечения срока нужно отправить новое приглашение.
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* =========================================================
+      Вкладка: История
+  ========================================================= */}
           {activeTab === 'history' && invitations.length > 0 && (
-            <div className="bg-[var(--hover-1)] backdrop-blur-sm rounded-xl border border-white/10 p-5">
-              <h3 className="text-l font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-                <Users className="w-4 h-4 text-[var(--text-primary)]/50" />
-                Статистика
-              </h3>
-              <div className="space-y-3">
+            <div className="bg-[var(--hover-1)] backdrop-blur-sm rounded-xl border border-[var(--border-color)] p-5">
+              <div className="flex items-center gap-2.5 mb-5">
+                <Users className="w-5 h-5 text-[var(--text-primary)]/50" />
+
+                <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                  Статистика
+                </h3>
+              </div>
+
+              <div className="space-y-1">
                 {[
-                  { label: 'Всего', value: stats.total, color: 'text-[var(--text-primary)]', dot: 'bg-[var(--hover-1)]' },
-                  { label: 'Ожидает', value: stats.pending, color: 'text-[var(--warning)]', dot: 'bg-yellow-400' },
-                  { label: 'Принято', value: stats.used, color: 'text-[var(--success)]', dot: 'bg-green-400' },
-                  { label: 'Истекло', value: stats.expired, color: 'text-[var(--accent)]', dot: 'bg-red-400' },
-                ].map(s => (
-                  <div key={s.label} className="flex items-center justify-between py-1.5">
-                    <span className="flex items-center gap-2 text-l text-[var(--text-primary)]/50">
-                      <span className={`w-2 h-2 rounded-full ${s.dot}`} />
-                      {s.label}
+                  {
+                    label: 'Всего',
+                    value: stats.total,
+                    color: 'text-[var(--text-primary)]',
+                    dot: 'bg-[var(--text-primary)]/35',
+                  },
+                  {
+                    label: 'Ожидает',
+                    value: stats.pending,
+                    color: 'text-[var(--warning)]',
+                    dot: 'bg-yellow-400',
+                  },
+                  {
+                    label: 'Принято',
+                    value: stats.used,
+                    color: 'text-[var(--success)]',
+                    dot: 'bg-green-400',
+                  },
+                  {
+                    label: 'Истекло',
+                    value: stats.expired,
+                    color: 'text-[var(--accent)]',
+                    dot: 'bg-red-400',
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    className="flex items-center justify-between py-2.5 border-b border-[var(--border-color)] last:border-b-0"
+                  >
+                    <span className="flex items-center gap-2.5 text-sm text-[var(--text-primary)]/55">
+                      <span className={`w-2 h-2 rounded-full ${item.dot}`} />
+                      {item.label}
                     </span>
-                    <span className={`text-lg font-bold ${s.color}`}>{s.value}</span>
+
+                    <span className={`text-base font-semibold ${item.color}`}>
+                      {item.value}
+                    </span>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Как это работает */}
-          <div className="bg-[var(--hover-1)] backdrop-blur-sm rounded-xl border border-white/10 p-5">
-            <div className="flex items-center gap-2.5 mb-5">
-              <HelpCircle className="w-5 h-5 text-[var(--info)]" />
-              <h3 className="text-l font-bold text-[var(--text-primary)]">Как это работает?</h3>
+          {/* Пустая история */}
+          {activeTab === 'history' && invitations.length === 0 && !loading && (
+            <div className="rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] p-5">
+              <p className="text-sm text-[var(--text-primary)]/40">
+                Здесь будет отображаться статистика после отправки приглашений.
+              </p>
             </div>
-            <div className="space-y-5">
-              {[
-                { n: '1', title: 'Отправьте приглашение', desc: 'Укажите email, роль и контрагента' },
-                { n: '2', title: 'Пользователь получит письмо', desc: 'Со ссылкой для регистрации' },
-                { n: '3', title: 'Регистрация', desc: 'Создаёт аккаунт и получает доступ' },
-              ].map(step => (
-                <div key={step.n} className="flex gap-3.5">
-                  <div className="w-8 h-8 rounded-full bg-[var(--accent)]/25 flex items-center justify-center text-l font-bold text-[var(--accent)] flex-shrink-0">
-                    {step.n}
-                  </div>
-                  <div>
-                    <p className="text-l font-medium text-[var(--text-primary)]">{step.title}</p>
-                    <p className="text-l text-[var(--text-primary)]/40">{step.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* О ролях */}
-          <div className="bg-[var(--hover-1)] backdrop-blur-sm rounded-xl border border-white/10 p-5">
-            <div className="flex items-center gap-2.5 mb-5">
-              <Shield className="w-5 h-5 text-[var(--info)]" />
-              <h3 className="text-l font-bold text-[var(--text-primary)]">О ролях</h3>
-            </div>
-            <div className="space-y-4">
-              {ROLES.map(r => (
-                <div key={r.value} className="flex items-start gap-3">
-                  <span className={`mt-0.5 ${r.color}`}>{r.icon}</span>
-                  <div>
-                    <p className={`text-l font-medium ${r.color}`}>{r.label}</p>
-                    <p className="text-l text-[var(--text-primary)]/40">{r.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Важно */}
-          <div className="bg-yellow-500/5 rounded-xl border border-yellow-500/15 p-5">
-            <div className="flex items-center gap-2.5 mb-3">
-              <AlertCircle className="w-5 h-5 text-[var(--warning)]" />
-              <h3 className="text-l font-bold text-[var(--text-primary)]">Важно</h3>
-            </div>
-            <p className="text-l text-[var(--text-primary)]/50 leading-relaxed">
-              Приглашение действительно <span className="text-[var(--text-primary)] font-medium">7 дней</span>.
-              После истечения срока необходимо отправить новое.
-            </p>
-          </div>
+          )}
         </div>
       </div>
       {/* ── Модалка подтверждения отзыва ──────────────────────────────── */}
