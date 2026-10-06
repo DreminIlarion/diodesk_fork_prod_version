@@ -4,11 +4,11 @@ from unittest.mock import AsyncMock, call
 import pytest
 
 from src.knowledge.infra.embeddings import (
+    AITunnelEmbeddingProvider,
     InvalidEmbeddingResponseError,
-    ProxyAPIEmbeddingProvider,
 )
 
-MODEL_ID = "baai/bge-m3"
+MODEL_ID = "text-embedding-3-small"
 EMBEDDING_DIMENSIONS = 2
 BATCH_SIZE = 2
 
@@ -21,8 +21,8 @@ def build_client():
     )
 
 
-def build_provider(client) -> ProxyAPIEmbeddingProvider:
-    return ProxyAPIEmbeddingProvider(
+def build_provider(client) -> AITunnelEmbeddingProvider:
+    return AITunnelEmbeddingProvider(
         client,
         model_id=MODEL_ID,
         dimensions=EMBEDDING_DIMENSIONS,
@@ -30,7 +30,7 @@ def build_provider(client) -> ProxyAPIEmbeddingProvider:
     )
 
 
-async def test_empty_input_does_not_call_proxyapi():
+async def test_empty_input_does_not_call_aitunnel():
     client = build_client()
     provider = build_provider(client)
 
@@ -88,6 +88,7 @@ async def test_embeddings_are_batched_and_returned_in_input_order():
                 "Второй текст",
             ],
             encoding_format="float",
+            dimensions=EMBEDDING_DIMENSIONS,
         ),
         call(
             model=MODEL_ID,
@@ -95,6 +96,7 @@ async def test_embeddings_are_batched_and_returned_in_input_order():
                 "Третий текст",
             ],
             encoding_format="float",
+            dimensions=EMBEDDING_DIMENSIONS,
         ),
     ]
 

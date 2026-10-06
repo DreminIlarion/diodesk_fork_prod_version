@@ -201,13 +201,13 @@ class OpenSearchSettings(BaseSettings):
     number_of_replicas: int = 0
 
 
-class ProxyAPISettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="PROXYAPI_")
+class AITunnelSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="AITUNNEL_")
 
-    base_url: str = "https://api.proxyapi.ru/v1"
-    embedding_api_key: SecretStr = SecretStr("<EMBEDDING_API_KEY>")
+    base_url: str = "https://api.aitunnel.ru/v1"
+    api_key: SecretStr = SecretStr("<API_KEY>")
 
-    embedding_model: str = "baai/bge-m3"
+    embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1024
 
     request_timeout_seconds: float = 90.0
@@ -232,8 +232,8 @@ class Settings(BaseSettings):
     admin: AdminSettings = AdminSettings()
 
     opensearch: OpenSearchSettings = OpenSearchSettings()
-    proxy_api: ProxyAPISettings = ProxyAPISettings()
+    ai_tunnel: AITunnelSettings = AITunnelSettings()
 
 
 settings = Settings()
-print(settings.rabbit.url)
+print(settings.rabbit.url)  # noqa: T201

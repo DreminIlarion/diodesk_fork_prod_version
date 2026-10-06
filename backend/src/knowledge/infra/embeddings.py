@@ -6,11 +6,11 @@ DEFAULT_EMBEDDING_BATCH_SIZE = 64
 
 
 class InvalidEmbeddingResponseError(RuntimeError):
-    """ProxyAPI вернул некорректный набор embeddings"""
+    """AI Tunnel вернул некорректный набор embeddings"""
 
 
-class ProxyAPIEmbeddingProvider:
-    """Генерирует embeddings через OpenAI-совместимый API ProxyAPI"""
+class AITunnelEmbeddingProvider:
+    """Генерирует embeddings через OpenAI-совместимый API AI Tunnel"""
 
     def __init__(
         self,
@@ -51,6 +51,7 @@ class ProxyAPIEmbeddingProvider:
                 model=self._model_id,
                 input=batch,
                 encoding_format="float",
+                dimensions=self._dimensions,
             )
 
             response_items = sorted(
@@ -66,7 +67,7 @@ class ProxyAPIEmbeddingProvider:
 
             if actual_indices != expected_indices:
                 raise InvalidEmbeddingResponseError(
-                    "ProxyAPI returned invalid embedding indices: "
+                    "AI Tunnel returned invalid embedding indices: "
                     f"{actual_indices}, expected {expected_indices}"
                 )
 
@@ -75,7 +76,7 @@ class ProxyAPIEmbeddingProvider:
 
                 if len(embedding) != self._dimensions:
                     raise InvalidEmbeddingResponseError(
-                        "ProxyAPI returned embedding dimension "
+                        "AI Tunnel returned embedding dimension "
                         f"{len(embedding)}, expected "
                         f"{self._dimensions}"
                     )
