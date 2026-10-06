@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytz
 from dotenv import load_dotenv
-from pydantic import Field, SecretStr
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 TIMEZONE = "Asia/Yekaterinburg"
@@ -205,23 +205,13 @@ class ProxyAPISettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="PROXYAPI_")
 
     base_url: str = "https://api.proxyapi.ru/v1"
-
-    chat_api_key: SecretStr = SecretStr("<CHAT_API_KEY>")
     embedding_api_key: SecretStr = SecretStr("<EMBEDDING_API_KEY>")
 
     embedding_model: str = "baai/bge-m3"
     embedding_dimensions: int = 1024
 
-    model_catalog_ttl_seconds: int = 900
     request_timeout_seconds: float = 90.0
     max_retries: int = 3
-
-    auto_model_priority: list[str] = Field(
-        default_factory=list
-    )
-
-    default_context_window: int = 32_768
-    max_answer_tokens: int = 1_500
 
 
 class Settings(BaseSettings):

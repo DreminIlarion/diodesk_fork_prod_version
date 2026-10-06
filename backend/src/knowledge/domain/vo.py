@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 
 
@@ -33,26 +33,3 @@ class ChunkKind(StrEnum):
     SOLUTION = "solution"
     VERIFICATION = "verification"
     DOCUMENTATION = "documentation"
-
-
-class ModelCapability(StrEnum):
-    """Возможность генеративной модели"""
-
-    TEXT = "text"
-    STRUCTURED_OUTPUT = "structured_output"
-    VISION = "vision"
-
-
-@dataclass(frozen=True, slots=True)
-class ModelSpec:
-    """Описание возможностей модели без политики её выбора."""
-
-    id: str
-    provider: str
-    api_model: str
-    context_window: int
-    max_output_tokens: int | None = None
-
-    capabilities: frozenset[ModelCapability] = field(
-        default_factory=lambda: frozenset({ModelCapability.TEXT})
-    )

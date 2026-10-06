@@ -16,7 +16,9 @@ from src.core.opensearch import (
     close_opensearch_client,
     get_opensearch_client,
 )
-from src.core.proxyapi import close_proxyapi_clients
+from src.core.proxyapi import (
+    close_proxyapi_embedding_client,
+)
 from src.core.redis import redis_client
 from src.core.settings import settings
 from src.crm.router import router as counterparty_router
@@ -75,7 +77,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     finally:
         # Освобождение HTTP-соединений с внешними сервисами
         try:
-            await close_proxyapi_clients()
+            await close_proxyapi_embedding_client()
         finally:
             await close_opensearch_client()
 
