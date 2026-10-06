@@ -41,6 +41,8 @@ class CounterpartyMapper(ModelMapper[Counterparty, CounterpartyOrm]):
                     full_name=FullName(contact_person["full_name"]),
                     phone=Phone(contact_person["phone"]) if contact_person["phone"] else None,
                     email=contact_person["email"],
+                    position=contact_person.get("position"),
+                    extension=contact_person.get("extension"),
                     messengers=contact_person["messengers"],
                 )
                 for contact_person in model.contact_persons
@@ -70,6 +72,8 @@ class CounterpartyMapper(ModelMapper[Counterparty, CounterpartyOrm]):
                     "full_name": contact_person.full_name.value,
                     "phone": contact_person.phone.value if contact_person.phone else None,
                     "email": contact_person.email,
+                    "position": contact_person.position,
+                    "extension": contact_person.extension,
                     "messengers": contact_person.messengers,
                 }
                 for contact_person in entity.contact_persons

@@ -121,17 +121,18 @@ const ST_LABEL: Record<TaskStatus, string> = {
   cancelled: 'Отменено',
 };
 
+
 const TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
-  backlog: ['todo', 'cancelled'],
-  todo: ['backlog', 'in_progress', 'paused', 'cancelled'],       // + backward: backlog
-  in_progress: ['todo', 'paused', 'to_review', 'done', 'cancelled'], // + backward: todo
-  paused: ['in_progress', 'todo', 'cancelled'],                   // + backward: todo
-  blocked: ['in_progress', 'todo', 'paused', 'cancelled'],        // + backward
-  to_review: ['in_progress', 'to_fix', 'to_test', 'done', 'cancelled'], // + backward: in_progress
-  to_fix: ['in_progress', 'to_review', 'cancelled'],
-  to_test: ['in_progress', 'to_review', 'done', 'cancelled'],
-  done: ['in_progress', 'to_fix', 'to_review', 'to_test'],        // + backward
-  cancelled: ['backlog', 'todo'],                                 // можно вернуть
+  backlog:      ['todo', 'in_progress', 'cancelled'],
+  todo:         ['backlog', 'in_progress', 'paused', 'blocked', 'to_review', 'to_fix', 'to_test', 'done', 'cancelled'],
+  in_progress:  ['backlog', 'todo', 'paused', 'blocked', 'to_review', 'to_fix', 'to_test', 'done', 'cancelled'],
+  paused:       ['backlog', 'todo', 'in_progress', 'blocked', 'cancelled'],
+  blocked:      ['backlog', 'todo', 'in_progress', 'paused', 'cancelled'],
+  to_review:    ['backlog', 'todo', 'in_progress', 'paused', 'to_fix', 'to_test', 'done', 'cancelled'],
+  to_fix:       ['backlog', 'todo', 'in_progress', 'to_review', 'to_test', 'done', 'cancelled'],
+  to_test:      ['backlog', 'todo', 'in_progress', 'to_review', 'to_fix', 'done', 'cancelled'],
+  done:         ['backlog', 'todo', 'in_progress', 'paused', 'to_review', 'to_fix', 'to_test', 'cancelled'],
+  cancelled:    ['backlog', 'todo', 'in_progress', 'paused', 'to_review', 'to_fix', 'to_test','done']
 };
 
 const ASSIGN_OK: Set<TaskStatus> = new Set([
