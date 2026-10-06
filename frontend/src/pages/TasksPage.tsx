@@ -21,6 +21,8 @@ import type {
   SimpleUser, CounterpartyCustomer,
 } from '../types';
 
+import { ActionButton } from '../components/ui/ActionButton';
+
 import TaskAnalytics from '../components/tasks/TaskAnalytics';
 
 import {
@@ -4774,13 +4776,13 @@ export default function TasksPage() {
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
-          <button
-            onClick={() => setCreate('backlog')}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-sm font-medium hover:bg-[var(--accent)]/90 transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Новая задача
-          </button>
+          <ActionButton
+  onClick={() => setCreate('backlog')}
+  className="px-4 py-2 text-sm font-medium"
+>
+  <Plus className="w-4 h-4" />
+  Новая задача
+</ActionButton>
         </div>
       </div>
 

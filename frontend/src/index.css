@@ -1305,3 +1305,104 @@ a {
   position: relative;
   z-index: 1;
 }
+
+
+
+/* =========================================================
+   PRIMARY ACTION BUTTON
+   ========================================================= */
+
+.btn-action {
+  position: relative;
+  isolation: isolate;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+
+  background: var(--hover-1);
+  color: var(--text-primary);
+
+  cursor: pointer;
+
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    transform 120ms ease;
+}
+
+.btn-action:hover {
+  background: var(--hover-2);
+}
+
+.btn-action:active {
+  transform: translateY(1px);
+  background: var(--hover-3);
+}
+
+.btn-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.btn-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+
+/* Анимированный контур */
+.btn-action__trace {
+  position: absolute;
+  inset: -1px;
+  z-index: 0;
+
+  border-radius: inherit;
+
+  pointer-events: none;
+}
+
+.btn-action__trace svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.btn-action__trace rect {
+  fill: none;
+
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 1.5;
+
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+
+  vector-effect: non-scaling-stroke;
+
+  /* быстро исчезает */
+  transition: stroke-dashoffset 300ms ease;
+}
+
+.btn-action:hover .btn-action__trace rect {
+  stroke-dashoffset: 0;
+
+  /* медленно появляется */
+  transition-duration: 1.4s;
+  transition-timing-function: ease-in-out;
+}
+
+/* Контент всегда над SVG */
+.btn-action__content {
+  position: relative;
+  z-index: 1;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
