@@ -35,13 +35,6 @@ class ChunkKind(StrEnum):
     DOCUMENTATION = "documentation"
 
 
-class ChatRole(StrEnum):
-    """Роль автора сообщения в ии-диалоге"""
-
-    USER = "user"
-    ASSISTANT = "assistant"
-
-
 class ModelCapability(StrEnum):
     """Возможность генеративной модели"""
 

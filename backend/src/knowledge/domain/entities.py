@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
-from src.shared.domain.entities import AggregateRoot, Entity
+from src.shared.domain.entities import AggregateRoot
 from src.shared.domain.exceptions import InvalidStateError
 from src.shared.utils.time import current_datetime
 
@@ -18,7 +18,6 @@ from .vo import (
     ArticleSource,
     ArticleStatus,
     ArticleVisibility,
-    ChatRole,
 )
 
 
@@ -174,50 +173,3 @@ class Article(AggregateRoot):
         self.status = ArticleStatus.ARCHIVED
         self.deleted_at = now
         self.updated_at = now
-
-
-@dataclass(kw_only=True)
-class ChatSession(AggregateRoot):
-    """
-    Диалог сотрудника с базой знаний в рамках тикета
-    """
-
-    # Тикет, в карточке которого открыт чат
-    ticket_id: UUID
-
-    # Сотрудник, создавший диалог
-    created_by: UUID
-
-    # Выбранная сотрудником модель или значение `auto`
-    model_id: str
-
-    def change_model(self, model_id: str) -> None:
-        """Изменение модели для последующих сообщений."""
-
-        self.model_id = model_id
-        self.updated_at = current_datetime()
-
-
-@dataclass(kw_only=True)
-class ChatMessage(Entity):
-    """
-    Сообщение пользователя или ии-модели в RAG-диалоге
-    """
-
-    # Диалог, которому принадлежит сообщение
-    session_id: UUID
-
-    # Роль и содержимое сообщения
-    role: ChatRole
-    content: str
-
-    # Запрошенная и фактически использованная модели
-    requested_model_id: str | None = None
-    actual_model_id: str | None = None
-
-    # Результаты RAG
-    confidence: float | None = None
-    citation_article_ids: list[UUID] = field(default_factory=list)
-
-    # Идентификатор запроса для диагностики в ProxyAPI
-    provider_request_id: str | None = None

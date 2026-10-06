@@ -1,8 +1,6 @@
-from uuid import UUID
-
 from src.shared.domain.repos import Repository
 
-from .entities import Article, ChatMessage, ChatSession
+from .entities import Article
 
 
 class ArticleRepository(Repository[Article]):
@@ -15,36 +13,4 @@ class ArticleRepository(Repository[Article]):
     ) -> Article | None:
         """
         Получение статьи по идентификатору во внешнем источнике
-        """
-
-
-class ChatSessionRepository(Repository[ChatSession]):
-    """Репозиторий ии-диалогов, открытых в карточках тикетов"""
-
-    async def get_by_ticket_and_user(
-        self,
-        ticket_id: UUID,
-        user_id: UUID,
-    ) -> ChatSession | None:
-        """
-        Возвращает диалог сотрудника в указанном тикете
-        """
-
-
-class ChatMessageRepository(Repository[ChatMessage]):
-    """Репозиторий сообщений ии-диалога"""
-
-    async def list_by_session(
-        self,
-        session_id: UUID,
-        *,
-        limit: int = 50,
-    ) -> list[ChatMessage]:
-        """
-        Возвращает последние сообщения диалога в хронологическом порядке
-        """
-
-    async def delete_by_session(self, session_id: UUID) -> None:
-        """
-        Удаляет сообщения закрываемого диалога
         """

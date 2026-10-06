@@ -73,17 +73,3 @@ class Citation:
     source: ArticleSource
 
     chunk_ids: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class ModelGeneration:
-    """Результат обращения к генеративной модели."""
-
-    text: str
-
-    requested_model_id: str
-    actual_model_id: str
-
-    input_tokens: int | None = None
-    output_tokens: int | None = None
-    provider_request_id: str | None = None

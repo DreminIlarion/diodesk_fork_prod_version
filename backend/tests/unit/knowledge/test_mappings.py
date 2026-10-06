@@ -4,8 +4,6 @@ from src.knowledge.infra.mappings import (
     build_articles_index_body,
     build_chunks_index_body,
     build_chunks_index_name,
-    build_messages_index_body,
-    build_sessions_index_body,
 )
 
 
@@ -72,13 +70,11 @@ def test_all_document_mappings_are_strict():
             number_of_shards=1,
             number_of_replicas=0,
         ),
-        build_sessions_index_body(
+        build_chunks_index_body(
             number_of_shards=1,
             number_of_replicas=0,
-        ),
-        build_messages_index_body(
-            number_of_shards=1,
-            number_of_replicas=0,
+            embedding_model="baai/bge-m3",
+            embedding_dimensions=1024,
         ),
     ]
 

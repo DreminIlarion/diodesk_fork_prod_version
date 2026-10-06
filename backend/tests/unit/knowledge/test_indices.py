@@ -18,8 +18,6 @@ def build_settings() -> OpenSearchSettings:
     return OpenSearchSettings(
         articles_index="kb_articles_v1",
         chunks_index_prefix="kb_chunks",
-        sessions_index="kb_chat_sessions_v1",
-        messages_index="kb_chat_messages_v1",
         articles_read_alias="kb_articles_read",
         articles_write_alias="kb_articles_write",
         chunks_read_alias="kb_chunks_read",
@@ -53,8 +51,6 @@ def test_resolve_knowledge_index_names():
     )
 
     assert names.articles == config.articles_index
-    assert names.sessions == config.sessions_index
-    assert names.messages == config.messages_index
     assert names.chunks.startswith("kb_chunks-1024-")
 
 
@@ -72,7 +68,7 @@ async def test_ensure_knowledge_indices_creates_missing_resources():
         embedding_dimensions=EMBEDDING_DIMENSIONS,
     )
 
-    expected_index_count = 4
+    expected_index_count = 2
     expected_alias_count = 4
 
     assert client.indices.create.await_count == expected_index_count
@@ -86,8 +82,6 @@ async def test_ensure_knowledge_indices_creates_missing_resources():
     assert created_indices == {
         names.articles,
         names.chunks,
-        names.sessions,
-        names.messages,
     }
 
 

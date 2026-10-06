@@ -190,8 +190,6 @@ class OpenSearchSettings(BaseSettings):
 
     articles_index: str = "kb_articles_v1"
     chunks_index_prefix: str = "kb_chunks"
-    sessions_index: str = "kb_chat_sessions_v1"
-    messages_index: str = "kb_chat_messages_v1"
 
     articles_read_alias: str = "kb_articles_read"
     articles_write_alias: str = "kb_articles_write"

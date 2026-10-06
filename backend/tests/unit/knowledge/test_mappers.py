@@ -1,22 +1,13 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from src.knowledge.domain.entities import (
-    Article,
-    ChatMessage,
-    ChatSession,
-)
+from src.knowledge.domain.entities import Article
 from src.knowledge.domain.vo import (
     ArticleSource,
     ArticleStatus,
     ArticleVisibility,
-    ChatRole,
 )
-from src.knowledge.infra.mappers import (
-    ArticleDocumentMapper,
-    ChatMessageDocumentMapper,
-    ChatSessionDocumentMapper,
-)
+from src.knowledge.infra.mappers import ArticleDocumentMapper
 
 
 def build_article() -> Article:
@@ -111,95 +102,4 @@ def test_article_mapper_preserves_empty_optional_fields():
     assert restored.product_id is None
     assert restored.project_id is None
     assert restored.counterparty_id is None
-    assert restored.deleted_at is None
-
-
-def build_chat_session() -> ChatSession:
-    return ChatSession(
-        id=UUID("ac47fc79-936f-4a02-b21d-8227bcc66f80"),
-        ticket_id=UUID("34294f51-5db7-47c6-9120-2d5df1e445e5"),
-        created_by=UUID("07832d16-437c-48a4-bf2a-87c18e30bfd2"),
-        model_id="auto",
-        created_at=datetime(2026, 9, 28, 10, 0, tzinfo=UTC),
-        updated_at=datetime(2026, 9, 28, 10, 5, tzinfo=UTC),
-        deleted_at=None,
-    )
-
-
-def build_chat_message() -> ChatMessage:
-    return ChatMessage(
-        id=UUID("e7781351-d416-4e2e-bf81-7b0750f6f12b"),
-        session_id=UUID("ac47fc79-936f-4a02-b21d-8227bcc66f80"),
-        role=ChatRole.ASSISTANT,
-        content="Для исправления перепроведите документ.",
-        requested_model_id="auto",
-        actual_model_id="openai/gpt-4.1-mini",
-        confidence=0.87,
-        citation_article_ids=[
-            UUID("c1545085-5ce4-4301-bc4a-058940332abb")
-        ],
-        provider_request_id="request-123",
-        created_at=datetime(2026, 9, 28, 10, 1, tzinfo=UTC),
-        updated_at=datetime(2026, 9, 28, 10, 1, tzinfo=UTC),
-        deleted_at=None,
-    )
-
-
-def test_chat_session_mapper_round_trip():
-    session = build_chat_session()
-
-    document = ChatSessionDocumentMapper.from_entity(session)
-    restored = ChatSessionDocumentMapper.to_entity(
-        str(session.id),
-        document,
-    )
-
-    assert "id" not in document
-    assert document["ticket_id"] == str(session.ticket_id)
-    assert document["model_id"] == "auto"
-    assert restored.id == session.id
-    assert restored.ticket_id == session.ticket_id
-    assert restored.created_by == session.created_by
-    assert restored.model_id == session.model_id
-    assert ChatSessionDocumentMapper.from_entity(restored) == document
-
-
-def test_chat_message_mapper_round_trip():
-    message = build_chat_message()
-
-    document = ChatMessageDocumentMapper.from_entity(message)
-    restored = ChatMessageDocumentMapper.to_entity(
-        str(message.id),
-        document,
-    )
-
-    assert "id" not in document
-    assert document["role"] == "assistant"
-    assert document["actual_model_id"] == message.actual_model_id
-    assert restored.id == message.id
-    assert restored.session_id == message.session_id
-    assert restored.role == ChatRole.ASSISTANT
-    assert restored.confidence == message.confidence
-    assert restored.citation_article_ids == message.citation_article_ids
-    assert ChatMessageDocumentMapper.from_entity(restored) == document
-
-
-def test_chat_message_mapper_preserves_empty_optional_fields():
-    message = ChatMessage(
-        session_id=uuid4(),
-        role=ChatRole.USER,
-        content="Как устранить ошибку?",
-    )
-
-    document = ChatMessageDocumentMapper.from_entity(message)
-    restored = ChatMessageDocumentMapper.to_entity(
-        str(message.id),
-        document,
-    )
-
-    assert restored.requested_model_id is None
-    assert restored.actual_model_id is None
-    assert restored.confidence is None
-    assert restored.citation_article_ids == []
-    assert restored.provider_request_id is None
     assert restored.deleted_at is None

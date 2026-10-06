@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import pytest
 
-from src.knowledge.domain.entities import Article, ChatSession
+from src.knowledge.domain.entities import Article
 from src.knowledge.domain.events import (
     ArticleCreated,
     ArticleEdited,
@@ -84,15 +84,3 @@ def test_archived_article_cannot_be_published(article: Article):
 
     with pytest.raises(InvalidStateError):
         article.publish(uuid4())
-
-
-def test_chat_session_changes_model():
-    session = ChatSession(
-        ticket_id=uuid4(),
-        created_by=uuid4(),
-        model_id="qwen/first",
-    )
-
-    session.change_model("deepseek/second")
-
-    assert session.model_id == "deepseek/second"

@@ -8,8 +8,6 @@ from .mappings import (
     build_articles_index_body,
     build_chunks_index_body,
     build_chunks_index_name,
-    build_messages_index_body,
-    build_sessions_index_body,
 )
 
 
@@ -23,8 +21,6 @@ class KnowledgeIndexNames:
 
     articles: str
     chunks: str
-    sessions: str
-    messages: str
 
 
 def resolve_knowledge_index_names(
@@ -42,8 +38,6 @@ def resolve_knowledge_index_names(
             embedding_model=embedding_model,
             embedding_dimensions=embedding_dimensions,
         ),
-        sessions=config.sessions_index,
-        messages=config.messages_index,
     )
 
 
@@ -110,24 +104,6 @@ async def ensure_knowledge_indices(
         index=names.chunks,
         alias=config.chunks_write_alias,
         is_write_index=True,
-    )
-
-    await _ensure_index(
-        client,
-        index=names.sessions,
-        body=build_sessions_index_body(
-            number_of_shards=config.number_of_shards,
-            number_of_replicas=config.number_of_replicas,
-        ),
-    )
-
-    await _ensure_index(
-        client,
-        index=names.messages,
-        body=build_messages_index_body(
-            number_of_shards=config.number_of_shards,
-            number_of_replicas=config.number_of_replicas,
-        ),
     )
 
     return names
