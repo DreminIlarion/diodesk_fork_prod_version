@@ -11,6 +11,8 @@ import type {
   CounterpartyType, CreateCounterpartyInput, ContactPersonInput, CreateBranchInput,
 } from '../types';
 
+import { ActionButton } from '../components/ui/ActionButton';
+
 // ─── Маска телефона ────
 
 function formatPhoneInput(raw: string): string {
@@ -474,320 +476,528 @@ export default function NewCounterpartyPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
-  const [step, setStep] = useState(1);
 
   const [formData, setFormData] = useState<CreateCounterpartyInput>({
     counterparty_type: 'Юридическое лицо',
-    name: '', legal_name: '', inn: '', kpp: '', okpo: '',
-    phone: '', email: '', address: '',
+    name: '',
+    legal_name: '',
+    inn: '',
+    kpp: '',
+    okpo: '',
+    phone: '',
+    email: '',
+    address: '',
   });
 
   const companyPhone = usePhoneMask(formData.phone);
 
-  const [contactPersons, setContactPersons] = useState<ContactPersonInput[]>([]);
+  // Дополнительные разделы
   const [includeContacts, setIncludeContacts] = useState(false);
-  const [branches, setBranches] = useState<BranchFormData[]>([]);
+  const [contactPersons, setContactPersons] = useState<ContactPersonInput[]>([]);
+
   const [includeBranches, setIncludeBranches] = useState(false);
+  const [branches, setBranches] = useState<BranchFormData[]>([]);
+
+  const [includeProducts, setIncludeProducts] = useState(false);
   const [linkedProducts, setLinkedProducts] = useState<LinkedProduct[]>([]);
-  const [showProductForm, setShowProductForm] = useState(false);
+
+  // Продукты
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productFilter, setProductFilter] = useState('');
-  const [selectedProductToLink, setSelectedProductToLink] = useState<any | null>(null);
   const [productEnv, setProductEnv] = useState('production');
   const [productIsPrimary, setProductIsPrimary] = useState(false);
 
   useEffect(() => {
-    if (showProductForm && allProducts.length === 0) {
-      setLoadingProducts(true);
-      productsApi.getProducts({ page: 1, size: 50 })
-        .then(res => setAllProducts(res.items ?? []))
-        .catch(() => { })
-        .finally(() => setLoadingProducts(false));
-    }
-  }, [showProductForm]);
+    if (!includeProducts || allProducts.length > 0) return;
 
-  const filteredProducts = productFilter.trim()
-    ? allProducts.filter(p => {
-      const q = productFilter.toLowerCase();
-      return (p.display_name || p.name || '').toLowerCase().includes(q) ||
-        (p.vendor || '').toLowerCase().includes(q);
-    })
-    : allProducts;
+    setLoadingProducts(true);
 
-  const availableProducts = filteredProducts.filter(
-    p => !linkedProducts.some(lp => lp.product.id === p.id)
-  );
+    productsApi
+      .getProducts({ page: 1, size: 50 })
+      .then((res) => setAllProducts(res.items ?? []))
+      .catch(() => {})
+      .finally(() => setLoadingProducts(false));
+  }, [includeProducts, allProducts.length]);
 
-  const clearErrors = () => { setGeneralError(null); setFieldErrors([]); };
+  const clearErrors = () => {
+    setGeneralError(null);
+    setFieldErrors([]);
+  };
 
   const handleTypeChange = (type: CounterpartyType) => {
     clearErrors();
-    setFormData({
-      ...formData,
+
+    setFormData((prev) => ({
+      ...prev,
       counterparty_type: type,
       inn: '',
-      kpp: isKppAllowed(type) ? formData.kpp : '',
-    });
-    if (type !== 'Юридическое лицо') { setIncludeBranches(false); setBranches([]); }
+      kpp: type === 'Юридическое лицо' ? prev.kpp : '',
+    }));
+
+    if (type !== 'Юридическое лицо') {
+      setIncludeBranches(false);
+      setBranches([]);
+    }
   };
 
-  const addContactPerson = () => setContactPersons([...contactPersons, emptyContactPerson()]);
-  const removeContactPerson = (i: number) => setContactPersons(contactPersons.filter((_, idx) => idx !== i));
-  const updateContactPerson = (i: number, v: ContactPersonInput) =>
-    setContactPersons(contactPersons.map((cp, idx) => idx === i ? v : cp));
+  // ─────────────────────────────────────────────────────────────
+  // CONTACTS
+  // ─────────────────────────────────────────────────────────────
 
-  const addBranch = () => setBranches([...branches, emptyBranch()]);
-  const removeBranch = (i: number) => setBranches(branches.filter((_, idx) => idx !== i));
-  const updateBranch = (i: number, v: BranchFormData) =>
-    setBranches(branches.map((b, idx) => idx === i ? v : b));
+  const toggleContacts = () => {
+    if (includeContacts) {
+      setIncludeContacts(false);
+      setContactPersons([]);
+      return;
+    }
 
-  const removeLinkedProduct = (i: number) =>
-    setLinkedProducts(linkedProducts.filter((_, idx) => idx !== i));
+    setIncludeContacts(true);
+
+    if (contactPersons.length === 0) {
+      setContactPersons([emptyContactPerson()]);
+    }
+  };
+
+  const addContactPerson = () =>
+    setContactPersons((prev) => [...prev, emptyContactPerson()]);
+
+  const removeContactPerson = (index: number) =>
+    setContactPersons((prev) =>
+      prev.filter((_, i) => i !== index),
+    );
+
+  const updateContactPerson = (
+    index: number,
+    value: ContactPersonInput,
+  ) =>
+    setContactPersons((prev) =>
+      prev.map((item, i) => (i === index ? value : item)),
+    );
+
+  // ─────────────────────────────────────────────────────────────
+  // BRANCHES
+  // ─────────────────────────────────────────────────────────────
+
+  const toggleBranches = () => {
+    if (includeBranches) {
+      setIncludeBranches(false);
+      setBranches([]);
+      return;
+    }
+
+    setIncludeBranches(true);
+
+    if (branches.length === 0) {
+      setBranches([emptyBranch()]);
+    }
+  };
+
+  const addBranch = () =>
+    setBranches((prev) => [...prev, emptyBranch()]);
+
+  const removeBranch = (index: number) =>
+    setBranches((prev) =>
+      prev.filter((_, i) => i !== index),
+    );
+
+  const updateBranch = (
+    index: number,
+    value: BranchFormData,
+  ) =>
+    setBranches((prev) =>
+      prev.map((item, i) => (i === index ? value : item)),
+    );
+
+  // ─────────────────────────────────────────────────────────────
+  // PRODUCTS
+  // ─────────────────────────────────────────────────────────────
+
+  const filteredProducts = productFilter.trim()
+    ? allProducts.filter((product) => {
+        const q = productFilter.toLowerCase();
+
+        return (
+          (product.display_name || product.name || '')
+            .toLowerCase()
+            .includes(q) ||
+          (product.vendor || '').toLowerCase().includes(q)
+        );
+      })
+    : allProducts;
+
+  const availableProducts = filteredProducts.filter(
+    (product) =>
+      !linkedProducts.some(
+        (linked) => linked.product.id === product.id,
+      ),
+  );
+
+  const addLinkedProduct = (product: any) => {
+    setLinkedProducts((prev) => [
+      ...prev,
+      {
+        product,
+        environment: productEnv,
+        is_primary: productIsPrimary,
+      },
+    ]);
+  };
+
+  const removeLinkedProduct = (index: number) =>
+    setLinkedProducts((prev) =>
+      prev.filter((_, i) => i !== index),
+    );
+
+  // ─────────────────────────────────────────────────────────────
+  // VALIDATION
+  // ─────────────────────────────────────────────────────────────
+
+  const innLength = getInnMaxLength(formData.counterparty_type);
+
+  const innValidation = validateInn(
+    formData.inn,
+    formData.counterparty_type,
+  );
+
+  const kppValidation = validateKpp(formData.kpp ?? '');
+  const okpoValidation = validateOkpo(formData.okpo ?? '');
+
+  const isMainValid =
+    !!formData.name.trim() &&
+    !!formData.legal_name.trim() &&
+    innValidation.valid &&
+    (
+      !isKppRequired(formData.counterparty_type) ||
+      kppValidation.valid
+    ) &&
+    okpoValidation.valid;
+
+  const areContactsValid =
+    !includeContacts ||
+    contactPersons.every(
+      (person) =>
+        person.last_name?.trim() &&
+        person.first_name?.trim() &&
+        person.middle_name?.trim() &&
+        (!person.phone || isPhoneValid(person.phone)) &&
+        (!person.email || isEmailValid(person.email)),
+    );
+
+  const areBranchesValid =
+    !includeBranches ||
+    branches.every(
+      (branch) =>
+        branch.name.trim() &&
+        branch.legal_name.trim() &&
+        validateKpp(branch.kpp).valid &&
+        (!branch.okpo || validateOkpo(branch.okpo).valid) &&
+        isPhoneValid(branch.phone) &&
+        branch.phone &&
+        branch.email.trim() &&
+        isEmailValid(branch.email),
+    );
+
+  const duplicates = findDuplicateEmails(
+    formData.email,
+    contactPersons,
+    includeContacts,
+    branches,
+    includeBranches,
+  );
+
+  const isFormValid =
+    isMainValid &&
+    companyPhone.isComplete &&
+    isEmailValid(formData.email) &&
+    areContactsValid &&
+    areBranchesValid &&
+    duplicates.length === 0;
+
+  // ─────────────────────────────────────────────────────────────
+  // SUBMIT
+  // ─────────────────────────────────────────────────────────────
 
   const handleSubmit = async () => {
-    // ── Предварительные проверки ─────────────────────────────
     clearErrors();
 
-    // Проверка дубликатов email
-    const dupes = findDuplicateEmails(
-      formData.email, contactPersons, includeContacts, branches, includeBranches,
+    const duplicateEmails = findDuplicateEmails(
+      formData.email,
+      contactPersons,
+      includeContacts,
+      branches,
+      includeBranches,
     );
-    if (dupes.length > 0) {
+
+    if (duplicateEmails.length > 0) {
       setGeneralError(
-        `Дубликаты email: ${dupes.map(d => d.email).join(', ')}. ` +
-        'В системе нельзя использовать одинаковые email для разных сущностей.'
+        `Дубликаты email: ${duplicateEmails
+          .map((item) => item.email)
+          .join(', ')}. В системе нельзя использовать одинаковые email для разных сущностей.`,
       );
       return;
     }
 
-    // Проверка валидности email во всех полях
     const allEmails = collectAllEmails(
-      formData.email, contactPersons, includeContacts, branches, includeBranches,
+      formData.email,
+      contactPersons,
+      includeContacts,
+      branches,
+      includeBranches,
     );
-    const invalidEmail = allEmails.find(e => e.email.trim() && !isEmailValid(e.email));
+
+    const invalidEmail = allEmails.find(
+      (item) =>
+        item.email.trim() &&
+        !isEmailValid(item.email),
+    );
+
     if (invalidEmail) {
-      setGeneralError(`Некорректный email "${invalidEmail.email}" в: ${invalidEmail.source}`);
+      setGeneralError(
+        `Некорректный email "${invalidEmail.email}" в: ${invalidEmail.source}`,
+      );
+      return;
+    }
+
+    if (!isFormValid) {
+      setGeneralError(
+        'Проверьте обязательные поля перед созданием контрагента.',
+      );
       return;
     }
 
     setIsLoading(true);
 
+    let createdId: string | null = null;
+
     try {
-      // ── 1. Подготовка payload ──────────────────────────────
       const payload: any = {
         counterparty_type: formData.counterparty_type,
         name: formData.name.trim(),
         legal_name: formData.legal_name.trim(),
         inn: formData.inn,
         phone: companyPhone.rawValue,
-        
       };
-      if (formData.email?.trim()) payload.email = formData.email.trim();
-      if (formData.counterparty_type === 'Юридическое лицо') {
-        if (formData.kpp) payload.kpp = formData.kpp;
+
+      if (formData.email?.trim()) {
+        payload.email = formData.email.trim();
+      }
+
+      if (
+        formData.counterparty_type === 'Юридическое лицо'
+      ) {
+        if (formData.kpp) {
+          payload.kpp = formData.kpp;
+        }
       } else {
-        // Для ИП и Физлица — явно передаем null
         payload.kpp = 0;
       }
-      if (isKppAllowed(formData.counterparty_type) && formData.kpp) payload.kpp = formData.kpp;
-      if (formData.okpo) payload.okpo = formData.okpo;
-      if (formData.address?.trim()) payload.address = formData.address.trim();
 
-      if (includeContacts && contactPersons.length > 0) {
-        payload.contact_persons = contactPersons.map(cp => {
-  const p: any = { first_name: cp.first_name, last_name: cp.last_name };
-  if (cp.middle_name) p.middle_name = cp.middle_name;
-  if (cp.phone) p.phone = cp.phone;
-  if (cp.extension?.trim()) p.extension = cp.extension.trim();   // ← добавить
-  if (cp.position?.trim()) p.position = cp.position.trim();       // ← добавить
-  if (cp.email?.trim()) p.email = cp.email.trim();
-  const m: any = {};
-  if (cp.messengers?.telegram) m.telegram = cp.messengers.telegram;
-  if (cp.messengers?.vk) m.vk = cp.messengers.vk;
-  if (Object.keys(m).length) p.messengers = m;
-  return p;
-});
+      if (formData.okpo) {
+        payload.okpo = formData.okpo;
       }
 
-      // ── 2. Создание контрагента ───────────────────────────
-      const created = await counterpartiesApi.create(payload);
+      if (formData.address?.trim()) {
+        payload.address = formData.address.trim();
+      }
 
-      // ── 3. Подразделения (с откатом при ошибке) ───────────
-      if (includeBranches && branches.length > 0) {
-        try {
-          for (const b of branches) {
-            const bp: CreateBranchInput = {
-              name: b.name,
-              legal_name: b.legal_name,
-              kpp: b.kpp,
-              phone: b.phone,
-              email: b.email,
+      if (
+        includeContacts &&
+        contactPersons.length > 0
+      ) {
+        payload.contact_persons = contactPersons.map(
+          (contact) => {
+            const result: any = {
+              first_name: contact.first_name.trim(),
+              last_name: contact.last_name.trim(),
             };
-            if (b.okpo) bp.okpo = b.okpo;
-            if (b.address) bp.address = b.address;
-            await counterpartiesApi.createBranch(created.id, bp);
-          }
-        } catch (branchErr: any) {
-          // Откатываем — удаляем созданного контрагента
-          try {
-            await counterpartiesApi.delete(created.id);
-          } catch {
-            // Если удаление тоже упало — логируем но показываем оригинальную ошибку
-            console.error('Не удалось откатить создание контрагента', created.id);
+
+            if (contact.middle_name?.trim()) {
+              result.middle_name =
+                contact.middle_name.trim();
+            }
+
+            if (contact.phone) {
+              result.phone = contact.phone;
+            }
+
+            if (contact.extension?.trim()) {
+              result.extension =
+                contact.extension.trim();
+            }
+
+            if (contact.position?.trim()) {
+              result.position =
+                contact.position.trim();
+            }
+
+            if (contact.email?.trim()) {
+              result.email = contact.email.trim();
+            }
+
+            const messengers: any = {};
+
+            if (contact.messengers?.telegram) {
+              messengers.telegram =
+                contact.messengers.telegram;
+            }
+
+            if (contact.messengers?.vk) {
+              messengers.vk = contact.messengers.vk;
+            }
+
+            if (Object.keys(messengers).length) {
+              result.messengers = messengers;
+            }
+
+            return result;
+          },
+        );
+      }
+
+      const created =
+        await counterpartiesApi.create(payload);
+
+      createdId = created.id;
+
+      // Подразделения
+      if (
+        includeBranches &&
+        branches.length > 0
+      ) {
+        for (const branch of branches) {
+          const branchPayload: CreateBranchInput = {
+            name: branch.name.trim(),
+            legal_name: branch.legal_name.trim(),
+            kpp: branch.kpp,
+            phone: branch.phone,
+            email: branch.email.trim(),
+          };
+
+          if (branch.okpo) {
+            branchPayload.okpo = branch.okpo;
           }
 
-          const parsed = parseBackendErrors(branchErr);
-          setGeneralError(
-            `Ошибка при создании подразделения: ${parsed.general}. ` +
-            'Контрагент НЕ был создан — исправьте ошибку и попробуйте снова.'
+          if (branch.address.trim()) {
+            branchPayload.address =
+              branch.address.trim();
+          }
+
+          await counterpartiesApi.createBranch(
+            created.id,
+            branchPayload,
           );
-          setFieldErrors(parsed.fields);
-
-          // Перекинуть на шаг подразделений
-          if (formData.counterparty_type === 'Юридическое лицо') setStep(4);
-          return;
         }
       }
 
-      // ── 4. Продукты (с откатом при ошибке) ────────────────
+      // Продукты
       if (linkedProducts.length > 0) {
-        try {
-          for (const lp of linkedProducts) {
-            await counterpartiesApi.linkProduct(created.id, {
-              product_id: lp.product.id,
-              environment: lp.environment,
-              is_primary: lp.is_primary,
-            });
-          }
-        } catch (productErr: any) {
-          // Откатываем — удаляем контрагента
-          try {
-            await counterpartiesApi.delete(created.id);
-          } catch {
-            console.error('Не удалось откатить создание контрагента', created.id);
-          }
-
-          const parsed = parseBackendErrors(productErr);
-          setGeneralError(
-            `Ошибка при привязке продукта: ${parsed.general}. ` +
-            'Контрагент НЕ был создан — исправьте ошибку и попробуйте снова.'
+        for (const linked of linkedProducts) {
+          await counterpartiesApi.linkProduct(
+            created.id,
+            {
+              product_id: linked.product.id,
+              environment: linked.environment,
+              is_primary: linked.is_primary,
+            },
           );
-          setFieldErrors(parsed.fields);
-          setStep(productsStep);
-          return;
         }
       }
 
-      // ── 5. Успех ──────────────────────────────────────────
-      navigate('/counterparties');
-    } catch (err: any) {
-      // Ошибка создания самого контрагента — откат не нужен
-      const parsed = parseBackendErrors(err);
-      setGeneralError(parsed.general);
+      navigate(`/counterparties/${created.id}`);
+    } catch (error: any) {
+      /*
+       * Если основной контрагент уже был создан, но создание
+       * подразделения/продукта упало — сохраняем прежнюю
+       * транзакционную логику страницы.
+       */
+      if (createdId) {
+        try {
+          await counterpartiesApi.delete(createdId);
+        } catch {
+          console.error(
+            'Не удалось откатить создание контрагента',
+            createdId,
+          );
+        }
+      }
+
+      const parsed = parseBackendErrors(error);
+
+      setGeneralError(
+        createdId
+          ? `${parsed.general}. Контрагент не был создан — исправьте данные и попробуйте снова.`
+          : parsed.general,
+      );
+
       setFieldErrors(parsed.fields);
 
-      const step1Fields = ['inn', 'kpp', 'okpo', 'name', 'legal_name', 'counterparty_type'];
-      const step2Fields = ['phone', 'email', 'address'];
-      if (parsed.fields.some(f => step1Fields.includes(f.field))) setStep(1);
-      else if (parsed.fields.some(f => step2Fields.includes(f.field))) setStep(2);
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ─── Валидация полей ─────────────────────────────────────────────────────
-
-  const innLength = getInnMaxLength(formData.counterparty_type);
-  const innValidation = validateInn(formData.inn, formData.counterparty_type);
-  const kppValidation = validateKpp(formData.kpp ?? '');
-  const okpoValidation = validateOkpo(formData.okpo ?? '');
-
-  const isInnValid = innValidation.valid;
-  const isKppValid = isKppRequired(formData.counterparty_type)
-    ? kppValidation.valid
-    : true;
-  const isOkpoValid = okpoValidation.valid;
-
-  const isEmailFilled = formData.email.trim().length > 0;
-  const isEmailCorrect = isEmailValid(formData.email);
-
-  const isStep1Valid = !!(
-    formData.counterparty_type &&
-    formData.name.trim() &&
-    formData.legal_name.trim() &&
-    isInnValid &&
-    isKppValid &&
-    isOkpoValid
-  );
-
-  const isStep2Valid = companyPhone.isComplete
-
-  const isStep3Valid = !includeContacts || contactPersons.every(cp => 
-    cp.last_name && cp.first_name && cp.middle_name 
-  );
-
-  const totalSteps = formData.counterparty_type === 'Юридическое лицо' ? 5 : 4;
-  const productsStep = formData.counterparty_type === 'Юридическое лицо' ? 5 : 4;
-  const productsPrevStep = formData.counterparty_type === 'Юридическое лицо' ? 4 : 3;
-
-  const stepLabels: Record<number, string> = {
-    1: 'Основное', 2: 'Контакты', 3: 'Контактные лица',
-    4: formData.counterparty_type === 'Юридическое лицо' ? 'Подразделение' : 'Продукты',
-    5: 'Продукты',
-  };
-
   return (
-    <div className="max-w-5xl mx-auto pb-12 space-y-8">
+    <div className="max-w-5xl mx-auto pb-16">
 
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <button onClick={() => navigate('/counterparties')}
-          className="p-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] border border-[var(--border-color)]
-                     text-[var(--text-primary)]/60 hover:text-[var(--text-primary)] transition-all">
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Новый контрагент</h1>
-          <p className="text-base text-[var(--text-primary)]/50 mt-0.5">Заполните данные контрагента</p>
+      {/* =========================================================
+          HEADER
+      ========================================================= */}
+      <div className="flex items-start justify-between gap-4 mb-8">
+        <div className="flex items-start gap-4">
+          <button
+            type="button"
+            onClick={() => navigate('/counterparties')}
+            className="
+              mt-0.5 p-2.5
+              rounded-xl
+              border border-[var(--border-color)]
+              bg-[var(--hover-1)]
+              hover:bg-[var(--hover-2)]
+              text-[var(--text-primary)]/50
+              hover:text-[var(--text-primary)]
+              transition-colors
+            "
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">
+              Новый контрагент
+            </h1>
+
+            <p className="mt-1 text-sm text-[var(--text-primary)]/40">
+              Заполните основные данные. Остальные разделы можно добавить при необходимости.
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Progress */}
-      <div className="flex items-center justify-center gap-2 flex-wrap">
-        {Array.from({ length: totalSteps }, (_, i) => i + 1).map(s => (
-          <div key={s} className="flex items-center gap-2">
-            <button
-              onClick={() => { if (s < step) setStep(s); }}
-              disabled={s > step}
-              className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-semibold transition-all ${step === s
-                ? 'bg-[var(--accent)] text-white shadow-[var(--shadow-md)]'
-                : step > s
-                  ? 'bg-emerald-600 text-white cursor-pointer hover:bg-emerald-500'
-                  : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40'
-                }`}
-            >
-              {step > s ? <Check className="w-4 h-4" /> : s}
-            </button>
-            <span className={`text-sm font-medium hidden sm:block ${step >= s ? 'text-[var(--text-primary)]/70' : 'text-[var(--text-primary)]/40'}`}>
-              {stepLabels[s]}
-            </span>
-            {s < totalSteps && <div className="w-6 h-0.5 bg-[var(--hover-3)]" />}
-          </div>
-        ))}
-      </div>
-
-      {/* Global Error */}
+      {/* =========================================================
+          GLOBAL ERROR
+      ========================================================= */}
       {generalError && (
-        <div className="p-4 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-xl flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-[var(--accent)] mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-base text-[var(--accent)] font-medium">{generalError}</p>
+        <div className="mb-6 p-4 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/30 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-[var(--accent)] mt-0.5 shrink-0" />
+
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-[var(--accent)]">
+              {generalError}
+            </p>
+
             {fieldErrors.length > 0 && (
               <ul className="mt-2 space-y-1">
-                {fieldErrors.map((fe, i) => (
-                  <li key={i} className="text-sm text-[var(--accent)]/80">
-                    <span className="font-mono">{fe.field}</span>: {fe.message}
+                {fieldErrors.map((error, index) => (
+                  <li
+                    key={index}
+                    className="text-xs text-[var(--accent)]/75"
+                  >
+                    {error.message}
                   </li>
                 ))}
               </ul>
@@ -796,781 +1006,1210 @@ export default function NewCounterpartyPage() {
         </div>
       )}
 
-      {/* ═══ Шаг 1: Основное ═══ */}
-      {step === 1 && (
-        <div className="bg-[var(--hover-2)] border border-[var(--border-color)] rounded-2xl p-6 space-y-7">
+      <div className="space-y-5">
 
-          {/* Тип */}
-          <div>
-            <p className={labelCls}>Тип контрагента</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {COUNTERPARTY_TYPES.map(type => (
-                <button key={type.value} type="button" onClick={() => handleTypeChange(type.value)}
-                  className={`p-5 rounded-xl border-2 text-left transition-all ${formData.counterparty_type === type.value
-                    ? 'border-[var(--accent)]/60 bg-[var(--accent)]/[0.06]'
-                    : 'border-[var(--border-color)] bg-[var(--hover-1)] hover:border-[var(--accent)]/20'
-                    }`}>
-                  <div className={`mb-2 ${formData.counterparty_type === type.value ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'}`}>
-                    {type.icon}
-                  </div>
-                  <p className={`text-base font-semibold ${formData.counterparty_type === type.value ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/70'}`}>
-                    {type.label}
-                  </p>
-                  <p className="text-sm text-[var(--text-primary)]/40 mt-1">{type.desc}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Названия */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className={labelCls}>Краткое название <span className="text-[var(--accent)]">*</span></label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={e => { clearErrors(); setFormData({ ...formData, name: e.target.value }); }}
-                placeholder={
-                  formData.counterparty_type === 'Физическое лицо' ? 'Введите название'
-                    : formData.counterparty_type === 'Индивидуальный предприниматель' ? 'Введите название'
-                      : 'Введите название'
-                }
-                className={inputCls(hasFieldError(fieldErrors, 'name'))}
-              />
-              <FieldErrorMsg fieldErrors={fieldErrors} fieldName="name" />
-            </div>
-            <div>
-              <label className={labelCls}>Полное наименование <span className="text-[var(--accent)]">*</span></label>
-              <input
-                type="text"
-                value={formData.legal_name}
-                onChange={e => { clearErrors(); setFormData({ ...formData, legal_name: e.target.value }); }}
-                placeholder={formData.counterparty_type === 'Юридическое лицо' ? 'Введите полное название' : 'Полное ФИО'}
-                className={inputCls(hasFieldError(fieldErrors, 'legal_name'))}
-              />
-              <FieldErrorMsg fieldErrors={fieldErrors} fieldName="legal_name" />
-            </div>
-          </div>
-
-          {/* Реквизиты */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {/* ИНН */}
-            <div>
-              <label className={labelCls}>ИНН <span className="text-[var(--accent)]">*</span></label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={formData.inn}
-                onChange={e => {
-                  clearErrors();
-                  const val = e.target.value.replace(/\D/g, '');
-                  if (val.length <= innLength) setFormData({ ...formData, inn: val });
-                }}
-                placeholder={getInnPlaceholder(formData.counterparty_type)}
-                maxLength={innLength}
-                className={inputCls(
-                  (formData.inn.length > 0 && !innValidation.valid) ||
-                  hasFieldError(fieldErrors, 'inn')
-                )}
-              />
-              {/* Прогресс ввода */}
-              {formData.inn.length > 0 && formData.inn.length < innLength && (
-                <Hint>ИНН: {formData.inn.length}/{innLength} цифр</Hint>
-              )}
-              {/* Ошибка контрольной суммы */}
-              {formData.inn.length === innLength && !innValidation.valid && innValidation.message && (
-                <Hint>{innValidation.message}</Hint>
-              )}
-              {/* Успех */}
-              {innValidation.valid && (
-                <SuccessHint>ИНН корректен</SuccessHint>
-              )}
-              <FieldErrorMsg fieldErrors={fieldErrors} fieldName="inn" />
-            </div>
-
-            {/* КПП */}
-            {isKppAllowed(formData.counterparty_type) && (
-              <div>
-                <label className={labelCls}>КПП <span className="text-[var(--accent)]">*</span></label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={formData.kpp}
-                  onChange={e => {
-                    clearErrors();
-                    const val = e.target.value.replace(/\D/g, '');
-                    if (val.length <= 9) setFormData({ ...formData, kpp: val });
-                  }}
-                  placeholder="9 цифр"
-                  maxLength={9}
-                  className={inputCls(
-                    (!!formData.kpp && !kppValidation.valid) ||
-                    hasFieldError(fieldErrors, 'kpp')
-                  )}
-                />
-                {formData.kpp && formData.kpp.length < 9 && (
-                  <Hint>КПП: {formData.kpp.length}/9 цифр</Hint>
-                )}
-                {formData.kpp && formData.kpp.length === 9 && !kppValidation.valid && (
-                  <Hint>{kppValidation.message}</Hint>
-                )}
-                {kppValidation.valid && formData.kpp && (
-                  <SuccessHint>КПП корректен</SuccessHint>
-                )}
-                <FieldErrorMsg fieldErrors={fieldErrors} fieldName="kpp" />
-              </div>
-            )}
-
-            {/* ОКПО */}
-            <div>
-              <label className={labelCls}>ОКПО <span className="text-[var(--text-primary)]/40 text-sm font-normal">(необяз.)</span></label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={formData.okpo}
-                onChange={e => {
-                  clearErrors();
-                  const val = e.target.value.replace(/\D/g, '');
-                  if (val.length <= 10) setFormData({ ...formData, okpo: val });
-                }}
-                placeholder="8 или 10 цифр"
-                maxLength={10}
-                className={inputCls(
-                  (!!formData.okpo && !okpoValidation.valid) ||
-                  hasFieldError(fieldErrors, 'okpo')
-                )}
-              />
-              {formData.okpo && !okpoValidation.valid && (
-                <Hint>{okpoValidation.message}</Hint>
-              )}
-              {formData.okpo && okpoValidation.valid && (
-                <SuccessHint>ОКПО: {formData.okpo}</SuccessHint>
-              )}
-              <FieldErrorMsg fieldErrors={fieldErrors} fieldName="okpo" />
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-2">
-            <button
-              onClick={() => setStep(2)}
-              disabled={!isStep1Valid}
-              className="px-6 py-3 text-base font-semibold text-white bg-[var(--accent)]
-                         hover:bg-[var(--accent-light)] rounded-xl transition-all
-                         disabled:opacity-40 disabled:cursor-not-allowed shadow-[var(--shadow-md)]"
-            >
-              Далее
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ Шаг 2: Контакты ═══ */}
-      {step === 2 && (
-        <div className="bg-[var(--hover-2)] border border-[var(--border-color)] rounded-2xl p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-
-            {/* Телефон компании */}
-            <div>
-              <label className={labelCls}>
-                <Phone className="w-4 h-4 inline mr-1.5 text-[var(--text-primary)]/40" />
-                Телефон <span className="text-[var(--accent)]">*</span>
-              </label>
-              <input
-                type="tel"
-                value={companyPhone.display}
-                onChange={companyPhone.handleChange}
-                onKeyDown={companyPhone.handleKeyDown}
-                placeholder="+7 (___) ___-__-__"
-                className={inputCls(
-                  (!companyPhone.isEmpty && !companyPhone.isComplete) ||
-                  hasFieldError(fieldErrors, 'phone')
-                )}
-              />
-              {!companyPhone.isEmpty && !companyPhone.isComplete && (
-                <Hint>Введите полный номер: +7 (XXX) XXX-XX-XX</Hint>
-              )}
-              {companyPhone.isComplete && (
-                <SuccessHint>{companyPhone.display}</SuccessHint>
-              )}
-              <FieldErrorMsg fieldErrors={fieldErrors} fieldName="phone" />
-            </div>
-
-            {/* Email компании */}
-            <div>
-              <label className={labelCls}>
-                <Mail className="w-4 h-4 inline mr-1.5 text-[var(--text-primary)]/40" />
-                Email <span class="text-[var(--text-primary)]/40 text-sm font-normal">(необяз.)</span>
-              </label>
-              <EmailInput
-                value={formData.email}
-                onChange={v => { clearErrors(); setFormData({ ...formData, email: v }); }}
-                placeholder="info@company.ru"
-
-                hasBackendError={hasFieldError(fieldErrors, 'email')}
-              />
-              <FieldErrorMsg fieldErrors={fieldErrors} fieldName="email" />
-            </div>
-          </div>
-
-          {/* Адрес */}
-          <div>
-            <label className={labelCls}>
-              <MapPin className="w-4 h-4 inline mr-1.5 text-[var(--text-primary)]/40" />
-              Адрес <span className="text-[var(--text-primary)]/40 text-sm font-normal">(необяз.)</span>
-            </label>
-            <textarea
-              value={formData.address}
-              onChange={e => setFormData({ ...formData, address: e.target.value })}
-              placeholder="г. Москва, ул. Примерная, д. 1"
-              rows={3}
-              className={`${inputCls()} resize-none`}
-            />
-          </div>
-
-          <div className="flex justify-between pt-2">
-            <button onClick={() => setStep(1)}
-              className="px-6 py-3 text-base font-medium text-[var(--text-primary)]/70
-                         bg-[var(--hover-2)] hover:bg-[var(--hover-3)] rounded-xl transition-all">
-              Назад
-            </button>
-            <button
-              onClick={() => setStep(3)}
-              disabled={!isStep2Valid}
-              className="px-6 py-3 text-base font-semibold text-white bg-[var(--accent)]
-                         hover:bg-[var(--accent-light)] rounded-xl transition-all
-                         disabled:opacity-40 disabled:cursor-not-allowed shadow-[var(--shadow-md)]"
-            >
-              Далее
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ Шаг 3: Контактные лица ═══ */}
-      {step === 3 && (
-        <div className="bg-[var(--hover-2)] border border-[var(--border-color)] rounded-2xl p-6 space-y-6">
-          <div className="flex items-center justify-between p-4 bg-[var(--hover-1)] rounded-xl border border-[var(--border-color)]">
+        {/* =======================================================
+            1. ОСНОВНЫЕ ДАННЫЕ
+        ======================================================= */}
+        <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] overflow-hidden">
+          <div className="px-6 py-5 border-b border-[var(--border-color)]">
             <div className="flex items-center gap-3">
-              <UserCircle className="w-6 h-6 text-[var(--text-primary)]/40" />
+              <div className="w-9 h-9 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
+                <Building2 className="w-4.5 h-4.5 text-[var(--accent)]" />
+              </div>
+
               <div>
-                <p className="text-base font-medium text-[var(--text-primary)]">Контактные лица</p>
-                <p className="text-sm text-[var(--text-primary)]/40">Ответственные сотрудники</p>
-              </div>
-            </div>
-            <button type="button"
-              onClick={() => {
-                if (includeContacts) { setIncludeContacts(false); setContactPersons([]); }
-                else { setIncludeContacts(true); if (!contactPersons.length) setContactPersons([emptyContactPerson()]); }
-              }}
-              className={`relative w-12 h-6 rounded-full transition-colors ${includeContacts ? 'bg-[var(--accent)]' : 'bg-[var(--hover-3)]'}`}>
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${includeContacts ? 'translate-x-6' : ''}`} />
-            </button>
-          </div>
+                <h2 className="text-base font-semibold text-[var(--text-primary)]">
+                  Основные данные
+                </h2>
 
-          {includeContacts && contactPersons.map((cp, i) => (
-            <div key={i} className="p-5 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-xl space-y-5">
-              <div className="flex items-center justify-between">
-                <p className="text-base font-medium text-[var(--text-primary)]">Контакт #{i + 1}</p>
-                {contactPersons.length > 1 && (
-                  <button onClick={() => removeContactPerson(i)}
-                    className="p-1.5 text-[var(--text-primary)]/40 hover:text-[var(--accent)] hover:bg-[var(--hover-2)] rounded-lg transition-all">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* ФИО */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className={labelCls}>Фамилия <span className="text-[var(--accent)]">*</span></label>
-                  <input type="text" value={cp.last_name}
-                    onChange={e => updateContactPerson(i, { ...cp, last_name: e.target.value })}
-                    placeholder="Введите фамилию" className={inputCls()} />
-                </div>
-                <div>
-                  <label className={labelCls}>Имя <span className="text-[var(--accent)]">*</span></label>
-                  <input type="text" value={cp.first_name}
-                    onChange={e => updateContactPerson(i, { ...cp, first_name: e.target.value })}
-                    placeholder="Введите имя" className={inputCls()} />
-                </div>
-                  <div>
-                    <label className={labelCls}>Отчество <span className="text-[var(--accent)]">*</span></label>
-                    <input type="text" value={cp.middle_name}
-                      onChange={e => updateContactPerson(i, { ...cp, middle_name: e.target.value })}
-                      placeholder="Введите отчество" className={inputCls()} />
-                  </div>
-              </div>
-
-              {/* Телефон + Email контакта */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>Телефон <span className="text-[var(--text-primary)]/40 text-sm font-normal">(необяз.)</span></label>
-                  <ContactPhoneInput
-                    value={cp.phone}
-                    onChange={(raw) => updateContactPerson(i, { ...cp, phone: raw })}
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Email <span className="text-[var(--text-primary)]/40 text-sm font-normal">(необяз.)</span></label>
-                  <EmailInput
-                    value={cp.email ?? ''}
-                    onChange={v => updateContactPerson(i, { ...cp, email: v })}
-                    placeholder="ivanov@company.ru"
-                  />
-                </div>
-              </div>
-
-              {/* Должность + Добавочный */}
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-  <div>
-    <label className={labelCls}>
-      <Briefcase className="w-3.5 h-3.5 inline mr-1.5 text-[var(--text-primary)]/40" />
-      Должность <span className="text-[var(--text-primary)]/40 text-sm font-normal">(необяз.)</span>
-    </label>
-    <input
-      type="text"
-      value={cp.position ?? ''}
-      onChange={e => updateContactPerson(i, { ...cp, position: e.target.value })}
-      placeholder="Главный бухгалтер"
-      className={inputCls()}
-    />
-  </div>
-  <div>
-    <label className={labelCls}>Добавочный номер <span className="text-[var(--text-primary)]/40 text-sm font-normal">(необяз.)</span></label>
-    <input
-      type="text"
-      value={cp.extension ?? ''}
-      onChange={e => updateContactPerson(i, { ...cp, extension: e.target.value })}
-      placeholder="1234"
-      className={inputCls()}
-    />
-  </div>
-</div>
-
-              {/* Мессенджеры */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>
-                    <MessageSquare className="w-3.5 h-3.5 inline mr-1.5 text-[var(--text-primary)]/40" />
-                    Telegram
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/40 text-base select-none">@</span>
-                    <input
-                      type="text"
-                      value={(cp.messengers?.telegram || '').replace(/^@/, '')}
-                      onChange={e => updateContactPerson(i, {
-                        ...cp,
-                        messengers: { ...cp.messengers, telegram: e.target.value ? '@' + e.target.value.replace(/^@/, '') : '' },
-                      })}
-                      placeholder="username"
-                      className={`${inputCls()} pl-8`}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className={labelCls}>VK</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/40 text-sm select-none">vk.com/</span>
-                    <input
-                      type="text"
-                      value={(cp.messengers?.vk || '').replace(/^vk\.com\//, '')}
-                      onChange={e => updateContactPerson(i, {
-                        ...cp,
-                        messengers: { ...cp.messengers, vk: e.target.value ? 'vk.com/' + e.target.value.replace(/^vk\.com\//, '') : '' },
-                      })}
-                      placeholder="id123456"
-                      className={`${inputCls()} pl-16`}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {includeContacts && (
-            <button onClick={addContactPerson}
-              className="flex items-center gap-2 px-5 py-3 text-base text-[var(--text-primary)]/50
-                         hover:text-[var(--text-primary)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)]
-                         border border-dashed border-[var(--border-color)] rounded-xl transition-all w-full justify-center">
-              <Plus className="w-4 h-4" /> Добавить ещё
-            </button>
-          )}
-
-          <div className="flex justify-between pt-2">
-            <button onClick={() => setStep(2)}
-              className="px-6 py-3 text-base font-medium text-[var(--text-primary)]/70
-                         bg-[var(--hover-2)] hover:bg-[var(--hover-3)] rounded-xl transition-all">
-              Назад
-            </button>
-            <button onClick={() => setStep(4)}
-              disabled={includeContacts && contactPersons.some(cp => !cp.last_name || !cp.first_name || !cp.middle_name )}
-              className="px-6 py-3 text-base font-semibold text-white bg-[var(--accent)]
-                        hover:bg-[var(--accent-light)] rounded-xl transition-all shadow-[var(--shadow-md)]
-                        disabled:opacity-40 disabled:cursor-not-allowed">
-              Далее
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ Шаг 4: Подразделение (юр. лицо) ═══ */}
-      {step === 4 && formData.counterparty_type === 'Юридическое лицо' && (
-        <div className="bg-[var(--hover-2)] border border-[var(--border-color)] rounded-2xl p-6 space-y-6">
-          <div className="flex items-center justify-between p-4 bg-[var(--hover-1)] rounded-xl border border-[var(--border-color)]">
-            <div className="flex items-center gap-3">
-              <GitBranch className="w-6 h-6 text-[var(--text-primary)]/40" />
-              <div>
-                <p className="text-base font-medium text-[var(--text-primary)]">Обособленные подразделения</p>
-                <p className="text-sm text-[var(--text-primary)]/40">Подразделения наследуют ИНН</p>
-              </div>
-            </div>
-            <button type="button"
-              onClick={() => {
-                if (includeBranches) { setIncludeBranches(false); setBranches([]); }
-                else { setIncludeBranches(true); if (!branches.length) setBranches([emptyBranch()]); }
-              }}
-              className={`relative w-12 h-6 rounded-full transition-colors ${includeBranches ? 'bg-[var(--accent)]' : 'bg-[var(--hover-3)]'}`}>
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${includeBranches ? 'translate-x-6' : ''}`} />
-            </button>
-          </div>
-
-          {includeBranches && branches.map((branch, i) => (
-            <div key={i} className="p-5 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-xl space-y-5">
-              <div className="flex items-center justify-between">
-                <p className="text-base font-medium text-[var(--text-primary)] flex items-center gap-2">
-                  <GitBranch className="w-4 h-4 text-[var(--text-primary)]/40" />
-                  Подразделение #{i + 1}
-                </p>
-                {branches.length > 1 && (
-                  <button onClick={() => removeBranch(i)}
-                    className="p-1.5 text-[var(--text-primary)]/40 hover:text-[var(--accent)] hover:bg-[var(--hover-2)] rounded-lg transition-all">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* ИНН наследуется */}
-              <div className="px-3 py-2 bg-[var(--hover-2)] rounded-lg border border-[var(--border-color)] flex items-center gap-2">
-                <FileText className="w-4 h-4 text-[var(--text-primary)]/40 flex-shrink-0" />
-                <p className="text-sm text-[var(--text-primary)]/40">
-                  ИНН наследуется:{' '}
-                  <span className="text-[var(--text-primary)] font-mono tracking-widest">{formData.inn}</span>
+                <p className="mt-0.5 text-xs text-[var(--text-primary)]/35">
+                  Тип организации и реквизиты
                 </p>
               </div>
+            </div>
+          </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>Название <span className="text-[var(--accent)]">*</span></label>
-                  <input type="text" value={branch.name}
-                    onChange={e => updateBranch(i, { ...branch, name: e.target.value })}
-                    placeholder="Введите название" className={inputCls()} />
-                </div>
-                <div>
-                  <label className={labelCls}>Полное наименование <span className="text-[var(--accent)]">*</span></label>
-                  <input type="text" value={branch.legal_name}
-                    onChange={e => updateBranch(i, { ...branch, legal_name: e.target.value })}
-                    placeholder="Введите полное название" className={inputCls()} />
-                </div>
+          <div className="p-6 space-y-6">
+
+            {/* TYPE */}
+            <div>
+              <label className={labelCls}>
+                Тип контрагента
+              </label>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {COUNTERPARTY_TYPES.map((type) => {
+                  const selected =
+                    formData.counterparty_type ===
+                    type.value;
+
+                  return (
+                    <button
+                      key={type.value}
+                      type="button"
+                      onClick={() =>
+                        handleTypeChange(type.value)
+                      }
+                      className={`
+                        relative
+                        p-4 rounded-xl
+                        border
+                        text-left
+                        transition-colors
+
+                        ${
+                          selected
+                            ? 'border-[var(--accent)]/50 bg-[var(--accent)]/[0.05]'
+                            : 'border-[var(--border-color)] bg-[var(--bg-card)] hover:bg-[var(--hover-2)]'
+                        }
+                      `}
+                    >
+                      {selected && (
+                        <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[var(--accent)] flex items-center justify-center">
+                          <Check className="w-3 h-3 text-white" />
+                        </span>
+                      )}
+
+                      <div
+                        className={
+                          selected
+                            ? 'text-[var(--accent)]'
+                            : 'text-[var(--text-primary)]/35'
+                        }
+                      >
+                        {type.icon}
+                      </div>
+
+                      <p className="mt-3 pr-6 text-sm font-semibold text-[var(--text-primary)]">
+                        {type.label}
+                      </p>
+
+                      <p className="mt-1 text-xs text-[var(--text-primary)]/35">
+                        {type.desc}
+                      </p>
+                    </button>
+                  );
+                })}
               </div>
+            </div>
 
-              {/* КПП + ОКПО подразделения */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>КПП <span className="text-[var(--accent)]">*</span></label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={branch.kpp}
-                    onChange={e => {
-                      const v = e.target.value.replace(/\D/g, '');
-                      if (v.length <= 9) updateBranch(i, { ...branch, kpp: v });
-                    }}
-                    placeholder="9 цифр"
-                    maxLength={9}
-                    className={inputCls(!!branch.kpp && branch.kpp.length !== 9)}
-                  />
-                  {branch.kpp && branch.kpp.length < 9 && (
-                    <Hint>КПП: {branch.kpp.length}/9 цифр</Hint>
-                  )}
-                  {branch.kpp && branch.kpp.length === 9 && !validateKpp(branch.kpp).valid && (
-                    <Hint>{validateKpp(branch.kpp).message}</Hint>
-                  )}
-                  {branch.kpp && validateKpp(branch.kpp).valid && (
-                    <SuccessHint>КПП корректен</SuccessHint>
-                  )}
-                </div>
-                <div>
-                  <label className={labelCls}>ОКПО <span className="text-[var(--text-primary)]/40 text-sm font-normal">(необяз.)</span></label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={branch.okpo}
-                    onChange={e => {
-                      const v = e.target.value.replace(/\D/g, '');
-                      if (v.length <= 10) updateBranch(i, { ...branch, okpo: v });
-                    }}
-                    placeholder="8 или 10 цифр"
-                    maxLength={10}
-                    className={inputCls(!!branch.okpo && !validateOkpo(branch.okpo).valid)}
-                  />
-                  {branch.okpo && !validateOkpo(branch.okpo).valid && (
-                    <Hint>{validateOkpo(branch.okpo).message}</Hint>
-                  )}
-                  {branch.okpo && validateOkpo(branch.okpo).valid && (
-                    <SuccessHint>ОКПО: {branch.okpo}</SuccessHint>
-                  )}
-                </div>
-              </div>
-
-              {/* Телефон + Email подразделения */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>
-                    <Phone className="w-4 h-4 inline mr-1.5 text-[var(--text-primary)]/40" />
-                    Телефон <span className="text-[var(--accent)]">*</span>
-                  </label>
-                  <BranchPhoneInput
-                    value={branch.phone}
-                    onChange={raw => updateBranch(i, { ...branch, phone: raw })}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>
-                    <Mail className="w-4 h-4 inline mr-1.5 text-[var(--text-primary)]/40" />
-                    Email <span className="text-[var(--accent)]">*</span>
-                  </label>
-                  <EmailInput
-                    value={branch.email}
-                    onChange={v => updateBranch(i, { ...branch, email: v })}
-                    placeholder="pochta@company.ru"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Адрес подразделения */}
+            {/* NAMES */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>
-                  <MapPin className="w-4 h-4 inline mr-1.5 text-[var(--text-primary)]/40" />
-                  Адрес
+                  Краткое название
+                  <span className="text-[var(--accent)] ml-1">
+                    *
+                  </span>
                 </label>
-                <input type="text" value={branch.address}
-                  onChange={e => updateBranch(i, { ...branch, address: e.target.value })}
-                  placeholder="г. Санкт-Петербург, ул. ..." className={inputCls()} />
-              </div>
-            </div>
-          ))}
 
-          {includeBranches && (
-            <button onClick={addBranch}
-              className="flex items-center gap-2 px-5 py-3 text-base text-[var(--text-primary)]/50
-                         hover:text-[var(--text-primary)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)]
-                         border border-dashed border-[var(--border-color)] rounded-xl transition-all w-full justify-center">
-              <Plus className="w-4 h-4" /> Добавить подразделение
-            </button>
-          )}
+                <input
+                  value={formData.name}
+                  onChange={(event) => {
+                    clearErrors();
 
-          <div className="flex justify-between pt-2">
-            <button onClick={() => setStep(3)}
-              className="px-6 py-3 text-base font-medium text-[var(--text-primary)]/70
-                         bg-[var(--hover-2)] hover:bg-[var(--hover-3)] rounded-xl transition-all">
-              Назад
-            </button>
-            <button onClick={() => setStep(5)}
-              className="px-6 py-3 text-base font-semibold text-white bg-[var(--accent)]
-                         hover:bg-[var(--accent-light)] rounded-xl transition-all shadow-[var(--shadow-md)]">
-              Далее
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ Шаг «Продукты» ═══ */}
-      {step === productsStep && (
-        <div className="bg-[var(--hover-2)] border border-[var(--border-color)] rounded-2xl p-6 space-y-6">
-          <div className="flex items-center justify-between p-4 bg-[var(--hover-1)] rounded-xl border border-[var(--border-color)]">
-            <div className="flex items-center gap-3">
-              <Package className="w-6 h-6 text-[var(--text-primary)]/40" />
-              <div>
-                <p className="text-base font-medium text-[var(--text-primary)]">Привязать продукты</p>
-                <p className="text-sm text-[var(--text-primary)]/40">ПО и оборудование</p>
-              </div>
-            </div>
-            <button type="button"
-              onClick={() => setShowProductForm(!showProductForm)}
-              className={`relative w-12 h-6 rounded-full transition-colors ${showProductForm ? 'bg-[var(--accent)]' : 'bg-[var(--hover-3)]'}`}>
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showProductForm ? 'translate-x-6' : ''}`} />
-            </button>
-          </div>
-
-          {showProductForm && (
-            <div className="space-y-5">
-              <div className="p-5 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-xl space-y-4">
-                <p className="text-base font-medium text-[var(--text-primary)]">Выберите продукт</p>
-
-                <div className="relative">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-primary)]/40 pointer-events-none" />
-                  <input
-                    value={productFilter}
-                    onChange={e => setProductFilter(e.target.value)}
-                    placeholder="Фильтр по названию или вендору..."
-                    className="w-full pl-10 pr-4 py-3 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl
-                               text-base text-[var(--text-primary)] placeholder-[var(--text-muted)]
-                               focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2
-                               focus:ring-[var(--accent-ring)] transition-all"
-                  />
-                </div>
-
-                <div className="max-h-56 overflow-y-auto rounded-xl border border-[var(--border-color)]
-                               bg-[var(--bg-secondary)] divide-y divide-[var(--border-color)]">
-                  {loadingProducts ? (
-                    <div className="flex justify-center py-10">
-                      <Loader2 className="w-5 h-5 animate-spin text-[var(--text-primary)]/20" />
-                    </div>
-                  ) : availableProducts.length === 0 ? (
-                    <div className="py-10 text-center">
-                      <Package className="w-8 h-8 mx-auto mb-2 text-[var(--text-primary)]/10" />
-                      <p className="text-base text-[var(--text-primary)]/40">
-                        {productFilter ? 'Ничего не найдено' : 'Нет продуктов'}
-                      </p>
-                    </div>
-                  ) : (
-                    availableProducts.slice(0, 30).map(p => {
-                      const PIcon = catMeta(p.category)?.icon || Package;
-                      return (
-                        <button key={p.id}
-                          onClick={() => {
-                            setLinkedProducts(prev => [...prev, {
-                              product: p, environment: productEnv, is_primary: productIsPrimary,
-                            }]);
-                            setProductFilter('');
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--hover-2)] transition-colors">
-                          <PIcon className="w-4 h-4 text-[var(--text-primary)]/40 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-base text-[var(--text-primary)] truncate">
-                              {p.display_name || p.name}
-                            </p>
-                            <p className="text-sm text-[var(--text-primary)]/40">{p.vendor}</p>
-                          </div>
-                        </button>
-                      );
-                    })
+                    setFormData((prev) => ({
+                      ...prev,
+                      name: event.target.value,
+                    }));
+                  }}
+                  placeholder="ООО Ромашка"
+                  className={inputCls(
+                    hasFieldError(fieldErrors, 'name'),
                   )}
-                </div>
+                />
 
-                {/* Выбор среды для продукта */}
+                <FieldErrorMsg
+                  fieldErrors={fieldErrors}
+                  fieldName="name"
+                />
+              </div>
+
+              <div>
+                <label className={labelCls}>
+                  Полное наименование
+                  <span className="text-[var(--accent)] ml-1">
+                    *
+                  </span>
+                </label>
+
+                <input
+                  value={formData.legal_name}
+                  onChange={(event) => {
+                    clearErrors();
+
+                    setFormData((prev) => ({
+                      ...prev,
+                      legal_name:
+                        event.target.value,
+                    }));
+                  }}
+                  placeholder={
+                    formData.counterparty_type ===
+                    'Юридическое лицо'
+                      ? 'Общество с ограниченной ответственностью «Ромашка»'
+                      : 'Полное ФИО'
+                  }
+                  className={inputCls(
+                    hasFieldError(
+                      fieldErrors,
+                      'legal_name',
+                    ),
+                  )}
+                />
+
+                <FieldErrorMsg
+                  fieldErrors={fieldErrors}
+                  fieldName="legal_name"
+                />
+              </div>
+            </div>
+
+            {/* REQUISITES */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className={labelCls}>
+                  ИНН
+                  <span className="text-[var(--accent)] ml-1">
+                    *
+                  </span>
+                </label>
+
+                <input
+                  value={formData.inn}
+                  inputMode="numeric"
+                  maxLength={innLength}
+                  onChange={(event) => {
+                    clearErrors();
+
+                    const value =
+                      event.target.value.replace(
+                        /\D/g,
+                        '',
+                      );
+
+                    if (value.length <= innLength) {
+                      setFormData((prev) => ({
+                        ...prev,
+                        inn: value,
+                      }));
+                    }
+                  }}
+                  placeholder={getInnPlaceholder(
+                    formData.counterparty_type,
+                  )}
+                  className={inputCls(
+                    (!!formData.inn &&
+                      !innValidation.valid) ||
+                    hasFieldError(
+                      fieldErrors,
+                      'inn',
+                    ),
+                  )}
+                />
+
+                {formData.inn &&
+                  !innValidation.valid && (
+                    <Hint>
+                      {innValidation.message}
+                    </Hint>
+                  )}
+
+                {innValidation.valid && (
+                  <SuccessHint>
+                    ИНН корректен
+                  </SuccessHint>
+                )}
+              </div>
+
+              {isKppAllowed(
+                formData.counterparty_type,
+              ) && (
                 <div>
-                  <label className="block text-sm text-[var(--text-primary)]/60 mb-2">
-                    Среда развертывания
+                  <label className={labelCls}>
+                    КПП
+                    <span className="text-[var(--accent)] ml-1">
+                      *
+                    </span>
                   </label>
-                  <p className="text-sm text-[var(--text-primary)]/40 mb-3">
-                    Выберите окружение, в котором будет использоваться продукт
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {ENVIRONMENTS.map(env => (
-                      <button
-                        key={env.value}
-                        onClick={() => setProductEnv(env.value)}
-                        className={`px-3 py-2.5 rounded-xl text-base font-medium transition-all ${productEnv === env.value
-                            ? envBadgeClass(env.value)
-                            : 'border border-[var(--border-color)] bg-[var(--hover-1)] text-[var(--text-primary)]/40 hover:bg-[var(--hover-2)]'
-                          }`}
-                      >
-                        {env.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
 
-                <div className="flex items-center justify-between p-3 bg-[var(--hover-1)] rounded-xl border border-[var(--border-color)]">
-                  <div>
-                    <p className="text-base text-[var(--text-primary)]/70">Основной продукт</p>
-                    <p className="text-sm text-[var(--text-primary)]/40">Отмечать следующие как основные</p>
+                  <input
+                    value={formData.kpp}
+                    inputMode="numeric"
+                    maxLength={9}
+                    onChange={(event) => {
+                      clearErrors();
+
+                      const value =
+                        event.target.value.replace(
+                          /\D/g,
+                          '',
+                        );
+
+                      if (value.length <= 9) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          kpp: value,
+                        }));
+                      }
+                    }}
+                    placeholder="9 цифр"
+                    className={inputCls(
+                      (!!formData.kpp &&
+                        !kppValidation.valid) ||
+                      hasFieldError(
+                        fieldErrors,
+                        'kpp',
+                      ),
+                    )}
+                  />
+
+                  {formData.kpp &&
+                    !kppValidation.valid && (
+                      <Hint>
+                        {kppValidation.message}
+                      </Hint>
+                    )}
+
+                  {formData.kpp &&
+                    kppValidation.valid && (
+                      <SuccessHint>
+                        КПП корректен
+                      </SuccessHint>
+                    )}
+                </div>
+              )}
+
+              <div>
+                <label className={labelCls}>
+                  ОКПО{' '}
+                  <span className="text-sm font-normal text-[var(--text-primary)]/30">
+                    (необяз.)
+                  </span>
+                </label>
+
+                <input
+                  value={formData.okpo}
+                  inputMode="numeric"
+                  maxLength={10}
+                  onChange={(event) => {
+                    const value =
+                      event.target.value.replace(
+                        /\D/g,
+                        '',
+                      );
+
+                    if (value.length <= 10) {
+                      setFormData((prev) => ({
+                        ...prev,
+                        okpo: value,
+                      }));
+                    }
+                  }}
+                  placeholder="8 или 10 цифр"
+                  className={inputCls(
+                    !!formData.okpo &&
+                      !okpoValidation.valid,
+                  )}
+                />
+
+                {formData.okpo &&
+                  !okpoValidation.valid && (
+                    <Hint>
+                      {okpoValidation.message}
+                    </Hint>
+                  )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* =======================================================
+            2. КОНТАКТЫ КОМПАНИИ
+        ======================================================= */}
+        <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] overflow-hidden">
+          <div className="px-6 py-5 border-b border-[var(--border-color)]">
+            <h2 className="text-base font-semibold text-[var(--text-primary)]">
+              Контакты компании
+            </h2>
+          </div>
+
+          <div className="p-6 space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>
+                  Телефон
+                  <span className="text-[var(--accent)] ml-1">
+                    *
+                  </span>
+                </label>
+
+                <input
+                  type="tel"
+                  value={companyPhone.display}
+                  onChange={companyPhone.handleChange}
+                  onKeyDown={
+                    companyPhone.handleKeyDown
+                  }
+                  placeholder="+7 (___) ___-__-__"
+                  className={inputCls(
+                    !companyPhone.isEmpty &&
+                      !companyPhone.isComplete,
+                  )}
+                />
+
+                {!companyPhone.isEmpty &&
+                  !companyPhone.isComplete && (
+                    <Hint>
+                      Введите полный номер телефона
+                    </Hint>
+                  )}
+              </div>
+
+              <div>
+                <label className={labelCls}>
+                  Email{' '}
+                  <span className="text-sm font-normal text-[var(--text-primary)]/30">
+                    (необяз.)
+                  </span>
+                </label>
+
+                <EmailInput
+                  value={formData.email}
+                  onChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      email: value,
+                    }))
+                  }
+                  placeholder="info@company.ru"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className={labelCls}>
+                Адрес{' '}
+                <span className="text-sm font-normal text-[var(--text-primary)]/30">
+                  (необяз.)
+                </span>
+              </label>
+
+              <textarea
+                value={formData.address}
+                onChange={(event) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    address: event.target.value,
+                  }))
+                }
+                placeholder="г. Москва, ул. Примерная, д. 1"
+                rows={2}
+                className={`${inputCls()} resize-none`}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* =======================================================
+            CONTACT PERSONS
+        ======================================================= */}
+        <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] overflow-hidden">
+          <button
+            type="button"
+            onClick={toggleContacts}
+            className="w-full px-6 py-5 flex items-center justify-between gap-4 text-left hover:bg-[var(--hover-2)] transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <UserCircle className="w-5 h-5 text-[var(--text-primary)]/40" />
+
+              <div>
+                <p className="text-base font-semibold text-[var(--text-primary)]">
+                  Контактные лица
+                </p>
+
+                <p className="mt-0.5 text-xs text-[var(--text-primary)]/35">
+                  Необязательно
+                </p>
+              </div>
+            </div>
+
+            <span className="text-sm text-[var(--accent)]">
+              {includeContacts
+                ? 'Убрать'
+                : '+ Добавить'}
+            </span>
+          </button>
+
+          {includeContacts && (
+            <div className="border-t border-[var(--border-color)] p-6 space-y-4">
+              {contactPersons.map(
+                (contact, index) => (
+                  <div
+                    key={index}
+                    className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5 space-y-5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">
+                        Контакт {index + 1}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          removeContactPerson(index)
+                        }
+                        className="p-2 rounded-lg text-[var(--text-primary)]/30 hover:text-[var(--accent)] hover:bg-[var(--hover-2)]"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* ФИО */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className={labelCls}>
+                          Фамилия *
+                        </label>
+
+                        <input
+                          value={
+                            contact.last_name
+                          }
+                          onChange={(event) =>
+                            updateContactPerson(
+                              index,
+                              {
+                                ...contact,
+                                last_name:
+                                  event.target
+                                    .value,
+                              },
+                            )
+                          }
+                          className={inputCls()}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelCls}>
+                          Имя *
+                        </label>
+
+                        <input
+                          value={
+                            contact.first_name
+                          }
+                          onChange={(event) =>
+                            updateContactPerson(
+                              index,
+                              {
+                                ...contact,
+                                first_name:
+                                  event.target
+                                    .value,
+                              },
+                            )
+                          }
+                          className={inputCls()}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelCls}>
+                          Отчество *
+                        </label>
+
+                        <input
+                          value={
+                            contact.middle_name
+                          }
+                          onChange={(event) =>
+                            updateContactPerson(
+                              index,
+                              {
+                                ...contact,
+                                middle_name:
+                                  event.target
+                                    .value,
+                              },
+                            )
+                          }
+                          className={inputCls()}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Position */}
+                    <div>
+                      <label className={labelCls}>
+                        Должность{' '}
+                        <span className="text-sm font-normal text-[var(--text-primary)]/30">
+                          (необяз.)
+                        </span>
+                      </label>
+
+                      <input
+                        value={
+                          contact.position ?? ''
+                        }
+                        onChange={(event) =>
+                          updateContactPerson(
+                            index,
+                            {
+                              ...contact,
+                              position:
+                                event.target.value,
+                            },
+                          )
+                        }
+                        placeholder="Главный бухгалтер"
+                        className={inputCls()}
+                      />
+                    </div>
+
+                    {/* Phone / extension */}
+                    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_170px] gap-3">
+                      <div>
+                        <label className={labelCls}>
+                          Телефон
+                        </label>
+
+                        <ContactPhoneInput
+                          value={contact.phone}
+                          onChange={(raw) =>
+                            updateContactPerson(
+                              index,
+                              {
+                                ...contact,
+                                phone: raw,
+                              },
+                            )
+                          }
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelCls}>
+                          Добавочный
+                        </label>
+
+                        <input
+                          value={
+                            contact.extension ??
+                            ''
+                          }
+                          inputMode="numeric"
+                          onChange={(event) =>
+                            updateContactPerson(
+                              index,
+                              {
+                                ...contact,
+                                extension:
+                                  event.target.value.replace(
+                                    /\D/g,
+                                    '',
+                                  ),
+                              },
+                            )
+                          }
+                          placeholder="1234"
+                          className={inputCls()}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Email */}
+                    <div>
+                      <label className={labelCls}>
+                        Email
+                      </label>
+
+                      <EmailInput
+                        value={
+                          contact.email ?? ''
+                        }
+                        onChange={(value) =>
+                          updateContactPerson(
+                            index,
+                            {
+                              ...contact,
+                              email: value,
+                            },
+                          )
+                        }
+                      />
+                    </div>
+
+                    {/* Messengers */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>
+                          Telegram
+                        </label>
+
+                        <input
+                          value={
+                            contact.messengers
+                              ?.telegram ?? ''
+                          }
+                          onChange={(event) =>
+                            updateContactPerson(
+                              index,
+                              {
+                                ...contact,
+                                messengers: {
+                                  ...contact.messengers,
+                                  telegram:
+                                    event.target
+                                      .value,
+                                },
+                              },
+                            )
+                          }
+                          placeholder="@username"
+                          className={inputCls()}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelCls}>
+                          ВКонтакте
+                        </label>
+
+                        <input
+                          value={
+                            contact.messengers
+                              ?.vk ?? ''
+                          }
+                          onChange={(event) =>
+                            updateContactPerson(
+                              index,
+                              {
+                                ...contact,
+                                messengers: {
+                                  ...contact.messengers,
+                                  vk:
+                                    event.target
+                                      .value,
+                                },
+                              },
+                            )
+                          }
+                          placeholder="username"
+                          className={inputCls()}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <button onClick={() => setProductIsPrimary(!productIsPrimary)}
-                    className={`relative w-11 h-6 rounded-full transition-colors ${productIsPrimary ? 'bg-[var(--accent)]' : 'bg-[var(--hover-3)]'}`}>
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${productIsPrimary ? 'translate-x-5' : ''}`} />
-                  </button>
+                ),
+              )}
+
+              <button
+                type="button"
+                onClick={addContactPerson}
+                className="w-full py-3 rounded-xl border border-dashed border-[var(--border-color)] text-sm text-[var(--text-primary)]/50 hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)] transition-colors"
+              >
+                + Добавить ещё контакт
+              </button>
+            </div>
+          )}
+        </section>
+
+        {/* =======================================================
+            BRANCHES
+        ======================================================= */}
+        {formData.counterparty_type ===
+          'Юридическое лицо' && (
+          <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] overflow-hidden">
+            <button
+              type="button"
+              onClick={toggleBranches}
+              className="w-full px-6 py-5 flex items-center justify-between gap-4 text-left hover:bg-[var(--hover-2)] transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <GitBranch className="w-5 h-5 text-[var(--text-primary)]/40" />
+
+                <div>
+                  <p className="text-base font-semibold text-[var(--text-primary)]">
+                    Обособленные подразделения
+                  </p>
+
+                  <p className="mt-0.5 text-xs text-[var(--text-primary)]/35">
+                    Необязательно · наследуют ИНН
+                  </p>
                 </div>
               </div>
 
-              {/* Список добавленных */}
+              <span className="text-sm text-[var(--accent)]">
+                {includeBranches
+                  ? 'Убрать'
+                  : '+ Добавить'}
+              </span>
+            </button>
+
+            {includeBranches && (
+              <div className="border-t border-[var(--border-color)] p-6 space-y-4">
+                {branches.map(
+                  (branch, index) => (
+                    <div
+                      key={index}
+                      className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5 space-y-5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">
+                          Подразделение {index + 1}
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeBranch(index)
+                          }
+                          className="p-2 rounded-lg text-[var(--text-primary)]/30 hover:text-[var(--accent)] hover:bg-[var(--hover-2)]"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="px-4 py-3 rounded-xl bg-[var(--hover-1)] text-sm text-[var(--text-primary)]/50">
+                        ИНН:{' '}
+                        <span className="font-mono text-[var(--text-primary)]">
+                          {formData.inn || '—'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>
+                            Название *
+                          </label>
+
+                          <input
+                            value={branch.name}
+                            onChange={(event) =>
+                              updateBranch(
+                                index,
+                                {
+                                  ...branch,
+                                  name:
+                                    event.target
+                                      .value,
+                                },
+                              )
+                            }
+                            className={inputCls()}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={labelCls}>
+                            Полное наименование *
+                          </label>
+
+                          <input
+                            value={
+                              branch.legal_name
+                            }
+                            onChange={(event) =>
+                              updateBranch(
+                                index,
+                                {
+                                  ...branch,
+                                  legal_name:
+                                    event.target
+                                      .value,
+                                },
+                              )
+                            }
+                            className={inputCls()}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>
+                            КПП *
+                          </label>
+
+                          <input
+                            value={branch.kpp}
+                            inputMode="numeric"
+                            maxLength={9}
+                            onChange={(event) =>
+                              updateBranch(
+                                index,
+                                {
+                                  ...branch,
+                                  kpp:
+                                    event.target.value
+                                      .replace(
+                                        /\D/g,
+                                        '',
+                                      )
+                                      .slice(0, 9),
+                                },
+                              )
+                            }
+                            className={inputCls()}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={labelCls}>
+                            ОКПО
+                          </label>
+
+                          <input
+                            value={branch.okpo}
+                            inputMode="numeric"
+                            maxLength={10}
+                            onChange={(event) =>
+                              updateBranch(
+                                index,
+                                {
+                                  ...branch,
+                                  okpo:
+                                    event.target.value
+                                      .replace(
+                                        /\D/g,
+                                        '',
+                                      )
+                                      .slice(0, 10),
+                                },
+                              )
+                            }
+                            className={inputCls()}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>
+                            Телефон *
+                          </label>
+
+                          <BranchPhoneInput
+                            value={branch.phone}
+                            onChange={(value) =>
+                              updateBranch(
+                                index,
+                                {
+                                  ...branch,
+                                  phone: value,
+                                },
+                              )
+                            }
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className={labelCls}>
+                            Email *
+                          </label>
+
+                          <EmailInput
+                            value={branch.email}
+                            onChange={(value) =>
+                              updateBranch(
+                                index,
+                                {
+                                  ...branch,
+                                  email: value,
+                                },
+                              )
+                            }
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className={labelCls}>
+                          Адрес
+                        </label>
+
+                        <input
+                          value={branch.address}
+                          onChange={(event) =>
+                            updateBranch(index, {
+                              ...branch,
+                              address:
+                                event.target.value,
+                            })
+                          }
+                          className={inputCls()}
+                        />
+                      </div>
+                    </div>
+                  ),
+                )}
+
+                <button
+                  type="button"
+                  onClick={addBranch}
+                  className="w-full py-3 rounded-xl border border-dashed border-[var(--border-color)] text-sm text-[var(--text-primary)]/50 hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)]"
+                >
+                  + Добавить подразделение
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* =======================================================
+            PRODUCTS
+        ======================================================= */}
+        <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] overflow-hidden">
+          <button
+            type="button"
+            onClick={() =>
+              setIncludeProducts(
+                (value) => !value,
+              )
+            }
+            className="w-full px-6 py-5 flex items-center justify-between gap-4 text-left hover:bg-[var(--hover-2)] transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Package className="w-5 h-5 text-[var(--text-primary)]/40" />
+
+              <div>
+                <p className="text-base font-semibold text-[var(--text-primary)]">
+                  Продукты
+                </p>
+
+                <p className="mt-0.5 text-xs text-[var(--text-primary)]/35">
+                  Необязательно · ПО и оборудование
+                </p>
+              </div>
+            </div>
+
+            <span className="text-sm text-[var(--accent)]">
+              {includeProducts
+                ? 'Скрыть'
+                : '+ Привязать'}
+            </span>
+          </button>
+
+          {includeProducts && (
+            <div className="border-t border-[var(--border-color)] p-6 space-y-5">
+
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-primary)]/30" />
+
+                <input
+                  value={productFilter}
+                  onChange={(event) =>
+                    setProductFilter(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Найти продукт..."
+                  className={`${inputCls()} pl-11`}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {ENVIRONMENTS.map(
+                  (environment) => (
+                    <button
+                      key={environment.value}
+                      type="button"
+                      onClick={() =>
+                        setProductEnv(
+                          environment.value,
+                        )
+                      }
+                      className={`
+                        px-3 py-2.5
+                        rounded-xl border
+                        text-sm font-medium
+
+                        ${
+                          productEnv ===
+                          environment.value
+                            ? envBadgeClass(
+                                environment.value,
+                              )
+                            : 'border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)]/40'
+                        }
+                      `}
+                    >
+                      {environment.label}
+                    </button>
+                  ),
+                )}
+              </div>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={productIsPrimary}
+                  onChange={(event) =>
+                    setProductIsPrimary(
+                      event.target.checked,
+                    )
+                  }
+                />
+
+                <span className="text-sm text-[var(--text-primary)]/60">
+                  Основной продукт
+                </span>
+              </label>
+
+              <div className="max-h-64 overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]">
+                {loadingProducts ? (
+                  <div className="py-10 flex justify-center">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  </div>
+                ) : availableProducts.length ===
+                  0 ? (
+                  <div className="py-10 text-center text-sm text-[var(--text-primary)]/35">
+                    Ничего не найдено
+                  </div>
+                ) : (
+                  availableProducts
+                    .slice(0, 30)
+                    .map((product) => (
+                      <button
+                        key={product.id}
+                        type="button"
+                        onClick={() =>
+                          addLinkedProduct(
+                            product,
+                          )
+                        }
+                        className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left border-b last:border-b-0 border-[var(--border-color)] hover:bg-[var(--hover-2)]"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                            {product.display_name ||
+                              product.name}
+                          </p>
+
+                          <p className="text-xs text-[var(--text-primary)]/35">
+                            {product.vendor}
+                          </p>
+                        </div>
+
+                        <Plus className="w-4 h-4 text-[var(--text-primary)]/30" />
+                      </button>
+                    ))
+                )}
+              </div>
+
               {linkedProducts.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-sm text-[var(--text-primary)]/40 font-medium">
-                    Будет привязано: {linkedProducts.length}
+                  <p className="text-xs font-medium text-[var(--text-primary)]/40">
+                    Выбрано: {linkedProducts.length}
                   </p>
-                  {linkedProducts.map((lp, idx) => {
-                    const PIcon = catMeta(lp.product.category)?.icon || Package;
-                    return (
-                      <div key={idx} className="flex items-center gap-3 p-3 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-xl">
-                        <PIcon className="w-4 h-4 text-[var(--text-primary)]/40 flex-shrink-0" />
+
+                  {linkedProducts.map(
+                    (linked, index) => (
+                      <div
+                        key={linked.product.id}
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]"
+                      >
                         <div className="flex-1 min-w-0">
-                          <p className="text-base text-[var(--text-primary)] truncate">
-                            {lp.product.display_name || lp.product.name}
+                          <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                            {linked.product
+                              .display_name ||
+                              linked.product.name}
                           </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${envBadgeClass(lp.environment)}`}>
-                              {envLabel(lp.environment)}
-                            </span>
-                            {lp.is_primary && (
-                              <span className="px-1.5 py-0.5 rounded text-xs font-medium
-                                             bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/20">
-                                Основной
-                              </span>
+
+                          <p className="mt-1 text-xs text-[var(--text-primary)]/35">
+                            {envLabel(
+                              linked.environment,
                             )}
-                          </div>
+                            {linked.is_primary &&
+                              ' · Основной'}
+                          </p>
                         </div>
-                        <button onClick={() => removeLinkedProduct(idx)}
-                          className="p-1.5 text-[var(--text-primary)]/40 hover:text-[var(--accent)] transition-colors">
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeLinkedProduct(
+                              index,
+                            )
+                          }
+                          className="p-2 rounded-lg text-[var(--text-primary)]/30 hover:text-[var(--accent)]"
+                        >
                           <X className="w-4 h-4" />
                         </button>
                       </div>
-                    );
-                  })}
+                    ),
+                  )}
                 </div>
               )}
             </div>
           )}
+        </section>
 
-          {/* Предупреждение о дубликатах email */}
-          <DuplicateEmailWarning
-            duplicates={findDuplicateEmails(
-              formData.email, contactPersons, includeContacts, branches, includeBranches,
-            )}
-          />
+        {/* =======================================================
+            DUPLICATES
+        ======================================================= */}
+        <DuplicateEmailWarning
+          duplicates={duplicates}
+        />
 
-          {/* 🔥 ИСПРАВЛЕННЫЙ БЛОК КНОПОК: Назад слева, Создать справа */}
-          <div className="flex justify-between pt-2">
-            <button
-              onClick={() => setStep(productsPrevStep)}
-              className="px-6 py-3 text-base font-medium text-[var(--text-primary)]/70
-                         bg-[var(--hover-2)] hover:bg-[var(--hover-3)] rounded-xl transition-all"
-            >
-              Назад
-            </button>
+        {/* =======================================================
+            ACTIONS
+        ======================================================= */}
+        <div className="sticky bottom-3 z-20">
+          <div className="flex items-center justify-between gap-4 p-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]/95 backdrop-blur-xl shadow-lg">
+            <div className="hidden sm:block">
+              <p className="text-sm font-medium text-[var(--text-primary)]">
+                Создание контрагента
+              </p>
 
-            <button
-              onClick={handleSubmit}
-              disabled={
-                isLoading ||
-                findDuplicateEmails(
-                  formData.email, contactPersons, includeContacts, branches, includeBranches,
-                ).length > 0
-              }
-              className="flex items-center gap-2 px-6 py-3 text-base font-semibold text-white
-                        bg-[var(--accent)] hover:bg-[var(--accent-light)] rounded-xl transition-all
-                        disabled:opacity-40 disabled:cursor-not-allowed shadow-[var(--shadow-md)]"
-            >
-              {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-              {isLoading ? 'Сохранение...' : 'Создать контрагента'}
-            </button>
+              <p className="mt-0.5 text-xs text-[var(--text-primary)]/35">
+                {isFormValid
+                  ? 'Все обязательные данные заполнены'
+                  : 'Заполните обязательные поля'}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 ml-auto">
+              <button
+                type="button"
+                onClick={() =>
+                  navigate('/counterparties')
+                }
+                disabled={isLoading}
+                className="px-5 py-3 rounded-xl text-sm font-medium text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)] disabled:opacity-50"
+              >
+                Отмена
+              </button>
+
+              <ActionButton
+                type="button"
+                onClick={handleSubmit}
+                disabled={
+                  isLoading || !isFormValid
+                }
+                className="px-6 py-3 text-sm font-semibold"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Создаём...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Создать контрагента
+                  </>
+                )}
+              </ActionButton>
+            </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
