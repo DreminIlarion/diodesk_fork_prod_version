@@ -1217,3 +1217,107 @@ a {
   .max-w-5xl { max-width: 100% !important; }
   .p-6 { padding: var(--space-3) !important; }
 }
+
+
+
+.create-ticket-btn {
+  --border-size: 1px;
+  --border-color: rgba(255, 255, 255, 0.8);
+
+  position: relative;
+  isolation: isolate;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+
+  padding: 1rem 2rem;
+  border: 0;
+  border-radius: 0.75rem;
+
+  color: var(--text-primary);
+  background: var(--hover-1);
+
+  font-size: 1rem;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+/* Обычная спокойная рамка */
+.create-ticket-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+
+  border: var(--border-size) solid var(--border-color);
+
+  pointer-events: none;
+}
+
+/* Анимированная белая обводка */
+.create-ticket-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: var(--border-size);
+
+  background: conic-gradient(
+    from -90deg,
+    rgba(255, 255, 255, 0.95) 0deg,
+    rgba(255, 255, 255, 0.95) var(--border-progress),
+    transparent var(--border-progress),
+    transparent 360deg
+  );
+
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+
+  -webkit-mask-composite: xor;
+
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+
+  mask-composite: exclude;
+
+  pointer-events: none;
+}
+
+.create-ticket-btn:hover {
+  background: var(--hover-2);
+  --border-progress: 360deg;
+}
+
+/* Начальное состояние */
+.create-ticket-btn {
+  --border-progress: 0deg;
+}
+
+/* Анимация custom property */
+@property --border-progress {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.create-ticket-btn::after {
+  transition: --border-progress 650ms ease;
+}
+
+.create-ticket-btn:active {
+  background: var(--hover-3);
+}
+
+.create-ticket-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}

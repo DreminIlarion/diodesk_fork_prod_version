@@ -2127,9 +2127,13 @@ export default function TicketsPage() {
             )}
           </p>
         </div>
-        <button onClick={() => navigate('/tickets/new')}
-          className="btn-primary py-4 px-8 text-base font-semibold">
-          <Plus size={18} /> Создать заявку
+        <button
+          type="button"
+          onClick={() => navigate('/tickets/new')}
+          className="create-ticket-btn"
+        >
+          <Plus size={18} />
+          <span>Создать заявку</span>
         </button>
       </div>
 
