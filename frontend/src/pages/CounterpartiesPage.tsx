@@ -865,7 +865,7 @@ return (
               <div
                 key={company.id}
                 className={`
-                  glass-card rounded-2xl border overflow-hidden transition-all
+                  rounded-2xl border overflow-hidden transition-all
                   ${(companyMatched || hasMatchedBranch)
                     ? ' '
                     : 'border-[var(--border-color)]'

@@ -627,7 +627,7 @@ function ProjectRow({
             <span
               className="
                 text-[18px] font-semibold text-[var(--text-primary)] block leading-snug
-                group-hover:text-[var(--accent-light)] transition-colors
+                group-hover:text-[var(--text-primary)]/75 transition-colors
                 line-clamp-1
               "
             >
