@@ -1218,12 +1218,7 @@ a {
   .p-6 { padding: var(--space-3) !important; }
 }
 
-
-
 .create-ticket-btn {
-  --border-size: 1px;
-  --border-color: rgba(255, 255, 255, 0.8);
-
   position: relative;
   isolation: isolate;
 
@@ -1233,11 +1228,12 @@ a {
   gap: 0.5rem;
 
   padding: 1rem 2rem;
-  border: 0;
+
+  border: 1px solid var(--border-color);
   border-radius: 0.75rem;
 
-  color: var(--text-primary);
   background: var(--hover-1);
+  color: var(--text-primary);
 
   font-size: 1rem;
   font-weight: 600;
@@ -1249,68 +1245,50 @@ a {
     color 180ms ease;
 }
 
-/* Обычная спокойная рамка */
-.create-ticket-btn::before {
-  content: '';
+/* SVG занимает всю кнопку */
+.create-ticket-btn__trace {
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
+  inset: -1px;
+  z-index: 0;
 
-  border: var(--border-size) solid var(--border-color);
+  border-radius: inherit;
+  overflow: visible;
 
   pointer-events: none;
 }
 
-/* Анимированная белая обводка */
-.create-ticket-btn::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: var(--border-size);
+.create-ticket-btn__trace svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
 
-  background: conic-gradient(
-    from -90deg,
-    rgba(255, 255, 255, 0.95) 0deg,
-    rgba(255, 255, 255, 0.95) var(--border-progress),
-    transparent var(--border-progress),
-    transparent 360deg
-  );
+.create-ticket-btn__trace rect {
+  fill: none;
 
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-width: 1.5;
 
-  -webkit-mask-composite: xor;
+  /*
+   * Вся длина rect благодаря pathLength = 100.
+   * Показываем линию длиной 100, но уводим её полностью.
+   */
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
 
-  mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
+  vector-effect: non-scaling-stroke;
 
-  mask-composite: exclude;
+  transition: stroke-dashoffset 650ms ease;
+}
 
-  pointer-events: none;
+/* Рисуем полный контур */
+.create-ticket-btn:hover .create-ticket-btn__trace rect {
+  stroke-dashoffset: 0;
 }
 
 .create-ticket-btn:hover {
   background: var(--hover-2);
-  --border-progress: 360deg;
-}
-
-/* Начальное состояние */
-.create-ticket-btn {
-  --border-progress: 0deg;
-}
-
-/* Анимация custom property */
-@property --border-progress {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
-}
-
-.create-ticket-btn::after {
-  transition: --border-progress 650ms ease;
 }
 
 .create-ticket-btn:active {
@@ -1320,4 +1298,10 @@ a {
 .create-ticket-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
+}
+
+.create-ticket-btn > svg:not(.create-ticket-btn__trace svg),
+.create-ticket-btn > span:not(.create-ticket-btn__trace) {
+  position: relative;
+  z-index: 1;
 }

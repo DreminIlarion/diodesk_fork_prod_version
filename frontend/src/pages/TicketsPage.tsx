@@ -2128,13 +2128,31 @@ export default function TicketsPage() {
           </p>
         </div>
         <button
-          type="button"
-          onClick={() => navigate('/tickets/new')}
-          className="create-ticket-btn"
-        >
-          <Plus size={18} />
-          <span>Создать заявку</span>
-        </button>
+  type="button"
+  onClick={() => navigate('/tickets/new')}
+  className="create-ticket-btn"
+>
+  <span className="create-ticket-btn__trace" aria-hidden="true">
+    <svg
+      viewBox="0 0 300 56"
+      preserveAspectRatio="none"
+    >
+      <rect
+        x="1"
+        y="1"
+        width="298"
+        height="54"
+        rx="12"
+        ry="12"
+        pathLength="100"
+      />
+    </svg>
+  </span>
+
+  <Plus size={18} />
+
+  <span>Создать заявку</span>
+</button>
       </div>
 
       {/* ── Stats ── */}
