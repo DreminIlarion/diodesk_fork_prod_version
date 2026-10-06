@@ -9,7 +9,7 @@ from .mappings import (
     build_chunks_index_body,
     build_chunks_index_name,
 )
-
+from .pipelines import ensure_rrf_search_pipeline
 
 class IndexAliasConflictError(RuntimeError):
     """Алиас OpenSearch уже связан с другим физическим индексом"""
@@ -104,6 +104,11 @@ async def ensure_knowledge_indices(
         index=names.chunks,
         alias=config.chunks_write_alias,
         is_write_index=True,
+    )
+
+    await ensure_rrf_search_pipeline(
+        client,
+        name=config.rrf_pipeline,
     )
 
     return names

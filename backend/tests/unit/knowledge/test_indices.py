@@ -22,6 +22,7 @@ def build_settings() -> OpenSearchSettings:
         articles_write_alias="kb_articles_write",
         chunks_read_alias="kb_chunks_read",
         chunks_write_alias="kb_chunks_write",
+        rrf_pipeline="kb-rrf-v1",
         number_of_shards=1,
         number_of_replicas=0,
     )
@@ -38,7 +39,15 @@ def build_client(
         exists_alias=AsyncMock(return_value=alias_exists),
         put_alias=AsyncMock(),
     )
-    return SimpleNamespace(indices=indices)
+
+    search_pipeline = SimpleNamespace(
+        put=AsyncMock(),
+    )
+
+    return SimpleNamespace(
+        indices=indices,
+        search_pipeline=search_pipeline,
+    )
 
 
 def test_resolve_knowledge_index_names():
@@ -83,6 +92,7 @@ async def test_ensure_knowledge_indices_creates_missing_resources():
         names.articles,
         names.chunks,
     }
+    client.search_pipeline.put.assert_awaited_once()
 
 
 async def test_ensure_knowledge_indices_is_idempotent():
@@ -101,6 +111,7 @@ async def test_ensure_knowledge_indices_is_idempotent():
 
     client.indices.create.assert_not_awaited()
     client.indices.put_alias.assert_not_awaited()
+    client.search_pipeline.put.assert_awaited_once()
 
 
 async def test_ensure_knowledge_indices_rejects_alias_conflict():
@@ -131,3 +142,4 @@ async def test_ensure_knowledge_indices_rejects_alias_conflict():
         )
 
     client.indices.put_alias.assert_not_awaited()
+    client.search_pipeline.put.assert_not_awaited()
