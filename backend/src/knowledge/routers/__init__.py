@@ -2,8 +2,11 @@ __all__ = ["router"]
 
 from fastapi import APIRouter
 
-from .categories import router as category_router
+from .search import router as search_router
 
-router = APIRouter(prefix="/knowledge", tags=["База знаний"])
+router = APIRouter(  # noqa: RUF067
+    prefix="/knowledge",
+    tags=["База знаний"],
+)
 
-router.include_router(category_router)
+router.include_router(search_router)  # noqa: RUF067

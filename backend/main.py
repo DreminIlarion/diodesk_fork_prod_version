@@ -24,6 +24,7 @@ from src.feedbacks.router import router as feedback_router
 from src.iam.routers import router as iam_router
 from src.iam.routers.invitations import broker_router as invitations_broker_router  # Добавить
 from src.knowledge.infra.indices import ensure_knowledge_indices
+from src.knowledge.routers import router as knowledge_router
 from src.media.router import router as media_router
 from src.notifications.infra.handlers import router as notifications_broker_router
 from src.notifications.routers.notifications import (
@@ -114,6 +115,7 @@ router.include_router(product_router)
 router.include_router(project_router)
 router.include_router(task_router)
 router.include_router(feedback_router)
+router.include_router(knowledge_router)
 
 app.include_router(router)
 app.include_router(broker_router)
