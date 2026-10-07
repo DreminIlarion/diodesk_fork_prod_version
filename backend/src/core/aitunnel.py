@@ -6,7 +6,7 @@ from .settings import settings
 
 
 @lru_cache(maxsize=1)
-def get_aitunnel_embedding_client() -> AsyncOpenAI:
+def get_aitunnel_client() -> AsyncOpenAI:
     config = settings.ai_tunnel
 
     return AsyncOpenAI(
@@ -17,9 +17,9 @@ def get_aitunnel_embedding_client() -> AsyncOpenAI:
     )
 
 
-async def close_aitunnel_embedding_client() -> None:
-    client = get_aitunnel_embedding_client()
+async def close_aitunnel_client() -> None:
+    client = get_aitunnel_client()
 
     await client.close()
 
-    get_aitunnel_embedding_client.cache_clear()
+    get_aitunnel_client.cache_clear()

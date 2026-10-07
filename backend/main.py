@@ -10,9 +10,7 @@ from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.comments.router import router as comments_router
-from src.core.aitunnel import (
-    close_aitunnel_embedding_client,
-)
+from src.core.aitunnel import close_aitunnel_client
 from src.core.broker import broker_router
 from src.core.logging import configure_logging
 from src.core.opensearch import (
@@ -77,7 +75,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     finally:
         # Освобождение HTTP-соединений с внешними сервисами
         try:
-            await close_aitunnel_embedding_client()
+            await close_aitunnel_client()
         finally:
             await close_opensearch_client()
 

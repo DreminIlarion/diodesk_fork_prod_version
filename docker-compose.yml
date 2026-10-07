@@ -157,6 +157,40 @@ services:
       opensearch:
         condition: service_healthy
 
+  knowledge-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command:
+      - faststream
+      - run
+      - src.knowledge.worker:app
+    restart: unless-stopped
+    environment:
+      RABBIT_HOST: rabbitmq
+      RABBIT_PORT: 5672
+      RABBIT_USER: ${RABBIT_USER}
+      RABBIT_PASSWORD: ${RABBIT_PASSWORD}
+
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: 9200
+      OPENSEARCH_USE_SSL: "false"
+      OPENSEARCH_VERIFY_CERTS: "false"
+
+      AITUNNEL_BASE_URL: ${AITUNNEL_BASE_URL:-https://api.aitunnel.ru/v1}
+      AITUNNEL_API_KEY: ${AITUNNEL_API_KEY:-<API_KEY>}
+      AITUNNEL_EMBEDDING_MODEL: ${AITUNNEL_EMBEDDING_MODEL:-text-embedding-3-small}
+      AITUNNEL_EMBEDDING_DIMENSIONS: ${AITUNNEL_EMBEDDING_DIMENSIONS:-1024}
+      AITUNNEL_CLASSIFICATION_MODEL: ${AITUNNEL_CLASSIFICATION_MODEL:-auto}
+      AITUNNEL_CLASSIFICATION_BATCH_SIZE: ${AITUNNEL_CLASSIFICATION_BATCH_SIZE:-20}
+      AITUNNEL_CLASSIFICATION_MAX_TOKENS: ${AITUNNEL_CLASSIFICATION_MAX_TOKENS:-2048}
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+
   frontend:
     build:
       context: ./frontend
