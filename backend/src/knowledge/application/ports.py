@@ -38,6 +38,21 @@ class ChunkClassifier(Protocol):
         """Классифицирует каждый фрагмент и сохраняет его position."""
 
 
+class EmbeddingProvider(Protocol):
+    """Порт генерации векторных представлений текста."""
+
+    @property
+    def model_id(self) -> str: ...
+
+    @property
+    def dimensions(self) -> int: ...
+
+    async def embed(
+        self,
+        texts: Sequence[str],
+    ) -> list[tuple[float, ...]]: ...
+
+
 class ArticleChunkRepository(Protocol):
     """Порт поискового индекса фрагментов статей."""
 
