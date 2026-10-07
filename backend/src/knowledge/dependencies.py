@@ -5,6 +5,7 @@ from src.core.opensearch import get_opensearch_client
 from src.core.settings import settings
 
 from .application.indexing import ArticleIndexingService
+from .application.search import KnowledgeSearchService
 from .infra.chunk_repos import OpenSearchArticleChunkRepository
 from .infra.chunkers import MarkdownArticleChunker
 from .infra.classifiers import AITunnelChunkClassifier
@@ -47,5 +48,29 @@ def get_article_indexing_service() -> ArticleIndexingService:
         chunk_repository=chunk_repository,
         chunker=chunker,
         classifier=classifier,
+        embedding_provider=embedding_provider,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_knowledge_search_service() -> KnowledgeSearchService:
+    opensearch_client = get_opensearch_client()
+    aitunnel_client = get_aitunnel_client()
+
+    chunk_repository = OpenSearchArticleChunkRepository(
+        opensearch_client,
+        read_index=settings.opensearch.chunks_read_alias,
+        write_index=settings.opensearch.chunks_write_alias,
+        embedding_model=settings.ai_tunnel.embedding_model,
+        search_pipeline=settings.opensearch.rrf_pipeline,
+    )
+    embedding_provider = AITunnelEmbeddingProvider(
+        aitunnel_client,
+        model_id=settings.ai_tunnel.embedding_model,
+        dimensions=settings.ai_tunnel.embedding_dimensions,
+    )
+
+    return KnowledgeSearchService(
+        chunk_repository=chunk_repository,
         embedding_provider=embedding_provider,
     )
