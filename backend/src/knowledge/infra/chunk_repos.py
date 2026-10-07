@@ -4,7 +4,11 @@ from uuid import UUID
 
 from opensearchpy import AsyncOpenSearch
 
-from ..application.dtos import EmbeddedArticleChunk
+from ..application.dtos import (
+    EmbeddedArticleChunk,
+    SearchFilters,
+    SearchHit,
+)
 from .chunk_mappers import ArticleChunkDocumentMapper
 
 
@@ -19,12 +23,16 @@ class OpenSearchArticleChunkRepository:
         self,
         client: AsyncOpenSearch,
         *,
+        read_index: str,
         write_index: str,
         embedding_model: str,
+        search_pipeline: str,
     ) -> None:
         self.client = client
+        self.read_index = read_index
         self.write_index = write_index
         self.embedding_model = embedding_model
+        self.search_pipeline = search_pipeline
 
     async def replace_for_article(
         self,
@@ -96,6 +104,73 @@ class OpenSearchArticleChunkRepository:
             },
         )
 
+    async def hybrid_search(
+        self,
+        *,
+        query: str,
+        query_embedding: tuple[float, ...],
+        filters: SearchFilters,
+        top_k: int = 10,
+    ) -> tuple[SearchHit, ...]:
+        """
+        Выполняет BM25- и HNSW-поиск с объединением через RRF.
+        """
+
+        hybrid_query: dict[str, Any] = {
+            "queries": [
+                {
+                    "multi_match": {
+                        "query": query,
+                        "fields": [
+                            "title^3",
+                            "content",
+                            "context_headings^2",
+                        ],
+                        "type": "best_fields",
+                    }
+                },
+                {
+                    "knn": {
+                        "embedding": {
+                            "vector": list(query_embedding),
+                            "k": top_k,
+                        }
+                    }
+                },
+            ]
+        }
+
+        search_filter = _build_search_filter(filters)
+        if search_filter is not None:
+            hybrid_query["filter"] = search_filter
+
+        response = await self.client.search(
+            index=self.read_index,
+            body={
+                "size": top_k,
+                "_source": {
+                    "excludes": [
+                        "embedding",
+                    ]
+                },
+                "query": {
+                    "hybrid": hybrid_query,
+                },
+            },
+            params={
+                "search_pipeline": self.search_pipeline,
+            },
+        )
+
+        return tuple(
+            ArticleChunkDocumentMapper.to_search_hit(
+                document_id=hit["_id"],
+                source=hit["_source"],
+                score=float(hit.get("_score") or 0.0),
+            )
+            for hit in response["hits"]["hits"]
+        )
+
     @staticmethod
     def _validate_article_ids(
         *,
@@ -113,3 +188,68 @@ class OpenSearchArticleChunkRepository:
             raise ValueError(
                 "All chunks must belong to the replaced article"
             )
+
+
+def _build_search_filter(
+    filters: SearchFilters,
+) -> dict[str, Any] | None:
+    """Преобразует фильтры поиска в OpenSearch DSL."""
+
+    clauses: list[dict[str, Any]] = []
+
+    if filters.visibilities:
+        clauses.append(
+            {
+                "terms": {
+                    "visibility": [
+                        visibility.value
+                        for visibility in filters.visibilities
+                    ]
+                }
+            }
+        )
+
+    if filters.source_kinds:
+        clauses.append(
+            {
+                "terms": {
+                    "source_type": list(
+                        filters.source_kinds
+                    )
+                }
+            }
+        )
+
+    if filters.tags:
+        clauses.append(
+            {
+                "terms": {
+                    "tags": list(filters.tags),
+                }
+            }
+        )
+
+    optional_ids = (
+        ("product_id", filters.product_id),
+        ("project_id", filters.project_id),
+        ("counterparty_id", filters.counterparty_id),
+    )
+
+    for field_name, value in optional_ids:
+        if value is not None:
+            clauses.append(
+                {
+                    "term": {
+                        field_name: str(value),
+                    }
+                }
+            )
+
+    if not clauses:
+        return None
+
+    return {
+        "bool": {
+            "filter": clauses,
+        }
+    }
