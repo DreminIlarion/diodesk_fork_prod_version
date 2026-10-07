@@ -4,6 +4,7 @@ import pytest
 
 from src.knowledge.domain.entities import Article
 from src.knowledge.domain.events import (
+    ArticleArchived,
     ArticleCreated,
     ArticleEdited,
     ArticlePublished,
@@ -69,7 +70,7 @@ def test_revise_article_increments_version(article: Article):
 
 
 def test_archived_article_cannot_be_edited(article: Article):
-    article.archive()
+    article.archive(uuid4())
 
     with pytest.raises(InvalidStateError):
         article.revise(
@@ -80,7 +81,32 @@ def test_archived_article_cannot_be_edited(article: Article):
 
 
 def test_archived_article_cannot_be_published(article: Article):
-    article.archive()
+    article.archive(uuid4())
 
     with pytest.raises(InvalidStateError):
         article.publish(uuid4())
+
+
+def test_archive_article_registers_event(article: Article):
+    list(article.collect_events())
+    archived_by = uuid4()
+
+    article.archive(archived_by)
+    events = list(article.collect_events())
+
+    assert article.status == ArticleStatus.ARCHIVED
+    assert article.deleted_at is not None
+    assert len(events) == 1
+    assert isinstance(events[0], ArticleArchived)
+    assert events[0].article_id == article.id
+    assert events[0].archived_by == archived_by
+
+
+def test_archive_article_is_idempotent(article: Article):
+    list(article.collect_events())
+
+    article.archive(uuid4())
+    list(article.collect_events())
+    article.archive(uuid4())
+
+    assert list(article.collect_events()) == []

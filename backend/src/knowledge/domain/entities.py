@@ -9,6 +9,7 @@ from src.shared.domain.exceptions import InvalidStateError
 from src.shared.utils.time import current_datetime
 
 from .events import (
+    ArticleArchived,
     ArticleCreated,
     ArticleEdited,
     ArticlePublished,
@@ -161,10 +162,11 @@ class Article(AggregateRoot):
             )
         )
 
-    def archive(self) -> None:
+    def archive(self, archived_by: UUID) -> None:
         """Архивирование статьи базы знаний."""
 
         # Повторное архивирование не изменяет состояние
+        # и не создаёт повторное событие.
         if self.status == ArticleStatus.ARCHIVED:
             return
 
@@ -173,3 +175,10 @@ class Article(AggregateRoot):
         self.status = ArticleStatus.ARCHIVED
         self.deleted_at = now
         self.updated_at = now
+
+        self.register_event(
+            ArticleArchived(
+                article_id=self.id,
+                archived_by=archived_by,
+            )
+        )

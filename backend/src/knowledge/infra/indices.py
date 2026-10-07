@@ -11,6 +11,7 @@ from .mappings import (
 )
 from .pipelines import ensure_rrf_search_pipeline
 
+
 class IndexAliasConflictError(RuntimeError):
     """Алиас OpenSearch уже связан с другим физическим индексом"""
 
