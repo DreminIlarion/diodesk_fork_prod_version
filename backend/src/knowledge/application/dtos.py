@@ -32,6 +32,16 @@ class ArticleChunk:
 
 
 @dataclass(frozen=True, slots=True)
+class EmbeddedArticleChunk:
+    """
+    Фрагмент статьи вместе с рассчитанным векторным представлением.
+    """
+
+    chunk: ArticleChunk
+    embedding: tuple[float, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class SearchFilters:
     """Фильтры гибридного поиска по базе знаний."""
 

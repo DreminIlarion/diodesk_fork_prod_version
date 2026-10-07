@@ -2,7 +2,11 @@ from typing import Protocol
 
 from uuid import UUID
 
-from .dtos import ArticleChunk, SearchFilters, SearchHit
+from .dtos import (
+    EmbeddedArticleChunk,
+    SearchFilters,
+    SearchHit,
+)
 
 
 class ArticleChunkRepository(Protocol):
@@ -11,9 +15,9 @@ class ArticleChunkRepository(Protocol):
     async def replace_for_article(
         self,
         article_id: UUID,
-        chunks: list[ArticleChunk],
+        chunks: list[EmbeddedArticleChunk],
     ) -> None:
-        """Заменяет поисковые фрагменты конкретной статьи."""
+        """Заменяет поисковые фрагменты статьи вместе с их embeddings."""
 
     async def delete_by_article(self, article_id: UUID) -> None:
         """Удаляет из поискового индекса все фрагменты статьи."""
