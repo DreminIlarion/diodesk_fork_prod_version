@@ -1,12 +1,41 @@
 from typing import Protocol
 
+from collections.abc import Sequence
 from uuid import UUID
 
+from ..domain.entities import Article
 from .dtos import (
+    ArticleFragment,
+    ChunkClassification,
     EmbeddedArticleChunk,
     SearchFilters,
     SearchHit,
 )
+
+
+class ArticleChunker(Protocol):
+    """Порт преобразования статьи в поисковые чанки."""
+
+    def split(
+        self,
+        article: Article,
+    ) -> list[ArticleFragment]:
+        """Разбивает статью на фрагменты без смысловой классификации."""
+
+
+class ChunkClassifier(Protocol):
+    """Порт AI-классификации смысловых ролей фрагментов."""
+
+    @property
+    def model_id(self) -> str: ...
+
+    async def classify(
+        self,
+        *,
+        article_title: str,
+        fragments: Sequence[ArticleFragment],
+    ) -> list[ChunkClassification]:
+        """Классифицирует каждый фрагмент и сохраняет его position."""
 
 
 class ArticleChunkRepository(Protocol):

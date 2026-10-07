@@ -5,6 +5,23 @@ from ..domain.vo import ArticleSource, ArticleVisibility, ChunkKind
 
 
 @dataclass(frozen=True, slots=True)
+class ArticleFragment:
+    """Текстовый фрагмент статьи до AI-классификации."""
+
+    position: int
+    content: str
+    context_headings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ChunkClassification:
+    """Смысловая роль, определённая для текстового фрагмента."""
+
+    position: int
+    kind: ChunkKind
+
+
+@dataclass(frozen=True, slots=True)
 class ArticleChunk:
     """Фрагмент опубликованной статьи, подготовленный для индексации в OpenSearch."""
 

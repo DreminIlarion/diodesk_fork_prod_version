@@ -32,4 +32,5 @@ class ChunkKind(StrEnum):
     CAUSE = "cause"
     SOLUTION = "solution"
     VERIFICATION = "verification"
-    DOCUMENTATION = "documentation"
+    REFERENCE = "reference"
+    OTHER = "other"

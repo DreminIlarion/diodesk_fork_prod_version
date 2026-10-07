@@ -210,6 +210,10 @@ class AITunnelSettings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1024
 
+    classification_model: str = "auto"
+    classification_batch_size: int = 20
+    classification_max_tokens: int = 2048
+
     request_timeout_seconds: float = 90.0
     max_retries: int = 3
 
