@@ -1,6 +1,7 @@
 from typing import Annotated
 
 import asyncio
+import json
 import logging
 from uuid import UUID
 
@@ -100,13 +101,7 @@ async def notification_stream(
                 unread_only=True,
             )
             for notification in unread_notifications.items:
-                payload = {
-                    "type": "notification",
-                    "notification": map_notification_to_response(
-                        notification
-                    ).model_dump(mode="json"),
-                }
-                yield ServerSentEvent(data=payload)
+                yield _notification_event(map_notification_to_response(notification))
 
             # 2. Основной цикл прослушивания очереди
             while True:
@@ -117,11 +112,7 @@ async def notification_stream(
                 try:
                     # Ожидание сообщения из очереди
                     message = await asyncio.wait_for(queue.get(), timeout=25.0)
-                    payload = {
-                        "type": "notification",
-                        "notification": message.model_dump(mode="json")
-                    }
-                    yield ServerSentEvent(data=payload)
+                    yield _notification_event(message)
                 except TimeoutError:
                     # Heartbeat - для удержания соединения
                     yield ServerSentEvent(comment="ping")
@@ -130,4 +121,12 @@ async def notification_stream(
             # Всегда отключаем пользователя при завершении
             await sse_manager.disconnect(current_user.id, queue)
 
-    return EventSourceResponse(event_generator(), ping=20)
+    # Прокси (nginx фронтенда) не должен копить события в буфере
+    return EventSourceResponse(event_generator(), ping=20, headers={"X-Accel-Buffering": "no"})
+
+
+def _notification_event(notification: NotificationResponse) -> ServerSentEvent:
+    """Событие потока уведомлений; data - JSON, как ожидает клиент."""
+
+    payload = {"type": "notification", "notification": notification.model_dump(mode="json")}
+    return ServerSentEvent(data=json.dumps(payload, ensure_ascii=False))
