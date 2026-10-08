@@ -7,7 +7,7 @@ from .knowledge.domain.events import (
     ArticlePublished,
 )
 from .shared.domain.events import Event
-from .tickets.domain.events import TicketCreated, TicketStatusChanged
+from .tickets.domain.events import TicketAssigned, TicketCreated, TicketStatusChanged
 from .timetracking.domain.events import WorklogApproved
 
 EventT = TypeVar("EventT", bound=Event)
@@ -20,6 +20,7 @@ ARTICLE_ARCHIVED_QUEUE = "knowledge.article.archived"
 EVENT_TOPIC_MAP: dict[type[EventT], str] = {
     TicketCreated: "tickets.create",
     TicketStatusChanged: "tickets.status_changed",
+    TicketAssigned: "tickets.assigned",
     WorklogApproved: "worklogs.approve",
     UserInvited: "user.invite",
     ArticlePublished: ARTICLE_PUBLISHED_QUEUE,

@@ -8,7 +8,7 @@ from src.projects.domain.entities import Project
 from src.projects.schemas import ProjectReference
 from src.tickets.domain.entities import Ticket
 from src.tickets.mappers import map_ticket_to_preview
-from src.tickets.schemas import Tag
+from src.shared.domain.vo import Tag
 
 
 def map_task_to_response(

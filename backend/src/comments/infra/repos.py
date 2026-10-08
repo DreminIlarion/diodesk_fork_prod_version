@@ -11,7 +11,7 @@ from src.shared.schemas import Page, Pagination
 
 from ..domain.dtos import CommentVisibilityPolicy, ReactionStats
 from ..domain.entities import Comment, Reaction
-from ..domain.vo import AggregateReference, CommentVisibility
+from ..domain.vo import AggregateReference, AggregateType, CommentVisibility
 from .models import CommentOrm, ReactionOrm
 
 
@@ -43,6 +43,10 @@ class CommentMapper(ModelMapper[Comment, CommentOrm]):
             deleted_at=entity.deleted_at,
             aggregate_id=entity.aggregate.id,
             aggregate_type=entity.aggregate.type,
+            # Модуль заявок читает комментарии по ticket_id
+            ticket_id=(
+                entity.aggregate.id if entity.aggregate.type == AggregateType.TICKET else None
+            ),
             author_id=entity.author_id,
             text=entity.text,
             visibility=entity.visibility,

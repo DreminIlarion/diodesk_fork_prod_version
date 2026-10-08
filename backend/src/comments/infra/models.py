@@ -54,6 +54,8 @@ class CommentOrm(Base):
 
     __table_args__ = (
         Index("ix_comments_parent_comment_id", "parent_comment_id"),
+        Index("ix_comments_ticket_id", "ticket_id"),
+        Index("ix_comments_aggregate", "aggregate_type", "aggregate_id"),
     )
 
 

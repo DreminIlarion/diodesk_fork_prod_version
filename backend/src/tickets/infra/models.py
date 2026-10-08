@@ -20,11 +20,14 @@ from src.media.infra.models import AttachmentOrm
 class TicketOrm(Base):
     __tablename__ = "tickets"
 
-    project_id: Mapped[UUID | None] = mapped_column(nullable=True)
-    # stage_id: Mapped[UUID | None] = mapped_column(
-    #     ForeignKey("project_stages.id", ondelete="SET NULL"),
-    #     nullable=True,
-    # )
+    project_id: Mapped[UUID | None] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    # Привязка к этапу проекта: в домене пока не используется, но колонка хранит уже
+    # проставленные связи, поэтому остаётся в схеме
+    stage_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("project_stages.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     counterparty_id: Mapped[UUID | None] = mapped_column(nullable=True)
     product_id: Mapped[UUID | None] = mapped_column(nullable=True)
 

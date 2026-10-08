@@ -7,6 +7,7 @@ import uvicorn
 from fastapi import APIRouter, FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastmcp.utilities.lifespan import combine_lifespans
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.comments.router import router as comments_router
@@ -25,6 +26,7 @@ from src.iam.routers import router as iam_router
 from src.iam.routers.invitations import broker_router as invitations_broker_router  # Добавить
 from src.knowledge.infra.indices import ensure_knowledge_indices
 from src.knowledge.routers import router as knowledge_router
+from src.mcp.server import mcp
 from src.media.router import router as media_router
 from src.notifications.infra.handlers import router as notifications_broker_router
 from src.notifications.routers.notifications import (
@@ -52,6 +54,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # Выполнение необходимых команд для запуска приложения
     await run_cli_command(sys.executable, "-m", "alembic", "upgrade", "head")
     await run_cli_command(sys.executable, "-m", "cli", "create-first-admin")
+    await run_cli_command(sys.executable, "-m", "cli", "create-test-users")
     await run_cli_command(sys.executable, "-m", "cli", "init-s3-buckets")
 
     # Проверка доступности Redis
@@ -81,11 +84,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             await close_opensearch_client()
 
 
+# MCP сервер для AI агентов (Streamable HTTP, endpoint: /mcp/)
+mcp_app = mcp.http_app(path="/", stateless_http=True)
+
 app = FastAPI(
     title="Ticket management system",
     description="REST API тикет-системы компании **ДИО-Консалт**",
     version="0.1.0",
-    lifespan=lifespan,
+    lifespan=combine_lifespans(lifespan, mcp_app.lifespan),
 )
 
 # Prometheus мониторинг
@@ -96,7 +102,6 @@ Instrumentator(
 ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 # Rabbit обработчики (все subscriber'ы)
-broker_router.include_router(notification_router)
 broker_router.include_router(notifications_broker_router)
 broker_router.include_router(task_broker_router)
 broker_router.include_router(invitations_broker_router)          # Добавить
@@ -116,9 +121,11 @@ router.include_router(project_router)
 router.include_router(task_router)
 router.include_router(feedback_router)
 router.include_router(knowledge_router)
+router.include_router(notification_router)
 
 app.include_router(router)
 app.include_router(broker_router)
+app.mount("/mcp", mcp_app)
 
 app.add_middleware(
     CORSMiddleware,
