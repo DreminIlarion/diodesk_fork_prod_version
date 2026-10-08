@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytz
 from dotenv import load_dotenv
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 TIMEZONE = "Asia/Yekaterinburg"
@@ -177,6 +178,46 @@ class AdminSettings(BaseSettings):
     password: str = "admin"
 
 
+class OpenSearchSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="OPENSEARCH_")
+
+    host: str = "opensearch"
+    port: int = 9200
+    use_ssl: bool = False
+    verify_certs: bool = False
+    username: str | None = None
+    password: SecretStr | None = None
+
+    articles_index: str = "kb_articles_v1"
+    chunks_index_prefix: str = "kb_chunks"
+
+    articles_read_alias: str = "kb_articles_read"
+    articles_write_alias: str = "kb_articles_write"
+    chunks_read_alias: str = "kb_chunks_read"
+    chunks_write_alias: str = "kb_chunks_write"
+
+    rrf_pipeline: str = "kb-rrf-v1"
+    number_of_shards: int = 1
+    number_of_replicas: int = 0
+
+
+class AITunnelSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="AITUNNEL_")
+
+    base_url: str = "https://api.aitunnel.ru/v1"
+    api_key: SecretStr = SecretStr("<API_KEY>")
+
+    embedding_model: str = "text-embedding-3-small"
+    embedding_dimensions: int = 1024
+
+    classification_model: str = "gpt-4.1-nano"
+    classification_batch_size: int = 20
+    classification_max_tokens: int = 2048
+
+    request_timeout_seconds: float = 90.0
+    max_retries: int = 3
+
+
 class Settings(BaseSettings):
     secret_key: str = "<SECRET_KEY>"
     frontend_url: str = "http://localhost:3000"
@@ -194,6 +235,9 @@ class Settings(BaseSettings):
     embeddings: EmbeddingsSettings = EmbeddingsSettings()
     admin: AdminSettings = AdminSettings()
 
+    opensearch: OpenSearchSettings = OpenSearchSettings()
+    ai_tunnel: AITunnelSettings = AITunnelSettings()
+
 
 settings = Settings()
-print(settings.rabbit.url)
+print(settings.rabbit.url)  # noqa: T201
