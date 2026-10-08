@@ -100,7 +100,7 @@ class OpenSearchArticleChunkRepository:
             },
             params={
                 "conflicts": "proceed",
-                "refresh": True,
+                "refresh": "true",
             },
         )
 

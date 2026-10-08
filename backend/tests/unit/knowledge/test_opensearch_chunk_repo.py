@@ -113,7 +113,7 @@ async def test_replace_for_article_deletes_old_and_bulk_indexes_new_chunks():
         },
         params={
             "conflicts": "proceed",
-            "refresh": True,
+            "refresh": "true",
         },
     )
 
@@ -213,7 +213,7 @@ async def test_delete_by_article_uses_term_query():
         },
         params={
             "conflicts": "proceed",
-            "refresh": True,
+            "refresh": "true",
         },
     )
 
