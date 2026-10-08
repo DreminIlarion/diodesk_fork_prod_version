@@ -1,3 +1,6 @@
+from typing import TYPE_CHECKING
+
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
@@ -7,8 +10,12 @@ from src.shared.domain.repos import Repository
 from src.shared.domain.vo import Priority, Tag
 from src.shared.schemas import Page, Pagination
 
+from .dtos import TaskSearchFilters
 from .entities import Task
 from .vo import TaskNumber, TaskStatus
+
+if TYPE_CHECKING:
+    from .assignment import CompletedTask, Workload
 
 
 @dataclass(frozen=True)
@@ -81,4 +88,25 @@ class TaskRepository(Repository[Task]):
         Учитывает переданное пространство имён, если project_id is None -
         вернуться все строке где project_id равен None.
         Возвращает облегченные модели представления задач.
+        """
+
+    async def search(
+            self, filters: TaskSearchFilters, pagination: Pagination,
+    ) -> Page[TaskView]:
+        """
+        Поиск задач по фильтрам.
+        Сортировка: сначала более приоритетные, затем с ближайшим сроком.
+        """
+
+    async def get_workloads(self, user_ids: Collection[UUID]) -> list["Workload"]:
+        """
+        Агрегированная загрузка исполнителей по открытым задачам и очереди ревью.
+        Пользователи без открытых задач и ревью в результат не попадают.
+        """
+
+    async def get_completed(
+            self, assignee_ids: Collection[UUID], *, since: datetime, limit: int,
+    ) -> list["CompletedTask"]:
+        """
+        Выполненные задачи исполнителей начиная с указанной даты (от новых к старым).
         """

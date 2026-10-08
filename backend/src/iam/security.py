@@ -3,6 +3,7 @@ from typing import Any
 import asyncio
 import logging
 import os
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from uuid import UUID, uuid4
@@ -13,7 +14,7 @@ from passlib.context import CryptContext
 from src.core.settings import settings
 from src.shared.utils.time import current_datetime
 
-from .domain.authz import SubjectType
+from .domain.authz import Subject, SubjectType
 from .domain.exceptions import UnauthorizedError
 from .domain.vo import Email, UserRole
 
@@ -119,3 +120,20 @@ def validate_token(token: str) -> dict[str, Any]:
         raise UnauthorizedError("Token signature expired!") from None
     except jwt.PyJWTError:
         raise UnauthorizedError("Invalid token!") from None
+
+
+def subject_from_claims(claims: Mapping[str, Any]) -> Subject:
+    """
+    Восстанавливает субъекта авторизации из claims провалидированного access токена.
+    """
+
+    counterparty_id = claims.get("counterparty_id")
+
+    return Subject(
+        id=UUID(claims["sub"]),
+        type=SubjectType(claims.get("sub_type", SubjectType.USER)),
+        email=Email(claims["email"]) if "email" in claims else None,
+        roles=[UserRole(role) for role in claims.get("roles", [])],
+        counterparty_id=None if counterparty_id is None else UUID(counterparty_id),
+        scopes=list(claims.get("scopes", [])),
+    )
