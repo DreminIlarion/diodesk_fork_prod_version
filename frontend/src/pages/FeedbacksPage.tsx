@@ -1610,7 +1610,7 @@ export default function FeedbacksPage() {
   /* RENDER */
 
   return (
-    <div className="mx-auto max-w-[1600px] space-y-6 pb-10 animate-in fade-in duration-500">
+    <div className="mx-auto max-w-[1700px] space-y-6 pb-10 animate-in fade-in duration-500">
       {/* HEADER */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>

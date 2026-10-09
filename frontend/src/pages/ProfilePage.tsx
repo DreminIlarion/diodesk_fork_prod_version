@@ -305,7 +305,7 @@ export default function ProfilePage() {
      ═══════════════════════════════════════════════════════════════ */
 
   return (
-    <div className="w-full max-w-[1500px] mx-auto space-y-6 pb-12 animate-in fade-in duration-500">
+    <div className="w-full max-w-[1700px] mx-auto space-y-6 pb-12 animate-in fade-in duration-500">
 
       {/* =========================================================
           HEADER
