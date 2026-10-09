@@ -1045,7 +1045,7 @@ export default function DashboardPage() {
      ========================================================================== */
 
   return (
-    <main className="mx-auto max-w-[1600px] space-y-6 pb-8 animate-in fade-in duration-500">
+    <main className="mx-auto max-w-[1900px] space-y-6 pb-8 animate-in fade-in duration-500">
 
       {/* ================================================================
           HEADER
