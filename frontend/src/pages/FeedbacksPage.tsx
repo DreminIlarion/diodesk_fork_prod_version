@@ -1,22 +1,58 @@
 // pages/FeedbacksPage.tsx
-import { useState, useCallback, useEffect, useRef, type CSSProperties } from 'react';
+
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  type CSSProperties,
+} from 'react';
+
 import { useSearchParams, Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+
 import {
-  Star, Filter, Plus, Loader2, X, Check,
-  ChevronDown, ChevronLeft, ChevronRight, RefreshCw,
-  MessageSquare, Ticket, User, Calendar, Pencil,
-  Trash2, Save, ArrowUpRight, BarChart3, Search,
+  Star,
+  Filter,
+  Plus,
+  Loader2,
+  X,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+  MessageSquare,
+  Ticket,
+  User,
+  Calendar,
+  Pencil,
+  Trash2,
+  Save,
+  ArrowUpRight,
+  BarChart3,
+  Search,
 } from 'lucide-react';
-import { feedbacksApi, ticketsApi, usersApi } from '../api/client';
-import type { Feedback, FeedbackUpdateInput } from '../api/client';
+
+import {
+  feedbacksApi,
+  ticketsApi,
+  usersApi,
+} from '../api/client';
+
+import type {
+  Feedback,
+  FeedbackUpdateInput,
+} from '../api/client';
+
 import { useAuthStore } from '../stores/authStore';
 import { useToast } from '../components/ui/use-toast';
+import { ActionButton } from '../components/ui/ActionButton';
 
-/* ═══════════════════════════════════════════════════════════════════
-   CONSTANTS & HELPERS
-   ═══════════════════════════════════════════════════════════════════ */
+/* ==========================================================================
+   CONSTANTS
+   ========================================================================== */
 
 const RATING_LABELS: Record<number, string> = {
   1: 'Очень плохо',
@@ -26,20 +62,30 @@ const RATING_LABELS: Record<number, string> = {
   5: 'Отлично',
 };
 
-const apiErr = (err: any) =>
-  err?.response?.data?.error?.public_message ??
-  err?.response?.data?.error?.message ??
-  err?.response?.data?.detail?.[0]?.msg ??
-  err?.message ??
+const INPUT_CLS = `
+  w-full
+  px-4 py-3
+  rounded-xl
+  border border-[var(--border-color)]
+  bg-[var(--hover-2)]
+  text-base text-[var(--text-primary)]
+  placeholder:text-[var(--text-primary)]/30
+  focus:outline-none
+  focus:border-[var(--accent)]/40
+  focus:ring-2
+  focus:ring-[var(--accent-ring)]
+  transition-all
+`;
+
+const apiErr = (error: any): string =>
+  error?.response?.data?.error?.public_message ??
+  error?.response?.data?.error?.message ??
+  error?.response?.data?.detail?.[0]?.msg ??
+  error?.message ??
   'Неизвестная ошибка';
 
-const INPUT_CLS =
-  'w-full px-3.5 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl ' +
-  'text-[var(--text-primary)] text-sm placeholder-[var(--text-primary)]/25 ' +
-  'focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all';
-
-const fmtDate = (d: string) =>
-  new Date(d).toLocaleDateString('ru-RU', {
+const fmtDate = (date: string): string =>
+  new Date(date).toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -47,37 +93,74 @@ const fmtDate = (d: string) =>
     minute: '2-digit',
   });
 
-const initials = (n?: string | null) =>
-  n ? n.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() : '?';
+const initials = (name?: string | null): string => {
+  if (!name) return '?';
+
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
+};
+
+/* ==========================================================================
+   DROPDOWN POSITION
+   ========================================================================== */
 
 function useDropdownPosition(
-  triggerRef: React.RefObject<HTMLDivElement | HTMLButtonElement | null>,
+  triggerRef: React.RefObject<HTMLButtonElement | null>,
   open: boolean,
 ) {
   const [style, setStyle] = useState<CSSProperties>({});
 
   useEffect(() => {
     if (!open || !triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const openUp = spaceBelow < 320;
-    setStyle({
-      position: 'fixed',
-      left: rect.left,
-      width: rect.width,
-      zIndex: 9999,
-      ...(openUp
-        ? { bottom: window.innerHeight - rect.top + 4 }
-        : { top: rect.bottom + 4 }),
-    });
+
+    const updatePosition = () => {
+      if (!triggerRef.current) return;
+
+      const rect = triggerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+
+      const openUp =
+        spaceBelow < 320 &&
+        spaceAbove > spaceBelow;
+
+      setStyle({
+        position: 'fixed',
+        left: rect.left,
+        width: rect.width,
+        zIndex: 9999,
+        maxHeight: Math.min(
+          360,
+          Math.max(160, openUp ? spaceAbove - 16 : spaceBelow - 16),
+        ),
+        ...(openUp
+          ? { bottom: window.innerHeight - rect.top + 6 }
+          : { top: rect.bottom + 6 }),
+      });
+    };
+
+    updatePosition();
+
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
   }, [open, triggerRef]);
 
   return style;
 }
 
-/* ═══════════════════════════════════════════════════════════════════
+/* ==========================================================================
    STAR RATING
-   ═══════════════════════════════════════════════════════════════════ */
+   ========================================================================== */
 
 function StarRating({
   value,
@@ -87,28 +170,35 @@ function StarRating({
   showLabel = false,
 }: {
   value: number;
-  onChange?: (v: number) => void;
+  onChange?: (value: number) => void;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   readonly?: boolean;
   showLabel?: boolean;
 }) {
   const [hovered, setHovered] = useState(0);
-  const display = readonly ? value : (hovered || value);
 
-  const pxMap = { sm: 16, md: 20, lg: 28, xl: 36 };
-  const px = pxMap[size];
+  const display = readonly
+    ? value
+    : hovered || value;
 
-  const label = display > 0 ? RATING_LABELS[display] : '';
+  const sizes = {
+    sm: 19,
+    md: 23,
+    lg: 29,
+    xl: 36,
+  };
+
+  const px = sizes[size];
+  const label = RATING_LABELS[display] || '';
 
   return (
     <div className="inline-flex flex-col items-center">
       <div
-        className="inline-flex items-center gap-0.5"
-        onMouseLeave={() => !readonly && setHovered(0)}
-        style={{ height: px, lineHeight: 0 }}
+        className="inline-flex items-center gap-1"
+        onMouseLeave={() => setHovered(0)}
       >
-        {[1, 2, 3, 4, 5].map(star => {
-          const isActive = star <= display;
+        {[1, 2, 3, 4, 5].map((star) => {
+          const active = star <= display;
 
           if (readonly) {
             return (
@@ -120,12 +210,11 @@ function StarRating({
                 <Star
                   width={px}
                   height={px}
-                  className={`transition-colors duration-150 ${
-                    isActive
-                      ? 'text-emerald-500 fill-emerald-500'
-                      : 'text-[var(--text-primary)]/10'
-                  }`}
-                  style={{ display: 'block' }}
+                  className={
+                    active
+                      ? 'fill-emerald-500 text-emerald-500'
+                      : 'text-[var(--text-primary)]/15'
+                  }
                 />
               </span>
             );
@@ -138,20 +227,20 @@ function StarRating({
               aria-label={`Оценка ${star}`}
               onClick={() => onChange?.(star)}
               onMouseEnter={() => setHovered(star)}
-              className="flex items-center justify-center outline-none
-                         transition-transform duration-100
-                         hover:scale-110 active:scale-95"
-              style={{ width: px + 4, height: px + 4, lineHeight: 0 }}
+              className="flex items-center justify-center transition-transform hover:scale-110 active:scale-95"
+              style={{
+                width: px + 5,
+                height: px + 5,
+              }}
             >
               <Star
                 width={px}
                 height={px}
-                className={`transition-colors duration-150 ${
-                  isActive
-                    ? 'text-emerald-500 fill-emerald-500'
+                className={`transition-colors ${
+                  active
+                    ? 'fill-emerald-500 text-emerald-500'
                     : 'text-[var(--text-primary)]/15'
                 }`}
-                style={{ display: 'block' }}
               />
             </button>
           );
@@ -159,7 +248,7 @@ function StarRating({
       </div>
 
       {showLabel && (
-        <div className="h-5 mt-2.5 flex items-center">
+        <div className="mt-3 h-6">
           <AnimatePresence mode="wait">
             {label && (
               <motion.span
@@ -167,8 +256,8 @@ function StarRating({
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.12 }}
-                className="text-sm font-medium text-emerald-500/70"
+                transition={{ duration: 0.15 }}
+                className="text-base font-medium text-emerald-500"
               >
                 {label}
               </motion.span>
@@ -180,44 +269,73 @@ function StarRating({
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
+/* ==========================================================================
    RATING BAR
-   ═══════════════════════════════════════════════════════════════════ */
+   ========================================================================== */
 
-function RatingBar({ star, count, total }: { star: number; count: number; total: number }) {
-  const pct = total > 0 ? (count / total) * 100 : 0;
+function RatingBar({
+  star,
+  count,
+  total,
+}: {
+  star: number;
+  count: number;
+  total: number;
+}) {
+  const percent =
+    total > 0 ? (count / total) * 100 : 0;
 
   return (
     <div className="flex items-center gap-3">
-      <div className="flex items-center gap-1 w-8 justify-end flex-shrink-0">
-        <span className="text-xs font-medium text-[var(--text-primary)]/50 tabular-nums">{star}</span>
-        <Star className="w-3 h-3 text-emerald-500 fill-emerald-500 flex-shrink-0" />
-      </div>
+      <span className="flex w-10 shrink-0 items-center justify-end gap-1 text-sm text-[var(--text-primary)]/65">
+        {star}
+        <Star className="h-3.5 w-3.5 fill-emerald-500 text-emerald-500" />
+      </span>
 
-      <div className="flex-1 h-1.5 bg-[var(--hover-3)] rounded-full overflow-hidden">
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--hover-3)]">
         <motion.div
           initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.4, ease: 'easeOut' }}
-          className="h-full rounded-full bg-emerald-500/60"
+          animate={{ width: `${percent}%` }}
+          transition={{ duration: 0.4 }}
+          className="h-full rounded-full bg-emerald-500"
         />
       </div>
 
-      <span className="text-xs text-[var(--text-primary)]/30 w-6 text-right tabular-nums flex-shrink-0">
+      <span className="w-8 shrink-0 text-right text-sm tabular-nums text-[var(--text-primary)]/45">
         {count}
       </span>
     </div>
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   TICKET SELECT (async, closed only)
-   ═══════════════════════════════════════════════════════════════════ */
+/* ==========================================================================
+   SELECT TYPES
+   ========================================================================== */
 
-interface TicketOption { id: string; number: string; title: string; }
+interface TicketOption {
+  id: string;
+  number: string;
+  title: string;
+}
+
+interface UserOption {
+  id: string;
+  full_name?: string;
+  username?: string;
+  email: string;
+  avatar_url?: string | null;
+}
+
+/* ==========================================================================
+   TICKET SELECT
+   ========================================================================== */
 
 function TicketSelect({
-  value, label, onChange, disabled = false, placeholder = 'Заявка',
+  value,
+  label,
+  onChange,
+  disabled = false,
+  placeholder = 'Выберите заявку',
 }: {
   value: string;
   label?: string;
@@ -230,152 +348,203 @@ function TicketSelect({
   const [options, setOptions] = useState<TicketOption[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const triggerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const dropdownStyle = useDropdownPosition(triggerRef, open);
 
   useEffect(() => {
     if (!open) return;
-    const h = (e: MouseEvent) => {
-      if (triggerRef.current?.contains(e.target as Node)) return;
-      if (dropdownRef.current?.contains(e.target as Node)) return;
+
+    const handler = (event: MouseEvent) => {
+      if (triggerRef.current?.contains(event.target as Node)) return;
+      if (dropdownRef.current?.contains(event.target as Node)) return;
+
       setOpen(false);
     };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
+
+    document.addEventListener('mousedown', handler);
+
+    return () => document.removeEventListener('mousedown', handler);
   }, [open]);
-
-  const loadClosedTickets = useCallback(async (q: string) => {
-    setLoading(true);
-    try {
-      const res = await ticketsApi.getAllWithFilters(1, 100, {});
-      const closed = res.items.filter((t: any) => String(t.status).toLowerCase() === 'closed');
-      const filtered = q
-        ? closed.filter((t: any) =>
-            String(t.title || '').toLowerCase().includes(q.toLowerCase()) ||
-            String(t.number || '').toLowerCase().includes(q.toLowerCase())
-          )
-        : closed;
-      setOptions(filtered.map((t: any) => ({
-        id: t.id,
-        number: String(t.number),
-        title: String(t.title || ''),
-      })));
-    } catch { setOptions([]); }
-    finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => {
-    if (!open) { setSearch(''); return; }
-    loadClosedTickets('');
-    setTimeout(() => inputRef.current?.focus(), 50);
-  }, [open, loadClosedTickets]);
 
   useEffect(() => {
     if (!open) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => loadClosedTickets(search), 250);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [open, search, loadClosedTickets]);
 
-  const dropdown = open ? createPortal(
-    <div
-      ref={dropdownRef}
-      style={dropdownStyle}
-      className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-[var(--shadow-lg)] overflow-hidden"
-    >
-      <div className="p-2 border-b border-[var(--border-color)]">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/25 pointer-events-none" />
-          <input
-            ref={inputRef}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Поиск по закрытым заявкам..."
-            className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30"
-          />
-        </div>
-      </div>
+    const load = async () => {
+      setLoading(true);
 
-      <div className="overflow-y-auto max-h-[260px] p-1 scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent">
-        <button
-          onClick={() => { onChange('', ''); setOpen(false); }}
-          className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm transition-colors
-            ${!value ? 'bg-emerald-500/8 text-[var(--text-primary)]' : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}
+      try {
+        const response = await ticketsApi.getAllWithFilters(1, 100, {});
+
+        const closed = response.items.filter(
+          (ticket: any) => ticket.status === 'closed',
+        );
+
+        const query = search.trim().toLowerCase();
+
+        const filtered = query
+          ? closed.filter(
+              (ticket: any) =>
+                String(ticket.title || '').toLowerCase().includes(query) ||
+                String(ticket.number || '').toLowerCase().includes(query),
+            )
+          : closed;
+
+        setOptions(
+          filtered.map((ticket: any) => ({
+            id: ticket.id,
+            number: String(ticket.number),
+            title: String(ticket.title || ''),
+          })),
+        );
+      } catch {
+        setOptions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const timer = setTimeout(load, search ? 250 : 0);
+
+    return () => clearTimeout(timer);
+  }, [open, search]);
+
+  useEffect(() => {
+    if (open) {
+      const timer = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
+    }
+
+    setSearch('');
+  }, [open]);
+
+  const dropdown = open
+    ? createPortal(
+        <div
+          ref={dropdownRef}
+          style={dropdownStyle}
+          className="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-lg)]"
         >
-          <span className="flex-1 text-left">Все заявки</span>
-          {!value && <Check className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />}
-        </button>
+          <div className="border-b border-[var(--border-color)] p-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-primary)]/35" />
 
-        {loading && (
-          <div className="flex justify-center py-4">
-            <Loader2 className="w-4 h-4 animate-spin text-[var(--text-primary)]/25" />
+              <input
+                ref={inputRef}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Номер или название заявки..."
+                className={INPUT_CLS + ' pl-10'}
+              />
+            </div>
           </div>
-        )}
 
-        {!loading && options.length === 0 && (
-          <div className="px-3 py-6 text-center">
-            <Ticket className="w-5 h-5 text-[var(--text-primary)]/15 mx-auto mb-2" />
-            <p className="text-sm text-[var(--text-primary)]/35">
-              {search ? 'Ничего не найдено' : 'Нет закрытых заявок'}
-            </p>
-          </div>
-        )}
-
-        {!loading && options.map(opt => {
-          const optionLabel = `#${opt.number} — ${opt.title}`;
-          return (
+          <div className="max-h-72 overflow-y-auto p-2">
             <button
-              key={opt.id}
-              onClick={() => { onChange(opt.id, optionLabel); setOpen(false); }}
-              className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm transition-colors
-                ${value === opt.id
-                  ? 'bg-emerald-500/8 text-[var(--text-primary)]'
-                  : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'}`}
+              type="button"
+              onClick={() => {
+                onChange('', '');
+                setOpen(false);
+              }}
+              className="flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm text-[var(--text-primary)]/65 hover:bg-[var(--hover-2)]"
             >
-              <Ticket className="w-3.5 h-3.5 text-[var(--text-primary)]/20 flex-shrink-0" />
-              <div className="flex-1 min-w-0 text-left">
-                <div className="truncate font-mono text-xs text-[var(--text-primary)]/45">#{opt.number}</div>
-                <div className="truncate text-sm text-[var(--text-primary)]/70">{opt.title}</div>
-              </div>
-              {value === opt.id && <Check className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />}
+              Все заявки
+              {!value && <Check className="h-4 w-4 text-emerald-500" />}
             </button>
-          );
-        })}
-      </div>
-    </div>,
-    document.body,
-  ) : null;
+
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : options.length === 0 ? (
+              <p className="py-8 text-center text-sm text-[var(--text-primary)]/40">
+                Ничего не найдено
+              </p>
+            ) : (
+              options.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(
+                      option.id,
+                      `#${option.number} — ${option.title}`,
+                    );
+                    setOpen(false);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-[var(--hover-2)]"
+                >
+                  <Ticket className="h-4 w-4 shrink-0 text-[var(--text-primary)]/35" />
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-mono text-xs text-[var(--text-primary)]/45">
+                      #{option.number}
+                    </p>
+
+                    <p className="truncate text-sm text-[var(--text-primary)]">
+                      {option.title}
+                    </p>
+                  </div>
+
+                  {value === option.id && (
+                    <Check className="h-4 w-4 text-emerald-500" />
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+        </div>,
+        document.body,
+      )
+    : null;
 
   return (
-    <div ref={triggerRef} className="relative">
-      <div
-        role="button"
-        tabIndex={disabled ? -1 : 0}
-        onClick={() => !disabled && setOpen(v => !v)}
-        className={`w-full flex items-center gap-2.5 px-4 py-3 bg-[var(--hover-2)] border rounded-xl text-sm text-left transition-all select-none
-          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--hover-3)]'}
-          ${open ? 'border-[var(--accent)]/30 ring-2 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((prev) => !prev)}
+        className="
+          flex w-full items-center gap-3 rounded-xl
+          border border-[var(--border-color)]
+          bg-[var(--hover-2)] px-4 py-3
+          text-left text-base
+          transition-colors
+          hover:bg-[var(--hover-3)]
+          disabled:cursor-not-allowed disabled:opacity-50
+        "
       >
-        <Ticket className="w-4 h-4 text-[var(--text-primary)]/25 flex-shrink-0" />
-        <span className={`flex-1 truncate ${label ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/30'}`}>
+        <Ticket className="h-5 w-5 shrink-0 text-[var(--text-primary)]/40" />
+
+        <span
+          className={`min-w-0 flex-1 truncate ${
+            label
+              ? 'text-[var(--text-primary)]'
+              : 'text-[var(--text-primary)]/40'
+          }`}
+        >
           {label || placeholder}
         </span>
-        <ChevronDown className={`w-4 h-4 text-[var(--text-primary)]/20 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </div>
+
+        <ChevronDown className="h-4 w-4 shrink-0 text-[var(--text-primary)]/35" />
+      </button>
+
       {dropdown}
-    </div>
+    </>
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
+/* ==========================================================================
    AUTHOR SELECT
-   ═══════════════════════════════════════════════════════════════════ */
+   ========================================================================== */
 
 function AuthorSelect({
-  value, label, onChange,
+  value,
+  label,
+  onChange,
 }: {
   value: string;
   label?: string;
@@ -383,152 +552,201 @@ function AuthorSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [options, setOptions] = useState<any[]>([]);
+  const [options, setOptions] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const triggerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
   const dropdownStyle = useDropdownPosition(triggerRef, open);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    const h = (e: MouseEvent) => {
-      if (triggerRef.current?.contains(e.target as Node)) return;
-      if (dropdownRef.current?.contains(e.target as Node)) return;
+
+    const handler = (event: MouseEvent) => {
+      if (triggerRef.current?.contains(event.target as Node)) return;
+      if (dropdownRef.current?.contains(event.target as Node)) return;
+
       setOpen(false);
     };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
+
+    document.addEventListener('mousedown', handler);
+
+    return () => document.removeEventListener('mousedown', handler);
   }, [open]);
-
-  const loadUsers = useCallback(async (q: string) => {
-    setLoading(true);
-    try {
-      const res = await usersApi.getAllUsers(1, 100);
-      const filtered = q
-        ? res.items.filter((u: any) =>
-            String(u.full_name || '').toLowerCase().includes(q.toLowerCase()) ||
-            String(u.username || '').toLowerCase().includes(q.toLowerCase()) ||
-            String(u.email || '').toLowerCase().includes(q.toLowerCase())
-          )
-        : res.items;
-      setOptions(filtered);
-    } catch { setOptions([]); }
-    finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => {
-    if (!open) { setSearch(''); return; }
-    loadUsers('');
-    setTimeout(() => inputRef.current?.focus(), 50);
-  }, [open, loadUsers]);
 
   useEffect(() => {
     if (!open) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => loadUsers(search), 250);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [open, search, loadUsers]);
 
-  const dropdown = open ? createPortal(
-    <div
-      ref={dropdownRef}
-      style={dropdownStyle}
-      className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-[var(--shadow-lg)] overflow-hidden"
-    >
-      <div className="p-2 border-b border-[var(--border-color)]">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-primary)]/25 pointer-events-none" />
-          <input
-            ref={inputRef}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Поиск автора..."
-            className="w-full pl-8 pr-3 py-2 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/25 focus:outline-none focus:border-[var(--accent)]/30"
-          />
-        </div>
-      </div>
+    const load = async () => {
+      setLoading(true);
 
-      <div className="overflow-y-auto max-h-[260px] p-1 scrollbar-thin scrollbar-thumb-[var(--hover-3)] scrollbar-track-transparent">
-        <button
-          onClick={() => { onChange('', ''); setOpen(false); }}
-          className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm transition-colors
-            ${!value ? 'bg-emerald-500/8 text-[var(--text-primary)]' : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}
+      try {
+        const response = await usersApi.getAllUsers(1, 100);
+        const query = search.trim().toLowerCase();
+
+        const filtered = query
+          ? response.items.filter(
+              (user: any) =>
+                String(user.full_name || '').toLowerCase().includes(query) ||
+                String(user.username || '').toLowerCase().includes(query) ||
+                String(user.email || '').toLowerCase().includes(query),
+            )
+          : response.items;
+
+        setOptions(filtered);
+      } catch {
+        setOptions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const timer = setTimeout(load, search ? 250 : 0);
+
+    return () => clearTimeout(timer);
+  }, [open, search]);
+
+  useEffect(() => {
+    if (open) {
+      const timer = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
+    }
+
+    setSearch('');
+  }, [open]);
+
+  const dropdown = open
+    ? createPortal(
+        <div
+          ref={dropdownRef}
+          style={dropdownStyle}
+          className="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-lg)]"
         >
-          <span className="flex-1 text-left">Все авторы</span>
-          {!value && <Check className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />}
-        </button>
+          <div className="border-b border-[var(--border-color)] p-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-primary)]/35" />
 
-        {loading && (
-          <div className="flex justify-center py-4">
-            <Loader2 className="w-4 h-4 animate-spin text-[var(--text-primary)]/25" />
+              <input
+                ref={inputRef}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Поиск автора..."
+                className={INPUT_CLS + ' pl-10'}
+              />
+            </div>
           </div>
-        )}
 
-        {!loading && options.length === 0 && (
-          <div className="px-3 py-6 text-center">
-            <User className="w-5 h-5 text-[var(--text-primary)]/15 mx-auto mb-2" />
-            <p className="text-sm text-[var(--text-primary)]/35">Ничего не найдено</p>
-          </div>
-        )}
-
-        {!loading && options.map((u: any) => {
-          const userLabel = String(u.full_name || u.username || u.email);
-          return (
+          <div className="max-h-72 overflow-y-auto p-2">
             <button
-              key={u.id}
-              onClick={() => { onChange(u.id, userLabel); setOpen(false); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-colors
-                ${value === u.id
-                  ? 'bg-emerald-500/8 text-[var(--text-primary)]'
-                  : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]'}`}
+              type="button"
+              onClick={() => {
+                onChange('', '');
+                setOpen(false);
+              }}
+              className="flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm text-[var(--text-primary)]/65 hover:bg-[var(--hover-2)]"
             >
-              <div className="w-7 h-7 rounded-full bg-[var(--accent)] text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
-                {initials(u.full_name || u.username || u.email)}
-              </div>
-              <div className="flex-1 min-w-0 text-left">
-                <div className="truncate text-sm text-[var(--text-primary)]/75">
-                  {u.full_name || u.username || u.email}
-                </div>
-                <div className="truncate text-[11px] text-[var(--text-primary)]/30">{u.email}</div>
-              </div>
-              {value === u.id && <Check className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />}
+              Все авторы
+              {!value && <Check className="h-4 w-4 text-emerald-500" />}
             </button>
-          );
-        })}
-      </div>
-    </div>,
-    document.body,
-  ) : null;
+
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : options.length === 0 ? (
+              <p className="py-8 text-center text-sm text-[var(--text-primary)]/40">
+                Ничего не найдено
+              </p>
+            ) : (
+              options.map((option) => {
+                const name =
+                  option.full_name ||
+                  option.username ||
+                  option.email;
+
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(option.id, name);
+                      setOpen(false);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-[var(--hover-2)]"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-semibold text-white">
+                      {initials(name)}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-[var(--text-primary)]">
+                        {name}
+                      </p>
+
+                      <p className="truncate text-xs text-[var(--text-primary)]/40">
+                        {option.email}
+                      </p>
+                    </div>
+
+                    {value === option.id && (
+                      <Check className="h-4 w-4 text-emerald-500" />
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>,
+        document.body,
+      )
+    : null;
 
   return (
-    <div ref={triggerRef} className="relative">
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => setOpen(v => !v)}
-        className={`w-full flex items-center gap-2.5 px-4 py-3 bg-[var(--hover-2)] border rounded-xl text-sm text-left transition-all select-none cursor-pointer hover:bg-[var(--hover-3)]
-          ${open ? 'border-[var(--accent)]/30 ring-2 ring-[var(--accent-ring)]' : 'border-[var(--border-color)]'}`}
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="
+          flex w-full items-center gap-3 rounded-xl
+          border border-[var(--border-color)]
+          bg-[var(--hover-2)] px-4 py-3
+          text-left text-base
+          transition-colors
+          hover:bg-[var(--hover-3)]
+        "
       >
-        <User className="w-4 h-4 text-[var(--text-primary)]/25 flex-shrink-0" />
-        <span className={`flex-1 truncate ${label ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/30'}`}>
-          {label || 'Автор'}
+        <User className="h-5 w-5 shrink-0 text-[var(--text-primary)]/40" />
+
+        <span
+          className={`min-w-0 flex-1 truncate ${
+            label
+              ? 'text-[var(--text-primary)]'
+              : 'text-[var(--text-primary)]/40'
+          }`}
+        >
+          {label || 'Выберите автора'}
         </span>
-        <ChevronDown className={`w-4 h-4 text-[var(--text-primary)]/20 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </div>
+
+        <ChevronDown className="h-4 w-4 shrink-0 text-[var(--text-primary)]/35" />
+      </button>
+
       {dropdown}
-    </div>
+    </>
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   CREATE FEEDBACK MODAL
-   ═══════════════════════════════════════════════════════════════════ */
+/* ==========================================================================
+   CREATE MODAL
+   ========================================================================== */
 
 function CreateFeedbackModal({
-  presetTicketId, presetTicketLabel, onClose, onCreated,
+  presetTicketId,
+  presetTicketLabel,
+  onClose,
+  onCreated,
 }: {
   presetTicketId?: string;
   presetTicketLabel?: string;
@@ -536,122 +754,168 @@ function CreateFeedbackModal({
   onCreated: () => void;
 }) {
   const { toast } = useToast();
+
   const [ticketId, setTicketId] = useState(presetTicketId ?? '');
   const [ticketLabel, setTicketLabel] = useState(presetTicketLabel ?? '');
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
-  
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { if (presetTicketId) setTicketId(presetTicketId); }, [presetTicketId]);
-  useEffect(() => { if (presetTicketLabel) setTicketLabel(presetTicketLabel); }, [presetTicketLabel]);
-
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !saving) onClose(); };
-    document.addEventListener('keydown', h);
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !saving) onClose();
+    };
+
+    document.addEventListener('keydown', handler);
+
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
+
+    return () => {
+      document.removeEventListener('keydown', handler);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [onClose, saving]);
 
   const submit = async () => {
     if (!ticketId || !rating) return;
+
     setSaving(true);
+
     try {
-      await feedbacksApi.create({ ticket_id: ticketId, rating, comment: comment.trim() });
-      toast({ title: 'Отзыв отправлен', description: `Оценка: ${rating} из 5` });
+      await feedbacksApi.create({
+        ticket_id: ticketId,
+        rating,
+        comment: comment.trim(),
+      });
+
+      toast({
+        title: 'Отзыв отправлен',
+        description: `Оценка: ${rating} из 5`,
+      });
+
       onCreated();
-    } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
-    } finally { setSaving(false); }
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка',
+        description: apiErr(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !saving && onClose()} />
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={() => !saving && onClose()}
+      />
+
       <motion.div
-        initial={{ scale: 0.97, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.97, opacity: 0 }}
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.98 }}
         transition={{ duration: 0.15 }}
-        className="relative w-full max-w-lg bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden"
-        style={{ boxShadow: 'var(--shadow-lg)' }}
-        onClick={e => e.stopPropagation()}
+        className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl"
       >
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-[var(--border-color)]">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-[var(--text-primary)]">Новый отзыв</h2>
-              <p className="text-xs text-[var(--text-primary)]/35 mt-0.5">Только по закрытой заявке</p>
-            </div>
-            <button
-              onClick={() => !saving && onClose()}
-              className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/25 hover:text-[var(--text-primary)]/55 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
+        <div className="flex items-center justify-between border-b border-[var(--border-color)] px-6 py-5">
+          <div>
+            <h2 className="text-lg font-bold text-[var(--text-primary)]">
+              Новый отзыв
+            </h2>
+
+            <p className="mt-1 text-sm text-[var(--text-primary)]/40">
+              Оценка работы по закрытой заявке
+            </p>
           </div>
+
+          <button
+            type="button"
+            onClick={() => !saving && onClose()}
+            className="rounded-xl p-2 text-[var(--text-primary)]/40 hover:bg-[var(--hover-2)]"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        {/* Body */}
-        <div className="p-6 space-y-5">
-          {/* Ticket */}
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-6">
           <div>
-            <label className="block text-xs font-medium text-[var(--text-primary)]/50 uppercase tracking-wider mb-2">
+            <label className="mb-2 block text-sm font-medium text-[var(--text-primary)]/65">
               Заявка <span className="text-[var(--accent)]">*</span>
             </label>
+
             <TicketSelect
               value={ticketId}
               label={ticketLabel}
-              onChange={(id, l) => { setTicketId(id); setTicketLabel(l); }}
+              onChange={(id, label) => {
+                setTicketId(id);
+                setTicketLabel(label);
+              }}
               disabled={!!presetTicketId}
               placeholder="Выберите закрытую заявку"
             />
           </div>
 
-          {/* Stars */}
           <div>
-            <label className="block text-xs font-medium text-[var(--text-primary)]/50 uppercase tracking-wider mb-2">
-              Оценка <span className="text-[var(--accent)]">*</span>
+            <label className="mb-3 block text-sm font-medium text-[var(--text-primary)]/65">
+              Ваша оценка <span className="text-[var(--accent)]">*</span>
             </label>
-            <div className="flex flex-col items-center gap-1 py-6 rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)]">
-              <StarRating value={rating} onChange={setRating} size="xl" showLabel />
-              {rating === 0 && (
-                <p className="text-xs text-[var(--text-primary)]/25 mt-1">Нажмите на звезду чтобы оценить</p>
+
+            <div className="flex flex-col items-center rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-6">
+              <StarRating
+                value={rating}
+                onChange={setRating}
+                size="xl"
+                showLabel
+              />
+
+              {!rating && (
+                <p className="mt-2 text-sm text-[var(--text-primary)]/35">
+                  Выберите оценку от 1 до 5
+                </p>
               )}
             </div>
           </div>
 
-          {/* Comment */}
           <div>
-            <label className="block text-xs font-medium text-[var(--text-primary)]/50 uppercase tracking-wider mb-2">
+            <label className="mb-2 block text-sm font-medium text-[var(--text-primary)]/65">
               Комментарий
             </label>
+
             <textarea
               value={comment}
-              onChange={e => setComment(e.target.value)}
-              rows={3}
-              placeholder="Комментарий к отзыву..."
+              onChange={(event) => setComment(event.target.value)}
+              rows={4}
+              placeholder="Расскажите о качестве работы..."
               className={`${INPUT_CLS} resize-none`}
             />
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2.5 px-6 py-4 border-t border-[var(--border-color)]">
+        <div className="flex justify-end gap-3 border-t border-[var(--border-color)] px-6 py-4">
           <button
+            type="button"
             onClick={() => !saving && onClose()}
             disabled={saving}
-            className="px-4 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/60 text-sm disabled:opacity-50 transition-colors"
+            className="rounded-xl bg-[var(--hover-2)] px-5 py-2.5 text-sm font-medium text-[var(--text-primary)]/65 hover:bg-[var(--hover-3)] disabled:opacity-50"
           >
             Отмена
           </button>
+
           <button
+            type="button"
             onClick={submit}
             disabled={!ticketId || !rating || saving}
-            className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-40 transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-40"
           >
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Check className="h-4 w-4" />
+            )}
+
             Отправить
           </button>
         </div>
@@ -660,101 +924,154 @@ function CreateFeedbackModal({
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   EDIT FEEDBACK MODAL
-   ═══════════════════════════════════════════════════════════════════ */
+/* ==========================================================================
+   EDIT MODAL
+   ========================================================================== */
 
 function EditFeedbackModal({
-  feedback, onClose, onUpdated,
+  feedback,
+  onClose,
+  onUpdated,
 }: {
   feedback: Feedback;
   onClose: () => void;
   onUpdated: () => void;
 }) {
   const { toast } = useToast();
-  const [rating, setRating] = useState(feedback.rating);
-  const [comment, setComment] = useState(feedback.comment);
 
+  const [rating, setRating] = useState(feedback.rating);
+  const [comment, setComment] = useState(feedback.comment ?? '');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !saving) onClose(); };
-    document.addEventListener('keydown', h);
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !saving) onClose();
+    };
+
+    document.addEventListener('keydown', handler);
+
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
+
+    return () => {
+      document.removeEventListener('keydown', handler);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [onClose, saving]);
 
   const submit = async () => {
     setSaving(true);
+
     try {
       const data: FeedbackUpdateInput = {};
-      if (rating !== feedback.rating) data.rating = rating;
-      
-      // Исправь эту строку:
-      const newComment = (comment || '').trim();
+
+      if (rating !== feedback.rating) {
+        data.rating = rating;
+      }
+
+      const newComment = comment.trim();
       const oldComment = (feedback.comment || '').trim();
-      if (newComment !== oldComment) data.comment = newComment || undefined;
-      
-      if (Object.keys(data).length > 0) await feedbacksApi.update(feedback.id, data);
+
+      if (newComment !== oldComment) {
+        data.comment = newComment || undefined;
+      }
+
+      if (Object.keys(data).length > 0) {
+        await feedbacksApi.update(feedback.id, data);
+      }
+
       toast({ title: 'Отзыв обновлён' });
       onUpdated();
-    } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
-    } finally { setSaving(false); }
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка',
+        description: apiErr(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !saving && onClose()} />
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={() => !saving && onClose()}
+      />
+
       <motion.div
-        initial={{ scale: 0.97, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="relative w-full max-w-lg bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden"
-        style={{ boxShadow: 'var(--shadow-lg)' }}
-        onClick={e => e.stopPropagation()}
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.15 }}
+        className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl"
       >
-        <div className="px-6 py-5 border-b border-[var(--border-color)]">
-          <h2 className="text-base font-bold text-[var(--text-primary)]">Редактировать отзыв</h2>
+        <div className="flex items-center justify-between border-b border-[var(--border-color)] px-6 py-5">
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">
+            Редактировать отзыв
+          </h2>
+
+          <button
+            type="button"
+            onClick={() => !saving && onClose()}
+            className="rounded-xl p-2 text-[var(--text-primary)]/40 hover:bg-[var(--hover-2)]"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-6">
           <div>
-            <label className="block text-xs font-medium text-[var(--text-primary)]/50 uppercase tracking-wider mb-2">
+            <label className="mb-3 block text-sm font-medium text-[var(--text-primary)]/65">
               Оценка
             </label>
-            <div className="flex flex-col items-center gap-1 py-6 rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)]">
-              <StarRating value={rating} onChange={setRating} size="xl" showLabel />
+
+            <div className="flex flex-col items-center rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-6">
+              <StarRating
+                value={rating}
+                onChange={setRating}
+                size="xl"
+                showLabel
+              />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[var(--text-primary)]/50 uppercase tracking-wider mb-2">
+            <label className="mb-2 block text-sm font-medium text-[var(--text-primary)]/65">
               Комментарий
             </label>
+
             <textarea
               value={comment}
-              onChange={e => setComment(e.target.value)}
-              rows={3}
-              placeholder="Комментарий к отзыву..."
+              onChange={(event) => setComment(event.target.value)}
+              rows={4}
               className={`${INPUT_CLS} resize-none`}
             />
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2.5 px-6 py-4 border-t border-[var(--border-color)]">
+        <div className="flex justify-end gap-3 border-t border-[var(--border-color)] px-6 py-4">
           <button
+            type="button"
             onClick={() => !saving && onClose()}
             disabled={saving}
-            className="px-4 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/60 text-sm disabled:opacity-50 transition-colors"
+            className="rounded-xl bg-[var(--hover-2)] px-5 py-2.5 text-sm font-medium text-[var(--text-primary)]/65 hover:bg-[var(--hover-3)] disabled:opacity-50"
           >
             Отмена
           </button>
+
           <button
+            type="button"
             onClick={submit}
             disabled={!rating || saving}
-            className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-sm font-medium disabled:opacity-40 transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[var(--accent-light)] disabled:opacity-40"
           >
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+
             Сохранить
           </button>
         </div>
@@ -763,12 +1080,14 @@ function EditFeedbackModal({
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   DELETE FEEDBACK MODAL
-   ═══════════════════════════════════════════════════════════════════ */
+/* ==========================================================================
+   DELETE MODAL
+   ========================================================================== */
 
 function DeleteFeedbackModal({
-  feedback, onClose, onDeleted,
+  feedback,
+  onClose,
+  onDeleted,
 }: {
   feedback: Feedback;
   onClose: () => void;
@@ -778,53 +1097,85 @@ function DeleteFeedbackModal({
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !deleting) onClose(); };
-    document.addEventListener('keydown', h);
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !deleting) onClose();
+    };
+
+    document.addEventListener('keydown', handler);
+
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
+
+    return () => {
+      document.removeEventListener('keydown', handler);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [onClose, deleting]);
 
   const confirm = async () => {
     setDeleting(true);
+
     try {
       await feedbacksApi.delete(feedback.id);
+
       toast({ title: 'Отзыв удалён' });
       onDeleted();
-    } catch (e: any) {
-      toast({ title: 'Ошибка', description: apiErr(e), variant: 'destructive' });
-    } finally { setDeleting(false); }
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка',
+        description: apiErr(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !deleting && onClose()} />
       <div
-        className="relative w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden"
-        style={{ boxShadow: 'var(--shadow-lg)' }}
-      >
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={() => !deleting && onClose()}
+      />
+
+      <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl">
         <div className="p-6 text-center">
-          <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center mx-auto mb-3">
-            <Trash2 className="w-5 h-5 text-red-400" />
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/10">
+            <Trash2 className="h-5 w-5 text-red-400" />
           </div>
-          <h3 className="text-base font-bold text-[var(--text-primary)] mb-1">Удалить отзыв?</h3>
-          <p className="text-sm text-[var(--text-primary)]/40">
-            Отзыв с оценкой {feedback.rating}/5 будет удалён
+
+          <h3 className="text-lg font-bold text-[var(--text-primary)]">
+            Удалить отзыв?
+          </h3>
+
+          <p className="mt-2 text-sm text-[var(--text-primary)]/50">
+            Отзыв с оценкой {feedback.rating} из 5 будет удалён.
           </p>
         </div>
-        <div className="flex border-t border-[var(--border-color)]">
+
+        <div className="flex gap-3 border-t border-[var(--border-color)] p-4">
           <button
+            type="button"
             onClick={onClose}
             disabled={deleting}
-            className="flex-1 py-3.5 text-sm text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)] disabled:opacity-50 transition-colors"
+            className="flex-1 rounded-xl bg-[var(--hover-2)] px-4 py-3 text-sm text-[var(--text-primary)]/70 disabled:opacity-50"
           >
             Отмена
           </button>
+
           <button
+            type="button"
             onClick={confirm}
             disabled={deleting}
-            className="flex-1 py-3.5 text-sm font-medium text-red-400 hover:bg-red-500/8 border-l border-[var(--border-color)] disabled:opacity-50 transition-colors"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-500/15 px-4 py-3 text-sm font-medium text-red-400 hover:bg-red-500/25 disabled:opacity-50"
           >
-            {deleting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Удалить'}
+            {deleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+
+            Удалить
           </button>
         </div>
       </div>
@@ -832,237 +1183,392 @@ function DeleteFeedbackModal({
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
+/* ==========================================================================
    FEEDBACK CARD
-   ═══════════════════════════════════════════════════════════════════ */
+   ========================================================================== */
 
 function FeedbackCard({
-  feedback, ticketMap, userMap, currentUserId, isStaff, onEdit, onDelete,
+  feedback,
+  ticketMap,
+  userMap,
+  currentUserId,
+  isStaff,
+  onEdit,
+  onDelete,
 }: {
   feedback: Feedback;
   ticketMap: Map<string, { number: string; title: string }>;
-  userMap: Map<string, { full_name?: string; username?: string; email: string; avatar_url?: string | null }>;
+  userMap: Map<string, UserOption>;
   currentUserId?: string;
   isStaff: boolean;
-  onEdit: (f: Feedback) => void;
-  onDelete: (f: Feedback) => void;
+  onEdit: (feedback: Feedback) => void;
+  onDelete: (feedback: Feedback) => void;
 }) {
   const author = userMap.get(feedback.author_id);
   const ticket = ticketMap.get(feedback.ticket_id);
-  const canManage = isStaff || feedback.author_id === currentUserId;
+
+  const canManage =
+    isStaff ||
+    feedback.author_id === currentUserId;
+
+  const authorName =
+    author?.full_name ||
+    author?.username ||
+    author?.email ||
+    'Пользователь';
 
   return (
-    <motion.div
+    <motion.article
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="group bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 transition-all hover:border-[var(--border-color)]/80"
-      style={{ boxShadow: 'var(--shadow-sm)' }}
+      className="
+        group flex h-full flex-col
+        rounded-2xl
+        border border-[var(--border-color)]
+        bg-[var(--bg-card)]
+        p-6
+        shadow-sm
+        transition-colors
+        hover:border-[var(--border-hover)]
+      "
     >
-      {/* Author row */}
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3 min-w-0">
+      {/* AUTHOR */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           {author?.avatar_url ? (
-            <img src={author.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+            <img
+              src={author.avatar_url}
+              alt=""
+              className="h-11 w-11 shrink-0 rounded-full object-cover"
+            />
           ) : (
-            <div className="w-9 h-9 rounded-full bg-[var(--accent)] flex items-center justify-center text-white font-bold text-[11px] flex-shrink-0">
-              {initials(author?.full_name || author?.username || author?.email)}
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-semibold text-white">
+              {initials(authorName)}
             </div>
           )}
+
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
-              {author?.full_name || author?.username || author?.email || 'Пользователь'}
+            <p className="truncate text-base font-semibold text-[var(--text-primary)]">
+              {authorName}
             </p>
-            <p className="text-[11px] text-[var(--text-primary)]/30 flex items-center gap-1 mt-0.5">
-              <Calendar className="w-3 h-3 flex-shrink-0" />
+
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--text-primary)]/40">
+              <Calendar className="h-3.5 w-3.5" />
               {fmtDate(feedback.created_at)}
             </p>
           </div>
         </div>
 
         {canManage && (
-          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+          <div className="flex shrink-0 items-center gap-1">
             <button
+              type="button"
               onClick={() => onEdit(feedback)}
-              className="p-2 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/20 hover:text-[var(--text-primary)]/55 transition-colors"
+              title="Редактировать отзыв"
+              className="rounded-lg p-2 text-[var(--text-primary)]/45 hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)]"
             >
-              <Pencil className="w-3.5 h-3.5" />
+              <Pencil className="h-4 w-4" />
             </button>
+
             <button
+              type="button"
               onClick={() => onDelete(feedback)}
-              className="p-2 rounded-lg hover:bg-red-500/8 text-[var(--text-primary)]/20 hover:text-red-400 transition-colors"
+              title="Удалить отзыв"
+              className="rounded-lg p-2 text-[var(--text-primary)]/45 hover:bg-red-500/10 hover:text-red-400"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="h-4 w-4" />
             </button>
           </div>
         )}
       </div>
 
-      {/* Stars + label */}
-      <div className="flex items-center gap-3 mb-3">
-        <StarRating value={feedback.rating} readonly size="sm" />
-        <span className="text-xs font-medium text-[var(--text-primary)]/40">
+      {/* RATING */}
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <StarRating
+          value={feedback.rating}
+          readonly
+          size="md"
+        />
+
+        <span className="text-sm font-medium text-[var(--text-primary)]/60">
           {RATING_LABELS[feedback.rating]}
         </span>
       </div>
 
-      {/* Comment */}
-      {feedback.comment && (
-        <p className="text-sm text-[var(--text-primary)]/60 leading-relaxed mb-4 whitespace-pre-wrap">
-          {feedback.comment}
-        </p>
-      )}
+      {/* COMMENT */}
+      <div className="mt-4 flex-1">
+        {feedback.comment ? (
+          <p className="whitespace-pre-wrap break-words text-base leading-7 text-[var(--text-primary)]/75">
+            {feedback.comment}
+          </p>
+        ) : (
+          <p className="text-sm italic text-[var(--text-primary)]/30">
+            Без комментария
+          </p>
+        )}
+      </div>
 
-      {/* Ticket link */}
-      <div className="pt-3.5 border-t border-[var(--border-color)]">
+      {/* TICKET */}
+      <div className="mt-6 border-t border-[var(--border-color)] pt-4">
         {ticket ? (
           <Link
             to={`/tickets/${ticket.number}`}
-            className="inline-flex items-center gap-1.5 text-xs text-[var(--text-primary)]/35 hover:text-[var(--accent)] transition-colors group/link"
+            className="group/link flex items-center gap-2 text-sm text-[var(--text-primary)]/55 hover:text-[var(--accent)]"
           >
-            <Ticket className="w-3.5 h-3.5 flex-shrink-0" />
-            <span className="font-mono">#{ticket.number}</span>
-            <span className="truncate max-w-[180px] text-[var(--text-primary)]/25 group-hover/link:text-[var(--accent)]/70">
+            <Ticket className="h-4 w-4 shrink-0" />
+
+            <span className="shrink-0 font-mono">
+              #{ticket.number}
+            </span>
+
+            <span className="min-w-0 flex-1 truncate">
               {ticket.title}
             </span>
-            <ArrowUpRight className="w-3 h-3 flex-shrink-0 opacity-0 group-hover/link:opacity-100 transition-opacity" />
+
+            <ArrowUpRight className="h-4 w-4 shrink-0 opacity-50 transition-all group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 group-hover/link:opacity-100" />
           </Link>
         ) : (
-          <span className="text-xs text-[var(--text-primary)]/20">Заявка не найдена</span>
+          <span className="text-sm text-[var(--text-primary)]/30">
+            Заявка не найдена
+          </span>
         )}
       </div>
-    </motion.div>
+    </motion.article>
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   MAIN PAGE
-   ═══════════════════════════════════════════════════════════════════ */
+/* ==========================================================================
+   PAGE
+   ========================================================================== */
 
 export default function FeedbacksPage() {
-  const [sp] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
   const { toast } = useToast();
 
-  const presetTicketId = sp.get('ticket_id') ?? '';
-  const isStaff = user?.roles?.some(r =>
-    ['admin', 'support_manager', 'support_agent', 'executor'].includes(r)
-  ) ?? false;
+  const presetTicketId = searchParams.get('ticket_id') ?? '';
+
+  const isStaff =
+    user?.roles?.some((role) =>
+      ['admin', 'support_manager', 'support_agent', 'executor'].includes(role),
+    ) ?? false;
 
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const [filterRating, setFilterRating] = useState<number | null>(null);
-  const [filterTicketId, setFilterTicketId] = useState<string>(presetTicketId);
-  const [filterTicketLabel, setFilterTicketLabel] = useState<string>('');
-  const [filterAuthorId, setFilterAuthorId] = useState<string>('');
-  const [filterAuthorLabel, setFilterAuthorLabel] = useState<string>('');
-  const [showRatingFilter, setShowRatingFilter] = useState(false);
+  const [filterTicketId, setFilterTicketId] = useState(presetTicketId);
+  const [filterTicketLabel, setFilterTicketLabel] = useState('');
+  const [filterAuthorId, setFilterAuthorId] = useState('');
+  const [filterAuthorLabel, setFilterAuthorLabel] = useState('');
 
+  const [showRatingFilter, setShowRatingFilter] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+
   const [editFeedback, setEditFeedback] = useState<Feedback | null>(null);
   const [deleteFeedback, setDeleteFeedback] = useState<Feedback | null>(null);
 
-  const [userMap, setUserMap] = useState<Map<string, any>>(new Map());
-  const [ticketMap, setTicketMap] = useState<Map<string, { number: string; title: string }>>(new Map());
+  const [userMap, setUserMap] = useState<Map<string, UserOption>>(new Map());
+  const [ticketMap, setTicketMap] = useState<
+    Map<string, { number: string; title: string }>
+  >(new Map());
+
   const [stats, setStats] = useState({
     avg: 0,
     total: 0,
-    distribution: [0, 0, 0, 0, 0] as [number, number, number, number, number],
+    distribution: [0, 0, 0, 0, 0] as [
+      number,
+      number,
+      number,
+      number,
+      number,
+    ],
   });
 
-  /* ─── Load users ─── */
+  /* LOAD USERS */
+
   const loadUsers = useCallback(async () => {
     try {
-      const res = await usersApi.getAllUsers(1, 100);
-      const map = new Map<string, any>();
-      res.items.forEach((u: any) => map.set(u.id, u));
+      const response = await usersApi.getAllUsers(1, 100);
+
+      const map = new Map<string, UserOption>();
+
+      response.items.forEach((item: any) => {
+        map.set(item.id, item);
+      });
+
       setUserMap(map);
-      if (filterAuthorId) {
-        const sel = res.items.find((u: any) => u.id === filterAuthorId);
-        if (sel) setFilterAuthorLabel(String(sel.full_name || sel.username || sel.email));
-      }
-    } catch { }
-  }, [filterAuthorId]);
-
-  useEffect(() => { loadUsers(); }, [loadUsers]);
-
-  /* ─── Load ticket map ─── */
-  const loadTicketInfo = useCallback(async () => {
-    try {
-      const res = await ticketsApi.getAllWithFilters(1, 100, {});
-      const map = new Map<string, { number: string; title: string }>();
-      res.items.forEach((t: any) => map.set(t.id, { number: String(t.number), title: String(t.title || '') }));
-      setTicketMap(map);
-      if (filterTicketId) {
-        const t = res.items.find((x: any) => x.id === filterTicketId);
-        if (t) setFilterTicketLabel(`#${t.number} — ${t.title}`);
-      }
-    } catch { }
-  }, [filterTicketId]);
-
-  useEffect(() => { loadTicketInfo(); }, [loadTicketInfo]);
-
-  /* ─── Stats helper ─── */
-  const loadAllFeedbacksForStats = useCallback(async (
-    filters: { ticketId?: string; author_id?: string },
-  ) => {
-    let cur = 1;
-    let all: Feedback[] = [];
-    let hasNext = true;
-    while (hasNext) {
-      const res = await feedbacksApi.getAll(cur, 100, filters);
-      all = [...all, ...res.items];
-      hasNext = res.has_next;
-      cur += 1;
+    } catch {
+      // Не блокируем загрузку отзывов
     }
-    return all;
   }, []);
 
-  /* ─── Fetch feedbacks ─── */
-  const fetchFeedbacks = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
+  useEffect(() => {
+    void loadUsers();
+  }, [loadUsers]);
 
+  /* LOAD TICKET INFO */
+
+  const loadTicketInfo = useCallback(async () => {
     try {
-      const filters: any = {};
-      if (filterRating) filters.rating = filterRating;
-      if (filterTicketId) filters.ticketId = filterTicketId;
-      if (filterAuthorId) filters.author_id = filterAuthorId;
+      const response = await ticketsApi.getAllWithFilters(1, 100, {});
 
-      const res = await feedbacksApi.getAll(page, 12, filters);
-      setFeedbacks(res.items);
-      setTotalItems(res.total_items);
-      setTotalPages(res.total_pages);
+      const map = new Map<string, { number: string; title: string }>();
 
-      const statsItems = await loadAllFeedbacksForStats({
-        ...(filterTicketId ? { ticketId: filterTicketId } : {}),
-        ...(filterAuthorId ? { author_id: filterAuthorId } : {}),
+      response.items.forEach((ticket: any) => {
+        map.set(ticket.id, {
+          number: String(ticket.number),
+          title: String(ticket.title || ''),
+        });
       });
 
-      const dist: [number, number, number, number, number] = [0, 0, 0, 0, 0];
-      let sum = 0;
-      statsItems.forEach(f => { dist[f.rating - 1] += 1; sum += f.rating; });
-      setStats({
-        avg: statsItems.length > 0 ? sum / statsItems.length : 0,
-        total: statsItems.length,
-        distribution: dist,
-      });
-    } catch (e: any) {
-      toast({ title: 'Ошибка загрузки', description: apiErr(e), variant: 'destructive' });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+      setTicketMap(map);
+    } catch {
+      // Отзывы могут отображаться без данных заявки
     }
-  }, [page, filterRating, filterTicketId, filterAuthorId, toast, loadAllFeedbacksForStats]);
+  }, []);
 
-  useEffect(() => { fetchFeedbacks(); }, [fetchFeedbacks]);
+  useEffect(() => {
+    void loadTicketInfo();
+  }, [loadTicketInfo]);
 
-  const refresh = () => fetchFeedbacks(true);
+  useEffect(() => {
+    if (!filterAuthorId) {
+      setFilterAuthorLabel('');
+      return;
+    }
+
+    const author = userMap.get(filterAuthorId);
+
+    if (author) {
+      setFilterAuthorLabel(
+        author.full_name || author.username || author.email,
+      );
+    }
+  }, [filterAuthorId, userMap]);
+
+  useEffect(() => {
+    if (!filterTicketId) {
+      setFilterTicketLabel('');
+      return;
+    }
+
+    const ticket = ticketMap.get(filterTicketId);
+
+    if (ticket) {
+      setFilterTicketLabel(`#${ticket.number} — ${ticket.title}`);
+    }
+  }, [filterTicketId, ticketMap]);
+
+  /* STATS */
+
+  const loadAllFeedbacksForStats = useCallback(
+    async (filters: { ticketId?: string; author_id?: string }) => {
+      let currentPage = 1;
+      const all: Feedback[] = [];
+      let hasNext = true;
+
+      while (hasNext) {
+        const response = await feedbacksApi.getAll(
+          currentPage,
+          100,
+          filters,
+        );
+
+        all.push(...response.items);
+        hasNext = response.has_next;
+        currentPage += 1;
+      }
+
+      return all;
+    },
+    [],
+  );
+
+  /* FETCH */
+
+  const fetchFeedbacks = useCallback(
+    async (silent = false) => {
+      if (silent) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      try {
+        const filters: any = {};
+
+        if (filterRating) filters.rating = filterRating;
+        if (filterTicketId) filters.ticketId = filterTicketId;
+        if (filterAuthorId) filters.author_id = filterAuthorId;
+
+        const response = await feedbacksApi.getAll(page, 12, filters);
+
+        setFeedbacks(response.items);
+        setTotalItems(response.total_items);
+        setTotalPages(response.total_pages);
+
+        const statsItems = await loadAllFeedbacksForStats({
+          ...(filterTicketId ? { ticketId: filterTicketId } : {}),
+          ...(filterAuthorId ? { author_id: filterAuthorId } : {}),
+        });
+
+        const distribution: [
+          number,
+          number,
+          number,
+          number,
+          number,
+        ] = [0, 0, 0, 0, 0];
+
+        let sum = 0;
+
+        statsItems.forEach((feedback) => {
+          if (feedback.rating >= 1 && feedback.rating <= 5) {
+            distribution[feedback.rating - 1] += 1;
+            sum += feedback.rating;
+          }
+        });
+
+        setStats({
+          avg: statsItems.length > 0 ? sum / statsItems.length : 0,
+          total: statsItems.length,
+          distribution,
+        });
+      } catch (error: any) {
+        toast({
+          title: 'Ошибка загрузки',
+          description: apiErr(error),
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [
+      page,
+      filterRating,
+      filterTicketId,
+      filterAuthorId,
+      toast,
+      loadAllFeedbacksForStats,
+    ],
+  );
+
+  useEffect(() => {
+    void fetchFeedbacks();
+  }, [fetchFeedbacks]);
+
+  const refresh = () => {
+    void fetchFeedbacks(true);
+  };
 
   const resetFilters = () => {
     setFilterRating(null);
@@ -1073,111 +1579,173 @@ export default function FeedbacksPage() {
     setPage(1);
   };
 
-  /* ─── Pagination helper ─── */
+  const hasActiveFilters =
+    !!filterRating ||
+    !!filterTicketId ||
+    !!filterAuthorId;
+
   const pageNumbers = (() => {
     const pages: number[] = [];
     const total = Math.min(totalPages, 7);
-    for (let i = 0; i < total; i++) {
-      let p: number;
-      if (totalPages <= 7) p = i + 1;
-      else if (page <= 4) p = i + 1;
-      else if (page >= totalPages - 3) p = totalPages - 6 + i;
-      else p = page - 3 + i;
-      pages.push(p);
+
+    for (let index = 0; index < total; index++) {
+      let number: number;
+
+      if (totalPages <= 7) {
+        number = index + 1;
+      } else if (page <= 4) {
+        number = index + 1;
+      } else if (page >= totalPages - 3) {
+        number = totalPages - 6 + index;
+      } else {
+        number = page - 3 + index;
+      }
+
+      pages.push(number);
     }
+
     return pages;
   })();
 
-  const hasActiveFilters = !!(filterRating || filterTicketId || filterAuthorId);
+  /* RENDER */
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-
-      {/* ─── Header ─── */}
-      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+    <div className="mx-auto max-w-[1600px] space-y-6 pb-10 animate-in fade-in duration-500">
+      {/* HEADER */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-4xl font-bold text-[var(--text-primary)]">Отзывы</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-[var(--text-primary)]">
+              Отзывы
+            </h1>
+
             {!loading && (
-              <span className="px-2 py-0.5 rounded-md bg-[var(--hover-3)] text-xs font-medium text-[var(--text-primary)]/40 tabular-nums">
+              <span className="rounded-lg bg-[var(--hover-2)] px-2.5 py-1 text-sm font-medium tabular-nums text-[var(--text-primary)]/50">
                 {totalItems}
               </span>
             )}
-            {refreshing && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--text-primary)]/30" />}
           </div>
-          <p className="text-sm text-[var(--text-primary)]/30 mt-1">Оценки по закрытым заявкам</p>
+
+          <p className="mt-2 text-base text-[var(--text-primary)]/45">
+            Оценки качества работы по закрытым заявкам
+          </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Ticket filter */}
-          <div className="w-[260px]">
+        <ActionButton
+          type="button"
+          onClick={() => setShowCreate(true)}
+          className="self-start px-6 py-3 text-base font-semibold"
+        >
+          <Plus className="h-5 w-5" />
+          Оставить отзыв
+        </ActionButton>
+      </div>
+
+      {/* FILTERS */}
+      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-full sm:w-[280px]">
             <TicketSelect
               value={filterTicketId}
               label={filterTicketLabel}
-              onChange={(id, l) => { setFilterTicketId(id); setFilterTicketLabel(l); setPage(1); }}
-              placeholder="Заявка"
+              onChange={(id, label) => {
+                setFilterTicketId(id);
+                setFilterTicketLabel(label);
+                setPage(1);
+              }}
+              placeholder="Все заявки"
             />
           </div>
 
-          {/* Author filter — только для support */}
           {isStaff && (
-            <div className="w-[220px]">
+            <div className="w-full sm:w-[240px]">
               <AuthorSelect
                 value={filterAuthorId}
                 label={filterAuthorLabel}
-                onChange={(id, l) => { setFilterAuthorId(id); setFilterAuthorLabel(l); setPage(1); }}
+                onChange={(id, label) => {
+                  setFilterAuthorId(id);
+                  setFilterAuthorLabel(label);
+                  setPage(1);
+                }}
               />
             </div>
           )}
 
-          {/* Rating filter */}
           <div className="relative">
             <button
-              onClick={() => setShowRatingFilter(v => !v)}
-              className={`flex items-center gap-1.5 px-4 py-3 rounded-xl border text-sm font-medium transition-all
-                ${filterRating
-                  ? 'bg-emerald-500/8 border-emerald-500/20 text-emerald-500'
-                  : 'bg-[var(--hover-2)] border-[var(--border-color)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60'
-                }`}
+              type="button"
+              onClick={() => setShowRatingFilter((prev) => !prev)}
+              className={`
+                flex h-[50px] items-center gap-2 rounded-xl border px-4
+                text-sm font-medium transition-colors
+                ${
+                  filterRating
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500'
+                    : 'border-[var(--border-color)] bg-[var(--hover-2)] text-[var(--text-primary)]/65 hover:bg-[var(--hover-3)]'
+                }
+              `}
             >
-              <Filter className="w-3.5 h-3.5" />
-              {filterRating ? (
-                <span className="flex items-center gap-1">
-                  {filterRating} <Star className="w-3 h-3 fill-current" />
-                </span>
-              ) : 'Оценка'}
+              <Filter className="h-4 w-4" />
+
+              {filterRating ? `${filterRating} звёзд` : 'Все оценки'}
+
+              <ChevronDown className="h-4 w-4" />
             </button>
 
             {showRatingFilter && (
               <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowRatingFilter(false)} />
-                <div className="absolute right-0 top-full mt-1 z-20 w-56 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-[var(--shadow-lg)] p-1.5">
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowRatingFilter(false)}
+                />
+
+                <div className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-2 shadow-xl">
                   <button
-                    onClick={() => { setFilterRating(null); setPage(1); setShowRatingFilter(false); }}
-                    className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm transition-colors
-                      ${!filterRating ? 'bg-emerald-500/8 text-[var(--text-primary)]' : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}
+                    type="button"
+                    onClick={() => {
+                      setFilterRating(null);
+                      setPage(1);
+                      setShowRatingFilter(false);
+                    }}
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-3 text-sm text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)]"
                   >
-                    <span className="flex-1 text-left min-w-0 truncate">Все оценки</span>
-                    {!filterRating && <Check className="w-3 h-3 text-emerald-500 flex-shrink-0" />}
+                    Все оценки
+                    {!filterRating && (
+                      <Check className="h-4 w-4 text-emerald-500" />
+                    )}
                   </button>
 
-                  {[5, 4, 3, 2, 1].map(r => (
+                  {[5, 4, 3, 2, 1].map((rating) => (
                     <button
-                      key={r}
-                      onClick={() => { setFilterRating(r); setPage(1); setShowRatingFilter(false); }}
-                      className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm transition-colors
-                        ${filterRating === r ? 'bg-emerald-500/8 text-[var(--text-primary)]' : 'text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)]'}`}
+                      key={rating}
+                      type="button"
+                      onClick={() => {
+                        setFilterRating(rating);
+                        setPage(1);
+                        setShowRatingFilter(false);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-[var(--hover-2)]"
                     >
-                      <div className="flex items-center gap-0.5 flex-shrink-0">
-                        {Array.from({ length: 5 }, (_, i) => (
+                      <span className="flex gap-0.5">
+                        {Array.from({ length: 5 }, (_, index) => (
                           <Star
-                            key={i}
-                            className={`w-3 h-3 ${i < r ? 'text-emerald-500 fill-emerald-500' : 'text-[var(--text-primary)]/10'}`}
+                            key={index}
+                            className={`h-3.5 w-3.5 ${
+                              index < rating
+                                ? 'fill-emerald-500 text-emerald-500'
+                                : 'text-[var(--text-primary)]/15'
+                            }`}
                           />
                         ))}
-                      </div>
-                      <span className="flex-1 min-w-0 truncate text-left text-xs">{RATING_LABELS[r]}</span>
-                      {filterRating === r && <Check className="w-3 h-3 text-emerald-500 flex-shrink-0" />}
+                      </span>
+
+                      <span className="flex-1 text-xs text-[var(--text-primary)]/65">
+                        {RATING_LABELS[rating]}
+                      </span>
+
+                      {filterRating === rating && (
+                        <Check className="h-4 w-4 text-emerald-500" />
+                      )}
                     </button>
                   ))}
                 </div>
@@ -1185,187 +1753,210 @@ export default function FeedbacksPage() {
             )}
           </div>
 
-          {/* Reset */}
           <button
+            type="button"
             onClick={resetFilters}
             disabled={!hasActiveFilters}
-            className="px-4 py-3 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-sm text-[var(--text-primary)]/45 hover:text-[var(--text-primary)]/65 disabled:opacity-30 transition-all"
+            className="h-[50px] rounded-xl border border-[var(--border-color)] px-4 text-sm text-[var(--text-primary)]/55 hover:bg-[var(--hover-2)] disabled:cursor-not-allowed disabled:opacity-30"
           >
             Сбросить
           </button>
 
-          {/* Refresh */}
           <button
+            type="button"
             onClick={refresh}
-            disabled={refreshing || loading}
-            className="p-3 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-[var(--text-primary)]/30 hover:text-[var(--text-primary)]/60 transition-all disabled:opacity-30"
+            disabled={loading || refreshing}
+            title="Обновить"
+            className="flex h-[50px] w-[50px] items-center justify-center rounded-xl border border-[var(--border-color)] text-[var(--text-primary)]/55 hover:bg-[var(--hover-2)] disabled:opacity-30"
           >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
-
-          {/* Create */}
-          <button
-            onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Отзыв
+            <RefreshCw
+              className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
+            />
           </button>
         </div>
       </div>
 
-      {/* ─── Stats ─── */}
-      {!loading && stats.total > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
-          {/* Average */}
-          <div
-            className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6"
-            style={{ boxShadow: 'var(--shadow-sm)' }}
-          >
-            <p className="text-[11px] uppercase tracking-wider text-[var(--text-primary)]/30 mb-4">
-              Средняя оценка
-            </p>
-            <div className="flex items-end gap-2 mb-3">
-              <span className="text-5xl font-bold text-[var(--text-primary)] tabular-nums leading-none">
-                {stats.avg.toFixed(1)}
-              </span>
-              <span className="text-sm text-[var(--text-primary)]/30 mb-1">из 5</span>
-            </div>
-            <StarRating value={Math.round(stats.avg)} readonly size="sm" />
-            <p className="text-xs text-[var(--text-primary)]/25 mt-3">
-              {stats.total} {stats.total === 1 ? 'отзыв' : stats.total < 5 ? 'отзыва' : 'отзывов'}
-            </p>
-          </div>
+      {/* MAIN CONTENT */}
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+        {/* FEEDBACKS */}
+        <section className="min-w-0">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                Список отзывов
+              </h2>
 
-          {/* Distribution */}
-          <div
-            className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6"
-            style={{ boxShadow: 'var(--shadow-sm)' }}
-          >
-            <div className="flex items-center gap-2 mb-4">
-              <BarChart3 className="w-3.5 h-3.5 text-[var(--text-primary)]/25" />
-              <p className="text-[11px] uppercase tracking-wider text-[var(--text-primary)]/30">
-                Распределение
+              <p className="mt-1 text-sm text-[var(--text-primary)]/40">
+                {totalItems} отзывов
               </p>
             </div>
-            <div className="space-y-2.5">
-              {[5, 4, 3, 2, 1].map(star => (
-                <RatingBar
-                  key={star}
-                  star={star}
-                  count={stats.distribution[star - 1]}
-                  total={stats.total}
-                />
-              ))}
-            </div>
           </div>
-        </div>
-      )}
 
-      {/* ─── Content ─── */}
-      {loading ? (
-        <div className="flex items-center justify-center py-24">
-          <div className="text-center">
-            <Loader2 className="w-6 h-6 text-emerald-500/50 animate-spin mx-auto mb-3" />
-            <p className="text-sm text-[var(--text-primary)]/30">Загрузка...</p>
-          </div>
-        </div>
-      ) : feedbacks.length === 0 ? (
-        <div className="flex items-center justify-center py-24">
-          <div className="text-center max-w-xs">
-            <div className="w-16 h-16 rounded-2xl bg-[var(--hover-2)] flex items-center justify-center mx-auto mb-4">
-              <MessageSquare className="w-7 h-7 text-[var(--text-primary)]/15" />
+          {loading ? (
+            <div className="flex items-center justify-center rounded-2xl border border-[var(--border-color)] py-24">
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--accent)]" />
             </div>
-            <p className="text-base font-medium text-[var(--text-primary)]/50 mb-1">Нет отзывов</p>
-            <p className="text-sm text-[var(--text-primary)]/30 mb-5">
-              {hasActiveFilters
-                ? 'Попробуйте изменить фильтры'
-                : 'Оставьте первый отзыв по закрытой заявке'
-              }
-            </p>
-            <div className="flex items-center justify-center gap-2">
+          ) : feedbacks.length === 0 ? (
+            <div className="rounded-2xl border border-[var(--border-color)] px-6 py-20 text-center">
+              <MessageSquare className="mx-auto h-12 w-12 text-[var(--text-primary)]/20" />
+
+              <h3 className="mt-4 text-lg font-semibold text-[var(--text-primary)]">
+                Отзывов пока нет
+              </h3>
+
+              <p className="mt-2 text-sm text-[var(--text-primary)]/45">
+                {hasActiveFilters
+                  ? 'Попробуйте изменить параметры фильтрации'
+                  : 'Оставьте первый отзыв по закрытой заявке'}
+              </p>
+
               {hasActiveFilters && (
                 <button
+                  type="button"
                   onClick={resetFilters}
-                  className="px-4 py-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/50 text-sm hover:bg-[var(--hover-3)] transition-colors"
+                  className="mt-5 rounded-xl bg-[var(--hover-2)] px-5 py-2.5 text-sm text-[var(--text-primary)]/65 hover:bg-[var(--hover-3)]"
                 >
-                  Сбросить
+                  Сбросить фильтры
                 </button>
               )}
-              <button
-                onClick={() => setShowCreate(true)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors"
-              >
-                <Star className="w-3.5 h-3.5" />
-                Оставить отзыв
-              </button>
             </div>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            <AnimatePresence mode="popLayout">
-              {feedbacks.map(f => (
-                <FeedbackCard
-                  key={f.id}
-                  feedback={f}
-                  ticketMap={ticketMap}
-                  userMap={userMap}
-                  currentUserId={user?.id}
-                  isStaff={isStaff}
-                  onEdit={setEditFeedback}
-                  onDelete={setDeleteFeedback}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
+                <AnimatePresence mode="popLayout">
+                  {feedbacks.map((feedback) => (
+                    <FeedbackCard
+                      key={feedback.id}
+                      feedback={feedback}
+                      ticketMap={ticketMap}
+                      userMap={userMap}
+                      currentUserId={user?.user_id}
+                      isStaff={isStaff}
+                      onEdit={setEditFeedback}
+                      onDelete={setDeleteFeedback}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-1.5 pt-2">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="p-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 disabled:opacity-20 transition-all"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
+              {totalPages > 1 && (
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                    disabled={page === 1}
+                    className="rounded-xl bg-[var(--hover-2)] p-2.5 text-[var(--text-primary)]/60 disabled:opacity-20"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
 
-              {pageNumbers.map(p => (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  className={`w-9 h-9 rounded-xl text-sm font-medium transition-all
-                    ${page === p
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:bg-[var(--hover-3)]'
-                    }`}
-                >
-                  {p}
-                </button>
-              ))}
+                  {pageNumbers.map((number) => (
+                    <button
+                      key={number}
+                      type="button"
+                      onClick={() => setPage(number)}
+                      className={`h-10 w-10 rounded-xl text-sm font-medium ${
+                        page === number
+                          ? 'bg-[var(--accent)] text-white'
+                          : 'bg-[var(--hover-2)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-3)]'
+                      }`}
+                    >
+                      {number}
+                    </button>
+                  ))}
 
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="p-2 rounded-xl bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 disabled:opacity-20 transition-all"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPage((prev) => Math.min(totalPages, prev + 1))
+                    }
+                    disabled={page === totalPages}
+                    className="rounded-xl bg-[var(--hover-2)] p-2.5 text-[var(--text-primary)]/60 disabled:opacity-20"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+            </>
           )}
-        </>
-      )}
+        </section>
 
-      {/* ─── Modals ─── */}
+        {/* STATISTICS */}
+        <aside className="xl:sticky xl:top-5">
+          <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+            <div className="flex items-center gap-2.5">
+              <BarChart3 className="h-5 w-5 text-[var(--text-primary)]/45" />
+
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                Статистика оценок
+              </h2>
+            </div>
+
+            {stats.total > 0 ? (
+              <>
+                <div className="mt-7 border-b border-[var(--border-color)] pb-6">
+                  <p className="text-sm text-[var(--text-primary)]/45">
+                    Средняя оценка
+                  </p>
+
+                  <div className="mt-3 flex items-end gap-2">
+                    <span className="text-5xl font-bold leading-none text-[var(--text-primary)] tabular-nums">
+                      {stats.avg.toFixed(1)}
+                    </span>
+
+                    <span className="mb-1 text-base text-[var(--text-primary)]/40">
+                      / 5
+                    </span>
+                  </div>
+
+                  <div className="mt-4">
+                    <StarRating
+                      value={Math.round(stats.avg)}
+                      readonly
+                      size="md"
+                    />
+                  </div>
+
+                  <p className="mt-3 text-sm text-[var(--text-primary)]/40">
+                    На основе {stats.total} отзывов
+                  </p>
+                </div>
+
+                <div className="mt-6 space-y-4">
+                  <p className="text-sm font-medium text-[var(--text-primary)]/65">
+                    Распределение оценок
+                  </p>
+
+                  {[5, 4, 3, 2, 1].map((star) => (
+                    <RatingBar
+                      key={star}
+                      star={star}
+                      count={stats.distribution[star - 1]}
+                      total={stats.total}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="mt-6 text-sm text-[var(--text-primary)]/40">
+                Пока нет данных для статистики
+              </p>
+            )}
+          </div>
+        </aside>
+      </div>
+
+      {/* MODALS */}
       <AnimatePresence>
         {showCreate && (
           <CreateFeedbackModal
             presetTicketId={presetTicketId || undefined}
             presetTicketLabel={presetTicketId ? filterTicketLabel : undefined}
             onClose={() => setShowCreate(false)}
-            onCreated={() => { setShowCreate(false); fetchFeedbacks(); }}
+            onCreated={() => {
+              setShowCreate(false);
+              void fetchFeedbacks();
+            }}
           />
         )}
       </AnimatePresence>
@@ -1374,7 +1965,10 @@ export default function FeedbacksPage() {
         <EditFeedbackModal
           feedback={editFeedback}
           onClose={() => setEditFeedback(null)}
-          onUpdated={() => { setEditFeedback(null); fetchFeedbacks(); }}
+          onUpdated={() => {
+            setEditFeedback(null);
+            void fetchFeedbacks();
+          }}
         />
       )}
 
@@ -1382,7 +1976,10 @@ export default function FeedbacksPage() {
         <DeleteFeedbackModal
           feedback={deleteFeedback}
           onClose={() => setDeleteFeedback(null)}
-          onDeleted={() => { setDeleteFeedback(null); fetchFeedbacks(); }}
+          onDeleted={() => {
+            setDeleteFeedback(null);
+            void fetchFeedbacks();
+          }}
         />
       )}
     </div>
