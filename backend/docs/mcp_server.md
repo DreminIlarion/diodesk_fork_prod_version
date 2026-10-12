@@ -1,8 +1,9 @@
 # MCP сервер для AI-агентов
 
 MCP сервер даёт AI-агенту (например, ассистенту в сервисе чатов) инструменты для работы
-с задачами, заявками и сотрудниками: создание и декомпозиция задач, формирование пула задач
-по заявке, подбор исполнителей с учётом опыта и загрузки, обсуждение в комментариях.
+с задачами, заявками, сотрудниками и базой знаний: поиск материалов, создание и декомпозиция задач,
+формирование пула задач по заявке, подбор исполнителей с учётом опыта и загрузки,
+обсуждение в комментариях.
 
 ## Подключение
 
@@ -53,6 +54,7 @@ async with Client("http://localhost:8001/mcp/", auth=access_token) as client:
 | Планирование  | `create_tasks_from_ticket`, `decompose_task`, `get_team_workload`, `get_user_expertise`, `suggest_assignees`, `suggest_tasks_for_user` |
 | Заявки        | `get_ticket`, `search_tickets`, `assign_ticket`                                                 |
 | Комментарии   | `list_ticket_comments`, `add_ticket_comment`, `list_task_comments`, `add_task_comment`          |
+| База знаний   | `search_knowledge`                                                                              |
 
 Изменяющие инструменты помечены MCP-аннотациями (`readOnlyHint`, `idempotentHint`),
 по которым клиент может запрашивать подтверждение пользователя.
@@ -98,5 +100,5 @@ python -m cli seed-demo-data
 ```
 
 Структура: инфраструктура и точка сборки - `src/mcp/`, компоненты - в модулях
-(`src/iam/mcp`, `src/tasks/mcp`, `src/tickets/mcp`). Новый модуль добавляет свой
+(`src/iam/mcp`, `src/tasks/mcp`, `src/tickets/mcp`, `src/knowledge/mcp`). Новый модуль добавляет свой
 `create_server()` и монтируется в `src/mcp/server.py`.
