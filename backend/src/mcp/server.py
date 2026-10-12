@@ -4,6 +4,9 @@ from fastmcp.server.middleware import AuthMiddleware
 from src.core.redis import redis_client
 from src.iam.infra.token_store import RedisTokenStore
 from src.iam.mcp.server import create_server as create_users_server
+from src.knowledge.mcp.server import (
+    create_server as create_knowledge_server,
+)
 from src.tasks.mcp.server import create_server as create_tasks_server
 from src.tickets.mcp.server import create_server as create_tickets_server
 
@@ -47,6 +50,7 @@ def create_server() -> FastMCP:
             create_users_server(),
             create_tasks_server(),
             create_tickets_server(),
+            create_knowledge_server(),
     ):
         server.mount(module_server)
 
