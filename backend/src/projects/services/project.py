@@ -9,6 +9,8 @@ from src.shared.domain.exceptions import AlreadyExistsError, NotFoundError
 from src.shared.domain.repos import UnitOfWork, finalize, get_or_raise_404
 from src.shared.schemas import Page
 
+from ..infra.repos import SqlProjectStageAssigneeRepository
+
 from ..domain.authz import ProjectAuthZService
 from ..domain.entities import Project
 from ..domain.repos import ProjectMemberRepository, ProjectRepository
@@ -39,11 +41,13 @@ class ProjectService:
             uow: UnitOfWork,
             project_repo: ProjectRepository,
             member_repo: ProjectMemberRepository,
+            stage_assignee_repo: SqlProjectStageAssigneeRepository,
             event_publisher: EventPublisher,
     ) -> None:
         self.uow = uow
         self.project_repo = project_repo
         self.member_repo = member_repo
+        self.stage_assignee_repo = stage_assignee_repo
         self.authz_service = ProjectAuthZService(member_repo)
         self.event_publisher = event_publisher
 
@@ -391,10 +395,6 @@ class ProjectService:
             data: ProjectStageAssigneesUpdate,
             current_subject: Subject,
     ) -> ProjectStageResponse:
-        """
-        Полная замена списка исполнителей этапа.
-        """
-
         project = await get_or_raise_404(self.project_repo.read, project_id, Project)
 
         permission = await self.authz_service.can_manage_project(
@@ -409,16 +409,15 @@ class ProjectService:
                 f"Project stage with ID {stage_id} does not exist in project"
             )
 
-        # убрать тех, кого больше нет
-        for uid in list(stage.assignee_ids):
-            if uid not in data.user_ids:
-                stage.remove_assignee(uid)
-
-        # добавить новых
-        for uid in data.user_ids:
-            stage.add_assignee(uid)
-
-        await self.project_repo.update(project)
+        await self.stage_assignee_repo.replace(
+            stage_id=stage_id,
+            user_ids=list(data.user_ids),
+            created_by=current_subject.id,
+        )
         await self.uow.commit()
+
+        # Перечитываем, чтобы вернуть актуальные assignee_ids
+        project = await get_or_raise_404(self.project_repo.read, project_id, Project)
+        stage = project.find_stage(stage_id)
 
         return map_project_stage_to_response(stage)

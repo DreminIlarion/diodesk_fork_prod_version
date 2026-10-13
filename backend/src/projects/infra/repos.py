@@ -8,6 +8,7 @@ from src.shared.infra.repos import ModelMapper, SqlAlchemyRepository
 from src.shared.schemas import Page, Pagination
 
 from ..domain.dtos import ProjectFilters
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..domain.entities import Project, ProjectMember, ProjectStage
 from ..domain.vo import MemberRole, ProjectKey
@@ -86,16 +87,7 @@ class ProjectStageMapper(ModelMapper[ProjectStage, ProjectStageOrm]):
             responsible_id=entity.responsible_id,
             description=entity.description,
             completion_criteria=entity.completion_criteria,
-            assignees=[
-                ProjectStageAssigneeOrm(
-                    stage_id=entity.id,
-                    user_id=uid,
-                    created_by=uid,
-                )
-                for uid in entity.assignee_ids
-            ],
         )
-
 
 class ProjectMapper(ModelMapper[Project, ProjectOrm]):
     @staticmethod
@@ -243,3 +235,36 @@ class SqlProjectMemberRepository(SqlAlchemyRepository[ProjectMember, ProjectMemb
         result = await self.session.execute(stmt)
         models = result.scalars().all()
         return [self.model_mapper.to_entity(m) for m in models]
+    
+class SqlProjectStageAssigneeRepository:
+    """
+    Репозиторий исполнителей этапа.
+    Работает напрямую с ORM без маппера — assignee это связка (stage_id, user_id),
+    а не полноценная доменная сущность.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def replace(
+        self,
+        stage_id: UUID,
+        user_ids: list[UUID],
+        created_by: UUID,
+    ) -> None:
+        from sqlalchemy import delete as sa_delete
+
+        await self.session.execute(
+            sa_delete(ProjectStageAssigneeOrm).where(
+                ProjectStageAssigneeOrm.stage_id == stage_id
+            )
+        )
+        for uid in user_ids:
+            self.session.add(
+                ProjectStageAssigneeOrm(
+                    stage_id=stage_id,
+                    user_id=uid,
+                    created_by=created_by,
+                )
+            )
+        await self.session.flush()

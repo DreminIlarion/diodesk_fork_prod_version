@@ -8,7 +8,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ...core.database import Base
 from ..domain.vo import MemberRole, ProjectStageStatus, ProjectStatus
 
-
 class ProjectMemberOrm(Base):
     __tablename__ = "project_members"
 
@@ -51,7 +50,6 @@ class ProjectStageOrm(Base):
 
     assignees: Mapped[list["ProjectStageAssigneeOrm"]] = relationship(
         lazy="selectin",
-        cascade="all, delete-orphan",
         foreign_keys="ProjectStageAssigneeOrm.stage_id",
     )
 

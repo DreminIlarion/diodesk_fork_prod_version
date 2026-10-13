@@ -4,6 +4,11 @@ from uuid import UUID
 
 from fastapi import Depends, Query
 
+from .infra.repos import (
+    SqlProjectMemberRepository,
+    SqlProjectRepository,
+    SqlProjectStageAssigneeRepository,
+)
 
 from .domain.dtos import ProjectFilters
 from .domain.vo import ProjectStatus
@@ -14,7 +19,6 @@ from src.shared.domain.exceptions import NotFoundError
 from src.shared.schemas import Page
 
 from .domain.repos import ProjectMemberRepository, ProjectRepository
-from .infra.repos import SqlProjectMemberRepository, SqlProjectRepository
 from .mappers import map_project_to_response
 from .schemas import ProjectResponse
 from .services import ProjectMemberService, ProjectService
@@ -32,16 +36,27 @@ ProjectRepoDep = Annotated[ProjectRepository, Depends(get_project_repo)]
 ProjectMemberRepoDep = Annotated[ProjectMemberRepository, Depends(get_project_member_repo)]
 
 
+def get_stage_assignee_repo(session: SessionDep) -> SqlProjectStageAssigneeRepository:
+    return SqlProjectStageAssigneeRepository(session)
+
+
+StageAssigneeRepoDep = Annotated[
+    SqlProjectStageAssigneeRepository,
+    Depends(get_stage_assignee_repo),
+]
+
 def get_project_service(
         session: SessionDep,
         project_repo: ProjectRepoDep,
         membership_repo: ProjectMemberRepoDep,
+        stage_assignee_repo: StageAssigneeRepoDep,
         event_publisher: EventPublisherDep,
 ) -> ProjectService:
     return ProjectService(
         uow=session,
         project_repo=project_repo,
         member_repo=membership_repo,
+        stage_assignee_repo=stage_assignee_repo,
         event_publisher=event_publisher,
     )
 
