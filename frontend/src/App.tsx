@@ -60,7 +60,7 @@ export default function App() {
 
             <Route path="/workflows" element={<LazyRoute><ProtectedRoute><WorkflowPage /></ProtectedRoute></LazyRoute>} /> 
 
-            <Route path="/global" element={<LazyRoute><GlobalPage />} </LazyRoute> }/>
+            <Route path="/global" element={<LazyRoute><GlobalPage /></LazyRoute>} />
 
 
             <Route path="/tasks" element={<LazyRoute><ProtectedRoute><TasksPage /></ProtectedRoute></LazyRoute>} />
