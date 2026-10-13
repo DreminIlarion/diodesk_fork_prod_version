@@ -1,15 +1,61 @@
-// ProjectStagesPage.tsx
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+// pages/ProjectStagesPage.tsx
+
 import {
-  Calendar, Clock, CheckCircle2, PlayCircle, AlertTriangle, X,
-  LayoutGrid, GanttChart, Map as MapIcon, BarChart3, Info, Target,
-  ArrowUpDown, ArrowUp, ArrowDown, Search, Filter,
-  Table as TableIcon, Milestone, Flag, PauseCircle, SkipForward,
-  PenSquare, Save, ChevronRight, Plus, Trash2, ArrowLeft, Eye,
-  User, FileText, ListChecks, Settings2, Layers, TrendingUp,
+  useState,
+  useMemo,
+  useEffect,
+  useCallback,
+} from 'react';
+
+import { createPortal } from 'react-dom';
+
+import {
+  motion,
+  AnimatePresence,
+} from 'framer-motion';
+
+import {
+  Calendar,
+  Clock,
+  CheckCircle2,
+  PlayCircle,
+  AlertTriangle,
+  X,
+  LayoutGrid,
+  GanttChart,
+  Map as MapIcon,
+  BarChart3,
+  Info,
+  Target,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Search,
+  Filter,
+  Table as TableIcon,
+  Milestone,
+  Flag,
+  PauseCircle,
+  SkipForward,
+  PenSquare,
+  Save,
+  ChevronRight,
+  Plus,
+  Trash2,
+  ArrowLeft,
+  Eye,
+  User,
+  Users,
+  UserPlus,
+  FileText,
+  ListChecks,
+  Settings2,
+  Layers,
+  TrendingUp,
+  Loader2,
+  Check,
 } from 'lucide-react';
+
 import {
   Select,
   SelectContent,
@@ -17,42 +63,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+
 import exportTimelineToExcel from '../components/utils/exportTimelineToExcel';
-import { projectsApi } from '../api/client';
-import type { Project, ProjectStageResponse, StageResponsible } from '../types';
+
+import {
+  projectsApi,
+  usersApi,
+} from '../api/client';
+
+import { useAuthStore } from '../stores/authStore';
+
+import type {
+  Project,
+  ProjectStageResponse,
+  StageResponsible,
+} from '../types';
 
 /* ════════════════════════════════════════════════════════════════
-   ТИПЫ
+   TYPES
    ════════════════════════════════════════════════════════════════ */
 
-export type ProjectStageStatus = 'planned' | 'active' | 'completed' | 'on_hold' | 'skipped';
-
-// Обновлённый интерфейс под API (execution_order вместо order)
-export interface ProjectStageResponse {
-  id: string;
-  created_at: string;
-  updated_at: string;
-  project_id: string;
-  name: string;
-  execution_order: number;
-  status: ProjectStageStatus;
-  planned_start: string | null;
-  planned_end: string | null;
-  started_at: string | null;
-  completed_at: string | null;
-  responsible_id: string | null;
-  description: string | null;
-  completion_criteria: string[];
-  is_overdue: boolean;
-  planned_duration_days: number | null;
-}
-
-export interface StageResponsible {
-  id: string;
-  full_name: string;
-  role?: string;
-  email?: string;
-}
+export type ProjectStageStatus =
+  | 'planned'
+  | 'active'
+  | 'completed'
+  | 'on_hold'
+  | 'skipped';
 
 export interface StageUpsertPayload {
   name: string;
@@ -66,13 +102,42 @@ export interface StageUpsertPayload {
   planned_duration_days: number | null;
 }
 
-export type EffectiveStatus = ProjectStageStatus | 'overdue';
+export type EffectiveStatus =
+  | ProjectStageStatus
+  | 'overdue';
 
-type ViewType = 'table' | 'overview' | 'roadmap' | 'timeline' | 'board' | 'analytics';
-type TimelineScale = 'days' | 'weeks' | 'months';
-type SortKey = 'order' | 'name' | 'status' | 'responsible' | 'dates' | 'duration';
+type ViewType =
+  | 'table'
+  | 'overview'
+  | 'roadmap'
+  | 'timeline'
+  | 'board'
+  | 'analytics';
+
+type TimelineScale =
+  | 'days'
+  | 'weeks'
+  | 'months';
+
+type SortKey =
+  | 'order'
+  | 'name'
+  | 'status'
+  | 'responsible'
+  | 'dates'
+  | 'duration';
+
 type SortDir = 'asc' | 'desc';
-type SectionScreen = { type: 'list' } | { type: 'detail'; stageId: string; editing: boolean } | { type: 'create' };
+
+type SectionScreen =
+  | { type: 'list' }
+  | {
+    type: 'detail';
+    stageId: string;
+    editing: boolean;
+  }
+  | { type: 'create' };
+
 type StageForm = {
   name: string;
   order: string;
@@ -85,172 +150,594 @@ type StageForm = {
   completion_criteria: string;
 };
 
+interface Toast {
+  id: number;
+  title: string;
+  type?: 'success' | 'error' | 'info';
+}
+
 /* ════════════════════════════════════════════════════════════════
-   МОКИ (для ответственных — пока нет API)
+   STATUS CONFIGURATION
    ════════════════════════════════════════════════════════════════ */
 
-const MOCK_RESPONSIBLES: Record<string, StageResponsible> = {
-  u2: { id: 'u2', full_name: 'Мария Сидорова', role: 'Бизнес-аналитик', email: 'sidorova@company.ru' },
-  u3: { id: 'u3', full_name: 'Анна Морозова', role: 'UX-дизайнер', email: 'morozova@company.ru' },
-  u4: { id: 'u4', full_name: 'Иван Кузнецов', role: 'Тимлид фронтенда', email: 'kuznetsov@company.ru' },
-  u5: { id: 'u5', full_name: 'Ольга Новикова', role: 'QA Lead', email: 'novikova@company.ru' },
-  u6: { id: 'u6', full_name: 'Дмитрий Орлов', role: 'DevOps-инженер', email: 'orlov@company.ru' },
-  u7: { id: 'u7', full_name: 'Алексей Петров', role: 'Тимлид бэкенда', email: 'petrov@company.ru' },
-  u8: { id: 'u8', full_name: 'Елена Волкова', role: 'Security Engineer', email: 'volkova@company.ru' },
+const STATUS_CFG: Record<
+  EffectiveStatus,
+  {
+    label: string;
+    dot: string;
+    chip: string;
+    bar: string;
+    ring: string;
+    border: string;
+    icon: React.ElementType;
+    text: string;
+  }
+> = {
+  planned: {
+    label: 'Запланирован',
+    dot: 'bg-slate-400',
+    chip:
+      'bg-slate-500/10 text-slate-400 border-slate-400/20',
+    bar: 'bg-slate-500',
+    ring: 'ring-slate-400/25',
+    border: 'border-slate-400/25',
+    icon: Clock,
+    text: 'text-slate-400',
+  },
+
+  active: {
+    label: 'В работе',
+    dot: 'bg-blue-500',
+    chip:
+      'bg-blue-500/10 text-blue-400 border-blue-400/25',
+    bar: 'bg-blue-500',
+    ring: 'ring-blue-500/25',
+    border: 'border-blue-400/25',
+    icon: PlayCircle,
+    text: 'text-blue-400',
+  },
+
+  completed: {
+    label: 'Завершён',
+    dot: 'bg-emerald-500',
+    chip:
+      'bg-emerald-500/10 text-emerald-500 border-emerald-400/25',
+    bar: 'bg-emerald-500',
+    ring: 'ring-emerald-500/25',
+    border: 'border-emerald-400/25',
+    icon: CheckCircle2,
+    text: 'text-emerald-500',
+  },
+
+  on_hold: {
+    label: 'На паузе',
+    dot: 'bg-amber-500',
+    chip:
+      'bg-amber-500/10 text-amber-500 border-amber-400/25',
+    bar: 'bg-amber-500',
+    ring: 'ring-amber-500/25',
+    border: 'border-amber-400/25',
+    icon: PauseCircle,
+    text: 'text-amber-500',
+  },
+
+  skipped: {
+    label: 'Пропущен',
+    dot: 'bg-neutral-500',
+    chip:
+      'bg-neutral-500/10 text-neutral-400 border-neutral-400/20',
+    bar: 'bg-neutral-500',
+    ring: 'ring-neutral-400/20',
+    border: 'border-neutral-400/20',
+    icon: SkipForward,
+    text: 'text-neutral-400',
+  },
+
+  overdue: {
+    label: 'Просрочен',
+    dot: 'bg-[var(--accent)]',
+    chip:
+      'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/25',
+    bar: 'bg-[var(--accent)]',
+    ring: 'ring-[var(--accent)]/25',
+    border: 'border-[var(--accent)]/25',
+    icon: AlertTriangle,
+    text: 'text-[var(--accent)]',
+  },
 };
+
+/* ════════════════════════════════════════════════════════════════
+   UTILITIES
+   ════════════════════════════════════════════════════════════════ */
 
 const TODAY = new Date();
 
-/* ════════════════════════════════════════════════════════════════
-   СТАТУСЫ
-   ════════════════════════════════════════════════════════════════ */
+const parseDate = (
+  value: string | null,
+): Date | null => {
+  if (!value) return null;
 
-const STATUS_CFG: Record<EffectiveStatus, { label: string; dot: string; chip: string; bar: string; ring: string; border: string; icon: any; text: string; }> = {
-  planned: { label: 'Запланирован', dot: 'bg-slate-400', chip: 'bg-slate-500/10 text-slate-300 border-slate-400/20', bar: 'bg-slate-500', ring: 'ring-slate-400/25', border: 'border-slate-400/25', icon: Clock, text: 'text-slate-300' },
-  active: { label: 'В работе', dot: 'bg-blue-500', chip: 'bg-blue-500/12 text-blue-300 border-blue-400/25', bar: 'bg-blue-500', ring: 'ring-blue-500/25', border: 'border-blue-400/25', icon: PlayCircle, text: 'text-blue-300' },
-  completed: { label: 'Завершён', dot: 'bg-emerald-500', chip: 'bg-emerald-500/12 text-emerald-300 border-emerald-400/25', bar: 'bg-emerald-500', ring: 'ring-emerald-500/25', border: 'border-emerald-400/25', icon: CheckCircle2, text: 'text-emerald-300' },
-  on_hold: { label: 'На паузе', dot: 'bg-amber-500', chip: 'bg-amber-500/12 text-amber-300 border-amber-400/25', bar: 'bg-amber-500', ring: 'ring-amber-500/25', border: 'border-amber-400/25', icon: PauseCircle, text: 'text-amber-300' },
-  skipped: { label: 'Пропущен', dot: 'bg-neutral-500', chip: 'bg-neutral-500/10 text-neutral-400 border-neutral-400/20', bar: 'bg-neutral-500', ring: 'ring-neutral-400/20', border: 'border-neutral-400/20', icon: SkipForward, text: 'text-neutral-400' },
-  overdue: { label: 'Просрочен', dot: 'bg-[var(--accent)]', chip: 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/25', bar: 'bg-[var(--accent)]', ring: 'ring-[var(--accent)]/25', border: 'border-[var(--accent)]/25', icon: AlertTriangle, text: 'text-[var(--accent)]' },
+  return new Date(
+    value +
+    (value.length === 10
+      ? 'T00:00:00'
+      : ''),
+  );
 };
 
-/* ════════════════════════════════════════════════════════════════
-   УТИЛИТЫ
-   ════════════════════════════════════════════════════════════════ */
+const fmtDate = (
+  value: string | null,
+): string => {
+  if (!value) return '—';
 
-const parseDate = (s: string | null): Date | null => s ? new Date(s + (s.length === 10 ? 'T00:00:00' : '')) : null;
-const fmtDate = (s: string | null) => { if (!s) return '—'; const d = parseDate(s); return d ? d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'; };
-const fmtShort = (s: string | null) => { if (!s) return '—'; const d = parseDate(s); return d ? d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) : '—'; };
-const fmtDT = (s: string | null) => { if (!s) return '—'; return new Date(s).toLocaleString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
-const fmtToday = () => fmtShort(new Date().toISOString());
-const daysB = (a: Date, b: Date) => Math.round((b.getTime() - a.getTime()) / 86400000);
+  const date = parseDate(value);
 
-// ✅ Исправлено: execution_order вместо order
-const effStatus = (s: ProjectStageResponse): EffectiveStatus => s.is_overdue && s.status !== 'completed' && s.status !== 'skipped' ? 'overdue' : s.status;
-const sortOrd = (l: ProjectStageResponse[]) => [...l].sort((a, b) => a.execution_order - b.execution_order || a.name.localeCompare(b.name, 'ru'));
-const normOrd = (l: ProjectStageResponse[]) => sortOrd(l).map((s, i) => ({ ...s, execution_order: i + 1 }));
+  if (!date) return '—';
 
-function getInitials(name?: string) { return !name ? '?' : name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase(); }
+  return date.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+};
 
-function stagesOverlap(a: ProjectStageResponse, b: ProjectStageResponse): boolean {
-  const as = parseDate(a.planned_start), ae = parseDate(a.planned_end);
-  const bs = parseDate(b.planned_start), be = parseDate(b.planned_end);
-  if (!as || !ae || !bs || !be) return false;
+const fmtShort = (
+  value: string | null,
+): string => {
+  if (!value) return '—';
+
+  const date = parseDate(value);
+
+  if (!date) return '—';
+
+  return date.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+  });
+};
+
+const fmtDT = (
+  value: string | null,
+): string => {
+  if (!value) return '—';
+
+  return new Date(value).toLocaleString(
+    'ru-RU',
+    {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    },
+  );
+};
+
+const fmtToday = () =>
+  fmtShort(new Date().toISOString());
+
+const daysB = (
+  a: Date,
+  b: Date,
+): number =>
+  Math.round(
+    (b.getTime() - a.getTime()) /
+    86400000,
+  );
+
+const effStatus = (
+  stage: ProjectStageResponse,
+): EffectiveStatus => {
+  if (
+    stage.is_overdue &&
+    stage.status !== 'completed' &&
+    stage.status !== 'skipped'
+  ) {
+    return 'overdue';
+  }
+
+  return stage.status;
+};
+
+const sortOrd = (
+  stages: ProjectStageResponse[],
+): ProjectStageResponse[] =>
+  [...stages].sort(
+    (a, b) =>
+      a.execution_order -
+      b.execution_order ||
+      a.name.localeCompare(
+        b.name,
+        'ru',
+      ),
+  );
+
+function getInitials(
+  name?: string | null,
+): string {
+  if (!name?.trim()) return '?';
+
+  const parts = name
+    .trim()
+    .split(/\s+/);
+
+  if (parts.length >= 2) {
+    return (
+      parts[0][0] +
+      parts[1][0]
+    ).toUpperCase();
+  }
+
+  return parts[0]
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function stagesOverlap(
+  a: ProjectStageResponse,
+  b: ProjectStageResponse,
+): boolean {
+  const as = parseDate(a.planned_start);
+  const ae = parseDate(a.planned_end);
+
+  const bs = parseDate(b.planned_start);
+  const be = parseDate(b.planned_end);
+
+  if (!as || !ae || !bs || !be) {
+    return false;
+  }
+
   return as <= be && bs <= ae;
 }
 
-const isRunning = (s: ProjectStageResponse) => s.status === 'active' || s.status === 'on_hold';
+const isRunning = (
+  stage: ProjectStageResponse,
+) =>
+  stage.status === 'active' ||
+  stage.status === 'on_hold';
 
-function getActualEnd(s: ProjectStageResponse): Date | null {
-  if (s.completed_at) return parseDate(s.completed_at);
-  if (s.status === 'active' || s.status === 'on_hold') return TODAY;
+function getActualEnd(
+  stage: ProjectStageResponse,
+): Date | null {
+  if (stage.completed_at) {
+    return parseDate(stage.completed_at);
+  }
+
+  if (
+    stage.status === 'active' ||
+    stage.status === 'on_hold'
+  ) {
+    return new Date();
+  }
+
   return null;
 }
 
-function isFactOverPlan(s: ProjectStageResponse): boolean {
-  const pe = parseDate(s.planned_end), ae = getActualEnd(s);
-  if (!pe || !ae) return false; return ae > pe;
+function isFactOverPlan(
+  stage: ProjectStageResponse,
+): boolean {
+  const plannedEnd = parseDate(
+    stage.planned_end,
+  );
+
+  const actualEnd = getActualEnd(stage);
+
+  if (!plannedEnd || !actualEnd) {
+    return false;
+  }
+
+  return actualEnd > plannedEnd;
 }
 
-function overrunDays(s: ProjectStageResponse): number {
-  const pe = parseDate(s.planned_end), ae = getActualEnd(s);
-  if (!pe || !ae || ae <= pe) return 0; return daysB(pe, ae);
-}
+function overrunDays(
+  stage: ProjectStageResponse,
+): number {
+  const plannedEnd = parseDate(
+    stage.planned_end,
+  );
 
-function resolveDates(prev: ProjectStageResponse, status: ProjectStageStatus) {
-  const now = new Date().toISOString(); let sa = prev.started_at, ca = prev.completed_at;
-  if (status === 'planned') { sa = null; ca = null; } if (status === 'active') { sa = sa ?? now; ca = null; }
-  if (status === 'completed') { sa = sa ?? now; ca = ca ?? now; } if (status === 'on_hold') { ca = null; } if (status === 'skipped') { ca = null; }
-  return { started_at: sa, completed_at: ca };
-}
+  const actualEnd = getActualEnd(stage);
 
-const emptyForm = (order: number): StageForm => ({ name: '', order: String(order), status: 'planned', responsible_id: '', planned_start: '', planned_end: '', planned_duration_days: '', description: '', completion_criteria: '' });
+  if (
+    !plannedEnd ||
+    !actualEnd ||
+    actualEnd <= plannedEnd
+  ) {
+    return 0;
+  }
 
-// ✅ Исправлено: execution_order вместо order
-const stageToForm = (s: ProjectStageResponse): StageForm => ({
-  name: s.name,
-  order: String(s.execution_order),
-  status: s.status,
-  responsible_id: s.responsible_id ?? '',
-  planned_start: s.planned_start ?? '',
-  planned_end: s.planned_end ?? '',
-  planned_duration_days: s.planned_duration_days != null ? String(s.planned_duration_days) : '',
-  description: s.description ?? '',
-  completion_criteria: s.completion_criteria.join('\n')
-});
-
-const formToPayload = (f: StageForm): StageUpsertPayload => ({
-  name: f.name.trim(),
-  order: Math.max(1, Number(f.order) || 1),
-  status: f.status,
-  planned_start: f.planned_start || null,
-  planned_end: f.planned_end || null,
-  responsible_id: f.responsible_id || null,
-  description: f.description.trim() || null,
-  completion_criteria: f.completion_criteria.split('\n').map(v => v.trim()).filter(Boolean),
-  planned_duration_days: f.planned_duration_days ? Math.max(1, Number(f.planned_duration_days)) : null
-});
-
-function applyPayload(stage: ProjectStageResponse, p: StageUpsertPayload): ProjectStageResponse {
-  const d = resolveDates(stage, p.status);
-  return { ...stage, ...p, ...d, updated_at: new Date().toISOString() };
+  return daysB(plannedEnd, actualEnd);
 }
 
 /* ════════════════════════════════════════════════════════════════
-   МАЛЕНЬКИЕ КОМПОНЕНТЫ
+   FORM UTILITIES
    ════════════════════════════════════════════════════════════════ */
 
-function Ava({ name, size = 'md' }: { name?: string; size?: 'sm' | 'md' }) {
-  const c = { sm: 'w-9 h-9 text-[13px]', md: 'w-11 h-11 text-[14px]' }[size];
-  return <div className={`${c} rounded-full bg-[var(--accent)] flex items-center justify-center font-semibold text-white flex-shrink-0 select-none`}>{getInitials(name)}</div>;
+const emptyForm = (
+  order: number,
+): StageForm => ({
+  name: '',
+  order: String(order),
+  status: 'planned',
+  responsible_id: '',
+  planned_start: '',
+  planned_end: '',
+  planned_duration_days: '',
+  description: '',
+  completion_criteria: '',
+});
+
+const stageToForm = (
+  stage: ProjectStageResponse,
+): StageForm => ({
+  name: stage.name,
+  order: String(stage.execution_order),
+  status: stage.status,
+  responsible_id:
+    stage.responsible_id ?? '',
+  planned_start:
+    stage.planned_start ?? '',
+  planned_end:
+    stage.planned_end ?? '',
+  planned_duration_days:
+    stage.planned_duration_days != null
+      ? String(
+        stage.planned_duration_days,
+      )
+      : '',
+  description:
+    stage.description ?? '',
+  completion_criteria:
+    stage.completion_criteria.join('\n'),
+});
+
+const formToPayload = (
+  form: StageForm,
+): StageUpsertPayload => ({
+  name: form.name.trim(),
+
+  order: Math.max(
+    1,
+    Number(form.order) || 1,
+  ),
+
+  status: form.status,
+
+  planned_start:
+    form.planned_start || null,
+
+  planned_end:
+    form.planned_end || null,
+
+  responsible_id:
+    form.responsible_id || null,
+
+  description:
+    form.description.trim() || null,
+
+  completion_criteria:
+    form.completion_criteria
+      .split('\n')
+      .map(value => value.trim())
+      .filter(Boolean),
+
+  planned_duration_days:
+    form.planned_duration_days
+      ? Math.max(
+        1,
+        Number(
+          form.planned_duration_days,
+        ),
+      )
+      : null,
+});
+
+/* ════════════════════════════════════════════════════════════════
+   AVATAR
+   ════════════════════════════════════════════════════════════════ */
+
+function Ava({
+  name,
+  size = 'md',
+}: {
+  name?: string | null;
+  size?: 'sm' | 'md';
+}) {
+  const sizes = {
+    sm: 'w-9 h-9 text-xs',
+    md: 'w-11 h-11 text-sm',
+  };
+
+  return (
+    <div
+      className={`
+        ${sizes[size]}
+        flex
+        shrink-0
+        select-none
+        items-center
+        justify-center
+        rounded-xl
+        bg-[var(--accent)]
+        font-semibold
+        text-white
+      `}
+    >
+      {getInitials(name)}
+    </div>
+  );
 }
 
-function Badge({ order }: { order: number }) {
-  return <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent-soft)] text-[var(--text-primary)] font-semibold px-2.5 py-1 text-[13px]"><Milestone className="w-3.5 h-3.5" />#{String(order).padStart(2, '0')}</span>;
+/* ════════════════════════════════════════════════════════════════
+   STAGE BADGE
+   ════════════════════════════════════════════════════════════════ */
+
+function Badge({
+  order,
+}: {
+  order: number;
+}) {
+  return (
+    <span
+      className="
+        inline-flex
+        items-center
+        gap-1.5
+        rounded-lg
+        border border-[var(--accent)]/20
+        bg-[var(--accent-soft)]
+        px-2.5 py-1
+        text-xs
+        font-semibold
+        text-[var(--text-primary)]
+      "
+    >
+      <Milestone className="h-3.5 w-3.5" />
+
+      #{String(order).padStart(2, '0')}
+    </span>
+  );
 }
 
-function Chip({ status }: { status: EffectiveStatus }) {
-  const c = STATUS_CFG[status];
-  const I = c.icon;
-  return <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[13px] font-medium ${c.chip}`}><I className="w-3.5 h-3.5" />{c.label}</span>;
+/* ════════════════════════════════════════════════════════════════
+   STATUS CHIP
+   ════════════════════════════════════════════════════════════════ */
+
+function Chip({
+  status,
+}: {
+  status: EffectiveStatus;
+}) {
+  const config = STATUS_CFG[status];
+
+  const Icon = config.icon;
+
+  return (
+    <span
+      className={`
+        inline-flex
+        items-center
+        gap-1.5
+        rounded-lg
+        border
+        px-2.5 py-1
+        text-xs
+        font-medium
+        ${config.chip}
+      `}
+    >
+      <Icon className="h-3.5 w-3.5" />
+
+      {config.label}
+    </span>
+  );
 }
 
-const Skeleton = ({ className = '' }: { className?: string }) => <div className={`bg-[var(--hover-2)] animate-pulse rounded-2xl ${className}`} />;
+/* ════════════════════════════════════════════════════════════════
+   SKELETON
+   ════════════════════════════════════════════════════════════════ */
+
+function Skeleton({
+  className = '',
+}: {
+  className?: string;
+}) {
+  return (
+    <div
+      className={`
+        skeleton
+        rounded-2xl
+        ${className}
+      `}
+    />
+  );
+}
 
 function PageSkeleton() {
-  return <div className="space-y-6"><Skeleton className="h-12 w-80" /><Skeleton className="h-[600px] w-full" /></div>;
+  return (
+    <div className="space-y-6">
+      <Skeleton className="h-12 w-80 max-w-full" />
+
+      <Skeleton className="h-[500px] w-full" />
+    </div>
+  );
 }
 
-interface Toast { id: number; title: string; type?: 'success' | 'error' | 'info' }
+/* ════════════════════════════════════════════════════════════════
+   TOASTS
+   ════════════════════════════════════════════════════════════════ */
 
-function Toasts({ toasts, onClose }: { toasts: Toast[]; onClose: (id: number) => void }) {
+function Toasts({
+  toasts,
+  onClose,
+}: {
+  toasts: Toast[];
+  onClose: (id: number) => void;
+}) {
   return createPortal(
-    <div className="fixed top-6 right-6 z-[200] flex flex-col gap-3">
+    <div className="pointer-events-none fixed right-4 top-5 z-[400] flex max-w-[calc(100vw-2rem)] flex-col gap-3">
+
       <AnimatePresence>
-        {toasts.map(t => (
+        {toasts.map(toast => (
           <motion.div
-            key={t.id}
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 30 }}
-            className={`min-w-[320px] rounded-2xl border bg-[var(--bg-card)] px-5 py-4 flex items-center gap-3 ${
-              t.type === 'error' ? 'border-[var(--accent)]/25' :
-              t.type === 'success' ? 'border-emerald-400/25' : 'border-[var(--border-color)]'
-            }`}
-            style={{ boxShadow: 'var(--shadow-lg)' }}
+            key={toast.id}
+            initial={{
+              opacity: 0,
+              x: 30,
+            }}
+            animate={{
+              opacity: 1,
+              x: 0,
+            }}
+            exit={{
+              opacity: 0,
+              x: 30,
+            }}
+            className="
+              pointer-events-auto
+              flex
+              w-full
+              min-w-0
+              max-w-[380px]
+              items-center
+              gap-3
+              rounded-2xl
+              border border-[var(--border-color)]
+              bg-[var(--bg-card)]
+              px-5 py-4
+              shadow-lg
+              sm:min-w-[300px]
+            "
           >
-            {t.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />}
-            {t.type === 'error' && <AlertTriangle className="w-5 h-5 text-[var(--accent)] flex-shrink-0" />}
-            {(!t.type || t.type === 'info') && <Info className="w-5 h-5 text-blue-400 flex-shrink-0" />}
-            <span className="text-[14px] text-[var(--text-primary)] flex-1">{t.title}</span>
-            <button onClick={() => onClose(t.id)} className="text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]">
-              <X className="w-4 h-4" />
+            {toast.type === 'success' && (
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
+            )}
+
+            {toast.type === 'error' && (
+              <AlertTriangle className="h-5 w-5 shrink-0 text-[var(--accent)]" />
+            )}
+
+            {(!toast.type ||
+              toast.type === 'info') && (
+                <Info className="h-5 w-5 shrink-0 text-blue-400" />
+              )}
+
+            <span className="min-w-0 flex-1 text-sm text-[var(--text-primary)]">
+              {toast.title}
+            </span>
+
+            <button
+              type="button"
+              onClick={() => onClose(toast.id)}
+              className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+            >
+              <X className="h-4 w-4" />
             </button>
           </motion.div>
         ))}
       </AnimatePresence>
     </div>,
-    document.body
+    document.body,
   );
 }
 
@@ -258,37 +745,107 @@ function Toasts({ toasts, onClose }: { toasts: Toast[]; onClose: (id: number) =>
    VIEW TABS
    ════════════════════════════════════════════════════════════════ */
 
-const VIEWS: { id: ViewType; label: string; icon: any }[] = [
-  { id: 'table', label: 'Таблица', icon: TableIcon },
-  { id: 'overview', label: 'Обзор', icon: Info },
-  { id: 'roadmap', label: 'Карта', icon: MapIcon },
-  { id: 'timeline', label: 'Хронология', icon: GanttChart },
-  { id: 'board', label: 'Доска', icon: LayoutGrid },
-  { id: 'analytics', label: 'Аналитика', icon: BarChart3 }
-];
+const VIEWS: {
+  id: ViewType;
+  label: string;
+  icon: React.ElementType;
+}[] = [
+    {
+      id: 'table',
+      label: 'Таблица',
+      icon: TableIcon,
+    },
+    {
+      id: 'overview',
+      label: 'Обзор',
+      icon: Info,
+    },
+    {
+      id: 'roadmap',
+      label: 'Карта',
+      icon: MapIcon,
+    },
+    {
+      id: 'timeline',
+      label: 'Хронология',
+      icon: GanttChart,
+    },
+    {
+      id: 'board',
+      label: 'Доска',
+      icon: LayoutGrid,
+    },
+    {
+      id: 'analytics',
+      label: 'Аналитика',
+      icon: BarChart3,
+    },
+  ];
 
-function ViewTabs({ view, onChange }: { view: ViewType; onChange: (v: ViewType) => void }) {
+function ViewTabs({
+  view,
+  onChange,
+}: {
+  view: ViewType;
+  onChange: (view: ViewType) => void;
+}) {
   return (
-    <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-2)] p-1.5 inline-flex gap-1 overflow-x-auto">
-      {VIEWS.map(t => {
-        const a = view === t.id;
+    <div
+      className="
+        inline-flex
+        max-w-full
+        gap-1
+        overflow-x-auto
+        rounded-2xl
+        border border-[var(--border-color)]
+        bg-[var(--hover-2)]
+        p-1.5
+      "
+    >
+      {VIEWS.map(item => {
+        const active = view === item.id;
+
+        const Icon = item.icon;
+
         return (
           <button
-            key={t.id}
-            onClick={() => onChange(t.id)}
-            className={`relative inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-[14px] font-medium whitespace-nowrap transition-colors ${
-              a ? 'text-white' : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]/80'
-            }`}
+            key={item.id}
+            type="button"
+            onClick={() => onChange(item.id)}
+            className={`
+              relative
+              inline-flex
+              shrink-0
+              items-center
+              gap-2
+              rounded-xl
+              px-4 py-2.5
+              text-sm
+              font-medium
+              transition-colors
+              ${active
+                ? 'text-white'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              }
+            `}
           >
-            {a && (
+            {active && (
               <motion.div
-                layoutId="stab"
+                layoutId="stage-view-tab"
                 className="absolute inset-0 rounded-xl bg-[var(--accent)]"
-                transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                transition={{
+                  type: 'spring',
+                  stiffness: 350,
+                  damping: 30,
+                }}
               />
             )}
-            <t.icon className="w-4 h-4 relative" />
-            <span className="relative">{t.label}</span>
+
+            <Icon className="relative h-4 w-4" />
+
+            <span className="relative">
+              {item.label}
+            </span>
           </button>
         );
       })}
@@ -297,460 +854,1803 @@ function ViewTabs({ view, onChange }: { view: ViewType; onChange: (v: ViewType) 
 }
 
 /* ════════════════════════════════════════════════════════════════
-   TABLE
+   ASSIGNEES MODAL
    ════════════════════════════════════════════════════════════════ */
 
-function TableView({ stages, responsibles, onSelect, onCreate }: {
-  stages: ProjectStageResponse[];
-  responsibles: Record<string, StageResponsible>;
-  onSelect: (s: ProjectStageResponse) => void;
-  onCreate: () => void;
-}) {
-  const [sortKey, setSortKey] = useState<SortKey>('order');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
+interface AssigneesModalProps {
+  open: boolean;
+  onClose: () => void;
+  users: Record<string, StageResponsible>;
+  selectedIds: string[];
+  currentUserId?: string;
+  saving: boolean;
+  onSave: (ids: string[]) => Promise<void>;
+}
+
+function AssigneesModal({
+  open,
+  onClose,
+  users,
+  selectedIds,
+  currentUserId,
+  saving,
+  onSave,
+}: AssigneesModalProps) {
   const [search, setSearch] = useState('');
-  const [statusF, setStatusF] = useState<EffectiveStatus | 'all'>('all');
 
-  const filtered = useMemo(() => {
-    let l = [...stages];
-    const q = search.toLowerCase().replace('#', '').trim();
-    if (q) {
-      l = l.filter(s => {
-        const rn = s.responsible_id ? responsibles[s.responsible_id]?.full_name ?? '' : '';
-        return s.name.toLowerCase().includes(q) || rn.toLowerCase().includes(q) ||
-          String(s.execution_order).includes(q) || (s.description ?? '').toLowerCase().includes(q);
+  const [selected, setSelected] =
+    useState<string[]>(selectedIds);
+
+  useEffect(() => {
+    if (!open) return;
+
+    setSelected(selectedIds);
+    setSearch('');
+  }, [open, selectedIds]);
+
+  const availableUsers = useMemo(() => {
+    const query = search
+      .trim()
+      .toLowerCase();
+
+    return Object.values(users)
+      .filter(user => {
+        if (!query) return true;
+
+        return (
+          user.full_name
+            .toLowerCase()
+            .includes(query) ||
+          (user.email ?? '')
+            .toLowerCase()
+            .includes(query)
+        );
+      })
+      .sort((a, b) => {
+        if (a.id === currentUserId) {
+          return -1;
+        }
+
+        if (b.id === currentUserId) {
+          return 1;
+        }
+
+        return a.full_name.localeCompare(
+          b.full_name,
+          'ru',
+        );
       });
-    }
-    if (statusF !== 'all') l = l.filter(s => effStatus(s) === statusF);
-    l.sort((a, b) => {
-      let av: string | number = '', bv: string | number = '';
-      switch (sortKey) {
-        case 'order': av = a.execution_order; bv = b.execution_order; break;
-        case 'name': av = a.name; bv = b.name; break;
-        case 'status': av = effStatus(a); bv = effStatus(b); break;
-        case 'responsible':
-          av = a.responsible_id ? responsibles[a.responsible_id]?.full_name ?? '' : '';
-          bv = b.responsible_id ? responsibles[b.responsible_id]?.full_name ?? '' : '';
-          break;
-        case 'dates': av = a.planned_start ?? ''; bv = b.planned_start ?? ''; break;
-        case 'duration': av = a.planned_duration_days ?? 0; bv = b.planned_duration_days ?? 0; break;
-      }
-      if (av < bv) return sortDir === 'asc' ? -1 : 1;
-      if (av > bv) return sortDir === 'asc' ? 1 : -1;
-      return 0;
-    });
-    return l;
-  }, [stages, responsibles, search, statusF, sortKey, sortDir]);
+  }, [users, search, currentUserId]);
 
-  const toggle = (k: SortKey) => {
-    if (sortKey === k) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortKey(k); setSortDir('asc'); }
+  const toggleUser = (id: string) => {
+    if (saving) return;
+
+    setSelected(previous =>
+      previous.includes(id)
+        ? previous.filter(
+          userId => userId !== id,
+        )
+        : [...previous, id],
+    );
   };
 
-  const SI = ({ k }: { k: SortKey }) =>
-    sortKey !== k ? <ArrowUpDown className="w-4 h-4 text-[var(--text-primary)]/20" /> :
-      sortDir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />;
+  const hasChanges = useMemo(() => {
+    if (
+      selected.length !==
+      selectedIds.length
+    ) {
+      return true;
+    }
+
+    const original = new Set(selectedIds);
+
+    return selected.some(
+      id => !original.has(id),
+    );
+  }, [selected, selectedIds]);
+
+  const handleSave = async () => {
+    if (saving || !hasChanges) return;
+
+    try {
+      await onSave(selected);
+
+      onClose();
+    } catch {
+      // Не закрываем окно при ошибке API.
+      // Сообщение отображается через Toast.
+    }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (
+      event: KeyboardEvent,
+    ) => {
+      if (
+        event.key === 'Escape' &&
+        !saving
+      ) {
+        onClose();
+      }
+    };
+
+    document.addEventListener(
+      'keydown',
+      handleKeyDown,
+    );
+
+    return () => {
+      document.removeEventListener(
+        'keydown',
+        handleKeyDown,
+      );
+    };
+  }, [open, saving, onClose]);
+
+  if (!open) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[300] flex items-center justify-center p-3 sm:p-5">
+
+      {/* BACKDROP */}
+      <div
+        className="absolute inset-0 bg-black/65 backdrop-blur-sm"
+        onClick={() => {
+          if (!saving) {
+            onClose();
+          }
+        }}
+      />
+
+      {/* MODAL */}
+      <motion.div
+        initial={{
+          opacity: 0,
+          scale: 0.97,
+          y: 12,
+        }}
+        animate={{
+          opacity: 1,
+          scale: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.2,
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stage-assignees-title"
+        className="
+          relative
+          flex
+          max-h-[85vh]
+          w-full
+          max-w-[560px]
+          flex-col
+          overflow-hidden
+          rounded-2xl
+          border border-[var(--border-color)]
+          bg-[var(--bg-primary)]
+        "
+        style={{
+          boxShadow: 'var(--shadow-lg)',
+        }}
+      >
+
+        {/* HEADER */}
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--border-color)] px-5 py-5 sm:px-6">
+
+          <div className="flex min-w-0 items-center gap-3">
+
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)]">
+              <Users className="h-5 w-5 text-[var(--accent)]" />
+            </div>
+
+            <div className="min-w-0">
+
+              <h2
+                id="stage-assignees-title"
+                className="text-lg font-bold text-[var(--text-primary)]"
+              >
+                Исполнители этапа
+              </h2>
+
+              <p className="mt-1 text-sm text-[var(--text-muted)]">
+                Выберите сотрудников для выполнения этапа
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            aria-label="Закрыть"
+            className="
+              shrink-0
+              rounded-lg
+              p-2
+              text-[var(--text-muted)]
+              transition-colors
+              hover:bg-[var(--hover-2)]
+              hover:text-[var(--text-primary)]
+              disabled:opacity-50
+            "
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* SEARCH */}
+        <div className="border-b border-[var(--border-color)] px-5 py-4 sm:px-6">
+
+          <div className="relative">
+
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+
+            <input
+              value={search}
+              onChange={event =>
+                setSearch(event.target.value)
+              }
+              disabled={saving}
+              placeholder="Поиск по имени или почте..."
+              className="
+                h-12
+                w-full
+                rounded-xl
+                border border-[var(--border-color)]
+                bg-[var(--hover-2)]
+                pl-11 pr-4
+                text-sm
+                text-[var(--text-primary)]
+                outline-none
+                transition-colors
+                placeholder:text-[var(--text-muted)]
+                focus:border-[var(--accent)]
+                disabled:opacity-50
+              "
+            />
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-3">
+
+            <span className="text-xs text-[var(--text-muted)]">
+              Найдено: {availableUsers.length}
+            </span>
+
+            <span className="rounded-lg bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--accent)]">
+              Выбрано: {selected.length}
+            </span>
+          </div>
+        </div>
+
+        {/* USERS */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+
+          {availableUsers.length === 0 ? (
+            <div className="py-12 text-center">
+
+              <Search className="mx-auto h-10 w-10 text-[var(--text-disabled)]" />
+
+              <p className="mt-4 text-sm font-medium text-[var(--text-primary)]">
+                Сотрудники не найдены
+              </p>
+
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                Попробуйте изменить поисковый запрос
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+
+              {availableUsers.map(user => {
+                const isSelected =
+                  selected.includes(user.id);
+
+                const isCurrentUser =
+                  user.id === currentUserId;
+
+                return (
+                  <button
+                    key={user.id}
+                    type="button"
+                    onClick={() =>
+                      toggleUser(user.id)
+                    }
+                    disabled={saving}
+                    aria-pressed={isSelected}
+                    className={`
+                      flex
+                      w-full
+                      items-center
+                      gap-3
+                      rounded-xl
+                      border
+                      px-3 py-3
+                      text-left
+                      transition-colors
+                      disabled:opacity-50
+                      ${isSelected
+                        ? 'border-[var(--accent)]/30 bg-[var(--accent-soft)]'
+                        : 'border-transparent hover:bg-[var(--hover-2)]'
+                      }
+                    `}
+                  >
+
+                    <Ava
+                      name={user.full_name}
+                      size="sm"
+                    />
+
+                    <div className="min-w-0 flex-1">
+
+                      <div className="flex flex-wrap items-center gap-2">
+
+                        <span className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                          {user.full_name}
+                        </span>
+
+                        {isCurrentUser && (
+                          <span className="rounded-md bg-[var(--hover-3)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
+                            Вы
+                          </span>
+                        )}
+                      </div>
+
+                      {user.email && (
+                        <p className="mt-1 truncate text-xs text-[var(--text-muted)]">
+                          {user.email}
+                        </p>
+                      )}
+
+                      {user.role && (
+                        <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">
+                          {user.role}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* CHECKBOX */}
+                    <div
+                      className={`
+                        flex
+                        h-5 w-5
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-md
+                        border
+                        transition-colors
+                        ${isSelected
+                          ? 'border-[var(--accent)] bg-[var(--accent)]'
+                          : 'border-[var(--border-color)]'
+                        }
+                      `}
+                    >
+                      {isSelected && (
+                        <Check className="h-3.5 w-3.5 text-white" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* FOOTER */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-color)] px-5 py-4 sm:px-6">
+
+          <span className="text-sm text-[var(--text-muted)]">
+            {selected.length === 0
+              ? 'Никто не выбран'
+              : `Исполнителей: ${selected.length}`}
+          </span>
+
+          <div className="flex items-center gap-2">
+
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="
+                rounded-xl
+                border border-[var(--border-color)]
+                bg-[var(--hover-2)]
+                px-4 py-2.5
+                text-sm
+                font-medium
+                text-[var(--text-secondary)]
+                transition-colors
+                hover:bg-[var(--hover-3)]
+                disabled:opacity-50
+              "
+            >
+              Отмена
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={
+                saving ||
+                !hasChanges
+              }
+              className="
+                inline-flex
+                items-center
+                justify-center
+                gap-2
+                rounded-xl
+                bg-[var(--accent)]
+                px-5 py-2.5
+                text-sm
+                font-semibold
+                text-white
+                transition-opacity
+                hover:opacity-90
+                disabled:cursor-not-allowed
+                disabled:opacity-40
+              "
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Сохранение...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4" />
+                  Сохранить
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>,
+    document.body,
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ASSIGNEES PREVIEW
+   ════════════════════════════════════════════════════════════════ */
+
+function AssigneesPreview({
+  ids,
+  users,
+  maxVisible = 3,
+}: {
+  ids?: string[];
+  users: Record<string, StageResponsible>;
+  maxVisible?: number;
+}) {
+  const assigneeIds = ids ?? [];
+
+  if (!assigneeIds.length) {
+    return (
+      <span className="text-sm text-[var(--text-muted)]">
+        Не назначены
+      </span>
+    );
+  }
+
+  const visible = assigneeIds.slice(0, maxVisible);
+  const remaining = Math.max(0, assigneeIds.length - maxVisible);
+
+  return (
+    <div
+      className="flex items-center gap-2"
+      title={assigneeIds
+        .map(id => users[id]?.full_name ?? 'Пользователь')
+        .join(', ')}
+    >
+      <div className="flex items-center -space-x-2">
+        {visible.map(id => {
+          const user = users[id];
+
+          return (
+            <div
+              key={id}
+              className="
+                relative
+                flex h-8 w-8
+                shrink-0
+                items-center justify-center
+                rounded-full
+                border-2 border-[var(--bg-card)]
+                bg-[var(--accent)]
+                text-[10px]
+                font-bold
+                text-white
+              "
+            >
+              {getInitials(user?.full_name)}
+            </div>
+          );
+        })}
+
+        {remaining > 0 && (
+          <div
+            className="
+              relative
+              flex h-8 w-8
+              items-center justify-center
+              rounded-full
+              border-2 border-[var(--bg-card)]
+              bg-[var(--hover-3)]
+              text-[11px]
+              font-semibold
+              text-[var(--text-primary)]
+            "
+          >
+            +{remaining}
+          </div>
+        )}
+      </div>
+
+      <span className="text-xs text-[var(--text-muted)]">
+        {assigneeIds.length}
+      </span>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TABLE VIEW
+   ════════════════════════════════════════════════════════════════ */
+
+function TableView({
+  stages,
+  responsibles,
+  onSelect,
+  onCreate,
+}: {
+  stages: ProjectStageResponse[];
+  responsibles: Record<string, StageResponsible>;
+  onSelect: (stage: ProjectStageResponse) => void;
+  onCreate: () => void;
+}) {
+  const [sortKey, setSortKey] =
+    useState<SortKey>('order');
+
+  const [sortDir, setSortDir] =
+    useState<SortDir>('asc');
+
+  const [search, setSearch] =
+    useState('');
+
+  const [statusFilter, setStatusFilter] =
+    useState<EffectiveStatus | 'all'>('all');
+
+  /* =========================================================
+     FILTER & SORT
+     ========================================================= */
+
+  const filtered = useMemo(() => {
+    let result = [...stages];
+
+    const query = search
+      .toLowerCase()
+      .replace('#', '')
+      .trim();
+
+    if (query) {
+      result = result.filter(stage => {
+        const responsibleName =
+          stage.responsible_id
+            ? responsibles[stage.responsible_id]?.full_name ?? ''
+            : '';
+
+        const assigneeNames = (stage.assignee_ids ?? [])
+          .map(id => responsibles[id]?.full_name ?? '')
+          .join(' ');
+
+        return (
+          stage.name.toLowerCase().includes(query) ||
+          responsibleName.toLowerCase().includes(query) ||
+          assigneeNames.toLowerCase().includes(query) ||
+          String(stage.execution_order).includes(query) ||
+          (stage.description ?? '')
+            .toLowerCase()
+            .includes(query)
+        );
+      });
+    }
+
+    if (statusFilter !== 'all') {
+      result = result.filter(
+        stage => effStatus(stage) === statusFilter,
+      );
+    }
+
+    result.sort((a, b) => {
+      let av: string | number = '';
+      let bv: string | number = '';
+
+      switch (sortKey) {
+        case 'order':
+          av = a.execution_order;
+          bv = b.execution_order;
+          break;
+
+        case 'name':
+          av = a.name;
+          bv = b.name;
+          break;
+
+        case 'status':
+          av = effStatus(a);
+          bv = effStatus(b);
+          break;
+
+        case 'responsible':
+          av = a.responsible_id
+            ? responsibles[a.responsible_id]?.full_name ?? ''
+            : '';
+
+          bv = b.responsible_id
+            ? responsibles[b.responsible_id]?.full_name ?? ''
+            : '';
+          break;
+
+        case 'dates':
+          av = a.planned_start ?? '';
+          bv = b.planned_start ?? '';
+          break;
+
+        case 'duration':
+          av = a.planned_duration_days ?? 0;
+          bv = b.planned_duration_days ?? 0;
+          break;
+      }
+
+      if (av < bv) {
+        return sortDir === 'asc' ? -1 : 1;
+      }
+
+      if (av > bv) {
+        return sortDir === 'asc' ? 1 : -1;
+      }
+
+      return 0;
+    });
+
+    return result;
+  }, [
+    stages,
+    responsibles,
+    search,
+    statusFilter,
+    sortKey,
+    sortDir,
+  ]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(previous =>
+        previous === 'asc' ? 'desc' : 'asc',
+      );
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({
+    column,
+  }: {
+    column: SortKey;
+  }) => {
+    if (sortKey !== column) {
+      return (
+        <ArrowUpDown className="h-3.5 w-3.5 text-[var(--text-disabled)]" />
+      );
+    }
+
+    return sortDir === 'asc' ? (
+      <ArrowUp className="h-3.5 w-3.5 text-[var(--accent)]" />
+    ) : (
+      <ArrowDown className="h-3.5 w-3.5 text-[var(--accent)]" />
+    );
+  };
+
+  /* =========================================================
+     EMPTY STATE
+     ========================================================= */
 
   if (!stages.length) {
     return (
-      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-10 text-center">
-        <Milestone className="w-14 h-14 mx-auto text-[var(--text-primary)]/15 mb-4" />
-        <h3 className="text-[18px] font-bold text-[var(--text-primary)] mb-2">Этапов пока нет</h3>
-        <p className="text-[15px] text-[var(--text-primary)]/50 mb-6 max-w-md mx-auto">Создайте первый этап проекта.</p>
-        <button onClick={onCreate} className="inline-flex items-center gap-2 rounded-2xl bg-[var(--accent)] px-5 py-3 text-[14px] font-semibold text-white">
-          <Plus className="w-4 h-4" /> Создать этап
+      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] px-6 py-16 text-center">
+
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--hover-2)]">
+          <Milestone className="h-8 w-8 text-[var(--text-disabled)]" />
+        </div>
+
+        <h3 className="mt-5 text-lg font-bold text-[var(--text-primary)]">
+          Этапов пока нет
+        </h3>
+
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--text-muted)]">
+          Создайте первый этап проекта, чтобы планировать
+          работу, назначать исполнителей и отслеживать сроки.
+        </p>
+
+        <button
+          type="button"
+          onClick={onCreate}
+          className="
+            mt-6
+            inline-flex
+            items-center
+            gap-2
+            rounded-xl
+            bg-[var(--accent)]
+            px-5 py-3
+            text-sm
+            font-semibold
+            text-white
+            transition-opacity
+            hover:opacity-90
+          "
+        >
+          <Plus className="h-4 w-4" />
+          Создать этап
         </button>
       </div>
     );
   }
 
+  /* =========================================================
+     RENDER
+     ========================================================= */
+
   return (
-    <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] overflow-hidden">
-      <div className="border-b border-[var(--border-color)] bg-[var(--hover-1)] px-5 py-4 flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/40" />
+    <div className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
+
+      {/* TOOLBAR */}
+      <div className="flex flex-wrap items-center gap-3 border-b border-[var(--border-color)] bg-[var(--hover-1)] px-5 py-4">
+
+        {/* SEARCH */}
+        <div className="relative min-w-[220px] flex-1">
+
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+
           <input
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Поиск…"
-            className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] pl-11 pr-4 py-3 text-[14px] text-[var(--text-primary)] placeholder-white/20 outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all"
+            onChange={event =>
+              setSearch(event.target.value)
+            }
+            placeholder="Поиск по этапам и сотрудникам..."
+            className="
+              h-11
+              w-full
+              rounded-xl
+              border border-[var(--border-color)]
+              bg-[var(--hover-2)]
+              pl-11 pr-4
+              text-sm
+              text-[var(--text-primary)]
+              outline-none
+              transition-colors
+              placeholder:text-[var(--text-muted)]
+              focus:border-[var(--accent)]
+            "
           />
         </div>
-        <div className="relative">
-          <Filter className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/40 pointer-events-none" />
-          <Select value={statusF} onValueChange={e => setStatusF(e as any)}>
-            <SelectTrigger className="rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] pl-11 pr-10 py-3 text-[14px] text-[var(--text-primary)] outline-none">
-              <SelectValue placeholder="Все статусы" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все статусы</SelectItem>
-              <SelectItem value="planned">Запланирован</SelectItem>
-              <SelectItem value="active">В работе</SelectItem>
-              <SelectItem value="on_hold">На паузе</SelectItem>
-              <SelectItem value="completed">Завершён</SelectItem>
-              <SelectItem value="skipped">Пропущен</SelectItem>
-              <SelectItem value="overdue">Просрочен</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <button onClick={onCreate} className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3 text-[14px] font-semibold text-white">
-          <Plus className="w-4 h-4" /> Создать
+
+        {/* FILTER */}
+        <Select
+          value={statusFilter}
+          onValueChange={value =>
+            setStatusFilter(
+              value as EffectiveStatus | 'all',
+            )
+          }
+        >
+          <SelectTrigger
+            className="
+              h-11
+              w-[190px]
+              rounded-xl
+              border border-[var(--border-color)]
+              bg-[var(--hover-2)]
+              px-4
+              text-sm
+              text-[var(--text-primary)]
+            "
+          >
+            <Filter className="mr-2 h-4 w-4 text-[var(--text-muted)]" />
+
+            <SelectValue placeholder="Все статусы" />
+          </SelectTrigger>
+
+          <SelectContent>
+            <SelectItem value="all">
+              Все статусы
+            </SelectItem>
+
+            <SelectItem value="planned">
+              Запланирован
+            </SelectItem>
+
+            <SelectItem value="active">
+              В работе
+            </SelectItem>
+
+            <SelectItem value="on_hold">
+              На паузе
+            </SelectItem>
+
+            <SelectItem value="completed">
+              Завершён
+            </SelectItem>
+
+            <SelectItem value="skipped">
+              Пропущен
+            </SelectItem>
+
+            <SelectItem value="overdue">
+              Просрочен
+            </SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* CREATE */}
+        <button
+          type="button"
+          onClick={onCreate}
+          className="
+            inline-flex
+            h-11
+            items-center
+            gap-2
+            rounded-xl
+            bg-[var(--accent)]
+            px-4
+            text-sm
+            font-semibold
+            text-white
+            transition-opacity
+            hover:opacity-90
+          "
+        >
+          <Plus className="h-4 w-4" />
+          Создать
         </button>
       </div>
+
+      {/* TABLE */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1060px]">
+
+        <table className="w-full min-w-[1250px]">
+
           <thead>
             <tr className="border-b border-[var(--border-color)] bg-[var(--hover-1)]">
-              {([['order', 'Этап'], ['name', 'Название'], ['status', 'Статус'], ['dates', 'Плановые сроки'], ['responsible', 'Ответственный'], ['duration', 'Дни']] as [SortKey, string][]).map(([k, l]) => (
-                <th key={k} className="px-5 py-4 text-left">
-                  <button onClick={() => toggle(k)} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--text-primary)]/45 hover:text-[var(--text-primary)] transition-colors">
-                    {l} <SI k={k} />
+
+              {(
+                [
+                  ['order', '№'],
+                  ['name', 'Название'],
+                  ['status', 'Статус'],
+                  ['dates', 'Плановые сроки'],
+                  ['responsible', 'Ответственный'],
+                ] as [SortKey, string][]
+              ).map(([key, label]) => (
+                <th
+                  key={key}
+                  className="px-5 py-4 text-left"
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleSort(key)}
+                    className="
+                      inline-flex
+                      items-center
+                      gap-2
+                      text-xs
+                      font-semibold
+                      text-[var(--text-muted)]
+                      transition-colors
+                      hover:text-[var(--text-primary)]
+                    "
+                  >
+                    {label}
+
+                    <SortIcon column={key} />
                   </button>
                 </th>
               ))}
-              <th className="px-5 py-4 text-left"><span className="text-[13px] font-semibold text-[var(--text-primary)]/45">Исполнение</span></th>
+
+              <th className="px-5 py-4 text-left text-xs font-semibold text-[var(--text-muted)]">
+                Исполнители
+              </th>
+
+              <th className="px-5 py-4 text-left">
+                <button
+                  type="button"
+                  onClick={() => toggleSort('duration')}
+                  className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                >
+                  Дни
+                  <SortIcon column="duration" />
+                </button>
+              </th>
+
+              <th className="px-5 py-4 text-left text-xs font-semibold text-[var(--text-muted)]">
+                Исполнение
+              </th>
+
               <th className="w-12" />
             </tr>
           </thead>
+
           <tbody>
-            {!filtered.length ? (
+
+            {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-16 text-center">
-                  <Search className="w-10 h-10 mx-auto text-[var(--text-primary)]/15 mb-3" />
-                  <p className="text-[15px] text-[var(--text-primary)]/40">Ничего не найдено</p>
+                <td
+                  colSpan={9}
+                  className="px-6 py-16 text-center"
+                >
+                  <Search className="mx-auto h-10 w-10 text-[var(--text-disabled)]" />
+
+                  <p className="mt-3 text-sm text-[var(--text-muted)]">
+                    Ничего не найдено
+                  </p>
                 </td>
               </tr>
-            ) : filtered.map(stage => {
-              const eff = effStatus(stage);
-              const resp = stage.responsible_id ? responsibles[stage.responsible_id] : null;
-              const ov = overrunDays(stage);
-              const fo = isFactOverPlan(stage);
-              return (
-                <tr
-                  key={stage.id}
-                  onClick={() => onSelect(stage)}
-                  className={`group cursor-pointer border-b border-[var(--border-color)] hover:bg-[var(--hover-1)] transition-colors ${eff === 'overdue' ? 'bg-[var(--accent-soft)]/20' : ''}`}
-                >
-                  <td className="px-5 py-5"><Badge order={stage.execution_order} /></td>
-                  <td className="px-5 py-5 min-w-[220px]">
-                    <p className="text-[15px] font-semibold text-[var(--text-primary)]">{stage.name}</p>
-                    <p className="mt-1 text-[14px] text-[var(--text-primary)]/50 line-clamp-1">{stage.description || 'Без описания'}</p>
-                  </td>
-                  <td className="px-5 py-5">
-                    <div className="flex flex-wrap gap-2">
-                      <Chip status={stage.status} />
-                      {eff === 'overdue' && <Chip status="overdue" />}
-                    </div>
-                  </td>
-                  <td className="px-5 py-5 whitespace-nowrap text-[14px] text-[var(--text-primary)]/65">
-                    {fmtShort(stage.planned_start)} — {fmtShort(stage.planned_end)}
-                  </td>
-                  <td className="px-5 py-5">
-                    {resp ? (
-                      <div className="inline-flex items-center gap-2.5">
-                        <Ava name={resp.full_name} size="sm" />
-                        <div className="min-w-0">
-                          <p className="text-[14px] text-[var(--text-primary)]/80 truncate">{resp.full_name}</p>
-                        </div>
-                      </div>
-                    ) : <span className="text-[14px] text-[var(--text-primary)]/40">—</span>}
-                  </td>
-                  <td className="px-5 py-5 text-[14px] font-medium text-[var(--text-primary)]/65">
-                    {stage.planned_duration_days != null ? `${stage.planned_duration_days} дн.` : '—'}
-                  </td>
-                  <td className="px-5 py-5">
-                    {stage.started_at ? (
-                      <div className="space-y-1">
-                        <p className="text-[13px] text-[var(--text-primary)]/50 whitespace-nowrap">
-                          {fmtShort(stage.started_at.slice(0, 10))} — {stage.completed_at ? fmtShort(stage.completed_at.slice(0, 10)) : fmtToday()}
-                        </p>
-                        {fo && (
-                          <span className="inline-flex items-center gap-1 text-[14px] font-semibold text-[var(--accent)]">
-                            <AlertTriangle className="w-3 h-3" /> +{ov} дн.
-                          </span>
+            ) : (
+              filtered.map(stage => {
+                const effective = effStatus(stage);
+
+                const responsible = stage.responsible_id
+                  ? responsibles[stage.responsible_id]
+                  : null;
+
+                const overdue = isFactOverPlan(stage);
+                const overdueDays = overrunDays(stage);
+
+                return (
+                  <tr
+                    key={stage.id}
+                    onClick={() => onSelect(stage)}
+                    className={`
+                      group
+                      cursor-pointer
+                      border-b border-[var(--border-color)]
+                      transition-colors
+                      hover:bg-[var(--hover-1)]
+                      ${effective === 'overdue'
+                        ? 'bg-[var(--accent-soft)]/20'
+                        : ''
+                      }
+                    `}
+                  >
+
+                    {/* ORDER */}
+                    <td className="px-5 py-5">
+                      <Badge order={stage.execution_order} />
+                    </td>
+
+                    {/* NAME */}
+                    <td className="min-w-[230px] px-5 py-5">
+
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">
+                        {stage.name}
+                      </p>
+
+                      <p className="mt-1 line-clamp-1 text-xs text-[var(--text-muted)]">
+                        {stage.description || 'Без описания'}
+                      </p>
+                    </td>
+
+                    {/* STATUS */}
+                    <td className="px-5 py-5">
+
+                      <div className="flex flex-wrap gap-2">
+
+                        <Chip status={stage.status} />
+
+                        {effective === 'overdue' && (
+                          <Chip status="overdue" />
                         )}
                       </div>
-                    ) : <span className="text-[14px] text-[var(--text-primary)]/30">—</span>}
-                  </td>
-                  <td className="px-4 py-5">
-                    <ChevronRight className="w-5 h-5 text-[var(--text-primary)]/20 group-hover:text-[var(--text-primary)]/50 transition-colors" />
-                  </td>
-                </tr>
-              );
-            })}
+                    </td>
+
+                    {/* DATES */}
+                    <td className="whitespace-nowrap px-5 py-5 text-sm text-[var(--text-secondary)]">
+                      {fmtShort(stage.planned_start)}
+                      {' — '}
+                      {fmtShort(stage.planned_end)}
+                    </td>
+
+                    {/* RESPONSIBLE */}
+                    <td className="px-5 py-5">
+
+                      {responsible ? (
+                        <div className="flex items-center gap-2.5">
+
+                          <Ava
+                            name={responsible.full_name}
+                            size="sm"
+                          />
+
+                          <span className="max-w-[160px] truncate text-sm text-[var(--text-secondary)]">
+                            {responsible.full_name}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-[var(--text-muted)]">
+                          Не назначен
+                        </span>
+                      )}
+                    </td>
+
+                    {/* ASSIGNEES */}
+                    <td className="px-5 py-5">
+
+                      <AssigneesPreview
+                        ids={stage.assignee_ids}
+                        users={responsibles}
+                        maxVisible={3}
+                      />
+                    </td>
+
+                    {/* DURATION */}
+                    <td className="whitespace-nowrap px-5 py-5 text-sm font-medium text-[var(--text-secondary)]">
+
+                      {stage.planned_duration_days != null
+                        ? `${stage.planned_duration_days} дн.`
+                        : '—'}
+                    </td>
+
+                    {/* EXECUTION */}
+                    <td className="px-5 py-5">
+
+                      {stage.started_at ? (
+                        <div className="space-y-1">
+
+                          <p className="whitespace-nowrap text-xs text-[var(--text-muted)]">
+                            {fmtShort(
+                              stage.started_at.slice(0, 10),
+                            )}
+                            {' — '}
+                            {stage.completed_at
+                              ? fmtShort(
+                                stage.completed_at.slice(0, 10),
+                              )
+                              : fmtToday()}
+                          </p>
+
+                          {overdue && (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent)]">
+                              <AlertTriangle className="h-3 w-3" />
+                              +{overdueDays} дн.
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-[var(--text-muted)]">
+                          —
+                        </span>
+                      )}
+                    </td>
+
+                    {/* ARROW */}
+                    <td className="px-4 py-5">
+
+                      <ChevronRight
+                        className="
+                          h-5 w-5
+                          text-[var(--text-disabled)]
+                          transition-all
+                          group-hover:translate-x-0.5
+                          group-hover:text-[var(--accent)]
+                        "
+                      />
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
+      </div>
+
+      {/* FOOTER */}
+      <div className="flex items-center justify-between border-t border-[var(--border-color)] bg-[var(--hover-1)] px-5 py-3">
+
+        <span className="text-xs text-[var(--text-muted)]">
+          Показано {filtered.length} из {stages.length}
+        </span>
+
+        <span className="text-xs text-[var(--text-muted)]">
+          Нажмите на этап для просмотра
+        </span>
       </div>
     </div>
   );
 }
 
 /* ════════════════════════════════════════════════════════════════
-   OVERVIEW
+   OVERVIEW VIEW
    ════════════════════════════════════════════════════════════════ */
 
-function OverviewView({ stages, responsibles, onSelect }: {
+function OverviewView({
+  stages,
+  responsibles,
+  onSelect,
+}: {
   stages: ProjectStageResponse[];
   responsibles: Record<string, StageResponsible>;
-  onSelect: (s: ProjectStageResponse) => void;
+  onSelect: (stage: ProjectStageResponse) => void;
 }) {
-  const activeStages = useMemo(() => stages.filter(s => s.status === 'active'), [stages]);
-  const onHoldStages = useMemo(() => stages.filter(s => s.status === 'on_hold'), [stages]);
-  const overdueStages = useMemo(() => stages.filter(s => s.is_overdue && s.status !== 'completed' && s.status !== 'skipped'), [stages]);
+  const activeStages = useMemo(
+    () => stages.filter(stage => stage.status === 'active'),
+    [stages],
+  );
+
+  const onHoldStages = useMemo(
+    () => stages.filter(stage => stage.status === 'on_hold'),
+    [stages],
+  );
+
+  const overdueStages = useMemo(
+    () =>
+      stages.filter(
+        stage =>
+          stage.is_overdue &&
+          stage.status !== 'completed' &&
+          stage.status !== 'skipped',
+      ),
+    [stages],
+  );
+
+  const completedWithOverrun = useMemo(
+    () =>
+      stages.filter(
+        stage =>
+          stage.status === 'completed' &&
+          isFactOverPlan(stage),
+      ),
+    [stages],
+  );
+
   const total = stages.length;
-  const done = stages.filter(s => s.status === 'completed').length;
-  const pct = total ? Math.round(done / total * 100) : 0;
+
+  const completed = stages.filter(
+    stage => stage.status === 'completed',
+  ).length;
+
+  const progress = total
+    ? Math.round((completed / total) * 100)
+    : 0;
+
+  /* =========================================================
+     PARALLEL GROUPS
+     ========================================================= */
 
   const parallelGroups = useMemo(() => {
     const groups: ProjectStageResponse[][] = [];
     const used = new Set<string>();
+
     const active = sortOrd(activeStages);
-    for (const s of active) {
-      if (used.has(s.id)) continue;
-      const group = [s];
-      used.add(s.id);
+
+    for (const stage of active) {
+      if (used.has(stage.id)) continue;
+
+      const group = [stage];
+
+      used.add(stage.id);
+
       for (const other of active) {
         if (used.has(other.id)) continue;
-        if (stagesOverlap(s, other)) {
+
+        if (stagesOverlap(stage, other)) {
           group.push(other);
           used.add(other.id);
         }
       }
+
       groups.push(group);
     }
+
     return groups;
   }, [activeStages]);
 
-  const overrunCompleted = useMemo(() => stages.filter(s => s.status === 'completed' && isFactOverPlan(s)), [stages]);
-
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid lg:grid-cols-3 gap-5">
-      <div className="lg:col-span-2 space-y-5">
-        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/12 border border-blue-400/20 flex items-center justify-center">
-              <PlayCircle className="w-4.5 h-4.5 text-blue-400" />
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]"
+    >
+
+      {/* LEFT COLUMN */}
+      <div className="space-y-6">
+
+        {/* ACTIVE STAGES */}
+        <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
+
+          {/* HEADER */}
+          <div className="flex items-center gap-3 border-b border-[var(--border-color)] px-6 py-5">
+
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10">
+              <PlayCircle className="h-5 w-5 text-blue-400" />
             </div>
+
             <div>
-              <h3 className="text-[18px] font-bold text-[var(--text-primary)]">Текущие этапы</h3>
-              <p className="text-[13px] text-[var(--text-primary)]/45">{activeStages.length ? `${activeStages.length} в работе` : 'Нет активных этапов'}</p>
+              <h2 className="text-lg font-bold text-[var(--text-primary)]">
+                Текущие этапы
+              </h2>
+
+              <p className="mt-1 text-sm text-[var(--text-muted)]">
+                {activeStages.length
+                  ? `${activeStages.length} этапов в работе`
+                  : 'Нет активных этапов'}
+              </p>
             </div>
           </div>
-          {!activeStages.length ? (
-            <div className="rounded-xl border border-dashed border-[var(--border-color)] p-6 text-center">
-              <Clock className="w-8 h-8 mx-auto text-[var(--text-primary)]/20 mb-2" />
-              <p className="text-[14px] text-[var(--text-primary)]/40">Нет этапов в работе</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {parallelGroups.map((group, gi) => (
-                <div key={gi}>
-                  {group.length > 1 && (
-                    <div className="flex items-center gap-2 mb-2.5 px-1">
-                      <Layers className="w-3.5 h-3.5 text-blue-400" />
-                      <span className="text-[13px] font-medium text-blue-300/70">Параллельное выполнение</span>
-                      <div className="flex-1 h-px bg-blue-400/15" />
-                    </div>
-                  )}
-                  <div className={group.length > 1 ? 'grid md:grid-cols-2 gap-3 pl-2 border-l-2 border-blue-400/20' : ''}>
-                    {group.map(cur => {
-                      const resp = cur.responsible_id ? responsibles[cur.responsible_id] : null;
-                      const fo = isFactOverPlan(cur);
-                      const ov = overrunDays(cur);
-                      const fs = cur.started_at ? parseDate(cur.started_at) : null;
-                      const fd = fs ? daysB(fs, TODAY) : 0;
-                      return (
-                        <button
-                          key={cur.id}
-                          onClick={() => onSelect(cur)}
-                          className={`w-full text-left rounded-2xl border bg-[var(--hover-2)] p-5 hover:bg-[var(--hover-1)] transition-colors ${fo ? 'border-[var(--accent)]/30' : 'border-[var(--border-color)]'}`}
-                        >
-                          <div className="flex items-center gap-3 mb-3 flex-wrap">
-                            <Badge order={cur.execution_order} />
-                            <Chip status={cur.status} />
-                            {fo && (
-                              <span className="inline-flex items-center gap-1 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent-soft)] px-2 py-0.5 text-[14px] font-semibold text-[var(--accent)]">
-                                <AlertTriangle className="w-3 h-3" /> +{ov} дн.
-                              </span>
-                            )}
-                          </div>
-                          <h2 className="text-[18px] font-bold text-[var(--text-primary)] mb-2">{cur.name}</h2>
-                          <p className="text-[14px] text-[var(--text-primary)]/50 line-clamp-2 mb-3">{cur.description || 'Без описания'}</p>
-                          <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-[var(--border-color)]">
-                            <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-2.5">
-                              <p className="text-[13px] font-semibold text-[var(--text-primary)]/35 uppercase tracking-wider mb-1">Плановые сроки</p>
-                              <p className="text-[13px] text-[var(--text-primary)]/70">{fmtShort(cur.planned_start)} — {fmtShort(cur.planned_end)}</p>
+
+          {/* CONTENT */}
+          <div className="p-5">
+
+            {!activeStages.length ? (
+              <div className="rounded-xl border border-dashed border-[var(--border-color)] px-5 py-12 text-center">
+
+                <Clock className="mx-auto h-9 w-9 text-[var(--text-disabled)]" />
+
+                <p className="mt-3 text-sm text-[var(--text-muted)]">
+                  Сейчас нет этапов в работе
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+
+                {parallelGroups.map((group, groupIndex) => (
+                  <div key={groupIndex}>
+
+                    {/* PARALLEL LABEL */}
+                    {group.length > 1 && (
+                      <div className="mb-3 flex items-center gap-2 px-1">
+
+                        <Layers className="h-4 w-4 text-blue-400" />
+
+                        <span className="text-xs font-semibold text-blue-400">
+                          Параллельное выполнение
+                        </span>
+
+                        <div className="h-px flex-1 bg-blue-400/15" />
+                      </div>
+                    )}
+
+                    <div
+                      className={
+                        group.length > 1
+                          ? 'grid grid-cols-1 gap-3 border-l-2 border-blue-400/20 pl-3 md:grid-cols-2'
+                          : ''
+                      }
+                    >
+
+                      {group.map(stage => {
+                        const responsible =
+                          stage.responsible_id
+                            ? responsibles[stage.responsible_id]
+                            : null;
+
+                        const overdue = isFactOverPlan(stage);
+                        const overdueDays = overrunDays(stage);
+
+                        const startedAt = stage.started_at
+                          ? parseDate(stage.started_at)
+                          : null;
+
+                        const actualDays = startedAt
+                          ? daysB(startedAt, new Date()) + 1
+                          : 0;
+
+                        return (
+                          <button
+                            key={stage.id}
+                            type="button"
+                            onClick={() => onSelect(stage)}
+                            className={`
+                              group
+                              w-full
+                              rounded-2xl
+                              border
+                              bg-[var(--hover-1)]
+                              p-5
+                              text-left
+                              transition-all
+                              hover:border-[var(--border-hover)]
+                              hover:bg-[var(--hover-2)]
+                              ${overdue
+                                ? 'border-[var(--accent)]/30'
+                                : 'border-[var(--border-color)]'
+                              }
+                            `}
+                          >
+
+                            {/* BADGES */}
+                            <div className="mb-4 flex flex-wrap items-center gap-2">
+
+                              <Badge order={stage.execution_order} />
+
+                              <Chip status={stage.status} />
+
+                              {overdue && (
+                                <span className="inline-flex items-center gap-1 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent-soft)] px-2 py-1 text-xs font-semibold text-[var(--accent)]">
+
+                                  <AlertTriangle className="h-3 w-3" />
+
+                                  +{overdueDays} дн.
+                                </span>
+                              )}
                             </div>
-                            <div className={`rounded-lg border p-2.5 ${fo ? 'border-[var(--accent)]/25 bg-[var(--accent-soft)]/30' : 'border-[var(--border-color)] bg-[var(--bg-card)]'}`}>
-                              <p className={`text-[13px] font-semibold uppercase tracking-wider mb-1 ${fo ? 'text-[var(--accent)]/90' : 'text-[var(--text-primary)]/35'}`}>Фактически</p>
-                              <p className={`text-[13px] ${fo ? 'text-[var(--accent)] font-medium' : 'text-[var(--text-primary)]/70'}`}>
-                                {fmtShort(cur.started_at?.slice(0, 10) ?? null)} — {fmtToday()}
-                              </p>
-                              <p className={`text-[14px] mt-0.5 ${fo ? 'text-[var(--accent)]/70' : 'text-[var(--text-primary)]/40'}`}>{fd} дн.</p>
-                            </div>
-                          </div>
-                          {resp && (
-                            <div className="flex items-center gap-2 mt-3">
-                              <Ava name={resp.full_name} size="sm" />
-                              <div className="min-w-0">
-                                <p className="text-[13px] text-[var(--text-primary)]/60 truncate">{resp.full_name}</p>
+
+                            {/* NAME */}
+                            <h3 className="text-base font-bold text-[var(--text-primary)]">
+                              {stage.name}
+                            </h3>
+
+                            <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--text-muted)]">
+                              {stage.description || 'Описание не заполнено'}
+                            </p>
+
+                            {/* DATES */}
+                            <div className="mt-4 grid grid-cols-2 gap-3">
+
+                              <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3">
+
+                                <p className="text-xs text-[var(--text-muted)]">
+                                  Плановые сроки
+                                </p>
+
+                                <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                                  {fmtShort(stage.planned_start)}
+                                  {' — '}
+                                  {fmtShort(stage.planned_end)}
+                                </p>
+                              </div>
+
+                              <div
+                                className={`
+                                  rounded-xl
+                                  border
+                                  p-3
+                                  ${overdue
+                                    ? 'border-[var(--accent)]/25 bg-[var(--accent-soft)]'
+                                    : 'border-[var(--border-color)] bg-[var(--bg-card)]'
+                                  }
+                                `}
+                              >
+
+                                <p className="text-xs text-[var(--text-muted)]">
+                                  Фактически
+                                </p>
+
+                                <p
+                                  className={`
+                                    mt-1
+                                    text-sm
+                                    font-semibold
+                                    ${overdue
+                                      ? 'text-[var(--accent)]'
+                                      : 'text-[var(--text-primary)]'
+                                    }
+                                  `}
+                                >
+                                  {actualDays} дн.
+                                </p>
                               </div>
                             </div>
-                          )}
-                        </button>
-                      );
-                    })}
+
+                            {/* PEOPLE */}
+                            <div className="mt-4 border-t border-[var(--border-color)] pt-4">
+
+                              {responsible && (
+                                <div className="mb-3 flex items-center gap-2.5">
+
+                                  <Ava
+                                    name={responsible.full_name}
+                                    size="sm"
+                                  />
+
+                                  <div className="min-w-0">
+
+                                    <p className="text-xs text-[var(--text-muted)]">
+                                      Ответственный
+                                    </p>
+
+                                    <p className="truncate text-sm font-medium text-[var(--text-primary)]">
+                                      {responsible.full_name}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="flex items-center justify-between gap-3">
+
+                                <span className="inline-flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                                  <Users className="h-4 w-4" />
+                                  Исполнители
+                                </span>
+
+                                <AssigneesPreview
+                                  ids={stage.assignee_ids}
+                                  users={responsibles}
+                                  maxVisible={3}
+                                />
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        {(onHoldStages.length > 0 || overdueStages.length > 0) && (
-          <div className="grid md:grid-cols-2 gap-5">
-            {overdueStages.length > 0 && (
-              <div className="rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent-soft)]/10 p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <AlertTriangle className="w-4 h-4 text-[var(--accent)]" />
-                  <h3 className="text-[16px] font-bold text-[var(--accent)]">Отставание от графика</h3>
-                </div>
-                <div className="space-y-2">
-                  {overdueStages.map(s => (
-                    <button
-                      key={s.id}
-                      onClick={() => onSelect(s)}
-                      className="w-full text-left rounded-xl border border-[var(--accent)]/15 bg-[var(--bg-card)] p-3.5 hover:bg-[var(--hover-1)] transition-colors"
-                    >
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <Badge order={s.execution_order} />
-                      </div>
-                      <p className="text-[14px] font-semibold text-[var(--text-primary)]">{s.name}</p>
-                      <p className="text-[13px] text-[var(--accent)]/70 mt-1">
-                        Срок до {fmtShort(s.planned_end)} · +{overrunDays(s)} дн.
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {onHoldStages.length > 0 && (
-              <div className="rounded-2xl border border-amber-400/20 bg-amber-500/5 p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <PauseCircle className="w-4 h-4 text-amber-400" />
-                  <h3 className="text-[16px] font-bold text-amber-300">Приостановлены</h3>
-                </div>
-                <div className="space-y-2">
-                  {onHoldStages.map(s => (
-                    <button
-                      key={s.id}
-                      onClick={() => onSelect(s)}
-                      className="w-full text-left rounded-xl border border-amber-400/15 bg-[var(--bg-card)] p-3.5 hover:bg-[var(--hover-1)] transition-colors"
-                    >
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <Badge order={s.execution_order} />
-                      </div>
-                      <p className="text-[14px] font-semibold text-[var(--text-primary)]">{s.name}</p>
-                    </button>
-                  ))}
-                </div>
+                ))}
               </div>
             )}
           </div>
-        )}
-        {overrunCompleted.length > 0 && (
-          <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="w-4 h-4 text-[var(--text-primary)]/45" />
-              <h3 className="text-[16px] font-bold text-[var(--text-primary)]">Завершены с отклонением</h3>
-            </div>
-            <div className="space-y-2">
-              {overrunCompleted.map(s => (
-                <button
-                  key={s.id}
-                  onClick={() => onSelect(s)}
-                  className="w-full text-left rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] p-3.5 hover:bg-[var(--hover-1)] transition-colors"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <Badge order={s.execution_order} />
-                      <span className="text-[14px] font-semibold text-[var(--text-primary)]">{s.name}</span>
-                    </div>
-                    <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-[var(--accent)]">
-                      <AlertTriangle className="w-3.5 h-3.5" /> +{overrunDays(s)} дн.
+        </section>
+
+        {/* OVERDUE / ON HOLD */}
+        {(overdueStages.length > 0 ||
+          onHoldStages.length > 0) && (
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+
+              {/* OVERDUE */}
+              {overdueStages.length > 0 && (
+                <section className="overflow-hidden rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent-soft)]/10">
+
+                  <div className="flex items-center gap-2 border-b border-[var(--accent)]/15 px-5 py-4">
+
+                    <AlertTriangle className="h-4 w-4 text-[var(--accent)]" />
+
+                    <h3 className="text-sm font-bold text-[var(--accent)]">
+                      Отставание от графика
+                    </h3>
+
+                    <span className="ml-auto text-xs font-semibold text-[var(--accent)]">
+                      {overdueStages.length}
                     </span>
                   </div>
+
+                  <div className="space-y-2 p-3">
+
+                    {overdueStages.map(stage => (
+                      <button
+                        key={stage.id}
+                        type="button"
+                        onClick={() => onSelect(stage)}
+                        className="
+                        w-full
+                        rounded-xl
+                        border border-[var(--border-color)]
+                        bg-[var(--bg-card)]
+                        p-4
+                        text-left
+                        transition-colors
+                        hover:bg-[var(--hover-2)]
+                      "
+                      >
+                        <Badge order={stage.execution_order} />
+
+                        <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                          {stage.name}
+                        </p>
+
+                        <p className="mt-1 text-xs text-[var(--accent)]">
+                          Срок до {fmtShort(stage.planned_end)}
+                          {' · '}
+                          +{overrunDays(stage)} дн.
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* ON HOLD */}
+              {onHoldStages.length > 0 && (
+                <section className="overflow-hidden rounded-2xl border border-amber-500/20 bg-amber-500/5">
+
+                  <div className="flex items-center gap-2 border-b border-amber-500/15 px-5 py-4">
+
+                    <PauseCircle className="h-4 w-4 text-amber-500" />
+
+                    <h3 className="text-sm font-bold text-amber-500">
+                      Приостановлены
+                    </h3>
+
+                    <span className="ml-auto text-xs font-semibold text-amber-500">
+                      {onHoldStages.length}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 p-3">
+
+                    {onHoldStages.map(stage => (
+                      <button
+                        key={stage.id}
+                        type="button"
+                        onClick={() => onSelect(stage)}
+                        className="
+                        w-full
+                        rounded-xl
+                        border border-[var(--border-color)]
+                        bg-[var(--bg-card)]
+                        p-4
+                        text-left
+                        transition-colors
+                        hover:bg-[var(--hover-2)]
+                      "
+                      >
+                        <Badge order={stage.execution_order} />
+
+                        <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                          {stage.name}
+                        </p>
+
+                        <p className="mt-1 text-xs text-[var(--text-muted)]">
+                          Выполнение приостановлено
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
+
+        {/* COMPLETED WITH OVERRUN */}
+        {completedWithOverrun.length > 0 && (
+          <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
+
+            <div className="flex items-center gap-3 border-b border-[var(--border-color)] px-5 py-4">
+
+              <TrendingUp className="h-5 w-5 text-[var(--text-muted)]" />
+
+              <h3 className="text-base font-bold text-[var(--text-primary)]">
+                Завершены с отклонением
+              </h3>
+            </div>
+
+            <div className="divide-y divide-[var(--border-color)]">
+
+              {completedWithOverrun.map(stage => (
+                <button
+                  key={stage.id}
+                  type="button"
+                  onClick={() => onSelect(stage)}
+                  className="
+                    flex
+                    w-full
+                    items-center
+                    justify-between
+                    gap-4
+                    px-5 py-4
+                    text-left
+                    transition-colors
+                    hover:bg-[var(--hover-1)]
+                  "
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+
+                    <Badge order={stage.execution_order} />
+
+                    <span className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                      {stage.name}
+                    </span>
+                  </div>
+
+                  <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[var(--accent)]">
+
+                    <AlertTriangle className="h-3.5 w-3.5" />
+
+                    +{overrunDays(stage)} дн.
+                  </span>
                 </button>
               ))}
             </div>
-          </div>
+          </section>
         )}
       </div>
+
+      {/* RIGHT COLUMN */}
       <div className="space-y-5">
-        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
-          <h3 className="text-[18px] font-bold text-[var(--text-primary)] mb-5">Прогресс</h3>
-          <div className="flex justify-center mb-5">
-            <div className="relative w-32 h-32">
-              <svg viewBox="0 0 100 100" className="-rotate-90 w-full h-full">
-                <circle cx="50" cy="50" r="42" stroke="var(--hover-3)" strokeWidth="10" fill="none" />
+
+        {/* PROGRESS */}
+        <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+
+          <h3 className="text-lg font-bold text-[var(--text-primary)]">
+            Прогресс проекта
+          </h3>
+
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Выполнение этапов
+          </p>
+
+          {/* CIRCLE */}
+          <div className="my-7 flex justify-center">
+
+            <div className="relative h-36 w-36">
+
+              <svg
+                viewBox="0 0 100 100"
+                className="h-full w-full -rotate-90"
+              >
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="42"
+                  stroke="var(--hover-3)"
+                  strokeWidth="9"
+                  fill="none"
+                />
+
                 <motion.circle
                   cx="50"
                   cy="50"
                   r="42"
                   stroke="var(--accent)"
-                  strokeWidth="10"
+                  strokeWidth="9"
                   fill="none"
                   strokeLinecap="round"
-                  strokeDasharray={`${2 * Math.PI * 42}`}
-                  initial={{ strokeDashoffset: 2 * Math.PI * 42 }}
-                  animate={{ strokeDashoffset: 2 * Math.PI * 42 * (1 - pct / 100) }}
-                  transition={{ duration: 1 }}
+                  strokeDasharray={2 * Math.PI * 42}
+                  initial={{
+                    strokeDashoffset: 2 * Math.PI * 42,
+                  }}
+                  animate={{
+                    strokeDashoffset:
+                      2 *
+                      Math.PI *
+                      42 *
+                      (1 - progress / 100),
+                  }}
+                  transition={{
+                    duration: 0.8,
+                  }}
                 />
               </svg>
+
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-[28px] font-bold text-[var(--text-primary)]">{pct}%</span>
-                <span className="text-[14px] text-[var(--text-primary)]/40">{done}/{total}</span>
+
+                <span className="text-3xl font-bold text-[var(--text-primary)]">
+                  {progress}%
+                </span>
+
+                <span className="mt-1 text-xs text-[var(--text-muted)]">
+                  {completed} из {total}
+                </span>
               </div>
             </div>
           </div>
-          <div className="space-y-2.5">
+
+          {/* STATUS BREAKDOWN */}
+          <div className="space-y-3 border-t border-[var(--border-color)] pt-5">
+
             {[
-              { l: 'Завершено', v: done, c: 'bg-emerald-500' },
-              { l: 'В работе', v: activeStages.length, c: 'bg-blue-500' },
-              { l: 'Приостановлено', v: onHoldStages.length, c: 'bg-amber-500' },
-              { l: 'Запланировано', v: stages.filter(s => s.status === 'planned').length, c: 'bg-slate-400' },
-              { l: 'С отклонением', v: overdueStages.length, c: 'bg-[var(--accent)]' }
-            ].filter(r => r.v > 0).map(r => (
-              <div key={r.l} className="flex items-center justify-between text-[14px]">
-                <span className="inline-flex items-center gap-2 text-[var(--text-primary)]/65">
-                  <span className={`w-2.5 h-2.5 rounded-full ${r.c}`} /> {r.l}
+              {
+                label: 'Завершено',
+                value: completed,
+                color: 'bg-emerald-500',
+              },
+              {
+                label: 'В работе',
+                value: activeStages.length,
+                color: 'bg-blue-500',
+              },
+              {
+                label: 'На паузе',
+                value: onHoldStages.length,
+                color: 'bg-amber-500',
+              },
+              {
+                label: 'Запланировано',
+                value: stages.filter(
+                  stage => stage.status === 'planned',
+                ).length,
+                color: 'bg-slate-400',
+              },
+              {
+                label: 'Просрочено',
+                value: overdueStages.length,
+                color: 'bg-[var(--accent)]',
+              },
+            ].map(item => (
+              <div
+                key={item.label}
+                className="flex items-center justify-between gap-3"
+              >
+                <span className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+
+                  <span
+                    className={`h-2.5 w-2.5 rounded-full ${item.color}`}
+                  />
+
+                  {item.label}
                 </span>
-                <span className="font-semibold text-[var(--text-primary)]">{r.v}</span>
+
+                <span className="text-sm font-semibold text-[var(--text-primary)]">
+                  {item.value}
+                </span>
               </div>
             ))}
           </div>
-        </div>
+        </section>
+
+        {/* NEXT STAGE */}
         {(() => {
-          const next = sortOrd(stages.filter(s => s.status === 'planned'))[0];
+          const next = sortOrd(
+            stages.filter(
+              stage => stage.status === 'planned',
+            ),
+          )[0];
+
           if (!next) return null;
+
           return (
-            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
-              <h3 className="text-[15px] font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-                <Flag className="w-4 h-4 text-[var(--text-primary)]/40" /> Далее
-              </h3>
+            <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
+
+              <div className="flex items-center gap-2 border-b border-[var(--border-color)] px-5 py-4">
+
+                <Flag className="h-4 w-4 text-[var(--text-muted)]" />
+
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                  Следующий этап
+                </h3>
+              </div>
+
               <button
+                type="button"
                 onClick={() => onSelect(next)}
-                className="w-full text-left rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] p-3.5 hover:bg-[var(--hover-1)] transition-colors"
+                className="
+                  w-full
+                  p-5
+                  text-left
+                  transition-colors
+                  hover:bg-[var(--hover-1)]
+                "
               >
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex flex-wrap items-center gap-2">
+
                   <Badge order={next.execution_order} />
+
                   <Chip status="planned" />
                 </div>
-                <p className="text-[14px] font-semibold text-[var(--text-primary)]">{next.name}</p>
-                <p className="text-[13px] text-[var(--text-primary)]/45 mt-1">
-                  {fmtShort(next.planned_start)} — {fmtShort(next.planned_end)}
+
+                <p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">
+                  {next.name}
                 </p>
+
+                <p className="mt-2 inline-flex items-center gap-2 text-xs text-[var(--text-muted)]">
+
+                  <Calendar className="h-3.5 w-3.5" />
+
+                  {fmtShort(next.planned_start)}
+                  {' — '}
+                  {fmtShort(next.planned_end)}
+                </p>
+
+                <div className="mt-4 flex items-center justify-between border-t border-[var(--border-color)] pt-4">
+
+                  <span className="text-xs text-[var(--text-muted)]">
+                    Исполнители
+                  </span>
+
+                  <AssigneesPreview
+                    ids={next.assignee_ids}
+                    users={responsibles}
+                  />
+                </div>
               </button>
-            </div>
+            </section>
           );
         })()}
       </div>
@@ -759,41 +2659,54 @@ function OverviewView({ stages, responsibles, onSelect }: {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   ROADMAP
+   ROADMAP VIEW
    ════════════════════════════════════════════════════════════════ */
 
 type GraphCol = ProjectStageResponse[];
 
-function buildGraphColumns(stages: ProjectStageResponse[]): GraphCol[] {
-  const ord = sortOrd(stages);
-  const cols: GraphCol[] = [];
+function buildGraphColumns(
+  stages: ProjectStageResponse[],
+): GraphCol[] {
+  const ordered = sortOrd(stages);
+
+  const columns: GraphCol[] = [];
   const placed = new Set<string>();
-  for (const s of ord) {
-    if (placed.has(s.id)) continue;
-    if (isRunning(s)) {
-      const siblings = ord.filter(
-        o => !placed.has(o.id) && o.id !== s.id && isRunning(o) && stagesOverlap(s, o)
+
+  for (const stage of ordered) {
+    if (placed.has(stage.id)) continue;
+
+    if (isRunning(stage)) {
+      const siblings = ordered.filter(other =>
+        !placed.has(other.id) &&
+        other.id !== stage.id &&
+        isRunning(other) &&
+        stagesOverlap(stage, other),
       );
+
       if (siblings.length > 0) {
-        const group = [s, ...siblings];
-        group.forEach(g => placed.add(g.id));
-        cols.push(group);
+        const group = [stage, ...siblings];
+
+        group.forEach(item => placed.add(item.id));
+
+        columns.push(group);
         continue;
       }
     }
-    placed.add(s.id);
-    cols.push([s]);
+
+    placed.add(stage.id);
+    columns.push([stage]);
   }
-  return cols;
+
+  return columns;
 }
 
 const NODE_R = 30;
 const NODE_D = NODE_R * 2;
-const CARD_W = 190;
-const COL_W = CARD_W + 60;
-const ROW_GAP = 260;
+const CARD_W = 210;
+const COL_W = CARD_W + 65;
+const ROW_GAP = 285;
 const TOP_PAD = 50;
-const BOTTOM_PAD = 160;
+const BOTTOM_PAD = 190;
 
 interface NodePos {
   id: string;
@@ -804,52 +2717,119 @@ interface NodePos {
   stage: ProjectStageResponse;
 }
 
-function RoadmapView({ stages, responsibles, onSelect }: {
+function RoadmapView({
+  stages,
+  responsibles,
+  onSelect,
+}: {
   stages: ProjectStageResponse[];
   responsibles: Record<string, StageResponsible>;
-  onSelect: (s: ProjectStageResponse) => void;
+  onSelect: (stage: ProjectStageResponse) => void;
 }) {
-  const columns = useMemo(() => buildGraphColumns(stages), [stages]);
+  const columns = useMemo(
+    () => buildGraphColumns(stages),
+    [stages],
+  );
 
-  const { nodes, edges, svgW, svgH } = useMemo(() => {
-    const colCount = columns.length;
-    const maxRows = Math.max(...columns.map(c => c.length), 1);
-    const graphW = colCount * COL_W;
-    const leftPad = COL_W / 2;
-    const ns: NodePos[] = [];
+  const {
+    nodes,
+    edges,
+    svgW,
+    svgH,
+  } = useMemo(() => {
+    const columnCount = columns.length;
 
-    columns.forEach((col, ci) => {
-      const colCx = leftPad + ci * COL_W;
-      const colH = (col.length - 1) * ROW_GAP;
-      const totalH = (maxRows - 1) * ROW_GAP;
-      const startY = TOP_PAD + NODE_R + (totalH - colH) / 2;
-      col.forEach((s, ri) => {
-        ns.push({ id: s.id, cx: colCx, cy: startY + ri * ROW_GAP, col: ci, row: ri, stage: s });
+    const maxRows = Math.max(
+      ...columns.map(column => column.length),
+      1,
+    );
+
+    const graphWidth = columnCount * COL_W;
+    const leftPadding = COL_W / 2;
+
+    const nodePositions: NodePos[] = [];
+
+    columns.forEach((column, columnIndex) => {
+      const centerX =
+        leftPadding + columnIndex * COL_W;
+
+      const columnHeight =
+        (column.length - 1) * ROW_GAP;
+
+      const totalHeight =
+        (maxRows - 1) * ROW_GAP;
+
+      const startY =
+        TOP_PAD +
+        NODE_R +
+        (totalHeight - columnHeight) / 2;
+
+      column.forEach((stage, rowIndex) => {
+        nodePositions.push({
+          id: stage.id,
+          cx: centerX,
+          cy: startY + rowIndex * ROW_GAP,
+          col: columnIndex,
+          row: rowIndex,
+          stage,
+        });
       });
     });
 
-    const es: { from: NodePos; to: NodePos; done: boolean }[] = [];
-    for (let ci = 0; ci < colCount - 1; ci++) {
-      const fromN = ns.filter(n => n.col === ci);
-      const toN = ns.filter(n => n.col === ci + 1);
-      for (const f of fromN) {
-        for (const t of toN) {
-          es.push({ from: f, to: t, done: f.stage.status === 'completed' });
+    const graphEdges: {
+      from: NodePos;
+      to: NodePos;
+      done: boolean;
+    }[] = [];
+
+    for (
+      let columnIndex = 0;
+      columnIndex < columnCount - 1;
+      columnIndex++
+    ) {
+      const fromNodes = nodePositions.filter(
+        node => node.col === columnIndex,
+      );
+
+      const toNodes = nodePositions.filter(
+        node => node.col === columnIndex + 1,
+      );
+
+      for (const from of fromNodes) {
+        for (const to of toNodes) {
+          graphEdges.push({
+            from,
+            to,
+            done: from.stage.status === 'completed',
+          });
         }
       }
     }
 
-    const w = graphW + 20;
-    const h = TOP_PAD + (maxRows - 1) * ROW_GAP + NODE_D + BOTTOM_PAD;
+    const width = graphWidth + 20;
 
-    return { nodes: ns, edges: es, svgW: Math.max(w, 600), svgH: Math.max(h, 380) };
+    const height =
+      TOP_PAD +
+      (maxRows - 1) * ROW_GAP +
+      NODE_D +
+      BOTTOM_PAD;
+
+    return {
+      nodes: nodePositions,
+      edges: graphEdges,
+      svgW: Math.max(width, 600),
+      svgH: Math.max(height, 400),
+    };
   }, [columns]);
 
   if (!stages.length) {
     return (
-      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-8 text-center">
-        <MapIcon className="w-12 h-12 mx-auto text-[var(--text-primary)]/15 mb-3" />
-        <p className="text-[15px] text-[var(--text-primary)]/45">Нет этапов</p>
+      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] px-6 py-16 text-center">
+        <MapIcon className="mx-auto h-12 w-12 text-[var(--text-disabled)]" />
+
+        <p className="mt-4 text-sm text-[var(--text-muted)]">
+          Нет этапов для отображения
+        </p>
       </div>
     );
   }
@@ -858,117 +2838,320 @@ function RoadmapView({ stages, responsibles, onSelect }: {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] overflow-hidden"
+      className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]"
     >
-      <div className="px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] flex items-center gap-3 flex-wrap">
-        <MapIcon className="w-5 h-5 text-[var(--text-primary)]/45" />
-        <h3 className="text-[18px] font-bold text-[var(--text-primary)]">Карта проекта</h3>
-        {columns.some(c => c.length > 1) && (
-          <span className="text-[13px] text-[var(--text-primary)]/70 ml-2 inline-flex items-center gap-1.5">
-            <Layers className="w-3.5 h-3.5" /> Параллельные этапы в работе
+
+      {/* HEADER */}
+      <div className="flex flex-wrap items-center gap-3 border-b border-[var(--border-color)] bg-[var(--hover-1)] px-6 py-5">
+
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--hover-2)]">
+          <MapIcon className="h-5 w-5 text-[var(--text-secondary)]" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h3 className="text-lg font-bold text-[var(--text-primary)]">
+            Карта проекта
+          </h3>
+
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Последовательность выполнения этапов
+          </p>
+        </div>
+
+        {columns.some(column => column.length > 1) && (
+          <span className="inline-flex items-center gap-2 rounded-lg bg-blue-500/10 px-3 py-2 text-xs font-medium text-blue-400">
+            <Layers className="h-4 w-4" />
+            Параллельные этапы
           </span>
         )}
       </div>
-      <div className="overflow-x-auto overflow-y-auto p-6" style={{ maxHeight: 750 }}>
-        <div className="relative mx-auto" style={{ width: svgW, height: svgH, minWidth: svgW }}>
-          <svg className="absolute inset-0 pointer-events-none" width={svgW} height={svgH}>
+
+      {/* GRAPH */}
+      <div
+        className="overflow-auto p-6"
+        style={{ maxHeight: 780 }}
+      >
+        <div
+          className="relative mx-auto"
+          style={{
+            width: svgW,
+            height: svgH,
+            minWidth: svgW,
+          }}
+        >
+
+          {/* CONNECTIONS */}
+          <svg
+            className="pointer-events-none absolute inset-0"
+            width={svgW}
+            height={svgH}
+          >
             <defs>
-              <marker id="arr-ok" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-                <path d="M0,0 L8,3 L0,6" fill="#10b981" />
+              <marker
+                id="stage-arrow-completed"
+                markerWidth="8"
+                markerHeight="6"
+                refX="7"
+                refY="3"
+                orient="auto"
+              >
+                <path
+                  d="M0,0 L8,3 L0,6"
+                  fill="#10b981"
+                />
               </marker>
-              <marker id="arr-wait" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-                <path d="M0,0 L8,3 L0,6" fill="#475569" />
+
+              <marker
+                id="stage-arrow-pending"
+                markerWidth="8"
+                markerHeight="6"
+                refX="7"
+                refY="3"
+                orient="auto"
+              >
+                <path
+                  d="M0,0 L8,3 L0,6"
+                  fill="#64748b"
+                />
               </marker>
             </defs>
-            {edges.map((e, i) => {
-              const x1 = e.from.cx + NODE_R + 4;
-              const y1 = e.from.cy;
-              const x2 = e.to.cx - NODE_R - 12;
-              const y2 = e.to.cy;
-              const straight = Math.abs(y1 - y2) < 5;
-              const mx = (x1 + x2) / 2;
-              const d = straight ? `M${x1},${y1} L${x2},${y2}` : `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+
+            {edges.map((edge, index) => {
+              const x1 = edge.from.cx + NODE_R + 4;
+              const y1 = edge.from.cy;
+
+              const x2 = edge.to.cx - NODE_R - 12;
+              const y2 = edge.to.cy;
+
+              const straight =
+                Math.abs(y1 - y2) < 5;
+
+              const middleX = (x1 + x2) / 2;
+
+              const path = straight
+                ? `M${x1},${y1} L${x2},${y2}`
+                : `M${x1},${y1} C${middleX},${y1} ${middleX},${y2} ${x2},${y2}`;
+
               return (
                 <motion.path
-                  key={i}
-                  d={d}
+                  key={index}
+                  d={path}
                   fill="none"
-                  stroke={e.done ? '#10b981' : '#475569'}
-                  strokeWidth={e.done ? 2.5 : 1.5}
-                  strokeDasharray={e.done ? undefined : '6 4'}
-                  markerEnd={e.done ? 'url(#arr-ok)' : 'url(#arr-wait)'}
-                  initial={{ pathLength: 0, opacity: 0 }}
-                  animate={{ pathLength: 1, opacity: e.done ? 0.65 : 0.3 }}
-                  transition={{ delay: 0.15 + i * 0.03, duration: 0.45 }}
+                  stroke={
+                    edge.done
+                      ? '#10b981'
+                      : '#64748b'
+                  }
+                  strokeWidth={
+                    edge.done ? 2.5 : 1.5
+                  }
+                  strokeDasharray={
+                    edge.done
+                      ? undefined
+                      : '6 4'
+                  }
+                  markerEnd={
+                    edge.done
+                      ? 'url(#stage-arrow-completed)'
+                      : 'url(#stage-arrow-pending)'
+                  }
+                  initial={{
+                    pathLength: 0,
+                    opacity: 0,
+                  }}
+                  animate={{
+                    pathLength: 1,
+                    opacity: edge.done
+                      ? 0.7
+                      : 0.35,
+                  }}
+                  transition={{
+                    delay: 0.15 + index * 0.03,
+                    duration: 0.45,
+                  }}
                 />
               );
             })}
           </svg>
-          {nodes.map((n, ni) => {
-            const s = n.stage;
-            const st = effStatus(s);
-            const m = STATUS_CFG[st];
-            const I = m.icon;
-            const cur = s.status === 'active';
-            const resp = s.responsible_id ? responsibles[s.responsible_id] : null;
-            const fo = isFactOverPlan(s);
-            const ov = overrunDays(s);
+
+          {/* NODES */}
+          {nodes.map((node, nodeIndex) => {
+            const stage = node.stage;
+
+            const effective = effStatus(stage);
+            const config = STATUS_CFG[effective];
+
+            const StatusIcon = config.icon;
+
+            const active = stage.status === 'active';
+
+            const responsible = stage.responsible_id
+              ? responsibles[stage.responsible_id]
+              : null;
+
+            const overdue = isFactOverPlan(stage);
+            const overdueDays = overrunDays(stage);
+
+            const assigneeIds = stage.assignee_ids ?? [];
+
             return (
               <motion.div
-                key={s.id}
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0.08 + ni * 0.05, type: 'spring', stiffness: 300, damping: 25 }}
+                key={stage.id}
+                initial={{
+                  scale: 0,
+                  opacity: 0,
+                }}
+                animate={{
+                  scale: 1,
+                  opacity: 1,
+                }}
+                transition={{
+                  delay: 0.08 + nodeIndex * 0.05,
+                  type: 'spring',
+                  stiffness: 300,
+                  damping: 25,
+                }}
                 className="absolute"
-                style={{ left: n.cx - NODE_R, top: n.cy - NODE_R, zIndex: 10 }}
+                style={{
+                  left: node.cx - NODE_R,
+                  top: node.cy - NODE_R,
+                  zIndex: 10,
+                }}
               >
-                {cur && (
-                  <span className="absolute rounded-full bg-blue-500/15 animate-ping" style={{ width: NODE_D, height: NODE_D }} />
+
+                {/* ACTIVE PULSE */}
+                {active && (
+                  <span
+                    className="absolute animate-ping rounded-full bg-blue-500/15"
+                    style={{
+                      width: NODE_D,
+                      height: NODE_D,
+                    }}
+                  />
                 )}
+
+                {/* NODE BUTTON */}
                 <button
-                  onClick={() => onSelect(s)}
-                  className={`relative z-10 rounded-full flex items-center justify-center text-white font-bold text-[15px] ${m.bar} ${cur ? `ring-4 ${m.ring}` : ''} hover:scale-110 transition-transform`}
-                  style={{ width: NODE_D, height: NODE_D, boxShadow: 'var(--shadow-md)' }}
+                  type="button"
+                  onClick={() => onSelect(stage)}
+                  className={`
+                    relative
+                    z-10
+                    flex
+                    items-center
+                    justify-center
+                    rounded-full
+                    text-sm
+                    font-bold
+                    text-white
+                    transition-transform
+                    hover:scale-110
+                    ${config.bar}
+                    ${active
+                      ? `ring-4 ${config.ring}`
+                      : ''
+                    }
+                  `}
+                  style={{
+                    width: NODE_D,
+                    height: NODE_D,
+                    boxShadow: 'var(--shadow-md)',
+                  }}
                 >
-                  {String(s.execution_order).padStart(2, '0')}
-                  <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center">
-                    <I className={`w-3.5 h-3.5 ${m.text}`} />
+                  {String(stage.execution_order).padStart(2, '0')}
+
+                  <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-card)]">
+                    <StatusIcon
+                      className={`h-3.5 w-3.5 ${config.text}`}
+                    />
                   </span>
                 </button>
+
+                {/* STAGE CARD */}
                 <button
-                  onClick={() => onSelect(s)}
-                  className={`absolute rounded-xl border bg-[var(--bg-card)] p-3 hover:bg-[var(--hover-1)] transition-colors text-left ${fo ? 'border-[var(--accent)]/25' : 'border-[var(--border-color)]'}`}
-                  style={{ top: NODE_D + 12, left: '50%', transform: 'translateX(-50%)', width: CARD_W, boxShadow: 'var(--shadow-sm)' }}
+                  type="button"
+                  onClick={() => onSelect(stage)}
+                  className={`
+                    absolute
+                    rounded-xl
+                    border
+                    bg-[var(--bg-card)]
+                    p-3.5
+                    text-left
+                    transition-colors
+                    hover:bg-[var(--hover-2)]
+                    ${overdue
+                      ? 'border-[var(--accent)]/30'
+                      : 'border-[var(--border-color)]'
+                    }
+                  `}
+                  style={{
+                    top: NODE_D + 12,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: CARD_W,
+                    boxShadow: 'var(--shadow-sm)',
+                  }}
                 >
-                  <h4 className="text-[13px] font-bold text-[var(--text-primary)] leading-5 line-clamp-2 mb-1.5">{s.name}</h4>
-                  <p className={`text-[14px] font-medium ${m.text}`}>{m.label}</p>
-                  <div className="flex items-center gap-1.5 mt-2 text-[13px] text-[var(--text-primary)]/40">
-                    <Calendar className="w-3 h-3 flex-shrink-0" />
-                    {(() => {
-                      const actualEnd = getActualEnd(s);
-                      const isOver = fo;
-                      if (isOver && actualEnd) {
-                        return (
-                          <div className="space-y-1">
-                            <div className="text-[13px] text-red-500">
-                              {fmtShort(s.started_at?.slice(0, 10) ?? null)} — {actualEnd.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}
-                            </div>
-                            <div className="text-[13px] text-red-500">+{ov} дн.</div>
-                            <div className="text-[12px] text-[var(--text-primary)]/65">
-                              План до <span className='text-green-400'>{fmtShort(s.planned_end)}</span>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return <span className="text-green-400">{fmtShort(s.planned_start)} — {fmtShort(s.planned_end)}</span>;
-                    })()}
+
+                  {/* NAME */}
+                  <h4 className="mb-2 line-clamp-2 text-sm font-bold leading-5 text-[var(--text-primary)]">
+                    {stage.name}
+                  </h4>
+
+                  {/* STATUS */}
+                  <p className={`text-xs font-semibold ${config.text}`}>
+                    {config.label}
+                  </p>
+
+                  {/* DATES */}
+                  <div className="mt-3 flex items-start gap-2 text-xs text-[var(--text-muted)]">
+
+                    <Calendar className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+
+                    <div>
+                      <p>
+                        {fmtShort(stage.planned_start)}
+                        {' — '}
+                        {fmtShort(stage.planned_end)}
+                      </p>
+
+                      {overdue && (
+                        <p className="mt-1 font-semibold text-[var(--accent)]">
+                          Отклонение +{overdueDays} дн.
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  {resp && (
-                    <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-[var(--border-color)]">
-                      <div className="w-5 h-5 rounded-full bg-[var(--accent)] flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0">
-                        {getInitials(resp.full_name)}
+
+                  {/* RESPONSIBLE */}
+                  {responsible && (
+                    <div className="mt-3 flex items-center gap-2 border-t border-[var(--border-color)] pt-3">
+
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] text-[9px] font-bold text-white">
+                        {getInitials(responsible.full_name)}
                       </div>
-                      <span className="text-[13px] text-[var(--text-primary)]/65 truncate">{resp.full_name}</span>
+
+                      <span className="truncate text-xs text-[var(--text-secondary)]">
+                        {responsible.full_name}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* ASSIGNEES */}
+                  {assigneeIds.length > 0 && (
+                    <div className="mt-3 border-t border-[var(--border-color)] pt-3">
+
+                      <div className="mb-2 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                        <Users className="h-3.5 w-3.5" />
+                        Исполнители
+                      </div>
+
+                      <AssigneesPreview
+                        ids={assigneeIds}
+                        users={responsibles}
+                        maxVisible={3}
+                      />
                     </div>
                   )}
                 </button>
@@ -982,103 +3165,356 @@ function RoadmapView({ stages, responsibles, onSelect }: {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   TIMELINE
+   TIMELINE VIEW
    ════════════════════════════════════════════════════════════════ */
 
-function TimelineView({ stages, responsibles, projectId, onSelect }: {
+function TimelineView({
+  stages,
+  responsibles,
+  projectId,
+  onSelect,
+}: {
   stages: ProjectStageResponse[];
   responsibles: Record<string, StageResponsible>;
   projectId: string;
-  onSelect: (s: ProjectStageResponse) => void;
+  onSelect: (stage: ProjectStageResponse) => void;
 }) {
-  const [sc, setSc] = useState<TimelineScale>('weeks');
-  const ord = useMemo(() => sortOrd(stages.filter(s => s.planned_start && s.planned_end)), [stages]);
-  const { minD, maxD, totalD } = useMemo(() => {
-    if (!ord.length) return { minD: TODAY, maxD: TODAY, totalD: 30 };
-    const ds = ord.flatMap(s => [parseDate(s.planned_start)!, parseDate(s.planned_end)!]);
-    ord.forEach(s => { const ae = getActualEnd(s); if (ae) ds.push(ae); });
-    const mn = new Date(Math.min(...ds.map(d => d.getTime())));
-    const mx = new Date(Math.max(...ds.map(d => d.getTime())));
-    mn.setDate(mn.getDate() - 2);
-    mx.setDate(mx.getDate() + 2);
-    return { minD: mn, maxD: mx, totalD: daysB(mn, mx) + 1 };
-  }, [ord]);
+  const [scale, setScale] =
+    useState<TimelineScale>('weeks');
 
-  const dW = sc === 'days' ? 42 : sc === 'weeks' ? 18 : 8;
-  const tW = totalD * dW;
+  const ordered = useMemo(
+    () =>
+      sortOrd(
+        stages.filter(
+          stage =>
+            stage.planned_start &&
+            stage.planned_end,
+        ),
+      ),
+    [stages],
+  );
+
+  /* =========================================================
+     DATE RANGE
+     ========================================================= */
+
+  const {
+    minDate,
+    maxDate,
+    totalDays,
+  } = useMemo(() => {
+    if (!ordered.length) {
+      return {
+        minDate: new Date(),
+        maxDate: new Date(),
+        totalDays: 30,
+      };
+    }
+
+    const dates = ordered.flatMap(stage => [
+      parseDate(stage.planned_start)!,
+      parseDate(stage.planned_end)!,
+    ]);
+
+    ordered.forEach(stage => {
+      const actualEnd = getActualEnd(stage);
+
+      if (actualEnd) {
+        dates.push(actualEnd);
+      }
+    });
+
+    const minimum = new Date(
+      Math.min(
+        ...dates.map(date => date.getTime()),
+      ),
+    );
+
+    const maximum = new Date(
+      Math.max(
+        ...dates.map(date => date.getTime()),
+      ),
+    );
+
+    minimum.setDate(
+      minimum.getDate() - 2,
+    );
+
+    maximum.setDate(
+      maximum.getDate() + 2,
+    );
+
+    return {
+      minDate: minimum,
+      maxDate: maximum,
+      totalDays: daysB(minimum, maximum) + 1,
+    };
+  }, [ordered]);
+
+  const dayWidth =
+    scale === 'days'
+      ? 42
+      : scale === 'weeks'
+        ? 18
+        : 8;
+
+  const timelineWidth = totalDays * dayWidth;
+
+  /* =========================================================
+     TICKS
+     ========================================================= */
 
   const ticks = useMemo(() => {
-    const r: { date: Date; label: string; major: boolean }[] = [];
-    const c = new Date(minD);
-    while (c <= maxD) {
-      if (sc === 'days') {
-        r.push({ date: new Date(c), label: c.getDate().toString().padStart(2, '0'), major: c.getDate() === 1 });
-        c.setDate(c.getDate() + 1);
-      } else if (sc === 'weeks') {
-        if (c.getDay() === 1 || !r.length)
-          r.push({ date: new Date(c), label: c.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }), major: c.getDate() <= 7 });
-        c.setDate(c.getDate() + 1);
+    const result: {
+      date: Date;
+      label: string;
+      major: boolean;
+    }[] = [];
+
+    const current = new Date(minDate);
+
+    while (current <= maxDate) {
+      if (scale === 'days') {
+        result.push({
+          date: new Date(current),
+          label: current
+            .getDate()
+            .toString()
+            .padStart(2, '0'),
+          major: current.getDate() === 1,
+        });
+
+        current.setDate(
+          current.getDate() + 1,
+        );
+      } else if (scale === 'weeks') {
+        if (
+          current.getDay() === 1 ||
+          !result.length
+        ) {
+          result.push({
+            date: new Date(current),
+            label: current.toLocaleDateString(
+              'ru-RU',
+              {
+                day: '2-digit',
+                month: '2-digit',
+              },
+            ),
+            major: current.getDate() <= 7,
+          });
+        }
+
+        current.setDate(
+          current.getDate() + 1,
+        );
       } else {
-        if (c.getDate() === 1 || !r.length)
-          r.push({ date: new Date(c), label: c.toLocaleDateString('ru-RU', { month: 'short', year: '2-digit' }), major: true });
-        c.setDate(c.getDate() + 1);
+        if (
+          current.getDate() === 1 ||
+          !result.length
+        ) {
+          result.push({
+            date: new Date(current),
+            label: current.toLocaleDateString(
+              'ru-RU',
+              {
+                month: 'short',
+                year: '2-digit',
+              },
+            ),
+            major: true,
+          });
+        }
+
+        current.setDate(
+          current.getDate() + 1,
+        );
       }
     }
-    return r;
-  }, [minD, maxD, sc]);
 
-  const tOff = daysB(minD, TODAY) * dW;
-  const showT = TODAY >= minD && TODAY <= maxD;
+    return result;
+  }, [minDate, maxDate, scale]);
 
-  if (!ord.length) {
-    return <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-8 text-center"><p className="text-[15px] text-[var(--text-primary)]/45">Нет этапов с датами</p></div>;
+  const today = new Date();
+
+  const todayOffset =
+    daysB(minDate, today) * dayWidth;
+
+  const showToday =
+    today >= minDate &&
+    today <= maxDate;
+
+  /* =========================================================
+     EMPTY
+     ========================================================= */
+
+  if (!ordered.length) {
+    return (
+      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] px-6 py-16 text-center">
+
+        <GanttChart className="mx-auto h-12 w-12 text-[var(--text-disabled)]" />
+
+        <p className="mt-4 text-sm text-[var(--text-muted)]">
+          Нет этапов с плановыми датами
+        </p>
+      </div>
+    );
   }
 
+  /* =========================================================
+     RENDER
+     ========================================================= */
+
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] overflow-hidden">
-      <div className="px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] flex items-center justify-between gap-3 flex-wrap">
-        <h3 className="text-[18px] font-bold text-[var(--text-primary)]">Хронология</h3>
-        <div className="flex items-center gap-2 flex-wrap">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]"
+    >
+
+      {/* HEADER */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] px-6 py-5">
+
+        <div>
+          <h3 className="text-lg font-bold text-[var(--text-primary)]">
+            Хронология
+          </h3>
+
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Плановые и фактические сроки выполнения
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+
+          {/* EXPORT */}
           <button
-            onClick={() => exportTimelineToExcel(ord, responsibles, projectId)}
-            className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] px-4 py-2.5 text-[14px] font-medium text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] hover:bg-[var(--hover-1)] transition-colors"
+            type="button"
+            onClick={() =>
+              exportTimelineToExcel(
+                ordered,
+                responsibles,
+                projectId,
+              )
+            }
+            className="
+              inline-flex
+              items-center
+              gap-2
+              rounded-xl
+              border border-[var(--border-color)]
+              bg-[var(--hover-2)]
+              px-4 py-2.5
+              text-sm
+              font-medium
+              text-[var(--text-secondary)]
+              transition-colors
+              hover:bg-[var(--hover-3)]
+              hover:text-[var(--text-primary)]
+            "
           >
-            <FileText className="w-4 h-4" /> Экспорт в Excel
+            <FileText className="h-4 w-4" />
+            Экспорт в Excel
           </button>
+
+          {/* SCALE */}
           <div className="inline-flex rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] p-1">
-            {(['days', 'weeks', 'months'] as TimelineScale[]).map((s) => (
+
+            {(
+              ['days', 'weeks', 'months'] as TimelineScale[]
+            ).map(item => (
               <button
-                key={s}
-                onClick={() => setSc(s)}
-                className={`px-3 py-2 rounded-lg text-[14px] font-medium transition-colors ${sc === s ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]'}`}
+                key={item}
+                type="button"
+                onClick={() => setScale(item)}
+                className={`
+                  rounded-lg
+                  px-3 py-2
+                  text-sm
+                  font-medium
+                  transition-colors
+                  ${scale === item
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  }
+                `}
               >
-                {{ days: 'Дни', weeks: 'Недели', months: 'Месяцы' }[s]}
+                {{
+                  days: 'Дни',
+                  weeks: 'Недели',
+                  months: 'Месяцы',
+                }[item]}
               </button>
             ))}
           </div>
         </div>
       </div>
+
+      {/* TIMELINE */}
       <div className="flex">
-        <div className="w-[300px] flex-shrink-0 border-r border-[var(--border-color)]">
-          <div className="h-12 border-b border-[var(--border-color)] px-4 flex items-center bg-[var(--hover-1)]">
-            <span className="text-[13px] font-medium text-[var(--text-primary)]/45">Этап</span>
+
+        {/* LEFT SIDE */}
+        <div className="w-[300px] shrink-0 border-r border-[var(--border-color)]">
+
+          <div className="flex h-12 items-center border-b border-[var(--border-color)] bg-[var(--hover-1)] px-4">
+            <span className="text-xs font-semibold text-[var(--text-muted)]">
+              Этап проекта
+            </span>
           </div>
-          {ord.map(s => {
-            const st = effStatus(s);
-            const fo = isFactOverPlan(s);
+
+          {ordered.map(stage => {
+            const effective = effStatus(stage);
+
+            const overdue = isFactOverPlan(stage);
+
             return (
               <button
-                key={s.id}
-                onClick={() => onSelect(s)}
-                className={`w-full h-16 px-4 border-b border-[var(--border-color)] flex items-center gap-3 hover:bg-[var(--hover-1)] transition-colors text-left ${fo ? 'bg-[var(--accent-soft)]/10' : ''}`}
+                key={stage.id}
+                type="button"
+                onClick={() => onSelect(stage)}
+                className={`
+                  flex
+                  h-20
+                  w-full
+                  items-center
+                  gap-3
+                  border-b border-[var(--border-color)]
+                  px-4
+                  text-left
+                  transition-colors
+                  hover:bg-[var(--hover-1)]
+                  ${overdue
+                    ? 'bg-[var(--accent-soft)]/10'
+                    : ''
+                  }
+                `}
               >
-                <Badge order={s.execution_order} />
-                <span className={`w-2 h-2 rounded-full ${STATUS_CFG[st].dot}`} />
+
+                <Badge order={stage.execution_order} />
+
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${STATUS_CFG[effective].dot}`}
+                />
+
                 <div className="min-w-0 flex-1">
-                  <span className="text-[14px] text-[var(--text-primary)] truncate block">{s.name}</span>
-                  {fo && (
-                    <span className="text-[14px] text-[var(--accent)] font-medium flex items-center gap-1 mt-0.5">
-                      <AlertTriangle className="w-3 h-3" /> +{overrunDays(s)} дн.
+
+                  <span className="block truncate text-sm font-medium text-[var(--text-primary)]">
+                    {stage.name}
+                  </span>
+
+                  <div className="mt-1 flex items-center gap-2">
+
+                    <Users className="h-3 w-3 text-[var(--text-muted)]" />
+
+                    <span className="text-xs text-[var(--text-muted)]">
+                      {(stage.assignee_ids ?? []).length} исполн.
+                    </span>
+                  </div>
+
+                  {overdue && (
+                    <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[var(--accent)]">
+                      <AlertTriangle className="h-3 w-3" />
+                      +{overrunDays(stage)} дн.
                     </span>
                   )}
                 </div>
@@ -1086,68 +3522,249 @@ function TimelineView({ stages, responsibles, projectId, onSelect }: {
             );
           })}
         </div>
-        <div className="flex-1 overflow-x-auto">
-          <div style={{ width: tW, minWidth: '100%' }} className="relative">
-            <div className="h-12 border-b border-[var(--border-color)] bg-[var(--hover-1)] relative">
-              {ticks.map((t, i) => (
-                <div key={i} className="absolute top-0 bottom-0 flex items-center" style={{ left: daysB(minD, t.date) * dW }}>
-                  <span className={`text-[13px] px-1.5 ${t.major ? 'text-[var(--text-primary)] font-semibold' : 'text-[var(--text-primary)]/40'}`}>{t.label}</span>
+
+        {/* RIGHT SIDE */}
+        <div className="min-w-0 flex-1 overflow-x-auto">
+
+          <div
+            className="relative"
+            style={{
+              width: timelineWidth,
+              minWidth: '100%',
+            }}
+          >
+
+            {/* DATE HEADER */}
+            <div className="relative h-12 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
+
+              {ticks.map((tick, index) => (
+                <div
+                  key={index}
+                  className="absolute inset-y-0 flex items-center"
+                  style={{
+                    left:
+                      daysB(minDate, tick.date) *
+                      dayWidth,
+                  }}
+                >
+                  <span
+                    className={`
+                      whitespace-nowrap
+                      px-1.5
+                      text-xs
+                      ${tick.major
+                        ? 'font-semibold text-[var(--text-primary)]'
+                        : 'text-[var(--text-muted)]'
+                      }
+                    `}
+                  >
+                    {tick.label}
+                  </span>
                 </div>
               ))}
             </div>
+
+            {/* ROWS */}
             <div className="relative">
-              <div className="absolute inset-0 pointer-events-none">
-                {ticks.map((t, i) => (
-                  <div key={i} className={`absolute top-0 bottom-0 w-px ${t.major ? 'bg-[var(--border-color)]' : 'bg-[var(--border-color)]/50'}`} style={{ left: daysB(minD, t.date) * dW }} />
+
+              {/* GRID */}
+              <div className="pointer-events-none absolute inset-0">
+
+                {ticks.map((tick, index) => (
+                  <div
+                    key={index}
+                    className={`
+                      absolute
+                      inset-y-0
+                      w-px
+                      ${tick.major
+                        ? 'bg-[var(--border-color)]'
+                        : 'bg-[var(--border-color)]/50'
+                      }
+                    `}
+                    style={{
+                      left:
+                        daysB(minDate, tick.date) *
+                        dayWidth,
+                    }}
+                  />
                 ))}
               </div>
-              {showT && (
-                <div className="absolute top-0 bottom-0 z-10 pointer-events-none" style={{ left: tOff }}>
-                  <div className="w-0.5 h-full bg-[var(--accent)]" />
-                  <span className="absolute top-0 left-1 rounded bg-[var(--accent)] px-2 py-1 text-[13px] font-semibold text-white whitespace-nowrap">Сегодня</span>
+
+              {/* TODAY */}
+              {showToday && (
+                <div
+                  className="pointer-events-none absolute inset-y-0 z-10"
+                  style={{
+                    left: todayOffset,
+                  }}
+                >
+                  <div className="h-full w-0.5 bg-[var(--accent)]" />
+
+                  <span className="absolute left-1 top-0 whitespace-nowrap rounded-md bg-[var(--accent)] px-2 py-1 text-xs font-semibold text-white">
+                    Сегодня
+                  </span>
                 </div>
               )}
-              {ord.map((s, idx) => {
-                const st = effStatus(s);
-                const m = STATUS_CFG[st];
-                const ps = parseDate(s.planned_start)!;
-                const pe = parseDate(s.planned_end)!;
-                const sO = daysB(minD, ps) * dW;
-                const wP = (daysB(ps, pe) + 1) * dW;
-                const fo = isFactOverPlan(s);
-                const ae = getActualEnd(s);
-                const owW = fo && ae ? daysB(pe, ae) * dW : 0;
+
+              {/* STAGES */}
+              {ordered.map((stage, index) => {
+                const effective = effStatus(stage);
+                const config = STATUS_CFG[effective];
+
+                const plannedStart =
+                  parseDate(stage.planned_start)!;
+
+                const plannedEnd =
+                  parseDate(stage.planned_end)!;
+
+                const startOffset =
+                  daysB(minDate, plannedStart) *
+                  dayWidth;
+
+                const plannedWidth =
+                  (daysB(plannedStart, plannedEnd) + 1) *
+                  dayWidth;
+
+                const overdue = isFactOverPlan(stage);
+
+                const actualEnd = getActualEnd(stage);
+
+                const overrunWidth =
+                  overdue && actualEnd
+                    ? daysB(plannedEnd, actualEnd) *
+                    dayWidth
+                    : 0;
+
                 return (
-                  <div key={s.id} className="h-16 border-b border-[var(--border-color)] relative">
+                  <div
+                    key={stage.id}
+                    className="relative h-20 border-b border-[var(--border-color)]"
+                  >
+
+                    {/* PLANNED BAR */}
                     <motion.button
-                      onClick={() => onSelect(s)}
-                      initial={{ width: 0, opacity: 0 }}
-                      animate={{ width: wP, opacity: 1 }}
-                      transition={{ delay: idx * 0.05, duration: 0.35 }}
-                      whileHover={{ scale: 1.01 }}
-                      className={`absolute top-1/2 -translate-y-1/2 h-9 flex items-center px-3 text-white text-[13px] font-medium overflow-hidden ${m.bar} ${fo ? 'rounded-l-xl' : 'rounded-xl'} ${st === 'overdue' && !fo ? `ring-2 ${m.ring}` : ''}`}
-                      style={{ left: sO, boxShadow: 'var(--shadow-md)' }}
+                      type="button"
+                      onClick={() => onSelect(stage)}
+                      initial={{
+                        width: 0,
+                        opacity: 0,
+                      }}
+                      animate={{
+                        width: plannedWidth,
+                        opacity: 1,
+                      }}
+                      transition={{
+                        delay: index * 0.05,
+                        duration: 0.35,
+                      }}
+                      whileHover={{
+                        scale: 1.01,
+                      }}
+                      className={`
+                        absolute
+                        top-1/2
+                        flex
+                        h-10
+                        -translate-y-1/2
+                        items-center
+                        overflow-hidden
+                        px-3
+                        text-xs
+                        font-semibold
+                        text-white
+                        ${config.bar}
+                        ${overdue
+                          ? 'rounded-l-xl'
+                          : 'rounded-xl'
+                        }
+                      `}
+                      style={{
+                        left: startOffset,
+                        boxShadow: 'var(--shadow-sm)',
+                      }}
+                      title={stage.name}
                     >
-                      {st === 'overdue' && !fo && <AlertTriangle className="w-3.5 h-3.5 mr-1.5 flex-shrink-0" />}
-                      <span className="truncate">#{String(s.execution_order).padStart(2, '0')} · {s.name}</span>
+                      <span className="truncate">
+                        #{String(stage.execution_order).padStart(2, '0')}
+                        {' · '}
+                        {stage.name}
+                      </span>
                     </motion.button>
-                    {fo && owW > 0 && (
+
+                    {/* OVERRUN */}
+                    {overdue && overrunWidth > 0 && (
                       <motion.button
-                        onClick={() => onSelect(s)}
-                        initial={{ width: 0, opacity: 0 }}
-                        animate={{ width: owW, opacity: 1 }}
-                        transition={{ delay: idx * 0.05 + 0.2, duration: 0.3 }}
-                        className="absolute top-1/2 -translate-y-1/2 h-9 rounded-r-xl flex items-center px-2 bg-[var(--accent)] text-white text-[14px] font-bold overflow-hidden ring-2 ring-[var(--accent)]/25"
-                        style={{ left: sO + wP, boxShadow: 'var(--shadow-md)' }}
+                        type="button"
+                        onClick={() => onSelect(stage)}
+                        initial={{
+                          width: 0,
+                          opacity: 0,
+                        }}
+                        animate={{
+                          width: overrunWidth,
+                          opacity: 1,
+                        }}
+                        transition={{
+                          delay: index * 0.05 + 0.2,
+                          duration: 0.3,
+                        }}
+                        className="
+                          absolute
+                          top-1/2
+                          flex
+                          h-10
+                          -translate-y-1/2
+                          items-center
+                          overflow-hidden
+                          rounded-r-xl
+                          bg-[var(--accent)]
+                          px-2
+                          text-xs
+                          font-bold
+                          text-white
+                        "
+                        style={{
+                          left:
+                            startOffset +
+                            plannedWidth,
+                        }}
                       >
-                        <AlertTriangle className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
-                        {owW > 50 && <span className="truncate">+{overrunDays(s)} дн.</span>}
+                        {overrunWidth > 50 && (
+                          <span className="truncate">
+                            +{overrunDays(stage)} дн.
+                          </span>
+                        )}
                       </motion.button>
                     )}
-                    {fo && ae && (
-                      <div className="absolute top-1/2 -translate-y-1/2 pointer-events-none text-[13px] font-medium text-[var(--accent)]" style={{ left: sO + wP + owW + 6 }}>
-                        {s.completed_at ? fmtShort(s.completed_at.slice(0, 10)) : 'н.в.'}
-                      </div>
+
+                    {/* ACTUAL END */}
+                    {overdue && actualEnd && (
+                      <span
+                        className="
+                          pointer-events-none
+                          absolute
+                          top-1/2
+                          -translate-y-1/2
+                          whitespace-nowrap
+                          text-xs
+                          font-semibold
+                          text-[var(--accent)]
+                        "
+                        style={{
+                          left:
+                            startOffset +
+                            plannedWidth +
+                            overrunWidth +
+                            8,
+                        }}
+                      >
+                        {stage.completed_at
+                          ? fmtShort(
+                            stage.completed_at.slice(0, 10),
+                          )
+                          : 'н.в.'}
+                      </span>
                     )}
                   </div>
                 );
@@ -1161,123 +3778,319 @@ function TimelineView({ stages, responsibles, projectId, onSelect }: {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   BOARD
+   BOARD VIEW
    ════════════════════════════════════════════════════════════════ */
 
-function BoardView({ stages, responsibles, onSelect, onMoveStage }: {
+function BoardView({
+  stages,
+  responsibles,
+  onSelect,
+  onMoveStage,
+}: {
   stages: ProjectStageResponse[];
   responsibles: Record<string, StageResponsible>;
-  onSelect: (s: ProjectStageResponse) => void;
-  onMoveStage: (stageId: string, newStatus: ProjectStageStatus) => void;
+  onSelect: (stage: ProjectStageResponse) => void;
+  onMoveStage: (
+    stageId: string,
+    status: ProjectStageStatus,
+  ) => Promise<void>;
 }) {
-  const cols: ProjectStageStatus[] = ['planned', 'active', 'on_hold', 'completed', 'skipped'];
+  const columns: ProjectStageStatus[] = [
+    'planned',
+    'active',
+    'on_hold',
+    'completed',
+    'skipped',
+  ];
+
   const [dragId, setDragId] = useState<string | null>(null);
-  const [overCol, setOverCol] = useState<ProjectStageStatus | null>(null);
+  const [overColumn, setOverColumn] =
+    useState<ProjectStageStatus | null>(null);
+  const [moving, setMoving] = useState(false);
 
   const grouped = useMemo(() => {
-    const m: Record<ProjectStageStatus, ProjectStageResponse[]> = { planned: [], active: [], on_hold: [], completed: [], skipped: [] };
-    sortOrd(stages).forEach(s => m[s.status].push(s));
-    return m;
+    const result: Record<
+      ProjectStageStatus,
+      ProjectStageResponse[]
+    > = {
+      planned: [],
+      active: [],
+      on_hold: [],
+      completed: [],
+      skipped: [],
+    };
+
+    sortOrd(stages).forEach(stage => {
+      result[stage.status].push(stage);
+    });
+
+    return result;
   }, [stages]);
+
+  const handleDrop = async (
+    status: ProjectStageStatus,
+  ) => {
+    const id = dragId;
+
+    setDragId(null);
+    setOverColumn(null);
+
+    if (!id || moving) return;
+
+    const stage = stages.find(item => item.id === id);
+
+    if (!stage || stage.status === status) return;
+
+    setMoving(true);
+
+    try {
+      await onMoveStage(id, status);
+    } catch {
+      // Уведомление об ошибке показывает родитель.
+    } finally {
+      setMoving(false);
+    }
+  };
 
   if (!stages.length) {
     return (
-      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-8 text-center">
-        <Milestone className="w-12 h-12 mx-auto text-[var(--text-primary)]/15 mb-3" />
-        <p className="text-[15px] text-[var(--text-primary)]/45">Нет этапов</p>
+      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] px-6 py-16 text-center">
+        <LayoutGrid className="mx-auto h-12 w-12 text-[var(--text-disabled)]" />
+
+        <p className="mt-4 text-sm text-[var(--text-muted)]">
+          Нет этапов для отображения
+        </p>
       </div>
     );
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid gap-4 xl:grid-cols-5 md:grid-cols-2 grid-cols-1">
-      {cols.map(col => {
-        const m = STATUS_CFG[col];
-        const I = m.icon;
-        const items = grouped[col];
-        const isO = overCol === col;
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5"
+    >
+      {columns.map(column => {
+        const config = STATUS_CFG[column];
+        const Icon = config.icon;
+
+        const items = grouped[column];
+        const isOver = overColumn === column;
+
         return (
           <div
-            key={col}
-            onDragOver={e => { e.preventDefault(); setOverCol(col); }}
-            onDragLeave={() => setOverCol(null)}
-            onDrop={() => {
-              if (dragId) {
-                const s = stages.find(s => s.id === dragId);
-                if (s && s.status !== col) onMoveStage(dragId, col);
+            key={column}
+            onDragOver={event => {
+              event.preventDefault();
+
+              if (!moving) {
+                setOverColumn(column);
               }
-              setDragId(null);
-              setOverCol(null);
             }}
-            className={`rounded-2xl border-2 bg-[var(--bg-card)] flex flex-col min-h-[400px] transition-all duration-200 ${isO ? 'border-[var(--accent)] bg-[var(--accent-soft)]/30 scale-[1.01]' : 'border-transparent'}`}
+            onDragLeave={event => {
+              if (
+                !event.currentTarget.contains(
+                  event.relatedTarget as Node,
+                )
+              ) {
+                setOverColumn(null);
+              }
+            }}
+            onDrop={event => {
+              event.preventDefault();
+              void handleDrop(column);
+            }}
+            className={`
+              flex
+              min-h-[420px]
+              flex-col
+              overflow-hidden
+              rounded-2xl
+              border
+              bg-[var(--bg-card)]
+              transition-all
+              ${isOver
+                ? 'border-[var(--accent)] bg-[var(--accent-soft)]/10'
+                : 'border-[var(--border-color)]'
+              }
+            `}
           >
-            <div className="px-4 py-3.5 border-b border-[var(--border-color)] bg-[var(--hover-1)] rounded-t-2xl flex items-center justify-between gap-3">
-              <div className="inline-flex items-center gap-2">
-                <I className={`w-4 h-4 ${m.text}`} />
-                <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">{m.label}</h3>
+            {/* COLUMN HEADER */}
+            <div className="flex items-center justify-between gap-3 border-b border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-4">
+
+              <div className="flex items-center gap-2">
+
+                <Icon className={`h-4 w-4 ${config.text}`} />
+
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                  {config.label}
+                </h3>
               </div>
-              <span className="min-w-[28px] h-7 rounded-full border border-[var(--border-color)] bg-[var(--hover-2)] px-2 text-[13px] font-semibold text-[var(--text-primary)]/50 flex items-center justify-center">
+
+              <span className="flex h-7 min-w-7 items-center justify-center rounded-lg bg-[var(--hover-2)] px-2 text-xs font-semibold text-[var(--text-secondary)]">
                 {items.length}
               </span>
             </div>
-            <div className="p-3 flex-1 space-y-2.5 overflow-y-auto">
-              {!items.length ? (
-                <div className={`h-32 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center transition-colors ${isO ? 'border-[var(--accent)]/40 bg-[var(--accent-soft)]/20 text-[var(--accent)]/60' : 'border-[var(--border-color)] text-[var(--text-primary)]/25'}`}>
-                  <Milestone className="w-6 h-6 mb-1.5" />
-                  <span className="text-[13px]">{isO ? 'Отпустите' : 'Пусто'}</span>
+
+            {/* COLUMN CONTENT */}
+            <div className="flex-1 space-y-3 p-3">
+
+              {items.length === 0 && (
+                <div
+                  className={`
+                    flex h-32 flex-col items-center justify-center
+                    rounded-xl border border-dashed
+                    ${isOver
+                      ? 'border-[var(--accent)]/40 bg-[var(--accent-soft)]'
+                      : 'border-[var(--border-color)]'
+                    }
+                  `}
+                >
+                  <Milestone className="h-6 w-6 text-[var(--text-disabled)]" />
+
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">
+                    {isOver ? 'Отпустите этап' : 'Пусто'}
+                  </p>
                 </div>
-              ) : items.map(stage => {
-                const resp = stage.responsible_id ? responsibles[stage.responsible_id] : null;
-                const eff = effStatus(stage);
-                const isDr = dragId === stage.id;
-                const cb = eff === 'overdue' ? STATUS_CFG.overdue.border : m.border;
+              )}
+
+              {items.map(stage => {
+                const responsible = stage.responsible_id
+                  ? responsibles[stage.responsible_id]
+                  : null;
+
+                const effective = effStatus(stage);
+
+                const dragging = dragId === stage.id;
+
                 return (
                   <motion.div
                     key={stage.id}
                     layout
-                    draggable
-                    onDragStart={e => {
+                    draggable={!moving}
+                    onDragStart={event => {
                       setDragId(stage.id);
-                      if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+
+                      if (event.dataTransfer) {
+                        event.dataTransfer.effectAllowed = 'move';
+                      }
                     }}
-                    onDragEnd={() => { setDragId(null); setOverCol(null); }}
-                    whileHover={{ y: -2 }}
-                    className={`rounded-2xl border bg-[var(--hover-2)] p-4 cursor-grab active:cursor-grabbing transition-all select-none ${cb} ${isDr ? 'opacity-40 scale-95 rotate-1 ring-2 ring-[var(--accent)]/30' : ''}`}
-                    style={{ boxShadow: 'var(--shadow-md)' }}
+                    onDragEnd={() => {
+                      setDragId(null);
+                      setOverColumn(null);
+                    }}
+                    className={`
+                      rounded-xl
+                      border
+                      bg-[var(--hover-1)]
+                      p-4
+                      cursor-grab
+                      select-none
+                      transition-colors
+                      hover:bg-[var(--hover-2)]
+                      ${effective === 'overdue'
+                        ? 'border-[var(--accent)]/30'
+                        : 'border-[var(--border-color)]'
+                      }
+                      ${dragging ? 'opacity-40' : ''}
+                    `}
                   >
-                    <div className="flex items-center justify-between gap-2 mb-3">
+                    {/* TOP */}
+                    <div className="mb-3 flex items-center justify-between gap-2">
+
                       <Badge order={stage.execution_order} />
-                      <div className="flex items-center gap-1.5">
-                        {eff === 'overdue' && <AlertTriangle className="w-4 h-4 text-[var(--accent)]" />}
-                        <button
-                          onClick={e => { e.stopPropagation(); onSelect(stage); }}
-                          className="p-1.5 rounded-lg border border-[var(--border-color)] text-[var(--text-primary)]/35 hover:text-[var(--text-primary)] hover:bg-[var(--hover-1)] transition-colors"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
+
+                      <button
+                        type="button"
+                        onClick={() => onSelect(stage)}
+                        aria-label="Открыть этап"
+                        className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--hover-3)] hover:text-[var(--accent)]"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    {/* NAME */}
+                    <button
+                      type="button"
+                      onClick={() => onSelect(stage)}
+                      className="w-full text-left"
+                    >
+                      <h4 className="text-sm font-bold leading-6 text-[var(--text-primary)]">
+                        {stage.name}
+                      </h4>
+
+                      <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">
+                        {stage.description || 'Без описания'}
+                      </p>
+                    </button>
+
+                    {/* PEOPLE */}
+                    <div className="mt-4 space-y-3 border-t border-[var(--border-color)] pt-4">
+
+                      {responsible && (
+                        <div className="flex items-center gap-2">
+
+                          <Ava
+                            name={responsible.full_name}
+                            size="sm"
+                          />
+
+                          <div className="min-w-0">
+
+                            <p className="text-[11px] text-[var(--text-muted)]">
+                              Ответственный
+                            </p>
+
+                            <p className="truncate text-xs font-medium text-[var(--text-primary)]">
+                              {responsible.full_name}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between gap-2">
+
+                        <span className="text-xs text-[var(--text-muted)]">
+                          Исполнители
+                        </span>
+
+                        <AssigneesPreview
+                          ids={stage.assignee_ids}
+                          users={responsibles}
+                          maxVisible={3}
+                        />
                       </div>
                     </div>
-                    <button onClick={() => onSelect(stage)} className="text-left w-full">
-                      <h4 className="text-[15px] font-semibold text-[var(--text-primary)] leading-6 mb-2">{stage.name}</h4>
-                      <p className="text-[14px] text-[var(--text-primary)]/45 line-clamp-2 leading-5 mb-3">{stage.description || 'Без описания'}</p>
-                    </button>
-                    <div className="flex items-center justify-between gap-3 pt-3 border-t border-[var(--border-color)]">
-                      {resp ? (
-                        <div className="inline-flex items-center gap-2 min-w-0">
-                          <Ava name={resp.full_name} size="sm" />
-                          <span className="text-[13px] text-[var(--text-primary)]/55 truncate">{resp.full_name.split(' ')[0]}</span>
-                        </div>
-                      ) : <span className="text-[13px] text-[var(--text-primary)]/40">Не назначен</span>}
-                      <div className="flex items-center gap-1.5 text-[13px] text-[var(--text-primary)]/40 flex-shrink-0">
-                        <Calendar className="w-3.5 h-3.5" /> {fmtShort(stage.planned_end)}
-                      </div>
+
+                    {/* DATE */}
+                    <div className="mt-3 flex items-center gap-2 border-t border-[var(--border-color)] pt-3 text-xs text-[var(--text-muted)]">
+
+                      <Calendar className="h-3.5 w-3.5" />
+
+                      {fmtShort(stage.planned_end)}
+
+                      {effective === 'overdue' && (
+                        <AlertTriangle className="ml-auto h-4 w-4 text-[var(--accent)]" />
+                      )}
                     </div>
                   </motion.div>
                 );
               })}
+
               {dragId && items.length > 0 && (
-                <div className={`h-16 rounded-2xl border-2 border-dashed flex items-center justify-center transition-colors ${isO ? 'border-[var(--accent)]/40 bg-[var(--accent-soft)]/20 text-[var(--accent)]/60' : 'border-[var(--border-color)]/50 text-[var(--text-primary)]/20'}`}>
-                  <span className="text-[13px]">{isO ? 'Отпустите' : 'Перетащите сюда'}</span>
+                <div
+                  className={`
+                    flex h-16 items-center justify-center
+                    rounded-xl border-2 border-dashed
+                    text-xs
+                    ${isOver
+                      ? 'border-[var(--accent)]/40 text-[var(--accent)]'
+                      : 'border-[var(--border-color)] text-[var(--text-muted)]'
+                    }
+                  `}
+                >
+                  {isOver ? 'Отпустите' : 'Перетащите сюда'}
                 </div>
               )}
             </div>
@@ -1289,473 +4102,1286 @@ function BoardView({ stages, responsibles, onSelect, onMoveStage }: {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   ANALYTICS
+   ANALYTICS VIEW
    ════════════════════════════════════════════════════════════════ */
 
-function AnalyticsView({ stages }: { stages: ProjectStageResponse[] }) {
-  const t = stages.length;
-  const done = stages.filter(s => s.status === 'completed').length;
-  const act = stages.filter(s => s.status === 'active').length;
-  const over = stages.filter(s => s.is_overdue && s.status !== 'completed' && s.status !== 'skipped').length;
-  const wO = stages.filter(s => isFactOverPlan(s)).length;
-  const durs = stages.map(s => s.planned_duration_days).filter((d): d is number => d != null);
-  const avg = durs.length ? Math.round(durs.reduce((a, b) => a + b, 0) / durs.length) : 0;
-  const tO = stages.reduce((s, x) => s + overrunDays(x), 0);
+function AnalyticsView({
+  stages,
+}: {
+  stages: ProjectStageResponse[];
+}) {
+  const total = stages.length;
 
-  const kpi = [
-    { l: 'Всего этапов', v: t, i: Milestone },
-    { l: 'Завершено', v: done, i: CheckCircle2, c: 'text-emerald-300', b: 'bg-emerald-500/10 border-emerald-400/15' },
-    { l: 'В работе', v: act, i: PlayCircle, c: 'text-blue-300', b: 'bg-blue-500/10 border-blue-400/15' },
-    { l: 'Отклонения', v: over, i: AlertTriangle, c: 'text-[var(--accent)]', b: 'bg-[var(--accent-soft)] border-[var(--accent)]/15' },
-    { l: 'Ср. длительность', v: `${avg} дн.`, i: Clock, c: 'text-amber-300', b: 'bg-amber-500/10 border-amber-400/15' },
-    { l: 'С превышением', v: wO, i: TrendingUp, c: 'text-orange-300', b: 'bg-orange-500/10 border-orange-400/15' },
-    { l: 'Итого превыш.', v: `${tO} дн.`, i: AlertTriangle, c: 'text-[var(--accent)]', b: 'bg-[var(--accent-soft)] border-[var(--accent)]/15' }
+  const completed = stages.filter(
+    stage => stage.status === 'completed',
+  ).length;
+
+  const active = stages.filter(
+    stage => stage.status === 'active',
+  ).length;
+
+  const overdue = stages.filter(
+    stage =>
+      stage.is_overdue &&
+      stage.status !== 'completed' &&
+      stage.status !== 'skipped',
+  ).length;
+
+  const completedLate = stages.filter(
+    stage => isFactOverPlan(stage),
+  ).length;
+
+  const durations = stages
+    .map(stage => stage.planned_duration_days)
+    .filter((value): value is number => value != null);
+
+  const averageDuration = durations.length
+    ? Math.round(
+      durations.reduce((sum, value) => sum + value, 0) /
+      durations.length,
+    )
+    : 0;
+
+  const totalOverrun = stages.reduce(
+    (sum, stage) => sum + overrunDays(stage),
+    0,
+  );
+
+  const assignedUsers = new Set(
+    stages.flatMap(stage => stage.assignee_ids ?? []),
+  );
+
+  const cards = [
+    {
+      label: 'Всего этапов',
+      value: total,
+      icon: Milestone,
+      color: 'text-[var(--text-primary)]',
+      background: 'bg-[var(--hover-2)]',
+    },
+    {
+      label: 'Завершено',
+      value: completed,
+      icon: CheckCircle2,
+      color: 'text-emerald-500',
+      background: 'bg-emerald-500/10',
+    },
+    {
+      label: 'В работе',
+      value: active,
+      icon: PlayCircle,
+      color: 'text-blue-400',
+      background: 'bg-blue-500/10',
+    },
+    {
+      label: 'Просрочено',
+      value: overdue,
+      icon: AlertTriangle,
+      color: 'text-[var(--accent)]',
+      background: 'bg-[var(--accent-soft)]',
+    },
+    {
+      label: 'Исполнителей',
+      value: assignedUsers.size,
+      icon: Users,
+      color: 'text-[var(--text-primary)]',
+      background: 'bg-[var(--hover-2)]',
+    },
+    {
+      label: 'Средняя длительность',
+      value: `${averageDuration} дн.`,
+      icon: Clock,
+      color: 'text-amber-500',
+      background: 'bg-amber-500/10',
+    },
+    {
+      label: 'С превышением',
+      value: completedLate,
+      icon: TrendingUp,
+      color: 'text-orange-400',
+      background: 'bg-orange-500/10',
+    },
+    {
+      label: 'Всего превышено',
+      value: `${totalOverrun} дн.`,
+      icon: AlertTriangle,
+      color: 'text-[var(--accent)]',
+      background: 'bg-[var(--accent-soft)]',
+    },
   ];
 
-  if (!t) {
-    return <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-8"><p className="text-[15px] text-[var(--text-primary)]/45">Нет данных</p></div>;
+  if (!total) {
+    return (
+      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-10 text-center">
+        <BarChart3 className="mx-auto h-12 w-12 text-[var(--text-disabled)]" />
+
+        <p className="mt-4 text-sm text-[var(--text-muted)]">
+          Нет данных для аналитики
+        </p>
+      </div>
+    );
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      <div className="grid gap-3 md:grid-cols-4 lg:grid-cols-7 grid-cols-2">
-        {kpi.map((k, i) => (
-          <motion.div
-            key={k.l}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            className={`rounded-2xl border p-4 ${k.b ?? 'bg-[var(--bg-card)] border-[var(--border-color)]'}`}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[13px] text-[var(--text-primary)]/45">{k.l}</p>
-                <p className="mt-1 text-[24px] font-bold text-[var(--text-primary)]">{k.v}</p>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="space-y-6"
+    >
+      {/* KPI */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+        {cards.map((card, index) => {
+          const Icon = card.icon;
+
+          return (
+            <motion.div
+              key={card.label}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.04 }}
+              className="
+                rounded-2xl
+                border border-[var(--border-color)]
+                bg-[var(--bg-card)]
+                p-5
+              "
+            >
+              <div className="flex items-start justify-between gap-4">
+
+                <div>
+                  <p className="text-sm text-[var(--text-muted)]">
+                    {card.label}
+                  </p>
+
+                  <p className="mt-3 text-3xl font-bold text-[var(--text-primary)]">
+                    {card.value}
+                  </p>
+                </div>
+
+                <div
+                  className={`
+                    flex h-11 w-11 shrink-0
+                    items-center justify-center
+                    rounded-xl
+                    ${card.background}
+                  `}
+                >
+                  <Icon className={`h-5 w-5 ${card.color}`} />
+                </div>
               </div>
-              <div className={`w-11 h-11 rounded-2xl border border-[var(--border-color)]/40 bg-[var(--bg-card)] flex items-center justify-center ${k.c ?? 'text-[var(--text-primary)]/60'}`}>
-                <k.i className="w-5 h-5" />
-              </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
       </div>
-      {stages.some(s => s.started_at) && (
-        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
-            <h3 className="text-[16px] font-bold text-[var(--text-primary)]">Сроки и исполнение</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px]">
-              <thead>
-                <tr className="border-b border-[var(--border-color)] bg-[var(--hover-1)]">
-                  <th className="px-4 py-3 text-left text-[13px] font-semibold text-[var(--text-primary)]/45">Этап</th>
-                  <th className="px-4 py-3 text-left text-[13px] font-semibold text-[var(--text-primary)]/45">Плановые сроки</th>
-                  <th className="px-4 py-3 text-left text-[13px] font-semibold text-[var(--text-primary)]/45">Фактические сроки</th>
-                  <th className="px-4 py-3 text-left text-[13px] font-semibold text-[var(--text-primary)]/45">План</th>
-                  <th className="px-4 py-3 text-left text-[13px] font-semibold text-[var(--text-primary)]/45">Факт</th>
-                  <th className="px-4 py-3 text-left text-[13px] font-semibold text-[var(--text-primary)]/45">Δ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortOrd(stages).filter(s => s.started_at).map(s => {
-                  const ps = parseDate(s.planned_start);
-                  const pe = parseDate(s.planned_end);
-                  const fs = parseDate(s.started_at);
-                  const fe = getActualEnd(s);
-                  const pd = ps && pe ? daysB(ps, pe) + 1 : null;
-                  const fd = fs && fe ? daysB(fs, fe) + 1 : null;
-                  const d = pd != null && fd != null ? fd - pd : null;
-                  const ov = d != null && d > 0;
-                  return (
-                    <tr key={s.id} className={`border-b border-[var(--border-color)] ${ov ? 'bg-[var(--accent-soft)]/10' : ''}`}>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Badge order={s.execution_order} />
-                          <span className="text-[14px] text-[var(--text-primary)]">{s.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-[14px] text-[var(--text-primary)]/60 whitespace-nowrap">
-                        {fmtShort(s.planned_start)} — {fmtShort(s.planned_end)}
-                      </td>
-                      <td className="px-4 py-3 text-[14px] whitespace-nowrap">
-                        <span className={ov ? 'text-[var(--accent)] font-medium' : 'text-[var(--text-primary)]/60'}>
-                          {fmtShort(s.started_at?.slice(0, 10) ?? null)} — {s.completed_at ? fmtShort(s.completed_at.slice(0, 10)) : 'н.в.'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-[14px] text-[var(--text-primary)]/60">{pd ?? '—'}</td>
-                      <td className={`px-4 py-3 text-[14px] font-medium ${ov ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/60'}`}>{fd ?? '—'}</td>
-                      <td className="px-4 py-3">
-                        {d != null ? (
-                          <span className={`inline-flex items-center gap-1 text-[13px] font-semibold ${d > 0 ? 'text-[var(--accent)]' : d < 0 ? 'text-emerald-400' : 'text-[var(--text-primary)]/40'}`}>
-                            {d > 0 && <AlertTriangle className="w-3 h-3" />}
-                            {d > 0 ? `+${d} дн.` : d === 0 ? 'в срок' : `${d} дн.`}
-                          </span>
-                        ) : '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+
+      {/* EXECUTION TABLE */}
+      <div className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
+
+        <div className="border-b border-[var(--border-color)] px-6 py-5">
+
+          <h3 className="text-lg font-bold text-[var(--text-primary)]">
+            Сроки и исполнение
+          </h3>
+
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Сравнение плановых и фактических показателей
+          </p>
         </div>
-      )}
+
+        <div className="overflow-x-auto">
+
+          <table className="w-full min-w-[850px]">
+
+            <thead>
+              <tr className="border-b border-[var(--border-color)] bg-[var(--hover-1)]">
+
+                {[
+                  'Этап',
+                  'Плановые сроки',
+                  'Фактические сроки',
+                  'План',
+                  'Факт',
+                  'Отклонение',
+                  'Исполнители',
+                ].map(label => (
+                  <th
+                    key={label}
+                    className="px-5 py-4 text-left text-xs font-semibold text-[var(--text-muted)]"
+                  >
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody>
+              {sortOrd(stages).map(stage => {
+                const plannedStart = parseDate(stage.planned_start);
+                const plannedEnd = parseDate(stage.planned_end);
+
+                const actualStart = parseDate(stage.started_at);
+                const actualEnd = getActualEnd(stage);
+
+                const plannedDays =
+                  plannedStart && plannedEnd
+                    ? daysB(plannedStart, plannedEnd) + 1
+                    : null;
+
+                const actualDays =
+                  actualStart && actualEnd
+                    ? daysB(actualStart, actualEnd) + 1
+                    : null;
+
+                const difference =
+                  plannedDays != null && actualDays != null
+                    ? actualDays - plannedDays
+                    : null;
+
+                return (
+                  <tr
+                    key={stage.id}
+                    className="border-b border-[var(--border-color)] hover:bg-[var(--hover-1)]"
+                  >
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2">
+
+                        <Badge order={stage.execution_order} />
+
+                        <span className="text-sm font-medium text-[var(--text-primary)]">
+                          {stage.name}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="whitespace-nowrap px-5 py-4 text-sm text-[var(--text-secondary)]">
+                      {fmtShort(stage.planned_start)}
+                      {' — '}
+                      {fmtShort(stage.planned_end)}
+                    </td>
+
+                    <td className="whitespace-nowrap px-5 py-4 text-sm text-[var(--text-secondary)]">
+                      {fmtShort(stage.started_at)}
+                      {' — '}
+                      {stage.completed_at
+                        ? fmtShort(stage.completed_at)
+                        : stage.started_at
+                          ? 'н.в.'
+                          : '—'}
+                    </td>
+
+                    <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
+                      {plannedDays ?? '—'}
+                    </td>
+
+                    <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
+                      {actualDays ?? '—'}
+                    </td>
+
+                    <td className="px-5 py-4">
+
+                      {difference == null ? (
+                        <span className="text-sm text-[var(--text-muted)]">
+                          —
+                        </span>
+                      ) : (
+                        <span
+                          className={`
+                            text-sm font-semibold
+                            ${difference > 0
+                              ? 'text-[var(--accent)]'
+                              : difference < 0
+                                ? 'text-emerald-500'
+                                : 'text-[var(--text-secondary)]'
+                            }
+                          `}
+                        >
+                          {difference > 0 ? '+' : ''}
+                          {difference} дн.
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
+                      {(stage.assignee_ids ?? []).length}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </motion.div>
   );
 }
 
 /* ════════════════════════════════════════════════════════════════
-   STAGE DETAIL / EDIT
+   STAGE DETAIL
    ════════════════════════════════════════════════════════════════ */
 
-function StageDetail({ stage, responsible, responsibles, totalStages, onBack, onSave, onDelete, onStart, onComplete, onSkip }: {
+function StageDetail({
+  stage,
+  responsible,
+  responsibles,
+  totalStages,
+  currentUserId,
+  onBack,
+  onSave,
+  onDelete,
+  onStart,
+  onComplete,
+  onSkip,
+  onSetAssignees,
+}: {
   stage: ProjectStageResponse;
   responsible: StageResponsible | null;
   responsibles: Record<string, StageResponsible>;
   totalStages: number;
+  currentUserId?: string;
   onBack: () => void;
-  onSave: (id: string, p: StageUpsertPayload) => Promise<void>;
+  onSave: (
+    id: string,
+    payload: StageUpsertPayload,
+  ) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onStart: (id: string) => Promise<void>;
   onComplete: (id: string) => Promise<void>;
   onSkip: (id: string) => Promise<void>;
+  onSetAssignees: (
+    stageId: string,
+    ids: string[],
+  ) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<StageForm>(stageToForm(stage));
-  const [action, setAction] = useState<null | string>(null);
+  const [action, setAction] = useState<string | null>(null);
+
+  const [form, setForm] = useState<StageForm>(
+    stageToForm(stage),
+  );
+
+  const [assigneesModalOpen, setAssigneesModalOpen] =
+    useState(false);
+
+  const [savingAssignees, setSavingAssignees] =
+    useState(false);
+
+  const assigneeIds = stage.assignee_ids ?? [];
 
   useEffect(() => {
     setForm(stageToForm(stage));
-    setEditing(false);
   }, [stage.id, stage.updated_at]);
 
-  const upd = <K extends keyof StageForm>(k: K, v: StageForm[K]) => setForm(p => ({ ...p, [k]: v }));
-  const iC = 'w-full rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] px-4 py-3 text-[14px] text-[var(--text-primary)] placeholder-white/20 outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all';
-  const lC = 'block text-[13px] font-medium text-[var(--text-primary)]/50 mb-2';
-  const eff = effStatus(stage);
-  const isOv = eff === 'overdue';
-  const fo = isFactOverPlan(stage);
-  const ov = overrunDays(stage);
-  const canSt = stage.status === 'planned' || stage.status === 'on_hold';
-  const canCo = stage.status === 'active';
-  const canSk = stage.status === 'planned' || stage.status === 'on_hold';
-  const rOpts = Object.values(responsibles).sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'));
-  const ps = parseDate(stage.planned_start);
-  const pe = parseDate(stage.planned_end);
-  const fs = stage.started_at ? parseDate(stage.started_at) : null;
-  const fe = getActualEnd(stage);
-  const pD = ps && pe ? daysB(ps, pe) + 1 : null;
-  const fD = fs && fe ? daysB(fs, fe) + 1 : null;
+  const updateForm = <K extends keyof StageForm>(
+    key: K,
+    value: StageForm[K],
+  ) => {
+    setForm(previous => ({
+      ...previous,
+      [key]: value,
+    }));
+  };
 
-  const hSave = async () => {
-    const p = formToPayload(form);
-    if (!p.name) return;
+  const inputClass = `
+    w-full rounded-xl
+    border border-[var(--border-color)]
+    bg-[var(--hover-2)]
+    px-4 py-3
+    text-sm text-[var(--text-primary)]
+    outline-none
+    transition-colors
+    placeholder:text-[var(--text-muted)]
+    focus:border-[var(--accent)]
+  `;
+
+  const labelClass =
+    'mb-2 block text-sm font-medium text-[var(--text-secondary)]';
+
+  const effective = effStatus(stage);
+  const overdue = isFactOverPlan(stage);
+  const overdueDays = overrunDays(stage);
+
+  const canStart =
+    stage.status === 'planned' ||
+    stage.status === 'on_hold';
+
+  const canComplete = stage.status === 'active';
+
+  const canSkip =
+    stage.status === 'planned' ||
+    stage.status === 'on_hold';
+
+  const userOptions = Object.values(responsibles).sort(
+    (a, b) => a.full_name.localeCompare(b.full_name, 'ru'),
+  );
+
+  const plannedStart = parseDate(stage.planned_start);
+  const plannedEnd = parseDate(stage.planned_end);
+  const actualStart = parseDate(stage.started_at);
+  const actualEnd = getActualEnd(stage);
+
+  const plannedDays =
+    plannedStart && plannedEnd
+      ? daysB(plannedStart, plannedEnd) + 1
+      : null;
+
+  const actualDays =
+    actualStart && actualEnd
+      ? daysB(actualStart, actualEnd) + 1
+      : null;
+
+  /* =========================================================
+     SAVE
+     ========================================================= */
+
+  const handleSave = async () => {
+    const payload = formToPayload(form);
+
+    if (!payload.name || saving) return;
+
     setSaving(true);
+
     try {
-      await onSave(stage.id, p);
+      await onSave(stage.id, payload);
       setEditing(false);
+    } catch {
+      // Ошибка отображается родителем.
     } finally {
       setSaving(false);
     }
   };
 
-  const hAct = async (t: string, fn: (id: string) => Promise<void>) => {
-    setAction(t);
-    try { await fn(stage.id); } finally { setAction(null); }
+  const handleAction = async (
+    name: string,
+    handler: (id: string) => Promise<void>,
+  ) => {
+    if (action) return;
+
+    setAction(name);
+
+    try {
+      await handler(stage.id);
+    } catch {
+      // Ошибка отображается родителем.
+    } finally {
+      setAction(null);
+    }
   };
 
-  const hDel = async () => {
-    if (!confirm(`Удалить этап «${stage.name}»?`)) return;
-    setAction('delete');
-    try { await onDelete(stage.id); } finally { setAction(null); }
+  const handleDelete = async () => {
+    if (
+      !window.confirm(
+        `Удалить этап «${stage.name}»?`,
+      )
+    ) {
+      return;
+    }
+
+    await handleAction('delete', onDelete);
+  };
+
+  const handleSaveAssignees = async (ids: string[]) => {
+    setSavingAssignees(true);
+
+    try {
+      await onSetAssignees(stage.id, ids);
+    } finally {
+      setSavingAssignees(false);
+    }
   };
 
   return (
-    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
-      <button onClick={onBack} className="inline-flex items-center gap-2 text-[14px] font-medium text-[var(--text-primary)]/60 hover:text-[var(--text-primary)] transition-colors mb-6">
-        <ArrowLeft className="w-4 h-4" /> Назад к этапам
+    <motion.div
+      initial={{ opacity: 0, x: 16 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -16 }}
+      transition={{ duration: 0.2 }}
+      className="space-y-6"
+    >
+      {/* BACK */}
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Назад к этапам
       </button>
-      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 md:p-8 mb-6">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+
+      {/* HEADER */}
+      <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 sm:p-8">
+
+        <div className="flex flex-wrap items-start justify-between gap-5">
+
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-3 flex-wrap mb-4">
+
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+
               <Badge order={stage.execution_order} />
+
               <Chip status={stage.status} />
-              {isOv && <Chip status="overdue" />}
-              {fo && (
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent-soft)] px-2.5 py-1 text-[13px] font-semibold text-[var(--accent)]">
-                  <AlertTriangle className="w-3.5 h-3.5" /> Отклонение: +{ov} дн.
+
+              {effective === 'overdue' && (
+                <Chip status="overdue" />
+              )}
+
+              {overdue && (
+                <span className="rounded-lg bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--accent)]">
+                  Отклонение +{overdueDays} дн.
                 </span>
               )}
             </div>
-            <h1 className="text-[26px] md:text-[30px] font-bold text-[var(--text-primary)] leading-tight">{stage.name}</h1>
-            <p className="mt-3 text-[15px] leading-7 text-[var(--text-primary)]/60 max-w-3xl whitespace-pre-wrap">{stage.description || 'Описание не заполнено'}</p>
+
+            <h1 className="text-2xl font-bold text-[var(--text-primary)] sm:text-3xl">
+              {stage.name}
+            </h1>
+
+            <p className="mt-3 max-w-3xl whitespace-pre-wrap text-sm leading-7 text-[var(--text-secondary)]">
+              {stage.description || 'Описание не заполнено'}
+            </p>
           </div>
-          <div className="flex gap-2 flex-shrink-0">
-            {!editing && (
-              <button
-                onClick={() => setEditing(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] px-4 py-3 text-[14px] font-medium text-[var(--text-primary)]/70 hover:text-[var(--text-primary)] hover:bg-[var(--hover-1)] transition-colors"
-              >
-                <PenSquare className="w-4 h-4" /> Редактировать
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-      {editing ? (
-        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 md:p-8 space-y-6">
-          <h2 className="text-[20px] font-bold text-[var(--text-primary)]">Редактирование</h2>
-          <div className="grid md:grid-cols-2 gap-5">
-            <div className="md:col-span-2">
-              <label className={lC}>Название</label>
-              <input value={form.name} onChange={e => upd('name', e.target.value)} className={iC} />
-            </div>
-            <div>
-              <label className={lC}>Номер</label>
-              <input type="number" min={1} value={form.order} onChange={e => upd('order', e.target.value)} className={iC} />
-            </div>
-            <div>
-              <label className={lC}>Статус</label>
-              <Select value={form.status} onValueChange={e => upd('status', e as ProjectStageStatus)}>
-                <SelectTrigger className={iC}><SelectValue placeholder="Выберите статус" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="planned">Запланирован</SelectItem>
-                  <SelectItem value="active">В работе</SelectItem>
-                  <SelectItem value="on_hold">На паузе</SelectItem>
-                  <SelectItem value="completed">Завершён</SelectItem>
-                  <SelectItem value="skipped">Пропущен</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className={lC}>Плановое начало</label>
-              <input type="date" value={form.planned_start} onChange={e => upd('planned_start', e.target.value)} className={iC} />
-            </div>
-            <div>
-              <label className={lC}>Плановое окончание</label>
-              <input type="date" value={form.planned_end} onChange={e => upd('planned_end', e.target.value)} className={iC} />
-            </div>
-            <div>
-              <label className={lC}>Длительность</label>
-              <input type="number" min={1} value={form.planned_duration_days} onChange={e => upd('planned_duration_days', e.target.value)} className={iC} />
-            </div>
-            <div>
-              <label className={lC}>Ответственный</label>
-              <Select value={form.responsible_id} onValueChange={e => upd('responsible_id', e.target.value)}>
-                <SelectTrigger className={iC}><SelectValue placeholder="Выберите ответственного" /></SelectTrigger>
-                <SelectContent>
-                  {rOpts.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}{p.role ? ` — ${p.role}` : ''}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="md:col-span-2">
-              <label className={lC}>Описание</label>
-              <textarea value={form.description} onChange={e => upd('description', e.target.value)} className={`${iC} min-h-[140px] resize-y`} />
-            </div>
-            <div className="md:col-span-2">
-              <label className={lC}>Критерии приёмки</label>
-              <textarea value={form.completion_criteria} onChange={e => upd('completion_criteria', e.target.value)} className={`${iC} min-h-[140px] resize-y`} placeholder={'Утверждено ТЗ\nПройдены тесты'} />
-            </div>
-          </div>
-          <div className="flex items-center justify-between gap-4 pt-4 border-t border-[var(--border-color)] flex-wrap">
+
+          {!editing && (
             <button
-              onClick={hDel}
-              disabled={action === 'delete'}
-              className="inline-flex items-center gap-2 rounded-xl border border-[var(--accent)]/20 bg-[var(--accent-soft)] px-4 py-3 text-[14px] font-medium text-[var(--accent)] disabled:opacity-50"
+              type="button"
+              onClick={() => setEditing(true)}
+              className="
+                inline-flex items-center gap-2
+                rounded-xl border border-[var(--border-color)]
+                bg-[var(--hover-2)] px-4 py-3
+                text-sm font-medium text-[var(--text-primary)]
+                hover:bg-[var(--hover-3)]
+              "
             >
-              <Trash2 className="w-4 h-4" /> {action === 'delete' ? 'Удаляем…' : 'Удалить'}
+              <PenSquare className="h-4 w-4" />
+              Редактировать
             </button>
-            <div className="flex gap-3">
+          )}
+        </div>
+      </section>
+
+      {/* EDIT MODE */}
+      {editing ? (
+        <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 sm:p-8">
+
+          <h2 className="mb-6 text-xl font-bold text-[var(--text-primary)]">
+            Редактирование этапа
+          </h2>
+
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+
+            <div className="md:col-span-2">
+              <label className={labelClass}>
+                Название этапа
+              </label>
+
+              <input
+                value={form.name}
+                onChange={event =>
+                  updateForm('name', event.target.value)
+                }
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>
+                Номер этапа
+              </label>
+
+              <input
+                type="number"
+                min={1}
+                value={form.order}
+                onChange={event =>
+                  updateForm('order', event.target.value)
+                }
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>
+                Статус
+              </label>
+
+              <Select
+                value={form.status}
+                onValueChange={value =>
+                  updateForm(
+                    'status',
+                    value as ProjectStageStatus,
+                  )
+                }
+              >
+                <SelectTrigger className={inputClass}>
+                  <SelectValue placeholder="Выберите статус" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  <SelectItem value="planned">
+                    Запланирован
+                  </SelectItem>
+
+                  <SelectItem value="active">
+                    В работе
+                  </SelectItem>
+
+                  <SelectItem value="on_hold">
+                    На паузе
+                  </SelectItem>
+
+                  <SelectItem value="completed">
+                    Завершён
+                  </SelectItem>
+
+                  <SelectItem value="skipped">
+                    Пропущен
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className={labelClass}>
+                Плановое начало
+              </label>
+
+              <input
+                type="date"
+                value={form.planned_start}
+                onChange={event =>
+                  updateForm(
+                    'planned_start',
+                    event.target.value,
+                  )
+                }
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>
+                Плановое окончание
+              </label>
+
+              <input
+                type="date"
+                value={form.planned_end}
+                onChange={event =>
+                  updateForm(
+                    'planned_end',
+                    event.target.value,
+                  )
+                }
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>
+                Длительность, дней
+              </label>
+
+              <input
+                type="number"
+                min={1}
+                value={form.planned_duration_days}
+                onChange={event =>
+                  updateForm(
+                    'planned_duration_days',
+                    event.target.value,
+                  )
+                }
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>
+                Ответственный
+              </label>
+
+              <Select
+                value={form.responsible_id || '__none__'}
+                onValueChange={value =>
+                  updateForm(
+                    'responsible_id',
+                    value === '__none__' ? '' : value,
+                  )
+                }
+              >
+                <SelectTrigger className={inputClass}>
+                  <SelectValue placeholder="Выберите ответственного" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  <SelectItem value="__none__">
+                    Не назначен
+                  </SelectItem>
+
+                  {userOptions.map(user => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className={labelClass}>
+                Описание
+              </label>
+
+              <textarea
+                value={form.description}
+                onChange={event =>
+                  updateForm(
+                    'description',
+                    event.target.value,
+                  )
+                }
+                rows={5}
+                className={`${inputClass} resize-y`}
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className={labelClass}>
+                Критерии приёмки
+              </label>
+
+              <textarea
+                value={form.completion_criteria}
+                onChange={event =>
+                  updateForm(
+                    'completion_criteria',
+                    event.target.value,
+                  )
+                }
+                rows={5}
+                placeholder="Каждый критерий с новой строки"
+                className={`${inputClass} resize-y`}
+              />
+            </div>
+          </div>
+
+          {/* ACTIONS */}
+          <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--border-color)] pt-6">
+
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={!!action}
+              className="
+                inline-flex items-center gap-2
+                rounded-xl border border-[var(--accent)]/20
+                bg-[var(--accent-soft)]
+                px-4 py-3 text-sm font-medium
+                text-[var(--accent)]
+                disabled:opacity-50
+              "
+            >
+              {action === 'delete' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+
+              Удалить этап
+            </button>
+
+            <div className="flex items-center gap-3">
+
               <button
-                onClick={() => { setEditing(false); setForm(stageToForm(stage)); }}
-                className="rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] px-4 py-3 text-[14px] font-medium text-[var(--text-primary)]/65 hover:text-[var(--text-primary)] transition-colors"
+                type="button"
+                onClick={() => {
+                  setEditing(false);
+                  setForm(stageToForm(stage));
+                }}
+                disabled={saving}
+                className="rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] px-4 py-3 text-sm text-[var(--text-secondary)]"
               >
                 Отмена
               </button>
+
               <button
-                onClick={hSave}
-                disabled={saving}
-                className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-[14px] font-semibold text-white disabled:opacity-50"
+                type="button"
+                onClick={handleSave}
+                disabled={saving || !form.name.trim()}
+                className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
               >
-                <Save className="w-4 h-4" /> {saving ? 'Сохраняем…' : 'Сохранить'}
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+
+                {saving ? 'Сохранение...' : 'Сохранить'}
               </button>
             </div>
           </div>
-        </div>
+        </section>
       ) : (
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+
+          {/* LEFT COLUMN */}
           <div className="space-y-6">
-            <div className={`rounded-2xl border p-6 ${fo ? 'border-[var(--accent)]/25 bg-[var(--accent-soft)]/10' : 'border-[var(--border-color)] bg-[var(--bg-card)]'}`}>
-              <h3 className="text-[16px] font-bold text-[var(--text-primary)] mb-5 inline-flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-[var(--text-primary)]/45" /> Сроки и исполнение
-                {fo && <span className="text-[13px] font-semibold text-[var(--accent)] ml-2">+{ov} дн.</span>}
+
+            {/* DATES */}
+            <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+
+              <h3 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
+                <Calendar className="h-4 w-4 text-[var(--text-muted)]" />
+                Сроки и исполнение
               </h3>
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="rounded-xl border border-blue-400/20 bg-blue-500/5 p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                    <span className="text-[14px] font-bold text-blue-300/70 uppercase tracking-wider">Плановые сроки</span>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+                {/* PLAN */}
+                <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+
+                  <div className="mb-4 flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
+
+                    <span className="text-sm font-semibold text-blue-400">
+                      Плановые сроки
+                    </span>
                   </div>
-                  <div className="space-y-2">
+
+                  <div className="space-y-4">
+
                     <div>
-                      <p className="text-[14px] text-[var(--text-primary)]/35">Начало</p>
-                      <p className="text-[14px] font-semibold text-[var(--text-primary)]">{fmtDate(stage.planned_start)}</p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Начало
+                      </p>
+
+                      <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                        {fmtDate(stage.planned_start)}
+                      </p>
                     </div>
+
                     <div>
-                      <p className="text-[14px] text-[var(--text-primary)]/35">Окончание</p>
-                      <p className="text-[14px] font-semibold text-[var(--text-primary)]">{fmtDate(stage.planned_end)}</p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Окончание
+                      </p>
+
+                      <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                        {fmtDate(stage.planned_end)}
+                      </p>
                     </div>
+
                     <div>
-                      <p className="text-[14px] text-[var(--text-primary)]/35">Длительность</p>
-                      <p className="text-[14px] font-semibold text-[var(--text-primary)]">{pD != null ? `${pD} дн.` : '—'}</p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Длительность
+                      </p>
+
+                      <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                        {plannedDays != null
+                          ? `${plannedDays} дн.`
+                          : '—'}
+                      </p>
                     </div>
                   </div>
                 </div>
-                <div className={`rounded-xl border p-4 ${fo ? 'border-[var(--accent)]/25 bg-[var(--accent)]/5' : 'border-emerald-400/20 bg-emerald-500/5'}`}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className={`w-2.5 h-2.5 rounded-full ${fo ? 'bg-[var(--accent)]' : 'bg-emerald-500'}`} />
-                    <span className={`text-[14px] font-bold uppercase tracking-wider ${fo ? 'text-[var(--accent)]/70' : 'text-emerald-300/70'}`}>Фактически</span>
+
+                {/* ACTUAL */}
+                <div
+                  className={`
+                    rounded-xl border p-4
+                    ${overdue
+                      ? 'border-[var(--accent)]/25 bg-[var(--accent-soft)]'
+                      : 'border-emerald-500/20 bg-emerald-500/5'
+                    }
+                  `}
+                >
+                  <div className="mb-4 flex items-center gap-2">
+
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${overdue
+                          ? 'bg-[var(--accent)]'
+                          : 'bg-emerald-500'
+                        }`}
+                    />
+
+                    <span
+                      className={`text-sm font-semibold ${overdue
+                          ? 'text-[var(--accent)]'
+                          : 'text-emerald-500'
+                        }`}
+                    >
+                      Фактически
+                    </span>
                   </div>
-                  <div className="space-y-2">
+
+                  <div className="space-y-4">
+
                     <div>
-                      <p className="text-[14px] text-[var(--text-primary)]/35">Начало</p>
-                      <p className={`text-[14px] font-semibold ${stage.started_at ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/30'}`}>
-                        {stage.started_at ? fmtDate(stage.started_at.slice(0, 10)) : '—'}
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Начало
+                      </p>
+
+                      <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                        {fmtDate(stage.started_at)}
                       </p>
                     </div>
+
                     <div>
-                      <p className="text-[14px] text-[var(--text-primary)]/35">Окончание</p>
-                      <p className={`text-[14px] font-semibold ${fo ? 'text-[var(--accent)]' : stage.completed_at ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]/30'}`}>
-                        {stage.completed_at ? fmtDate(stage.completed_at.slice(0, 10)) : stage.started_at ? 'в работе' : '—'}
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Окончание
+                      </p>
+
+                      <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                        {stage.completed_at
+                          ? fmtDate(stage.completed_at)
+                          : stage.started_at
+                            ? 'В работе'
+                            : '—'}
                       </p>
                     </div>
+
                     <div>
-                      <p className="text-[14px] text-[var(--text-primary)]/35">Длительность</p>
-                      <p className={`text-[14px] font-semibold ${fo ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
-                        {fD != null ? `${fD} дн.` : '—'}
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Длительность
+                      </p>
+
+                      <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                        {actualDays != null
+                          ? `${actualDays} дн.`
+                          : '—'}
                       </p>
                     </div>
                   </div>
                 </div>
               </div>
-              {pD != null && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <span className="text-[14px] text-[var(--text-primary)]/40 w-14 flex-shrink-0">Плановый</span>
-                    <div className="flex-1 h-4 rounded-full bg-[var(--hover-2)] overflow-hidden">
-                      <div className="h-full rounded-full bg-blue-500/60" style={{ width: '100%' }} />
-                    </div>
-                    <span className="text-[14px] text-[var(--text-primary)]/50 w-12 text-right">{pD} дн.</span>
-                  </div>
-                  {fD != null && (
-                    <div className="flex items-center gap-3">
-                      <span className="text-[14px] text-[var(--text-primary)]/40 w-14 flex-shrink-0">Фактич.</span>
-                      <div className="flex-1 h-4 rounded-full bg-[var(--hover-2)] overflow-hidden">
-                        <div className="h-full rounded-full flex overflow-hidden" style={{ width: `${Math.min(150, (fD / pD) * 100)}%` }}>
-                          <div className="h-full bg-emerald-500/60" style={{ width: `${Math.min(100, (pD / fD) * 100)}%` }} />
-                          {fo && <div className="h-full bg-[var(--accent)]/70 flex-1" />}
-                        </div>
-                      </div>
-                      <span className={`text-[14px] w-12 text-right font-medium ${fo ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/50'}`}>{fD} дн.</span>
-                    </div>
-                  )}
+
+              {overdue && (
+                <div className="mt-4 flex items-center gap-2 rounded-xl bg-[var(--accent-soft)] p-3 text-sm font-medium text-[var(--accent)]">
+
+                  <AlertTriangle className="h-4 w-4" />
+
+                  Превышение планового срока на {overdueDays} дн.
                 </div>
               )}
-            </div>
-            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
-              <h3 className="text-[16px] font-bold text-[var(--text-primary)] mb-5 inline-flex items-center gap-2">
-                <User className="w-4 h-4 text-[var(--text-primary)]/45" /> Ответственный
+            </section>
+
+            {/* RESPONSIBLE */}
+            <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+
+              <h3 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
+
+                <User className="h-4 w-4 text-[var(--text-muted)]" />
+
+                Ответственный
               </h3>
+
               {responsible ? (
                 <div className="flex items-center gap-4">
+
                   <Ava name={responsible.full_name} />
-                  <div>
-                    <p className="text-[15px] font-semibold text-[var(--text-primary)]">{responsible.full_name}</p>
-                    {responsible.role && <p className="text-[14px] text-[var(--text-primary)]/50 mt-0.5">{responsible.role}</p>}
-                    {responsible.email && <p className="text-[14px] text-[var(--text-primary)]/40 mt-0.5">{responsible.email}</p>}
+
+                  <div className="min-w-0">
+
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">
+                      {responsible.full_name}
+                    </p>
+
+                    {responsible.role && (
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        {responsible.role}
+                      </p>
+                    )}
+
+                    {responsible.email && (
+                      <p className="mt-1 break-all text-xs text-[var(--text-muted)]">
+                        {responsible.email}
+                      </p>
+                    )}
                   </div>
                 </div>
-              ) : <p className="text-[14px] text-[var(--text-primary)]/40">Не назначен</p>}
-            </div>
-            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
-              <h3 className="text-[16px] font-bold text-[var(--text-primary)] mb-5 inline-flex items-center gap-2">
-                <Settings2 className="w-4 h-4 text-[var(--text-primary)]/45" /> Служебная информация
+              ) : (
+                <p className="text-sm text-[var(--text-muted)]">
+                  Ответственный не назначен
+                </p>
+              )}
+            </section>
+
+            {/* ASSIGNEES */}
+            <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
+
+              <div className="flex items-center justify-between gap-3 border-b border-[var(--border-color)] px-6 py-5">
+
+                <div className="flex items-center gap-3">
+
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--hover-2)]">
+                    <Users className="h-5 w-5 text-[var(--text-secondary)]" />
+                  </div>
+
+                  <div>
+                    <h3 className="text-base font-bold text-[var(--text-primary)]">
+                      Исполнители
+                    </h3>
+
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Сотрудники, назначенные на этап
+                    </p>
+                  </div>
+                </div>
+
+                <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-[var(--hover-2)] px-2 text-sm font-semibold text-[var(--text-secondary)]">
+                  {assigneeIds.length}
+                </span>
+              </div>
+
+              <div className="p-6">
+
+                {assigneeIds.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-8 text-center">
+
+                    <Users className="mx-auto h-9 w-9 text-[var(--text-disabled)]" />
+
+                    <p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">
+                      Исполнители не назначены
+                    </p>
+
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Добавьте сотрудников для выполнения этапа
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+
+                    {assigneeIds.map(id => {
+                      const employee = responsibles[id];
+
+                      return (
+                        <div
+                          key={id}
+                          className="flex items-center gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] p-3"
+                        >
+                          <Ava
+                            name={employee?.full_name}
+                            size="sm"
+                          />
+
+                          <div className="min-w-0 flex-1">
+
+                            <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                              {employee?.full_name ?? 'Пользователь'}
+                            </p>
+
+                            {employee?.email && (
+                              <p className="mt-1 truncate text-xs text-[var(--text-muted)]">
+                                {employee.email}
+                              </p>
+                            )}
+                          </div>
+
+                          {id === currentUserId && (
+                            <span className="rounded-lg bg-[var(--hover-2)] px-2 py-1 text-xs text-[var(--text-secondary)]">
+                              Вы
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setAssigneesModalOpen(true)}
+                  className="
+                    mt-4 flex w-full items-center justify-center gap-2
+                    rounded-xl border border-[var(--border-color)]
+                    bg-[var(--hover-2)] px-4 py-3
+                    text-sm font-semibold text-[var(--text-primary)]
+                    transition-colors
+                    hover:bg-[var(--hover-3)]
+                  "
+                >
+                  <UserPlus className="h-4 w-4" />
+
+                  {assigneeIds.length
+                    ? 'Управление исполнителями'
+                    : 'Назначить исполнителей'}
+                </button>
+              </div>
+            </section>
+
+            {/* SERVICE INFO */}
+            <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+
+              <h3 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
+                <Settings2 className="h-4 w-4 text-[var(--text-muted)]" />
+                Служебная информация
               </h3>
-              <div className="space-y-3 text-[14px]">
+
+              <div className="space-y-4">
+
                 {[
-                  { l: 'ID', v: stage.id, mono: true },
-                  { l: 'Порядок', v: `Этап ${stage.execution_order} из ${totalStages}` },
-                  { l: 'Создан', v: fmtDT(stage.created_at) },
-                  { l: 'Обновлён', v: fmtDT(stage.updated_at) }
-                ].map(r => (
-                  <div key={r.l} className="flex justify-between gap-4">
-                    <span className="text-[var(--text-primary)]/40">{r.l}</span>
-                    <span className={`text-[var(--text-primary)]/70 ${r.mono ? 'font-mono text-[13px]' : ''} text-right break-all`}>{r.v}</span>
+                  {
+                    label: 'ID',
+                    value: stage.id,
+                  },
+                  {
+                    label: 'Порядок',
+                    value: `Этап ${stage.execution_order} из ${totalStages}`,
+                  },
+                  {
+                    label: 'Создан',
+                    value: fmtDT(stage.created_at),
+                  },
+                  {
+                    label: 'Обновлён',
+                    value: fmtDT(stage.updated_at),
+                  },
+                ].map(item => (
+                  <div
+                    key={item.label}
+                    className="flex justify-between gap-4 text-sm"
+                  >
+                    <span className="shrink-0 text-[var(--text-muted)]">
+                      {item.label}
+                    </span>
+
+                    <span className="break-all text-right text-[var(--text-secondary)]">
+                      {item.value}
+                    </span>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           </div>
+
+          {/* RIGHT COLUMN */}
           <div className="space-y-6">
-            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
-              <h3 className="text-[16px] font-bold text-[var(--text-primary)] mb-5 inline-flex items-center gap-2">
-                <ListChecks className="w-4 h-4 text-[var(--text-primary)]/45" /> Критерии приёмки
+
+            {/* CRITERIA */}
+            <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+
+              <h3 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
+                <ListChecks className="h-4 w-4 text-[var(--text-muted)]" />
+                Критерии приёмки
               </h3>
+
               {!stage.completion_criteria.length ? (
-                <p className="text-[14px] text-[var(--text-primary)]/40">Критерии не указаны</p>
+                <p className="text-sm text-[var(--text-muted)]">
+                  Критерии не указаны
+                </p>
               ) : (
-                <div className="space-y-3">
-                  {stage.completion_criteria.map((c, i) => (
-                    <div key={i} className="flex items-start gap-3">
-                      <Target className="w-4 h-4 text-[var(--accent)] mt-0.5 flex-shrink-0" />
-                      <span className="text-[14px] leading-6 text-[var(--text-primary)]/75">{c}</span>
-                    </div>
-                  ))}
+                <div className="space-y-4">
+
+                  {stage.completion_criteria.map(
+                    (criterion, index) => (
+                      <div
+                        key={index}
+                        className="flex items-start gap-3"
+                      >
+                        <Target className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]" />
+
+                        <p className="text-sm leading-6 text-[var(--text-secondary)]">
+                          {criterion}
+                        </p>
+                      </div>
+                    ),
+                  )}
                 </div>
               )}
-            </div>
-            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
-              <h3 className="text-[16px] font-bold text-[var(--text-primary)] mb-5 inline-flex items-center gap-2">
-                <Flag className="w-4 h-4 text-[var(--text-primary)]/45" /> Действия
+            </section>
+
+            {/* ACTIONS */}
+            <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+
+              <h3 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
+                <Flag className="h-4 w-4 text-[var(--text-muted)]" />
+                Действия
               </h3>
-              <div className="grid gap-3">
-                {canSt && (
+
+              <div className="space-y-3">
+
+                {canStart && (
                   <button
-                    onClick={() => hAct('start', onStart)}
+                    type="button"
+                    onClick={() =>
+                      handleAction('start', onStart)
+                    }
                     disabled={!!action}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3.5 text-[14px] font-semibold text-white disabled:opacity-50"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3.5 text-sm font-semibold text-white disabled:opacity-50"
                   >
-                    <PlayCircle className="w-4 h-4" /> {action === 'start' ? 'Запускаем…' : 'Начать этап'}
+                    {action === 'start' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <PlayCircle className="h-4 w-4" />
+                    )}
+
+                    {action === 'start'
+                      ? 'Запускаем...'
+                      : 'Начать этап'}
                   </button>
                 )}
-                {canCo && (
+
+                {canComplete && (
                   <button
-                    onClick={() => hAct('complete', onComplete)}
+                    type="button"
+                    onClick={() =>
+                      handleAction('complete', onComplete)
+                    }
                     disabled={!!action}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3.5 text-[14px] font-semibold text-white disabled:opacity-50"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-sm font-semibold text-white disabled:opacity-50"
                   >
-                    <CheckCircle2 className="w-4 h-4" /> {action === 'complete' ? 'Завершаем…' : 'Завершить этап'}
+                    {action === 'complete' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4" />
+                    )}
+
+                    {action === 'complete'
+                      ? 'Завершаем...'
+                      : 'Завершить этап'}
                   </button>
                 )}
-                {canSk && (
+
+                {canSkip && (
                   <button
-                    onClick={() => hAct('skip', onSkip)}
+                    type="button"
+                    onClick={() =>
+                      handleAction('skip', onSkip)
+                    }
                     disabled={!!action}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] px-4 py-3.5 text-[14px] font-medium text-[var(--text-primary)]/65 hover:text-[var(--text-primary)] disabled:opacity-50 transition-colors"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] px-4 py-3.5 text-sm font-medium text-[var(--text-primary)] disabled:opacity-50"
                   >
-                    <SkipForward className="w-4 h-4" /> {action === 'skip' ? 'Пропускаем…' : 'Пропустить'}
+                    <SkipForward className="h-4 w-4" />
+
+                    {action === 'skip'
+                      ? 'Пропускаем...'
+                      : 'Пропустить этап'}
                   </button>
                 )}
-                {!canSt && !canCo && !canSk && (
-                  <p className="text-[14px] text-[var(--text-primary)]/40 text-center py-4">Нет доступных действий</p>
+
+                {!canStart && !canComplete && !canSkip && (
+                  <p className="py-4 text-center text-sm text-[var(--text-muted)]">
+                    Нет доступных действий
+                  </p>
                 )}
               </div>
-            </div>
+            </section>
           </div>
         </div>
       )}
+
+      {/* MODAL */}
+      <AssigneesModal
+        open={assigneesModalOpen}
+        onClose={() => setAssigneesModalOpen(false)}
+        users={responsibles}
+        selectedIds={assigneeIds}
+        currentUserId={currentUserId}
+        saving={savingAssignees}
+        onSave={handleSaveAssignees}
+      />
     </motion.div>
   );
 }
@@ -1764,362 +5390,1111 @@ function StageDetail({ stage, responsible, responsibles, totalStages, onBack, on
    CREATE STAGE
    ════════════════════════════════════════════════════════════════ */
 
-function CreateStage({ nextOrder, responsibles, onBack, onSubmit }: {
+function CreateStage({
+  nextOrder,
+  responsibles,
+  onBack,
+  onSubmit,
+}: {
   nextOrder: number;
   responsibles: Record<string, StageResponsible>;
   onBack: () => void;
-  onSubmit: (p: StageUpsertPayload) => Promise<void>;
+  onSubmit: (payload: StageUpsertPayload) => Promise<void>;
 }) {
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<StageForm>(emptyForm(nextOrder));
-  const upd = <K extends keyof StageForm>(k: K, v: StageForm[K]) => setForm(p => ({ ...p, [k]: v }));
-  const iC = 'w-full rounded-lg border border-[var(--border-color)] bg-[var(--hover-2)] px-3 py-2 text-[14px] text-[var(--text-primary)] placeholder-white/20 outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all';
-  const lC = 'block text-[13px] font-medium text-[var(--text-primary)]/45 mb-1';
-  const rOpts = Object.values(responsibles).sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'));
+  const [form, setForm] = useState<StageForm>(
+    emptyForm(nextOrder),
+  );
 
-  const hSubmit = async () => {
-    const p = formToPayload(form);
-    if (!p.name) return;
+  const [saving, setSaving] = useState(false);
+
+  const updateForm = <K extends keyof StageForm>(
+    key: K,
+    value: StageForm[K],
+  ) => {
+    setForm(previous => ({
+      ...previous,
+      [key]: value,
+    }));
+  };
+
+  const users = Object.values(responsibles).sort(
+    (a, b) => a.full_name.localeCompare(b.full_name, 'ru'),
+  );
+
+  const inputClass =
+    'w-full rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]';
+
+  const labelClass =
+    'mb-2 block text-sm font-medium text-[var(--text-secondary)]';
+
+  const handleSubmit = async () => {
+    const payload = formToPayload(form);
+
+    if (!payload.name || saving) return;
+
     setSaving(true);
-    try { await onSubmit(p); } finally { setSaving(false); }
+
+    try {
+      await onSubmit(payload);
+    } catch {
+      // Ошибка отображается родителем.
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
-      <button onClick={onBack} className="inline-flex items-center gap-2 text-[14px] font-medium text-[var(--text-primary)]/55 hover:text-[var(--text-primary)] transition-colors mb-5">
-        <ArrowLeft className="w-4 h-4" /> Назад
+    <motion.div
+      initial={{ opacity: 0, x: 16 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -16 }}
+      className="space-y-6"
+    >
+      {/* BACK */}
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Назад к этапам
       </button>
-      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5 mb-5 flex items-center justify-between gap-4 flex-wrap">
+
+      {/* HEADER */}
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)]/15 flex items-center justify-center text-[var(--accent)]">
-            <Plus className="w-5 h-5" />
+
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent-soft)]">
+            <Plus className="h-5 w-5 text-[var(--accent)]" />
           </div>
+
           <div>
-            <h1 className="text-[20px] font-bold text-[var(--text-primary)]">Новый этап</h1>
-            <p className="text-[14px] text-[var(--text-primary)]/45">Заполните информацию</p>
+            <h1 className="text-xl font-bold text-[var(--text-primary)]">
+              Новый этап
+            </h1>
+
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Заполните информацию об этапе проекта
+            </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={onBack}
-            className="rounded-lg border border-[var(--border-color)] bg-[var(--hover-2)] px-3 py-2 text-[14px] text-[var(--text-primary)]/55 hover:text-[var(--text-primary)] transition-colors"
-          >
-            Отмена
-          </button>
-          <button
-            onClick={hSubmit}
-            disabled={saving}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3.5 py-2 text-[14px] font-semibold text-white disabled:opacity-50"
-          >
-            <Plus className="w-3.5 h-3.5" /> {saving ? 'Создаём…' : 'Создать'}
-          </button>
-        </div>
-      </div>
-      <div className="grid lg:grid-cols-3 gap-5">
-        <div className="space-y-5">
-          <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
-            <h3 className="text-[14px] font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-              <Milestone className="w-4 h-4 text-[var(--text-primary)]/35" /> Основное
-            </h3>
-            <div className="space-y-3">
+
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={saving || !form.name.trim()}
+          className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="h-4 w-4" />
+          )}
+
+          {saving ? 'Создание...' : 'Создать этап'}
+        </button>
+      </section>
+
+      {/* FORM */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+
+        {/* MAIN */}
+        <div className="space-y-6">
+
+          <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+
+            <h2 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
+              <Milestone className="h-4 w-4 text-[var(--text-muted)]" />
+              Основные данные
+            </h2>
+
+            <div className="space-y-5">
+
               <div>
-                <label className={lC}>Название</label>
-                <input value={form.name} onChange={e => upd('name', e.target.value)} className={iC} placeholder="Тестирование" />
+                <label className={labelClass}>
+                  Название этапа
+                </label>
+
+                <input
+                  value={form.name}
+                  onChange={event =>
+                    updateForm('name', event.target.value)
+                  }
+                  placeholder="Например, тестирование"
+                  className={inputClass}
+                />
               </div>
+
               <div className="grid grid-cols-2 gap-3">
+
                 <div>
-                  <label className={lC}>Номер</label>
-                  <input type="number" min={1} value={form.order} onChange={e => upd('order', e.target.value)} className={iC} />
+                  <label className={labelClass}>
+                    Номер
+                  </label>
+
+                  <input
+                    type="number"
+                    min={1}
+                    value={form.order}
+                    onChange={event =>
+                      updateForm('order', event.target.value)
+                    }
+                    className={inputClass}
+                  />
                 </div>
+
                 <div>
-                  <label className={lC}>Статус</label>
-                  <Select value={form.status} onValueChange={e => upd('status', e as ProjectStageStatus)}>
-                    <SelectTrigger className={iC}><SelectValue placeholder="Выберите статус" /></SelectTrigger>
+                  <label className={labelClass}>
+                    Статус
+                  </label>
+
+                  <Select
+                    value={form.status}
+                    onValueChange={value =>
+                      updateForm(
+                        'status',
+                        value as ProjectStageStatus,
+                      )
+                    }
+                  >
+                    <SelectTrigger className={inputClass}>
+                      <SelectValue placeholder="Статус" />
+                    </SelectTrigger>
+
                     <SelectContent>
-                      <SelectItem value="planned">Запланирован</SelectItem>
-                      <SelectItem value="active">В работе</SelectItem>
-                      <SelectItem value="on_hold">На паузе</SelectItem>
-                      <SelectItem value="completed">Завершён</SelectItem>
-                      <SelectItem value="skipped">Пропущен</SelectItem>
+                      <SelectItem value="planned">
+                        Запланирован
+                      </SelectItem>
+
+                      <SelectItem value="active">
+                        В работе
+                      </SelectItem>
+
+                      <SelectItem value="on_hold">
+                        На паузе
+                      </SelectItem>
+
+                      <SelectItem value="completed">
+                        Завершён
+                      </SelectItem>
+
+                      <SelectItem value="skipped">
+                        Пропущен
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
+
               <div>
-                <label className={lC}>Ответственный</label>
-                <Select value={form.responsible_id} onValueChange={e => upd('responsible_id', e.target.value)}>
-                  <SelectTrigger className={iC}><SelectValue placeholder="Выберите ответственного" /></SelectTrigger>
+                <label className={labelClass}>
+                  Ответственный
+                </label>
+
+                <Select
+                  value={form.responsible_id || '__none__'}
+                  onValueChange={value =>
+                    updateForm(
+                      'responsible_id',
+                      value === '__none__' ? '' : value,
+                    )
+                  }
+                >
+                  <SelectTrigger className={inputClass}>
+                    <SelectValue placeholder="Выберите сотрудника" />
+                  </SelectTrigger>
+
                   <SelectContent>
-                    {rOpts.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}{p.role ? ` — ${p.role}` : ''}</SelectItem>)}
+                    <SelectItem value="__none__">
+                      Не назначен
+                    </SelectItem>
+
+                    {users.map(user => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.full_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
-          </div>
-          <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
-            <h3 className="text-[14px] font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-[var(--text-primary)]/35" /> Сроки
-            </h3>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={lC}>Начало</label>
-                  <input type="date" value={form.planned_start} onChange={e => upd('planned_start', e.target.value)} className={iC} />
-                </div>
-                <div>
-                  <label className={lC}>Окончание</label>
-                  <input type="date" value={form.planned_end} onChange={e => upd('planned_end', e.target.value)} className={iC} />
-                </div>
-              </div>
+          </section>
+
+          {/* DATES */}
+          <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+
+            <h2 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
+              <Calendar className="h-4 w-4 text-[var(--text-muted)]" />
+              Плановые сроки
+            </h2>
+
+            <div className="space-y-4">
+
               <div>
-                <label className={lC}>Длительность</label>
-                <input type="number" min={1} value={form.planned_duration_days} onChange={e => upd('planned_duration_days', e.target.value)} className={iC} placeholder="—" />
+                <label className={labelClass}>
+                  Начало
+                </label>
+
+                <input
+                  type="date"
+                  value={form.planned_start}
+                  onChange={event =>
+                    updateForm(
+                      'planned_start',
+                      event.target.value,
+                    )
+                  }
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}>
+                  Окончание
+                </label>
+
+                <input
+                  type="date"
+                  value={form.planned_end}
+                  onChange={event =>
+                    updateForm(
+                      'planned_end',
+                      event.target.value,
+                    )
+                  }
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}>
+                  Длительность, дней
+                </label>
+
+                <input
+                  type="number"
+                  min={1}
+                  value={form.planned_duration_days}
+                  onChange={event =>
+                    updateForm(
+                      'planned_duration_days',
+                      event.target.value,
+                    )
+                  }
+                  className={inputClass}
+                />
               </div>
             </div>
-          </div>
+          </section>
         </div>
-        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
-          <h3 className="text-[14px] font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-[var(--text-primary)]/35" /> Описание
-          </h3>
-          <textarea value={form.description} onChange={e => upd('description', e.target.value)} className={`${iC} min-h-[280px] resize-y`} placeholder="Задачи этапа" />
-        </div>
-        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
-          <h3 className="text-[14px] font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-            <ListChecks className="w-4 h-4 text-[var(--text-primary)]/35" /> Критерии приёмки
-          </h3>
-          <p className="text-[13px] text-[var(--text-primary)]/40 mb-2">Каждый с новой строки</p>
-          <textarea value={form.completion_criteria} onChange={e => upd('completion_criteria', e.target.value)} className={`${iC} min-h-[250px] resize-y`} placeholder={'Утверждено ТЗ\nПройдены тесты'} />
-        </div>
+
+        {/* DESCRIPTION */}
+        <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+
+          <h2 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
+            <FileText className="h-4 w-4 text-[var(--text-muted)]" />
+            Описание
+          </h2>
+
+          <textarea
+            value={form.description}
+            onChange={event =>
+              updateForm('description', event.target.value)
+            }
+            placeholder="Опишите задачи и цели этапа"
+            className={`${inputClass} min-h-[280px] resize-y`}
+          />
+        </section>
+
+        {/* CRITERIA */}
+        <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+
+          <h2 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
+            <ListChecks className="h-4 w-4 text-[var(--text-muted)]" />
+            Критерии приёмки
+          </h2>
+
+          <p className="mb-4 text-sm text-[var(--text-muted)]">
+            Каждый критерий укажите с новой строки
+          </p>
+
+          <textarea
+            value={form.completion_criteria}
+            onChange={event =>
+              updateForm(
+                'completion_criteria',
+                event.target.value,
+              )
+            }
+            placeholder={'Утверждено ТЗ\nПройдены тесты'}
+            className={`${inputClass} min-h-[280px] resize-y`}
+          />
+        </section>
       </div>
     </motion.div>
   );
 }
 
 /* ════════════════════════════════════════════════════════════════
-   SECTION — ИНТЕГРАЦИЯ С API
+   PROJECT STAGES SECTION
    ════════════════════════════════════════════════════════════════ */
 
 interface SectionProps {
-  projectId: string; // ✅ Теперь обязательный проп
+  projectId: string;
 }
 
-export function ProjectStagesSection({ projectId }: SectionProps) {
-  const [stages, setStages] = useState<ProjectStageResponse[]>([]);
-  const [responsibles, setResponsibles] = useState<Record<string, StageResponsible>>(MOCK_RESPONSIBLES);
+export function ProjectStagesSection({
+  projectId,
+}: SectionProps) {
+  const { user } = useAuthStore();
+
+  const [stages, setStages] =
+    useState<ProjectStageResponse[]>([]);
+
+  const [responsibles, setResponsibles] =
+    useState<Record<string, StageResponsible>>({});
+
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<ViewType>('table');
-  const [screen, setScreen] = useState<SectionScreen>({ type: 'list' });
-  const [toasts, setToasts] = useState<Toast[]>([]);
 
-  // ✅ Загрузка проекта с этапами
-  useEffect(() => {
-    const loadProject = async () => {
-      setLoading(true);
-      try {
-        const project = await projectsApi.getById(projectId);
-        const sorted = [...project.stages].sort((a, b) => a.execution_order - b.execution_order);
-        setStages(sorted);
-      } catch (err) {
-        console.error('Failed to load project:', err);
-        push('Не удалось загрузить проект', 'error');
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadProject();
-  }, [projectId]);
+  const [view, setView] =
+    useState<ViewType>('table');
 
-  const push = useCallback((title: string, type: Toast['type'] = 'info') => {
-    const id = Date.now() + Math.random();
-    setToasts(p => [...p, { id, title, type }]);
-    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 3500);
-  }, []);
+  const [screen, setScreen] =
+    useState<SectionScreen>({ type: 'list' });
 
-  const commit = useCallback((next: ProjectStageResponse[]) => {
-    setStages(next);
-  }, []);
+  const [toasts, setToasts] =
+    useState<Toast[]>([]);
 
-  const selectedStage = useMemo(() =>
-    screen.type === 'detail' ? stages.find(s => s.id === screen.stageId) ?? null : null,
-    [stages, screen]
+  /* =========================================================
+     TOASTS
+     ========================================================= */
+
+  const push = useCallback(
+    (
+      title: string,
+      type: Toast['type'] = 'info',
+    ) => {
+      const id =
+        Date.now() + Math.random();
+
+      setToasts(previous => [
+        ...previous,
+        {
+          id,
+          title,
+          type,
+        },
+      ]);
+
+      window.setTimeout(() => {
+        setToasts(previous =>
+          previous.filter(toast => toast.id !== id),
+        );
+      }, 3500);
+    },
+    [],
   );
 
-  const goList = useCallback(() => setScreen({ type: 'list' }), []);
-  const goDetail = useCallback((s: ProjectStageResponse) => setScreen({ type: 'detail', stageId: s.id, editing: false }), []);
-  const goCreate = useCallback(() => setScreen({ type: 'create' }), []);
+  /* =========================================================
+     LOAD USERS
+     ========================================================= */
 
-  // ✅ Создание — извлекаем stages из Project
-  const handleCreate = useCallback(async (p: StageUpsertPayload) => {
-    const apiPayload = {
-      name: p.name,
-      description: p.description || undefined,
-      execution_order: p.order,
-      planned_start: p.planned_start,
-      planned_end: p.planned_end,
-      responsible_id: p.responsible_id || undefined,
-      completion_criteria: p.completion_criteria,
-    };
-    const prev = stages;
-    try {
-      const project = await projectsApi.createStage(projectId, apiPayload as any);
-      const sorted = [...project.stages].sort((a, b) => a.execution_order - b.execution_order);
-      commit(sorted);
-      const newStage = sorted.find(s => s.name === p.name);
-      setScreen({ type: 'detail', stageId: newStage?.id || sorted[sorted.length - 1].id, editing: false });
-      push(`Этап «${p.name}» создан`, 'success');
-    } catch {
-      commit(prev);
-      push('Не удалось создать', 'error');
-    }
-  }, [stages, commit, projectId, push]);
+  useEffect(() => {
+    let cancelled = false;
 
-  // ✅ Обновление — извлекаем stages из Project
- // ✅ Исправленная версия
-const handleUpdate = useCallback(async (sid: string, p: StageUpsertPayload) => {
-  const cur = stages.find(s => s.id === sid);
-  if (!cur) return;
-  
-  const apiPayload = {
-    name: p.name,
-    description: p.description || undefined,
-    responsible_id: p.responsible_id,
-    completion_criteria: p.completion_criteria,
-    planned_start: p.planned_start,
-    planned_end: p.planned_end,
-  };
-  
-  const prev = stages;
-  try {
-    // ✅ API возвращает один этап, а не проект
-    const updatedStage = await projectsApi.updateStage(projectId, sid, apiPayload as any);
-    
-    // ✅ Обновляем этап в текущем массиве
-    const next = stages.map(s => s.id === sid ? { ...s, ...updatedStage } : s);
-    const sorted = [...next].sort((a, b) => a.execution_order - b.execution_order);
-    commit(sorted);
-    
-    push(`Этап «${p.name}» сохранён`, 'success');
-  } catch (err) {
-    console.error('Update stage error:', err);
-    commit(prev);
-    push('Не удалось сохранить', 'error');
-  }
-}, [stages, commit, projectId, push]);
+    const loadUsers = async () => {
+      try {
+        const result: Record<
+          string,
+          StageResponsible
+        > = {};
 
-  // ✅ Удаление — извлекаем stages из Project
-  const handleDelete = useCallback(async (sid: string) => {
-    const cur = stages.find(s => s.id === sid);
-    if (!cur) return;
-    const prev = stages;
-    try {
-      const project = await projectsApi.deleteStage(projectId, sid);
-      const sorted = [...project.stages].sort((a, b) => a.execution_order - b.execution_order);
-      commit(sorted);
-      goList();
-      push(`Этап «${cur.name}» удалён`, 'success');
-    } catch {
-      commit(prev);
-      setScreen({ type: 'detail', stageId: sid, editing: false });
-      push('Не удалось удалить', 'error');
-    }
-  }, [stages, commit, projectId, push, goList]);
+        let page = 1;
+        let totalPages = 1;
 
-  // ✅ Действия — извлекаем stages из Project
-  const quickAction = useCallback(async (sid: string, type: 'start' | 'complete' | 'skip') => {
-    const cur = stages.find(s => s.id === sid);
-    if (!cur) return;
-    const prev = stages;
-    try {
-      let project: Project;
-      if (type === 'start') project = await projectsApi.startStage(projectId, sid);
-      else if (type === 'complete') project = await projectsApi.completeStage(projectId, sid);
-      else project = await projectsApi.skipStage(projectId, sid);
-      const sorted = [...project.stages].sort((a, b) => a.execution_order - b.execution_order);
-      commit(sorted);
-      push(`Этап «${cur.name}» — ${STATUS_CFG[cur.status].label.toLowerCase()}`, 'success');
-    } catch {
-      commit(prev);
-      push('Ошибка', 'error');
-    }
-  }, [stages, commit, projectId, push]);
+        do {
+          const response =
+            await usersApi.getAllUsers(page, 100);
 
-  // ✅ Drag & Drop — извлекаем stages из Project
-  const handleMoveStage = useCallback(async (stageId: string, newStatus: ProjectStageStatus) => {
-    const cur = stages.find(s => s.id === stageId);
-    if (!cur || cur.status === newStatus) return;
-    const prev = stages;
-    try {
-      let project: Project;
-      if (newStatus === 'active') project = await projectsApi.startStage(projectId, stageId);
-      else if (newStatus === 'completed') project = await projectsApi.completeStage(projectId, stageId);
-      else if (newStatus === 'skipped') project = await projectsApi.skipStage(projectId, stageId);
-      else {
-        const pl = { name: cur.name, description: cur.description, responsible_id: cur.responsible_id, completion_criteria: cur.completion_criteria };
-        await projectsApi.updateStage(projectId, stageId, pl as any);
-        project = await projectsApi.getById(projectId);
+          if (cancelled) return;
+
+          response.items.forEach(item => {
+            result[item.id] = {
+              id: item.id,
+              full_name:
+                item.full_name ||
+                item.email ||
+                'Без имени',
+              email: item.email,
+            };
+          });
+
+          totalPages = response.total_pages;
+          page += 1;
+        } while (
+          page <= totalPages &&
+          !cancelled
+        );
+
+        if (!cancelled) {
+          setResponsibles(result);
+        }
+      } catch (error) {
+        console.error(
+          'Failed to load users:',
+          error,
+        );
+
+        if (!cancelled) {
+          push(
+            'Не удалось загрузить сотрудников',
+            'error',
+          );
+        }
       }
-      const sorted = [...project.stages].sort((a, b) => a.execution_order - b.execution_order);
-      commit(sorted);
-      push(`«${cur.name}» → ${STATUS_CFG[newStatus].label}`, 'success');
-    } catch {
-      commit(prev);
-      push('Не удалось изменить статус', 'error');
-    }
-  }, [stages, commit, projectId, push]);
+    };
 
-  if (loading) return <PageSkeleton />;
+    void loadUsers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [push]);
+
+  /* =========================================================
+     LOAD PROJECT
+     ========================================================= */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadProject = async () => {
+      setLoading(true);
+
+      try {
+        const project =
+          await projectsApi.getById(projectId);
+
+        if (cancelled) return;
+
+        setStages(sortOrd(project.stages ?? []));
+      } catch (error) {
+        console.error(
+          'Failed to load project:',
+          error,
+        );
+
+        if (!cancelled) {
+          push(
+            'Не удалось загрузить проект',
+            'error',
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadProject();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, push]);
+
+  /* =========================================================
+     HELPERS
+     ========================================================= */
+
+  const commit = useCallback(
+    (next: ProjectStageResponse[]) => {
+      setStages(sortOrd(next));
+    },
+    [],
+  );
+
+  const selectedStage = useMemo(() => {
+    if (screen.type !== 'detail') {
+      return null;
+    }
+
+    return (
+      stages.find(
+        stage => stage.id === screen.stageId,
+      ) ?? null
+    );
+  }, [stages, screen]);
+
+  const goList = useCallback(() => {
+    setScreen({ type: 'list' });
+  }, []);
+
+  const goDetail = useCallback(
+    (stage: ProjectStageResponse) => {
+      setScreen({
+        type: 'detail',
+        stageId: stage.id,
+        editing: false,
+      });
+    },
+    [],
+  );
+
+  const goCreate = useCallback(() => {
+    setScreen({ type: 'create' });
+  }, []);
+
+  const reloadProject = useCallback(async () => {
+    const project =
+      await projectsApi.getById(projectId);
+
+    commit(project.stages ?? []);
+
+    return project;
+  }, [projectId, commit]);
+
+  /* =========================================================
+     CREATE STAGE
+     ========================================================= */
+
+  const handleCreate = useCallback(
+    async (payload: StageUpsertPayload) => {
+      try {
+        const apiPayload = {
+          name: payload.name,
+          description: payload.description ?? undefined,
+          execution_order: payload.order,
+          planned_start: payload.planned_start,
+          planned_end: payload.planned_end,
+          responsible_id:
+            payload.responsible_id ?? undefined,
+          completion_criteria:
+            payload.completion_criteria,
+        };
+
+        const project = await projectsApi.createStage(
+          projectId,
+          apiPayload as any,
+        );
+
+        const sorted = sortOrd(project.stages ?? []);
+
+        commit(sorted);
+
+        const newStage = [...sorted]
+          .reverse()
+          .find(stage => stage.name === payload.name);
+
+        if (newStage) {
+          goDetail(newStage);
+        } else {
+          goList();
+        }
+
+        push(
+          `Этап «${payload.name}» создан`,
+          'success',
+        );
+      } catch (error) {
+        console.error(
+          'Create stage error:',
+          error,
+        );
+
+        push(
+          'Не удалось создать этап',
+          'error',
+        );
+
+        throw error;
+      }
+    },
+    [
+      projectId,
+      commit,
+      goDetail,
+      goList,
+      push,
+    ],
+  );
+
+  /* =========================================================
+     UPDATE STAGE
+     ========================================================= */
+
+  const handleUpdate = useCallback(
+    async (
+      stageId: string,
+      payload: StageUpsertPayload,
+    ) => {
+      try {
+        const current = stages.find(
+          stage => stage.id === stageId,
+        );
+
+        if (!current) {
+          throw new Error('Stage not found');
+        }
+
+        const apiPayload = {
+          name: payload.name,
+          description: payload.description,
+          responsible_id: payload.responsible_id,
+          completion_criteria:
+            payload.completion_criteria,
+          planned_start: payload.planned_start,
+          planned_end: payload.planned_end,
+        };
+
+        const updatedStage =
+          await projectsApi.updateStage(
+            projectId,
+            stageId,
+            apiPayload as any,
+          );
+
+        commit(
+          stages.map(stage =>
+            stage.id === stageId
+              ? { ...stage, ...updatedStage }
+              : stage,
+          ),
+        );
+
+        push(
+          `Этап «${payload.name}» сохранён`,
+          'success',
+        );
+      } catch (error) {
+        console.error(
+          'Update stage error:',
+          error,
+        );
+
+        push(
+          'Не удалось сохранить этап',
+          'error',
+        );
+
+        throw error;
+      }
+    },
+    [stages, projectId, commit, push],
+  );
+
+  /* =========================================================
+     DELETE STAGE
+     ========================================================= */
+
+  const handleDelete = useCallback(
+    async (stageId: string) => {
+      try {
+        await projectsApi.deleteStage(
+          projectId,
+          stageId,
+        );
+
+        await reloadProject();
+
+        goList();
+
+        push(
+          'Этап удалён',
+          'success',
+        );
+      } catch (error) {
+        console.error(
+          'Delete stage error:',
+          error,
+        );
+
+        push(
+          'Не удалось удалить этап',
+          'error',
+        );
+
+        throw error;
+      }
+    },
+    [
+      projectId,
+      reloadProject,
+      goList,
+      push,
+    ],
+  );
+
+  /* =========================================================
+     QUICK ACTIONS
+     ========================================================= */
+
+  const quickAction = useCallback(
+    async (
+      stageId: string,
+      type: 'start' | 'complete' | 'skip',
+    ) => {
+      try {
+        if (type === 'start') {
+          await projectsApi.startStage(
+            projectId,
+            stageId,
+          );
+        } else if (type === 'complete') {
+          await projectsApi.completeStage(
+            projectId,
+            stageId,
+          );
+        } else {
+          await projectsApi.skipStage(
+            projectId,
+            stageId,
+          );
+        }
+
+        await reloadProject();
+
+        const messages = {
+          start: 'Этап запущен',
+          complete: 'Этап завершён',
+          skip: 'Этап пропущен',
+        };
+
+        push(messages[type], 'success');
+      } catch (error) {
+        console.error(
+          'Stage action error:',
+          error,
+        );
+
+        push(
+          'Не удалось выполнить действие',
+          'error',
+        );
+
+        throw error;
+      }
+    },
+    [
+      projectId,
+      reloadProject,
+      push,
+    ],
+  );
+
+  /* =========================================================
+     MOVE STAGE
+     ========================================================= */
+
+  const handleMoveStage = useCallback(
+    async (
+      stageId: string,
+      newStatus: ProjectStageStatus,
+    ) => {
+      const current = stages.find(
+        stage => stage.id === stageId,
+      );
+
+      if (!current || current.status === newStatus) {
+        return;
+      }
+
+      try {
+        if (newStatus === 'active') {
+          await projectsApi.startStage(
+            projectId,
+            stageId,
+          );
+        } else if (newStatus === 'completed') {
+          await projectsApi.completeStage(
+            projectId,
+            stageId,
+          );
+        } else if (newStatus === 'skipped') {
+          await projectsApi.skipStage(
+            projectId,
+            stageId,
+          );
+        } else {
+          throw new Error(
+            'Перемещение в выбранный статус не поддерживается API',
+          );
+        }
+
+        await reloadProject();
+
+        push(
+          `Статус этапа: ${STATUS_CFG[newStatus].label}`,
+          'success',
+        );
+      } catch (error) {
+        console.error(
+          'Move stage error:',
+          error,
+        );
+
+        push(
+          'Не удалось изменить статус',
+          'error',
+        );
+
+        throw error;
+      }
+    },
+    [
+      stages,
+      projectId,
+      reloadProject,
+      push,
+    ],
+  );
+
+  /* =========================================================
+     SET ASSIGNEES
+     ========================================================= */
+
+  const handleSetAssignees = useCallback(
+    async (
+      stageId: string,
+      userIds: string[],
+    ) => {
+      try {
+        const uniqueIds = [...new Set(userIds)];
+
+        const updatedStage =
+          await projectsApi.setStageAssignees(
+            projectId,
+            stageId,
+            uniqueIds,
+          );
+
+        // Обновляем данные этапа из ответа API.
+        setStages(previous =>
+          previous.map(stage =>
+            stage.id === stageId
+              ? {
+                ...stage,
+                ...updatedStage,
+                assignee_ids:
+                  updatedStage.assignee_ids ?? uniqueIds,
+              }
+              : stage,
+          ),
+        );
+
+        // Синхронизируемся с сервером.
+        try {
+          await reloadProject();
+        } catch (reloadError) {
+          console.error(
+            'Failed to refresh project after assignee update:',
+            reloadError,
+          );
+        }
+
+        push(
+          'Исполнители обновлены',
+          'success',
+        );
+      } catch (error) {
+        console.error(
+          'Failed to set stage assignees:',
+          error,
+        );
+
+        push(
+          'Не удалось сохранить исполнителей',
+          'error',
+        );
+
+        throw error;
+      }
+    },
+    [
+      projectId,
+      reloadProject,
+      push,
+    ],
+  );
+
+  /* =========================================================
+     LOADING
+     ========================================================= */
+
+  if (loading) {
+    return <PageSkeleton />;
+  }
+
+  /* =========================================================
+     RENDER
+     ========================================================= */
 
   return (
     <div className="space-y-6">
+
       <AnimatePresence mode="wait">
+
+        {/* LIST */}
         {screen.type === 'list' && (
-          <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-            <div className="flex items-center justify-between gap-4 flex-wrap mb-5">
-              <ViewTabs view={view} onChange={setView} />
+          <motion.div
+            key="stages-list"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            {/* VIEW NAVIGATION */}
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+
+              <ViewTabs
+                view={view}
+                onChange={setView}
+              />
+
               {stages.length > 0 && view !== 'table' && (
-                <button onClick={goCreate} className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-[14px] font-semibold text-white">
-                  <Plus className="w-4 h-4" /> Создать
+                <button
+                  type="button"
+                  onClick={goCreate}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white"
+                >
+                  <Plus className="h-4 w-4" />
+                  Создать этап
                 </button>
               )}
             </div>
+
+            {/* CURRENT VIEW */}
             <AnimatePresence mode="wait">
-              <motion.div key={view} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
-                {view === 'table' && <TableView stages={stages} responsibles={responsibles} onSelect={goDetail} onCreate={goCreate} />}
-                {view === 'overview' && <OverviewView stages={stages} responsibles={responsibles} onSelect={goDetail} />}
-                {view === 'roadmap' && <RoadmapView stages={stages} responsibles={responsibles} onSelect={goDetail} />}
-                {view === 'timeline' && <TimelineView stages={stages} responsibles={responsibles} projectId={projectId} onSelect={goDetail} />}
-                {view === 'board' && <BoardView stages={stages} responsibles={responsibles} onSelect={goDetail} onMoveStage={handleMoveStage} />}
-                {view === 'analytics' && <AnalyticsView stages={stages} />}
+              <motion.div
+                key={view}
+                initial={{
+                  opacity: 0,
+                  y: 8,
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                }}
+                exit={{
+                  opacity: 0,
+                  y: -8,
+                }}
+                transition={{
+                  duration: 0.15,
+                }}
+              >
+
+                {view === 'table' && (
+                  <TableView
+                    stages={stages}
+                    responsibles={responsibles}
+                    onSelect={goDetail}
+                    onCreate={goCreate}
+                  />
+                )}
+
+                {view === 'overview' && (
+                  <OverviewView
+                    stages={stages}
+                    responsibles={responsibles}
+                    onSelect={goDetail}
+                  />
+                )}
+
+                {view === 'roadmap' && (
+                  <RoadmapView
+                    stages={stages}
+                    responsibles={responsibles}
+                    onSelect={goDetail}
+                  />
+                )}
+
+                {view === 'timeline' && (
+                  <TimelineView
+                    stages={stages}
+                    responsibles={responsibles}
+                    projectId={projectId}
+                    onSelect={goDetail}
+                  />
+                )}
+
+                {view === 'board' && (
+                  <BoardView
+                    stages={stages}
+                    responsibles={responsibles}
+                    onSelect={goDetail}
+                    onMoveStage={handleMoveStage}
+                  />
+                )}
+
+                {view === 'analytics' && (
+                  <AnalyticsView
+                    stages={stages}
+                  />
+                )}
               </motion.div>
             </AnimatePresence>
           </motion.div>
         )}
+
+        {/* DETAIL */}
         {screen.type === 'detail' && selectedStage && (
           <StageDetail
             key={selectedStage.id}
             stage={selectedStage}
-            responsible={selectedStage.responsible_id ? responsibles[selectedStage.responsible_id] ?? null : null}
+            responsible={
+              selectedStage.responsible_id
+                ? responsibles[selectedStage.responsible_id] ?? null
+                : null
+            }
             responsibles={responsibles}
             totalStages={stages.length}
+            currentUserId={user?.id}
             onBack={goList}
             onSave={handleUpdate}
             onDelete={handleDelete}
-            onStart={sid => quickAction(sid, 'start')}
-            onComplete={sid => quickAction(sid, 'complete')}
-            onSkip={sid => quickAction(sid, 'skip')}
+            onStart={stageId =>
+              quickAction(stageId, 'start')
+            }
+            onComplete={stageId =>
+              quickAction(stageId, 'complete')
+            }
+            onSkip={stageId =>
+              quickAction(stageId, 'skip')
+            }
+            onSetAssignees={handleSetAssignees}
           />
         )}
+
+        {/* CREATE */}
         {screen.type === 'create' && (
-          <CreateStage key="create" nextOrder={stages.length + 1} responsibles={responsibles} onBack={goList} onSubmit={handleCreate} />
+          <CreateStage
+            key="create-stage"
+            nextOrder={stages.length + 1}
+            responsibles={responsibles}
+            onBack={goList}
+            onSubmit={handleCreate}
+          />
         )}
       </AnimatePresence>
-      <Toasts toasts={toasts} onClose={id => setToasts(p => p.filter(t => t.id !== id))} />
+
+      {/* TOASTS */}
+      <Toasts
+        toasts={toasts}
+        onClose={id =>
+          setToasts(previous =>
+            previous.filter(toast => toast.id !== id),
+          )
+        }
+      />
     </div>
   );
 }
 
 /* ════════════════════════════════════════════════════════════════
-   PAGE
+   DEFAULT EXPORT
    ════════════════════════════════════════════════════════════════ */
+
 export default ProjectStagesSection;

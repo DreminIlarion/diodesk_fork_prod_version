@@ -624,6 +624,22 @@ export const projectsApi = {
     return response.data;
   },
 
+  // Назначение нескольких исполнителей этапа
+setStageAssignees: async (
+  projectId: string,
+  stageId: string,
+  userIds: string[]
+): Promise<ProjectStageResponse> => {
+  const response = await api.patch<ProjectStageResponse>(
+    `/api/v1/projects/${projectId}/stages/${stageId}/assignees`,
+    {
+      user_ids: userIds,
+    }
+  );
+
+  return response.data;
+},
+
 
 };
 
