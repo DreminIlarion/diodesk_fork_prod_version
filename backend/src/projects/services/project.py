@@ -297,6 +297,42 @@ class ProjectService:
 
         return map_project_to_response(project)
 
+    async def pause_stage(
+            self, project_id: UUID, stage_id: UUID, current_subject: Subject
+    ) -> ProjectResponse:
+        """Приостановить этап."""
+        project = await get_or_raise_404(self.project_repo.read, project_id, Project)
+
+        permission = await self.authz_service.can_manage_project(
+            subject=current_subject, project_id=project.id
+        )
+        if not permission.allowed:
+            raise PermissionDeniedError(permission.reason)
+
+        project.pause_stage(stage_id)
+        await self.project_repo.update(project)
+        await self.uow.commit()
+
+        return map_project_to_response(project)
+
+    async def resume_stage(
+            self, project_id: UUID, stage_id: UUID, current_subject: Subject
+    ) -> ProjectResponse:
+        """Возобновить этап после паузы."""
+        project = await get_or_raise_404(self.project_repo.read, project_id, Project)
+
+        permission = await self.authz_service.can_manage_project(
+            subject=current_subject, project_id=project.id
+        )
+        if not permission.allowed:
+            raise PermissionDeniedError(permission.reason)
+
+        project.resume_stage(stage_id)
+        await self.project_repo.update(project)
+        await self.uow.commit()
+
+        return map_project_to_response(project)
+
     async def remove_stage(
             self, project_id: UUID, stage_id: UUID, current_subject: Subject
     ) -> ProjectResponse:

@@ -188,3 +188,38 @@ async def set_project_stage_assignees(
         data=data,
         current_subject=current_subject,
     )
+
+
+
+@router.post(
+    path="/{project_id}/stages/{stage_id}/pause",
+    status_code=status.HTTP_200_OK,
+    response_model=ProjectResponse,
+    summary="Приостановить этап проекта",
+)
+async def pause_project_stage(
+        project_id: UUID,
+        stage_id: UUID,
+        current_subject: CurrentSubjectDep,
+        service: ProjectServiceDep,
+) -> ProjectResponse:
+    return await service.pause_stage(
+        project_id=project_id, stage_id=stage_id, current_subject=current_subject
+    )
+
+
+@router.post(
+    path="/{project_id}/stages/{stage_id}/resume",
+    status_code=status.HTTP_200_OK,
+    response_model=ProjectResponse,
+    summary="Возобновить этап проекта",
+)
+async def resume_project_stage(
+        project_id: UUID,
+        stage_id: UUID,
+        current_subject: CurrentSubjectDep,
+        service: ProjectServiceDep,
+) -> ProjectResponse:
+    return await service.resume_stage(
+        project_id=project_id, stage_id=stage_id, current_subject=current_subject
+    )

@@ -239,6 +239,22 @@ class ProjectStage(Entity):
         self.assignee_ids.remove(user_id)
         self.updated_at = current_datetime()
 
+    def pause(self) -> None:
+        """Приостановить активный этап."""
+        if self.status != ProjectStageStatus.ACTIVE:
+            raise InvalidStateError("Only ACTIVE stage can be paused")
+
+        self.status = ProjectStageStatus.ON_HOLD
+        self.updated_at = current_datetime()
+
+    def resume(self) -> None:
+        """Возобновить приостановленный этап."""
+        if self.status != ProjectStageStatus.ON_HOLD:
+            raise InvalidStateError("Only ON_HOLD stage can be resumed")
+
+        self.status = ProjectStageStatus.ACTIVE
+        self.updated_at = current_datetime()
+
 
 @dataclass(kw_only=True)
 class Project(AggregateRoot):
@@ -584,3 +600,21 @@ class Project(AggregateRoot):
             for s in self.stages
         ):
             self.status = ProjectStatus.COMPLETED
+
+    def pause_stage(self, stage_id: UUID) -> None:
+        """Приостановить этап."""
+        stage = self.find_stage(stage_id)
+        if stage is None:
+            raise NotFoundError(f"Stage with ID {stage_id} does not exist in project")
+
+        stage.pause()
+        self.updated_at = current_datetime()
+
+    def resume_stage(self, stage_id: UUID) -> None:
+        """Возобновить этап после паузы."""
+        stage = self.find_stage(stage_id)
+        if stage is None:
+            raise NotFoundError(f"Stage with ID {stage_id} does not exist in project")
+
+        stage.resume()
+        self.updated_at = current_datetime()

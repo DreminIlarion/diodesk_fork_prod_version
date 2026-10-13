@@ -639,6 +639,17 @@ setStageAssignees: async (
 
   return response.data;
 },
+  // Приостановить этап
+  pauseStage: async (projectId: string, stageId: string): Promise<Project> => {
+    const response = await api.post<Project>(`/api/v1/projects/${projectId}/stages/${stageId}/pause`);
+    return response.data;
+  },
+
+  // Возобновить этап
+  resumeStage: async (projectId: string, stageId: string): Promise<Project> => {
+    const response = await api.post<Project>(`/api/v1/projects/${projectId}/stages/${stageId}/resume`);
+    return response.data;
+  },
 
 
 };

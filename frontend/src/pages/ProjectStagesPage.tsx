@@ -1,99 +1,50 @@
 // pages/ProjectStagesPage.tsx
 
-import {
-  useState,
-  useMemo,
-  useEffect,
-  useCallback,
-} from 'react';
-
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import {
-  motion,
-  AnimatePresence,
-} from 'framer-motion';
-
-import {
-  Calendar,
-  Clock,
-  CheckCircle2,
-  PlayCircle,
-  AlertTriangle,
-  X,
-  LayoutGrid,
-  GanttChart,
-  Map as MapIcon,
-  BarChart3,
-  Info,
-  Target,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  Search,
-  Filter,
-  Table as TableIcon,
-  Milestone,
-  Flag,
-  PauseCircle,
-  SkipForward,
-  PenSquare,
-  Save,
-  ChevronRight,
-  Plus,
-  Trash2,
-  ArrowLeft,
-  Eye,
-  User,
-  Users,
-  UserPlus,
-  FileText,
-  ListChecks,
-  Settings2,
-  Layers,
-  TrendingUp,
-  Loader2,
-  Check,
+  ArrowLeft, ArrowRight, ChevronRight, ChevronDown, MoreHorizontal,
+  Plus, Search, Filter, X, Check, Save, Trash2, Pencil,
+  Calendar, Clock, Timer, AlertTriangle, CheckCircle2,
+  PlayCircle, PauseCircle, SkipForward, RotateCcw,
+  Milestone, Flag, Target, ListChecks, FileText, Settings2,
+  User, Users, UserPlus, UserCheck, FolderOpen, Hash,
+  LayoutGrid, GanttChart, Map as MapIcon, BarChart3,
+  Table as TableIcon, TrendingUp, Info, Layers,
+  ArrowUpDown, ArrowUp, ArrowDown, Loader2, Eye,
+  Download, CalendarDays, CircleDot, Activity,
 } from 'lucide-react';
 
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 
+import { ActionButton } from '../components/ui/ActionButton';
 import exportTimelineToExcel from '../components/utils/exportTimelineToExcel';
-
-import {
-  projectsApi,
-  usersApi,
-} from '../api/client';
-
+import { projectsApi, usersApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 
-import type {
-  Project,
-  ProjectStageResponse,
-  StageResponsible,
-} from '../types';
+import type { Project, ProjectStageResponse, StageResponsible } from '../types';
 
-/* ════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    TYPES
-   ════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════ */
 
-export type ProjectStageStatus =
-  | 'planned'
-  | 'active'
-  | 'completed'
-  | 'on_hold'
-  | 'skipped';
+type StageStatus = 'planned' | 'active' | 'completed' | 'on_hold' | 'skipped';
+type EffectiveStatus = StageStatus | 'overdue';
+type ViewType = 'table' | 'overview' | 'roadmap' | 'timeline' | 'board' | 'analytics';
+type TimelineScale = 'days' | 'weeks' | 'months';
+type SortKey = 'order' | 'name' | 'status' | 'responsible' | 'dates' | 'duration';
+type SortDir = 'asc' | 'desc';
+type Screen = { type: 'list' } | { type: 'detail'; stageId: string } | { type: 'create' };
 
-export interface StageUpsertPayload {
+interface StagePayload {
   name: string;
   order: number;
-  status: ProjectStageStatus;
+  status: StageStatus;
   planned_start: string | null;
   planned_end: string | null;
   responsible_id: string | null;
@@ -102,636 +53,316 @@ export interface StageUpsertPayload {
   planned_duration_days: number | null;
 }
 
-export type EffectiveStatus =
-  | ProjectStageStatus
-  | 'overdue';
-
-type ViewType =
-  | 'table'
-  | 'overview'
-  | 'roadmap'
-  | 'timeline'
-  | 'board'
-  | 'analytics';
-
-type TimelineScale =
-  | 'days'
-  | 'weeks'
-  | 'months';
-
-type SortKey =
-  | 'order'
-  | 'name'
-  | 'status'
-  | 'responsible'
-  | 'dates'
-  | 'duration';
-
-type SortDir = 'asc' | 'desc';
-
-type SectionScreen =
-  | { type: 'list' }
-  | {
-    type: 'detail';
-    stageId: string;
-    editing: boolean;
-  }
-  | { type: 'create' };
-
-type StageForm = {
+interface StageForm {
   name: string;
   order: string;
-  status: ProjectStageStatus;
+  status: StageStatus;
   responsible_id: string;
   planned_start: string;
   planned_end: string;
   planned_duration_days: string;
   description: string;
-  completion_criteria: string;
-};
+  completion_criteria: string[];
+}
 
 interface Toast {
   id: number;
-  title: string;
-  type?: 'success' | 'error' | 'info';
+  message: string;
+  type: 'success' | 'error' | 'info';
 }
 
-/* ════════════════════════════════════════════════════════════════
-   STATUS CONFIGURATION
-   ════════════════════════════════════════════════════════════════ */
+type UsersMap = Record<string, StageResponsible>;
 
-const STATUS_CFG: Record<
-  EffectiveStatus,
-  {
-    label: string;
-    dot: string;
-    chip: string;
-    bar: string;
-    ring: string;
-    border: string;
-    icon: React.ElementType;
-    text: string;
-  }
-> = {
+/* ═══════════════════════════════════════════════════════════════
+   STATUS CONFIG
+   ═══════════════════════════════════════════════════════════════ */
+
+const STATUS: Record<EffectiveStatus, {
+  label: string;
+  icon: React.ElementType;
+  dot: string;
+  bg: string;
+  text: string;
+  border: string;
+  bar: string;
+}> = {
   planned: {
-    label: 'Запланирован',
-    dot: 'bg-slate-400',
-    chip:
-      'bg-slate-500/10 text-slate-400 border-slate-400/20',
-    bar: 'bg-slate-500',
-    ring: 'ring-slate-400/25',
-    border: 'border-slate-400/25',
-    icon: Clock,
-    text: 'text-slate-400',
+    label: 'Запланирован', icon: Clock, dot: 'bg-slate-400',
+    bg: 'bg-slate-500/10', text: 'text-slate-400',
+    border: 'border-slate-400/20', bar: 'bg-slate-500',
   },
-
   active: {
-    label: 'В работе',
-    dot: 'bg-blue-500',
-    chip:
-      'bg-blue-500/10 text-blue-400 border-blue-400/25',
-    bar: 'bg-blue-500',
-    ring: 'ring-blue-500/25',
-    border: 'border-blue-400/25',
-    icon: PlayCircle,
-    text: 'text-blue-400',
+    label: 'В работе', icon: PlayCircle, dot: 'bg-blue-500',
+    bg: 'bg-blue-500/10', text: 'text-blue-400',
+    border: 'border-blue-400/20', bar: 'bg-blue-500',
   },
-
   completed: {
-    label: 'Завершён',
-    dot: 'bg-emerald-500',
-    chip:
-      'bg-emerald-500/10 text-emerald-500 border-emerald-400/25',
-    bar: 'bg-emerald-500',
-    ring: 'ring-emerald-500/25',
-    border: 'border-emerald-400/25',
-    icon: CheckCircle2,
-    text: 'text-emerald-500',
+    label: 'Завершён', icon: CheckCircle2, dot: 'bg-emerald-500',
+    bg: 'bg-emerald-500/10', text: 'text-emerald-500',
+    border: 'border-emerald-500/20', bar: 'bg-emerald-500',
   },
-
   on_hold: {
-    label: 'На паузе',
-    dot: 'bg-amber-500',
-    chip:
-      'bg-amber-500/10 text-amber-500 border-amber-400/25',
-    bar: 'bg-amber-500',
-    ring: 'ring-amber-500/25',
-    border: 'border-amber-400/25',
-    icon: PauseCircle,
-    text: 'text-amber-500',
+    label: 'На паузе', icon: PauseCircle, dot: 'bg-amber-500',
+    bg: 'bg-amber-500/10', text: 'text-amber-500',
+    border: 'border-amber-500/20', bar: 'bg-amber-500',
   },
-
   skipped: {
-    label: 'Пропущен',
-    dot: 'bg-neutral-500',
-    chip:
-      'bg-neutral-500/10 text-neutral-400 border-neutral-400/20',
-    bar: 'bg-neutral-500',
-    ring: 'ring-neutral-400/20',
-    border: 'border-neutral-400/20',
-    icon: SkipForward,
-    text: 'text-neutral-400',
+    label: 'Пропущен', icon: SkipForward, dot: 'bg-neutral-500',
+    bg: 'bg-neutral-500/10', text: 'text-neutral-400',
+    border: 'border-neutral-400/20', bar: 'bg-neutral-500',
   },
-
   overdue: {
-    label: 'Просрочен',
-    dot: 'bg-[var(--accent)]',
-    chip:
-      'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/25',
-    bar: 'bg-[var(--accent)]',
-    ring: 'ring-[var(--accent)]/25',
-    border: 'border-[var(--accent)]/25',
-    icon: AlertTriangle,
-    text: 'text-[var(--accent)]',
+    label: 'Просрочен', icon: AlertTriangle, dot: 'bg-[var(--accent)]',
+    bg: 'bg-[var(--accent-soft)]', text: 'text-[var(--accent)]',
+    border: 'border-[var(--accent)]/25', bar: 'bg-[var(--accent)]',
   },
 };
 
-/* ════════════════════════════════════════════════════════════════
-   UTILITIES
-   ════════════════════════════════════════════════════════════════ */
+const VIEWS: { id: ViewType; label: string; icon: React.ElementType }[] = [
+  { id: 'table', label: 'Таблица', icon: TableIcon },
+  { id: 'overview', label: 'Сводка', icon: Activity },
+  { id: 'roadmap', label: 'Карта', icon: MapIcon },
+  { id: 'timeline', label: 'Хронология', icon: GanttChart },
+  { id: 'board', label: 'Доска', icon: LayoutGrid },
+  { id: 'analytics', label: 'Аналитика', icon: BarChart3 },
+];
 
-const TODAY = new Date();
+/* ═══════════════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════════════ */
 
-const parseDate = (
-  value: string | null,
-): Date | null => {
+const parseDate = (value?: string | null): Date | null => {
   if (!value) return null;
-
-  return new Date(
-    value +
-    (value.length === 10
-      ? 'T00:00:00'
-      : ''),
-  );
+  const date = new Date(value.length === 10 ? `${value}T00:00:00` : value);
+  return Number.isNaN(date.getTime()) ? null : date;
 };
 
-const fmtDate = (
-  value: string | null,
-): string => {
-  if (!value) return '—';
-
+const formatDate = (value?: string | null) => {
   const date = parseDate(value);
-
-  if (!date) return '—';
-
-  return date.toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  return date ? date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
 };
 
-const fmtShort = (
-  value: string | null,
-): string => {
-  if (!value) return '—';
-
+const formatShort = (value?: string | null) => {
   const date = parseDate(value);
-
-  if (!date) return '—';
-
-  return date.toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-  });
+  return date ? date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) : '—';
 };
 
-const fmtDT = (
-  value: string | null,
-): string => {
-  if (!value) return '—';
-
-  return new Date(value).toLocaleString(
-    'ru-RU',
-    {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    },
-  );
+const formatDateTime = (value?: string | null) => {
+  const date = parseDate(value);
+  return date ? date.toLocaleString('ru-RU', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  }) : '—';
 };
 
-const fmtToday = () =>
-  fmtShort(new Date().toISOString());
+const daysBetween = (a: Date, b: Date) =>
+  Math.round((b.getTime() - a.getTime()) / 86400000);
 
-const daysB = (
-  a: Date,
-  b: Date,
-): number =>
-  Math.round(
-    (b.getTime() - a.getTime()) /
-    86400000,
+const sortStages = (stages: ProjectStageResponse[]) =>
+  [...stages].sort((a, b) =>
+    a.execution_order - b.execution_order || a.name.localeCompare(b.name, 'ru'),
   );
 
-const effStatus = (
-  stage: ProjectStageResponse,
-): EffectiveStatus => {
-  if (
-    stage.is_overdue &&
-    stage.status !== 'completed' &&
-    stage.status !== 'skipped'
-  ) {
-    return 'overdue';
-  }
+const effectiveStatus = (stage: ProjectStageResponse): EffectiveStatus =>
+  stage.is_overdue && stage.status !== 'completed' && stage.status !== 'skipped'
+    ? 'overdue' : stage.status;
 
-  return stage.status;
-};
-
-const sortOrd = (
-  stages: ProjectStageResponse[],
-): ProjectStageResponse[] =>
-  [...stages].sort(
-    (a, b) =>
-      a.execution_order -
-      b.execution_order ||
-      a.name.localeCompare(
-        b.name,
-        'ru',
-      ),
-  );
-
-function getInitials(
-  name?: string | null,
-): string {
-  if (!name?.trim()) return '?';
-
-  const parts = name
-    .trim()
-    .split(/\s+/);
-
-  if (parts.length >= 2) {
-    return (
-      parts[0][0] +
-      parts[1][0]
-    ).toUpperCase();
-  }
-
-  return parts[0]
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-function stagesOverlap(
-  a: ProjectStageResponse,
-  b: ProjectStageResponse,
-): boolean {
-  const as = parseDate(a.planned_start);
-  const ae = parseDate(a.planned_end);
-
-  const bs = parseDate(b.planned_start);
-  const be = parseDate(b.planned_end);
-
-  if (!as || !ae || !bs || !be) {
-    return false;
-  }
-
-  return as <= be && bs <= ae;
-}
-
-const isRunning = (
-  stage: ProjectStageResponse,
-) =>
-  stage.status === 'active' ||
-  stage.status === 'on_hold';
-
-function getActualEnd(
-  stage: ProjectStageResponse,
-): Date | null {
-  if (stage.completed_at) {
-    return parseDate(stage.completed_at);
-  }
-
-  if (
-    stage.status === 'active' ||
-    stage.status === 'on_hold'
-  ) {
-    return new Date();
-  }
-
+const actualEnd = (stage: ProjectStageResponse): Date | null => {
+  if (stage.completed_at) return parseDate(stage.completed_at);
+  if (stage.status === 'active' || stage.status === 'on_hold') return new Date();
   return null;
-}
+};
 
-function isFactOverPlan(
-  stage: ProjectStageResponse,
-): boolean {
-  const plannedEnd = parseDate(
-    stage.planned_end,
-  );
+const isOverPlan = (stage: ProjectStageResponse) => {
+  const planned = parseDate(stage.planned_end);
+  const actual = actualEnd(stage);
+  if (!planned || !actual) return false;
+  return actual > planned;
+};
 
-  const actualEnd = getActualEnd(stage);
+const overrunDays = (stage: ProjectStageResponse) => {
+  const planned = parseDate(stage.planned_end);
+  const actual = actualEnd(stage);
+  return planned && actual && actual > planned ? daysBetween(planned, actual) : 0;
+};
 
-  if (!plannedEnd || !actualEnd) {
-    return false;
-  }
+const getInitials = (name?: string | null) => {
+  if (!name?.trim()) return '?';
+  const parts = name.trim().split(/\s+/);
+  return (parts.length > 1 ? parts[0][0] + parts[1][0] : parts[0].slice(0, 2)).toUpperCase();
+};
 
-  return actualEnd > plannedEnd;
-}
+const shortName = (name?: string | null) => {
+  if (!name) return '—';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length < 2) return name;
+  return `${parts[0]} ${parts.slice(1).map(p => `${p[0]}.`).join('')}`;
+};
 
-function overrunDays(
-  stage: ProjectStageResponse,
-): number {
-  const plannedEnd = parseDate(
-    stage.planned_end,
-  );
+const stagesOverlap = (a: ProjectStageResponse, b: ProjectStageResponse) => {
+  const as = parseDate(a.planned_start), ae = parseDate(a.planned_end);
+  const bs = parseDate(b.planned_start), be = parseDate(b.planned_end);
+  return !!(as && ae && bs && be && as <= be && bs <= ae);
+};
 
-  const actualEnd = getActualEnd(stage);
-
-  if (
-    !plannedEnd ||
-    !actualEnd ||
-    actualEnd <= plannedEnd
-  ) {
-    return 0;
-  }
-
-  return daysB(plannedEnd, actualEnd);
-}
-
-/* ════════════════════════════════════════════════════════════════
-   FORM UTILITIES
-   ════════════════════════════════════════════════════════════════ */
-
-const emptyForm = (
-  order: number,
-): StageForm => ({
-  name: '',
-  order: String(order),
-  status: 'planned',
-  responsible_id: '',
-  planned_start: '',
-  planned_end: '',
-  planned_duration_days: '',
-  description: '',
-  completion_criteria: '',
+const emptyForm = (order: number): StageForm => ({
+  name: '', order: String(order), status: 'planned', responsible_id: '',
+  planned_start: '', planned_end: '', planned_duration_days: '',
+  description: '', completion_criteria: [],
 });
 
-const stageToForm = (
-  stage: ProjectStageResponse,
-): StageForm => ({
+const stageToForm = (stage: ProjectStageResponse): StageForm => ({
   name: stage.name,
   order: String(stage.execution_order),
   status: stage.status,
-  responsible_id:
-    stage.responsible_id ?? '',
-  planned_start:
-    stage.planned_start ?? '',
-  planned_end:
-    stage.planned_end ?? '',
-  planned_duration_days:
-    stage.planned_duration_days != null
-      ? String(
-        stage.planned_duration_days,
-      )
-      : '',
-  description:
-    stage.description ?? '',
-  completion_criteria:
-    stage.completion_criteria.join('\n'),
+  responsible_id: stage.responsible_id ?? '',
+  planned_start: stage.planned_start ?? '',
+  planned_end: stage.planned_end ?? '',
+  planned_duration_days: stage.planned_duration_days != null ? String(stage.planned_duration_days) : '',
+  description: stage.description ?? '',
+  completion_criteria: [...stage.completion_criteria],
 });
 
-const formToPayload = (
-  form: StageForm,
-): StageUpsertPayload => ({
+const formToPayload = (form: StageForm): StagePayload => ({
   name: form.name.trim(),
-
-  order: Math.max(
-    1,
-    Number(form.order) || 1,
-  ),
-
+  order: Math.max(1, Number(form.order) || 1),
   status: form.status,
-
-  planned_start:
-    form.planned_start || null,
-
-  planned_end:
-    form.planned_end || null,
-
-  responsible_id:
-    form.responsible_id || null,
-
-  description:
-    form.description.trim() || null,
-
-  completion_criteria:
-    form.completion_criteria
-      .split('\n')
-      .map(value => value.trim())
-      .filter(Boolean),
-
-  planned_duration_days:
-    form.planned_duration_days
-      ? Math.max(
-        1,
-        Number(
-          form.planned_duration_days,
-        ),
-      )
-      : null,
+  responsible_id: form.responsible_id || null,
+  planned_start: form.planned_start || null,
+  planned_end: form.planned_end || null,
+  planned_duration_days: form.planned_duration_days ? Math.max(1, Number(form.planned_duration_days)) : null,
+  description: form.description.trim() || null,
+  completion_criteria: form.completion_criteria.map(c => c.trim()).filter(Boolean),
 });
 
-/* ════════════════════════════════════════════════════════════════
-   AVATAR
-   ════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   SHARED UI
+   ═══════════════════════════════════════════════════════════════ */
 
-function Ava({
-  name,
-  size = 'md',
-}: {
-  name?: string | null;
-  size?: 'sm' | 'md';
-}) {
-  const sizes = {
-    sm: 'w-9 h-9 text-xs',
-    md: 'w-11 h-11 text-sm',
-  };
+const inputCls = 'w-full px-4 py-3 rounded-xl bg-[var(--hover-2)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[var(--accent)]/50 focus:ring-2 focus:ring-[var(--accent-soft)] transition-all';
+const labelCls = 'block mb-2 text-sm font-medium text-[var(--text-secondary)]';
 
+function Avatar({ name, size = 'md' }: { name?: string | null; size?: 'xs' | 'sm' | 'md' | 'lg' }) {
+  const sizes = { xs: 'w-6 h-6 text-[10px]', sm: 'w-8 h-8 text-xs', md: 'w-10 h-10 text-sm', lg: 'w-12 h-12 text-base' };
   return (
-    <div
-      className={`
-        ${sizes[size]}
-        flex
-        shrink-0
-        select-none
-        items-center
-        justify-center
-        rounded-xl
-        bg-[var(--accent)]
-        font-semibold
-        text-white
-      `}
-    >
+    <div className={`${sizes[size]} rounded-xl bg-[var(--accent)] flex items-center justify-center text-white font-semibold shrink-0 select-none`}>
       {getInitials(name)}
     </div>
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   STAGE BADGE
-   ════════════════════════════════════════════════════════════════ */
-
-function Badge({
-  order,
-}: {
-  order: number;
-}) {
+function StatusBadge({ status, small = false }: { status: EffectiveStatus; small?: boolean }) {
+  const cfg = STATUS[status];
+  const Icon = cfg.icon;
   return (
-    <span
-      className="
-        inline-flex
-        items-center
-        gap-1.5
-        rounded-lg
-        border border-[var(--accent)]/20
-        bg-[var(--accent-soft)]
-        px-2.5 py-1
-        text-xs
-        font-semibold
-        text-[var(--text-primary)]
-      "
-    >
-      <Milestone className="h-3.5 w-3.5" />
-
-      #{String(order).padStart(2, '0')}
+    <span className={`inline-flex items-center gap-1.5 rounded-lg border font-medium whitespace-nowrap ${cfg.bg} ${cfg.text} ${cfg.border} ${small ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'}`}>
+      <Icon className={small ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+      {cfg.label}
     </span>
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   STATUS CHIP
-   ════════════════════════════════════════════════════════════════ */
-
-function Chip({
-  status,
-}: {
-  status: EffectiveStatus;
-}) {
-  const config = STATUS_CFG[status];
-
-  const Icon = config.icon;
-
+function StageNumber({ order }: { order: number }) {
   return (
-    <span
-      className={`
-        inline-flex
-        items-center
-        gap-1.5
-        rounded-lg
-        border
-        px-2.5 py-1
-        text-xs
-        font-medium
-        ${config.chip}
-      `}
-    >
-      <Icon className="h-3.5 w-3.5" />
-
-      {config.label}
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[var(--border-color)] bg-[var(--hover-2)] font-mono text-xs font-semibold text-[var(--text-secondary)]">
+      <Milestone className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+      {String(order).padStart(2, '0')}
     </span>
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   SKELETON
-   ════════════════════════════════════════════════════════════════ */
-
-function Skeleton({
-  className = '',
-}: {
-  className?: string;
+function AssigneeAvatars({ ids = [], users, max = 3 }: {
+  ids?: string[]; users: UsersMap; max?: number;
 }) {
+  if (!ids.length) return <span className="text-xs text-[var(--text-muted)]">Не назначены</span>;
   return (
-    <div
-      className={`
-        skeleton
-        rounded-2xl
-        ${className}
-      `}
-    />
-  );
-}
-
-function PageSkeleton() {
-  return (
-    <div className="space-y-6">
-      <Skeleton className="h-12 w-80 max-w-full" />
-
-      <Skeleton className="h-[500px] w-full" />
+    <div className="flex items-center gap-2" title={ids.map(id => users[id]?.full_name ?? id).join(', ')}>
+      <div className="flex -space-x-2">
+        {ids.slice(0, max).map(id => (
+          <div key={id} className="relative w-8 h-8 rounded-full border-2 border-[var(--bg-card)] bg-[var(--accent)] flex items-center justify-center text-[10px] font-bold text-white">
+            {getInitials(users[id]?.full_name)}
+          </div>
+        ))}
+        {ids.length > max && (
+          <div className="relative w-8 h-8 rounded-full border-2 border-[var(--bg-card)] bg-[var(--hover-3)] flex items-center justify-center text-[10px] font-bold text-[var(--text-primary)]">
+            +{ids.length - max}
+          </div>
+        )}
+      </div>
+      <span className="text-xs text-[var(--text-muted)]">{ids.length}</span>
     </div>
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   TOASTS
-   ════════════════════════════════════════════════════════════════ */
-
-function Toasts({
-  toasts,
-  onClose,
-}: {
-  toasts: Toast[];
-  onClose: (id: number) => void;
+function SectionCard({ title, description, icon: Icon, action, children, className = '' }: {
+  title: string; description?: string; icon?: React.ElementType;
+  action?: React.ReactNode; children: React.ReactNode; className?: string;
 }) {
+  return (
+    <section className={`rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] overflow-hidden ${className}`}>
+      <div className="flex items-center justify-between gap-3 px-6 py-5 border-b border-[var(--border-color)]">
+        <div className="flex items-center gap-3 min-w-0">
+          {Icon && (
+            <div className="w-10 h-10 rounded-xl bg-[var(--hover-2)] flex items-center justify-center shrink-0">
+              <Icon className="w-5 h-5 text-[var(--text-secondary)]" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-[var(--text-primary)]">{title}</h2>
+            {description && <p className="mt-1 text-xs text-[var(--text-muted)]">{description}</p>}
+          </div>
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function EmptyState({ icon: Icon, title, description, action }: {
+  icon: React.ElementType; title: string; description?: string; action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
+      <div className="w-14 h-14 rounded-2xl bg-[var(--hover-2)] flex items-center justify-center">
+        <Icon className="w-7 h-7 text-[var(--text-disabled)]" />
+      </div>
+      <h3 className="mt-4 text-base font-semibold text-[var(--text-primary)]">{title}</h3>
+      {description && <p className="mt-2 max-w-sm text-sm leading-6 text-[var(--text-muted)]">{description}</p>}
+      {action && <div className="mt-5">{action}</div>}
+    </div>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3">
+      <Loader2 className="w-9 h-9 animate-spin text-[var(--accent)]" />
+      <p className="text-sm text-[var(--text-muted)]">Загрузка этапов...</p>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TOASTS
+   ═══════════════════════════════════════════════════════════════ */
+
+function Toasts({ items, onClose }: { items: Toast[]; onClose: (id: number) => void }) {
   return createPortal(
-    <div className="pointer-events-none fixed right-4 top-5 z-[400] flex max-w-[calc(100vw-2rem)] flex-col gap-3">
-
+    <div className="fixed top-5 right-5 z-[500] flex flex-col gap-2 pointer-events-none max-w-[calc(100vw-40px)]">
       <AnimatePresence>
-        {toasts.map(toast => (
+        {items.map(item => (
           <motion.div
-            key={toast.id}
-            initial={{
-              opacity: 0,
-              x: 30,
-            }}
-            animate={{
-              opacity: 1,
-              x: 0,
-            }}
-            exit={{
-              opacity: 0,
-              x: 30,
-            }}
-            className="
-              pointer-events-auto
-              flex
-              w-full
-              min-w-0
-              max-w-[380px]
-              items-center
-              gap-3
-              rounded-2xl
-              border border-[var(--border-color)]
-              bg-[var(--bg-card)]
-              px-5 py-4
-              shadow-lg
-              sm:min-w-[300px]
-            "
+            key={item.id}
+            initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }}
+            className="pointer-events-auto flex items-center gap-3 min-w-[280px] max-w-[380px] px-4 py-3.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]"
+            style={{ boxShadow: 'var(--shadow-lg)' }}
           >
-            {toast.type === 'success' && (
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
-            )}
-
-            {toast.type === 'error' && (
-              <AlertTriangle className="h-5 w-5 shrink-0 text-[var(--accent)]" />
-            )}
-
-            {(!toast.type ||
-              toast.type === 'info') && (
-                <Info className="h-5 w-5 shrink-0 text-blue-400" />
-              )}
-
-            <span className="min-w-0 flex-1 text-sm text-[var(--text-primary)]">
-              {toast.title}
-            </span>
-
-            <button
-              type="button"
-              onClick={() => onClose(toast.id)}
-              className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            >
-              <X className="h-4 w-4" />
+            {item.type === 'success' ? <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" /> :
+              item.type === 'error' ? <AlertTriangle className="w-5 h-5 text-[var(--accent)] shrink-0" /> :
+                <Info className="w-5 h-5 text-blue-400 shrink-0" />}
+            <span className="flex-1 text-sm text-[var(--text-primary)]">{item.message}</span>
+            <button onClick={() => onClose(item.id)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+              <X className="w-4 h-4" />
             </button>
           </motion.div>
         ))}
@@ -741,111 +372,28 @@ function Toasts({
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   VIEW TABS
-   ════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   VIEW NAVIGATION
+   ═══════════════════════════════════════════════════════════════ */
 
-const VIEWS: {
-  id: ViewType;
-  label: string;
-  icon: React.ElementType;
-}[] = [
-    {
-      id: 'table',
-      label: 'Таблица',
-      icon: TableIcon,
-    },
-    {
-      id: 'overview',
-      label: 'Обзор',
-      icon: Info,
-    },
-    {
-      id: 'roadmap',
-      label: 'Карта',
-      icon: MapIcon,
-    },
-    {
-      id: 'timeline',
-      label: 'Хронология',
-      icon: GanttChart,
-    },
-    {
-      id: 'board',
-      label: 'Доска',
-      icon: LayoutGrid,
-    },
-    {
-      id: 'analytics',
-      label: 'Аналитика',
-      icon: BarChart3,
-    },
-  ];
-
-function ViewTabs({
-  view,
-  onChange,
-}: {
-  view: ViewType;
-  onChange: (view: ViewType) => void;
+function ViewNavigation({ view, onChange }: {
+  view: ViewType; onChange: (view: ViewType) => void;
 }) {
   return (
-    <div
-      className="
-        inline-flex
-        max-w-full
-        gap-1
-        overflow-x-auto
-        rounded-2xl
-        border border-[var(--border-color)]
-        bg-[var(--hover-2)]
-        p-1.5
-      "
-    >
+    <div className="flex items-center gap-1 p-1 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] overflow-x-auto">
       {VIEWS.map(item => {
         const active = view === item.id;
-
         const Icon = item.icon;
-
         return (
           <button
-            key={item.id}
-            type="button"
-            onClick={() => onChange(item.id)}
-            className={`
-              relative
-              inline-flex
-              shrink-0
-              items-center
-              gap-2
-              rounded-xl
-              px-4 py-2.5
-              text-sm
-              font-medium
-              transition-colors
-              ${active
-                ? 'text-white'
-                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-              }
-            `}
+            key={item.id} onClick={() => onChange(item.id)}
+            className={`relative flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+              active ? 'text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)]'
+            }`}
           >
-            {active && (
-              <motion.div
-                layoutId="stage-view-tab"
-                className="absolute inset-0 rounded-xl bg-[var(--accent)]"
-                transition={{
-                  type: 'spring',
-                  stiffness: 350,
-                  damping: 30,
-                }}
-              />
-            )}
-
-            <Icon className="relative h-4 w-4" />
-
-            <span className="relative">
-              {item.label}
-            </span>
+            {active && <motion.div layoutId="stages-active-tab" className="absolute inset-0 rounded-lg bg-[var(--accent)]" transition={{ type: 'spring', stiffness: 350, damping: 30 }} />}
+            <Icon className="relative w-4 h-4" />
+            <span className="relative">{item.label}</span>
           </button>
         );
       })}
@@ -853,386 +401,116 @@ function ViewTabs({
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    ASSIGNEES MODAL
-   ════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════ */
 
-interface AssigneesModalProps {
-  open: boolean;
-  onClose: () => void;
-  users: Record<string, StageResponsible>;
-  selectedIds: string[];
-  currentUserId?: string;
-  saving: boolean;
-  onSave: (ids: string[]) => Promise<void>;
-}
-
-function AssigneesModal({
-  open,
-  onClose,
-  users,
-  selectedIds,
-  currentUserId,
-  saving,
-  onSave,
-}: AssigneesModalProps) {
+function AssigneesModal({ open, users, selectedIds, currentUserId, saving, onSave, onClose }: {
+  open: boolean; users: UsersMap; selectedIds: string[]; currentUserId?: string;
+  saving: boolean; onSave: (ids: string[]) => Promise<void>; onClose: () => void;
+}) {
   const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<string[]>(selectedIds);
 
-  const [selected, setSelected] =
-    useState<string[]>(selectedIds);
+  useEffect(() => {
+    if (open) { setSelected(selectedIds); setSearch(''); }
+  }, [open, selectedIds]);
 
   useEffect(() => {
     if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape' && !saving) onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open, saving, onClose]);
 
-    setSelected(selectedIds);
-    setSearch('');
-  }, [open, selectedIds]);
-
-  const availableUsers = useMemo(() => {
-    const query = search
-      .trim()
-      .toLowerCase();
-
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
     return Object.values(users)
-      .filter(user => {
-        if (!query) return true;
-
-        return (
-          user.full_name
-            .toLowerCase()
-            .includes(query) ||
-          (user.email ?? '')
-            .toLowerCase()
-            .includes(query)
-        );
-      })
+      .filter(u => !q || u.full_name.toLowerCase().includes(q) || (u.email ?? '').toLowerCase().includes(q))
       .sort((a, b) => {
-        if (a.id === currentUserId) {
-          return -1;
-        }
-
-        if (b.id === currentUserId) {
-          return 1;
-        }
-
-        return a.full_name.localeCompare(
-          b.full_name,
-          'ru',
-        );
+        if (a.id === currentUserId) return -1;
+        if (b.id === currentUserId) return 1;
+        return a.full_name.localeCompare(b.full_name, 'ru');
       });
   }, [users, search, currentUserId]);
 
-  const toggleUser = (id: string) => {
-    if (saving) return;
+  const toggle = (id: string) => setSelected(prev =>
+    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id],
+  );
 
-    setSelected(previous =>
-      previous.includes(id)
-        ? previous.filter(
-          userId => userId !== id,
-        )
-        : [...previous, id],
-    );
+  const changed = selected.length !== selectedIds.length ||
+    selected.some(id => !selectedIds.includes(id));
+
+  const submit = async () => {
+    if (saving || !changed) return;
+    try { await onSave(selected); onClose(); } catch { /* Ошибка в родителе */ }
   };
-
-  const hasChanges = useMemo(() => {
-    if (
-      selected.length !==
-      selectedIds.length
-    ) {
-      return true;
-    }
-
-    const original = new Set(selectedIds);
-
-    return selected.some(
-      id => !original.has(id),
-    );
-  }, [selected, selectedIds]);
-
-  const handleSave = async () => {
-    if (saving || !hasChanges) return;
-
-    try {
-      await onSave(selected);
-
-      onClose();
-    } catch {
-      // Не закрываем окно при ошибке API.
-      // Сообщение отображается через Toast.
-    }
-  };
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handleKeyDown = (
-      event: KeyboardEvent,
-    ) => {
-      if (
-        event.key === 'Escape' &&
-        !saving
-      ) {
-        onClose();
-      }
-    };
-
-    document.addEventListener(
-      'keydown',
-      handleKeyDown,
-    );
-
-    return () => {
-      document.removeEventListener(
-        'keydown',
-        handleKeyDown,
-      );
-    };
-  }, [open, saving, onClose]);
 
   if (!open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-3 sm:p-5">
-
-      {/* BACKDROP */}
-      <div
-        className="absolute inset-0 bg-black/65 backdrop-blur-sm"
-        onClick={() => {
-          if (!saving) {
-            onClose();
-          }
-        }}
-      />
-
-      {/* MODAL */}
+    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" onClick={() => !saving && onClose()} />
       <motion.div
-        initial={{
-          opacity: 0,
-          scale: 0.97,
-          y: 12,
-        }}
-        animate={{
-          opacity: 1,
-          scale: 1,
-          y: 0,
-        }}
-        transition={{
-          duration: 0.2,
-        }}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="stage-assignees-title"
-        className="
-          relative
-          flex
-          max-h-[85vh]
-          w-full
-          max-w-[560px]
-          flex-col
-          overflow-hidden
-          rounded-2xl
-          border border-[var(--border-color)]
-          bg-[var(--bg-primary)]
-        "
-        style={{
-          boxShadow: 'var(--shadow-lg)',
-        }}
+        initial={{ opacity: 0, scale: 0.97, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+        role="dialog" aria-modal="true" aria-label="Назначение исполнителей"
+        className="relative w-full max-w-[560px] max-h-[85vh] flex flex-col rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] overflow-hidden"
+        style={{ boxShadow: 'var(--shadow-lg)' }}
       >
-
-        {/* HEADER */}
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--border-color)] px-5 py-5 sm:px-6">
-
-          <div className="flex min-w-0 items-center gap-3">
-
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)]">
-              <Users className="h-5 w-5 text-[var(--accent)]" />
+        <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-[var(--border-color)]">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
+              <Users className="w-5 h-5 text-[var(--accent)]" />
             </div>
-
-            <div className="min-w-0">
-
-              <h2
-                id="stage-assignees-title"
-                className="text-lg font-bold text-[var(--text-primary)]"
-              >
-                Исполнители этапа
-              </h2>
-
-              <p className="mt-1 text-sm text-[var(--text-muted)]">
-                Выберите сотрудников для выполнения этапа
-              </p>
+            <div>
+              <h2 className="text-lg font-bold text-[var(--text-primary)]">Исполнители этапа</h2>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">Выберите сотрудников для выполнения</p>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            aria-label="Закрыть"
-            className="
-              shrink-0
-              rounded-lg
-              p-2
-              text-[var(--text-muted)]
-              transition-colors
-              hover:bg-[var(--hover-2)]
-              hover:text-[var(--text-primary)]
-              disabled:opacity-50
-            "
-          >
-            <X className="h-5 w-5" />
+          <button onClick={onClose} disabled={saving} className="p-2 rounded-lg text-[var(--text-muted)] hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] disabled:opacity-50">
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* SEARCH */}
-        <div className="border-b border-[var(--border-color)] px-5 py-4 sm:px-6">
-
+        <div className="px-6 py-4 border-b border-[var(--border-color)]">
           <div className="relative">
-
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
-
-            <input
-              value={search}
-              onChange={event =>
-                setSearch(event.target.value)
-              }
-              disabled={saving}
-              placeholder="Поиск по имени или почте..."
-              className="
-                h-12
-                w-full
-                rounded-xl
-                border border-[var(--border-color)]
-                bg-[var(--hover-2)]
-                pl-11 pr-4
-                text-sm
-                text-[var(--text-primary)]
-                outline-none
-                transition-colors
-                placeholder:text-[var(--text-muted)]
-                focus:border-[var(--accent)]
-                disabled:opacity-50
-              "
-            />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск по имени или email..." className={`${inputCls} pl-11`} />
           </div>
-
-          <div className="mt-3 flex items-center justify-between gap-3">
-
-            <span className="text-xs text-[var(--text-muted)]">
-              Найдено: {availableUsers.length}
-            </span>
-
-            <span className="rounded-lg bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--accent)]">
+          <div className="flex items-center justify-between mt-3">
+            <span className="text-xs text-[var(--text-muted)]">Найдено: {filtered.length}</span>
+            <span className="px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent)]">
               Выбрано: {selected.length}
             </span>
           </div>
         </div>
 
-        {/* USERS */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-
-          {availableUsers.length === 0 ? (
-            <div className="py-12 text-center">
-
-              <Search className="mx-auto h-10 w-10 text-[var(--text-disabled)]" />
-
-              <p className="mt-4 text-sm font-medium text-[var(--text-primary)]">
-                Сотрудники не найдены
-              </p>
-
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                Попробуйте изменить поисковый запрос
-              </p>
-            </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-3">
+          {!filtered.length ? (
+            <EmptyState icon={Search} title="Сотрудники не найдены" description="Попробуйте изменить поисковый запрос" />
           ) : (
             <div className="space-y-1">
-
-              {availableUsers.map(user => {
-                const isSelected =
-                  selected.includes(user.id);
-
-                const isCurrentUser =
-                  user.id === currentUserId;
-
+              {filtered.map(u => {
+                const checked = selected.includes(u.id);
                 return (
                   <button
-                    key={user.id}
-                    type="button"
-                    onClick={() =>
-                      toggleUser(user.id)
-                    }
-                    disabled={saving}
-                    aria-pressed={isSelected}
-                    className={`
-                      flex
-                      w-full
-                      items-center
-                      gap-3
-                      rounded-xl
-                      border
-                      px-3 py-3
-                      text-left
-                      transition-colors
-                      disabled:opacity-50
-                      ${isSelected
-                        ? 'border-[var(--accent)]/30 bg-[var(--accent-soft)]'
-                        : 'border-transparent hover:bg-[var(--hover-2)]'
-                      }
-                    `}
+                    key={u.id} onClick={() => toggle(u.id)} disabled={saving}
+                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-colors disabled:opacity-50 ${
+                      checked ? 'border-[var(--accent)]/30 bg-[var(--accent-soft)]' : 'border-transparent hover:bg-[var(--hover-2)]'
+                    }`}
                   >
-
-                    <Ava
-                      name={user.full_name}
-                      size="sm"
-                    />
-
+                    <Avatar name={u.full_name} size="md" />
                     <div className="min-w-0 flex-1">
-
-                      <div className="flex flex-wrap items-center gap-2">
-
-                        <span className="truncate text-sm font-semibold text-[var(--text-primary)]">
-                          {user.full_name}
-                        </span>
-
-                        {isCurrentUser && (
-                          <span className="rounded-md bg-[var(--hover-3)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
-                            Вы
-                          </span>
-                        )}
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{u.full_name}</p>
+                        {u.id === currentUserId && <span className="px-2 py-0.5 rounded-md bg-[var(--hover-3)] text-xs text-[var(--text-secondary)]">Вы</span>}
                       </div>
-
-                      {user.email && (
-                        <p className="mt-1 truncate text-xs text-[var(--text-muted)]">
-                          {user.email}
-                        </p>
-                      )}
-
-                      {user.role && (
-                        <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">
-                          {user.role}
-                        </p>
-                      )}
+                      {u.email && <p className="mt-0.5 text-xs text-[var(--text-muted)] truncate">{u.email}</p>}
                     </div>
-
-                    {/* CHECKBOX */}
-                    <div
-                      className={`
-                        flex
-                        h-5 w-5
-                        shrink-0
-                        items-center
-                        justify-center
-                        rounded-md
-                        border
-                        transition-colors
-                        ${isSelected
-                          ? 'border-[var(--accent)] bg-[var(--accent)]'
-                          : 'border-[var(--border-color)]'
-                        }
-                      `}
-                    >
-                      {isSelected && (
-                        <Check className="h-3.5 w-3.5 text-white" />
-                      )}
+                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
+                      checked ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'
+                    }`}>
+                      {checked && <Check className="w-3.5 h-3.5 text-white" />}
                     </div>
                   </button>
                 );
@@ -1241,73 +519,16 @@ function AssigneesModal({
           )}
         </div>
 
-        {/* FOOTER */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-color)] px-5 py-4 sm:px-6">
-
-          <span className="text-sm text-[var(--text-muted)]">
-            {selected.length === 0
-              ? 'Никто не выбран'
-              : `Исполнителей: ${selected.length}`}
-          </span>
-
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-[var(--border-color)]">
+          <span className="text-sm text-[var(--text-muted)]">{selected.length} выбрано</span>
           <div className="flex items-center gap-2">
-
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              className="
-                rounded-xl
-                border border-[var(--border-color)]
-                bg-[var(--hover-2)]
-                px-4 py-2.5
-                text-sm
-                font-medium
-                text-[var(--text-secondary)]
-                transition-colors
-                hover:bg-[var(--hover-3)]
-                disabled:opacity-50
-              "
-            >
+            <button onClick={onClose} disabled={saving} className="px-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] text-sm text-[var(--text-secondary)] hover:bg-[var(--hover-3)]">
               Отмена
             </button>
-
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={
-                saving ||
-                !hasChanges
-              }
-              className="
-                inline-flex
-                items-center
-                justify-center
-                gap-2
-                rounded-xl
-                bg-[var(--accent)]
-                px-5 py-2.5
-                text-sm
-                font-semibold
-                text-white
-                transition-opacity
-                hover:opacity-90
-                disabled:cursor-not-allowed
-                disabled:opacity-40
-              "
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Сохранение...
-                </>
-              ) : (
-                <>
-                  <Check className="h-4 w-4" />
-                  Сохранить
-                </>
-              )}
-            </button>
+            <ActionButton onClick={submit} disabled={saving || !changed} className="px-5 py-2.5 text-sm font-semibold">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              {saving ? 'Сохранение...' : 'Сохранить'}
+            </ActionButton>
           </div>
         </div>
       </motion.div>
@@ -1316,1842 +537,494 @@ function AssigneesModal({
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   ASSIGNEES PREVIEW
-   ════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   DELETE CONFIRMATION
+   ═══════════════════════════════════════════════════════════════ */
 
-function AssigneesPreview({
-  ids,
-  users,
-  maxVisible = 3,
-}: {
-  ids?: string[];
-  users: Record<string, StageResponsible>;
-  maxVisible?: number;
+function DeleteStageModal({ stage, loading, onConfirm, onClose }: {
+  stage: ProjectStageResponse; loading: boolean;
+  onConfirm: () => Promise<void>; onClose: () => void;
 }) {
-  const assigneeIds = ids ?? [];
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [loading, onClose]);
 
-  if (!assigneeIds.length) {
-    return (
-      <span className="text-sm text-[var(--text-muted)]">
-        Не назначены
-      </span>
-    );
-  }
-
-  const visible = assigneeIds.slice(0, maxVisible);
-  const remaining = Math.max(0, assigneeIds.length - maxVisible);
-
-  return (
-    <div
-      className="flex items-center gap-2"
-      title={assigneeIds
-        .map(id => users[id]?.full_name ?? 'Пользователь')
-        .join(', ')}
-    >
-      <div className="flex items-center -space-x-2">
-        {visible.map(id => {
-          const user = users[id];
-
-          return (
-            <div
-              key={id}
-              className="
-                relative
-                flex h-8 w-8
-                shrink-0
-                items-center justify-center
-                rounded-full
-                border-2 border-[var(--bg-card)]
-                bg-[var(--accent)]
-                text-[10px]
-                font-bold
-                text-white
-              "
-            >
-              {getInitials(user?.full_name)}
-            </div>
-          );
-        })}
-
-        {remaining > 0 && (
-          <div
-            className="
-              relative
-              flex h-8 w-8
-              items-center justify-center
-              rounded-full
-              border-2 border-[var(--bg-card)]
-              bg-[var(--hover-3)]
-              text-[11px]
-              font-semibold
-              text-[var(--text-primary)]
-            "
-          >
-            +{remaining}
+  return createPortal(
+    <div className="fixed inset-0 z-[350] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" onClick={() => !loading && onClose()} />
+      <div className="relative w-full max-w-[440px] rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] overflow-hidden" style={{ boxShadow: 'var(--shadow-lg)' }}>
+        <div className="px-7 pt-8 text-center">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-[var(--accent-soft)] flex items-center justify-center">
+            <Trash2 className="w-7 h-7 text-[var(--accent)]" />
           </div>
-        )}
+          <h2 className="mt-5 text-xl font-bold text-[var(--text-primary)]">Удалить этап?</h2>
+          <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
+            Этап «<span className="font-semibold text-[var(--text-primary)]">{stage.name}</span>» будет удалён без возможности восстановления.
+          </p>
+        </div>
+        <div className="flex gap-3 p-6 mt-3">
+          <button onClick={onClose} disabled={loading} className="flex-1 px-4 py-3 rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] text-sm font-medium text-[var(--text-primary)] disabled:opacity-50">
+            Отмена
+          </button>
+          <button onClick={() => void onConfirm()} disabled={loading} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[var(--accent)] text-sm font-semibold text-white disabled:opacity-50">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            {loading ? 'Удаление...' : 'Удалить'}
+          </button>
+        </div>
       </div>
-
-      <span className="text-xs text-[var(--text-muted)]">
-        {assigneeIds.length}
-      </span>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    TABLE VIEW
-   ════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════ */
 
-function TableView({
-  stages,
-  responsibles,
-  onSelect,
-  onCreate,
-}: {
-  stages: ProjectStageResponse[];
-  responsibles: Record<string, StageResponsible>;
-  onSelect: (stage: ProjectStageResponse) => void;
-  onCreate: () => void;
+function TableView({ stages, users, onOpen, onCreate }: {
+  stages: ProjectStageResponse[]; users: UsersMap;
+  onOpen: (stage: ProjectStageResponse) => void; onCreate: () => void;
 }) {
-  const [sortKey, setSortKey] =
-    useState<SortKey>('order');
-
-  const [sortDir, setSortDir] =
-    useState<SortDir>('asc');
-
-  const [search, setSearch] =
-    useState('');
-
-  const [statusFilter, setStatusFilter] =
-    useState<EffectiveStatus | 'all'>('all');
-
-  /* =========================================================
-     FILTER & SORT
-     ========================================================= */
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<EffectiveStatus | 'all'>('all');
+  const [sortKey, setSortKey] = useState<SortKey>('order');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
 
   const filtered = useMemo(() => {
-    let result = [...stages];
-
-    const query = search
-      .toLowerCase()
-      .replace('#', '')
-      .trim();
-
-    if (query) {
-      result = result.filter(stage => {
-        const responsibleName =
-          stage.responsible_id
-            ? responsibles[stage.responsible_id]?.full_name ?? ''
-            : '';
-
-        const assigneeNames = (stage.assignee_ids ?? [])
-          .map(id => responsibles[id]?.full_name ?? '')
-          .join(' ');
-
-        return (
-          stage.name.toLowerCase().includes(query) ||
-          responsibleName.toLowerCase().includes(query) ||
-          assigneeNames.toLowerCase().includes(query) ||
-          String(stage.execution_order).includes(query) ||
-          (stage.description ?? '')
-            .toLowerCase()
-            .includes(query)
-        );
-      });
-    }
-
-    if (statusFilter !== 'all') {
-      result = result.filter(
-        stage => effStatus(stage) === statusFilter,
-      );
-    }
-
-    result.sort((a, b) => {
-      let av: string | number = '';
-      let bv: string | number = '';
-
-      switch (sortKey) {
-        case 'order':
-          av = a.execution_order;
-          bv = b.execution_order;
-          break;
-
-        case 'name':
-          av = a.name;
-          bv = b.name;
-          break;
-
-        case 'status':
-          av = effStatus(a);
-          bv = effStatus(b);
-          break;
-
-        case 'responsible':
-          av = a.responsible_id
-            ? responsibles[a.responsible_id]?.full_name ?? ''
-            : '';
-
-          bv = b.responsible_id
-            ? responsibles[b.responsible_id]?.full_name ?? ''
-            : '';
-          break;
-
-        case 'dates':
-          av = a.planned_start ?? '';
-          bv = b.planned_start ?? '';
-          break;
-
-        case 'duration':
-          av = a.planned_duration_days ?? 0;
-          bv = b.planned_duration_days ?? 0;
-          break;
-      }
-
-      if (av < bv) {
-        return sortDir === 'asc' ? -1 : 1;
-      }
-
-      if (av > bv) {
-        return sortDir === 'asc' ? 1 : -1;
-      }
-
-      return 0;
+    const q = search.trim().toLowerCase();
+    let result = stages.filter(s => {
+      if (statusFilter !== 'all' && effectiveStatus(s) !== statusFilter) return false;
+      if (!q) return true;
+      const responsible = s.responsible_id ? users[s.responsible_id]?.full_name ?? '' : '';
+      const assignees = (s.assignee_ids ?? []).map(id => users[id]?.full_name ?? '').join(' ');
+      return [s.name, s.description ?? '', responsible, assignees, String(s.execution_order)]
+        .some(v => v.toLowerCase().includes(q));
     });
 
+    result = [...result].sort((a, b) => {
+      let av: string | number = '', bv: string | number = '';
+      switch (sortKey) {
+        case 'order': av = a.execution_order; bv = b.execution_order; break;
+        case 'name': av = a.name; bv = b.name; break;
+        case 'status': av = effectiveStatus(a); bv = effectiveStatus(b); break;
+        case 'responsible':
+          av = a.responsible_id ? users[a.responsible_id]?.full_name ?? '' : '';
+          bv = b.responsible_id ? users[b.responsible_id]?.full_name ?? '' : '';
+          break;
+        case 'dates': av = a.planned_start ?? ''; bv = b.planned_start ?? ''; break;
+        case 'duration': av = a.planned_duration_days ?? 0; bv = b.planned_duration_days ?? 0; break;
+      }
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
     return result;
-  }, [
-    stages,
-    responsibles,
-    search,
-    statusFilter,
-    sortKey,
-    sortDir,
-  ]);
+  }, [stages, users, search, statusFilter, sortKey, sortDir]);
 
   const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir(previous =>
-        previous === 'asc' ? 'desc' : 'asc',
-      );
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
-    }
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
   };
 
-  const SortIcon = ({
-    column,
-  }: {
-    column: SortKey;
-  }) => {
-    if (sortKey !== column) {
-      return (
-        <ArrowUpDown className="h-3.5 w-3.5 text-[var(--text-disabled)]" />
-      );
-    }
-
-    return sortDir === 'asc' ? (
-      <ArrowUp className="h-3.5 w-3.5 text-[var(--accent)]" />
-    ) : (
-      <ArrowDown className="h-3.5 w-3.5 text-[var(--accent)]" />
-    );
-  };
-
-  /* =========================================================
-     EMPTY STATE
-     ========================================================= */
+  const SortIcon = ({ column }: { column: SortKey }) =>
+    sortKey !== column ? <ArrowUpDown className="w-3.5 h-3.5 opacity-30" /> :
+      sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-[var(--accent)]" /> :
+        <ArrowDown className="w-3.5 h-3.5 text-[var(--accent)]" />;
 
   if (!stages.length) {
     return (
-      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] px-6 py-16 text-center">
-
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--hover-2)]">
-          <Milestone className="h-8 w-8 text-[var(--text-disabled)]" />
-        </div>
-
-        <h3 className="mt-5 text-lg font-bold text-[var(--text-primary)]">
-          Этапов пока нет
-        </h3>
-
-        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--text-muted)]">
-          Создайте первый этап проекта, чтобы планировать
-          работу, назначать исполнителей и отслеживать сроки.
-        </p>
-
-        <button
-          type="button"
-          onClick={onCreate}
-          className="
-            mt-6
-            inline-flex
-            items-center
-            gap-2
-            rounded-xl
-            bg-[var(--accent)]
-            px-5 py-3
-            text-sm
-            font-semibold
-            text-white
-            transition-opacity
-            hover:opacity-90
-          "
-        >
-          <Plus className="h-4 w-4" />
-          Создать этап
-        </button>
-      </div>
+      <SectionCard title="Этапы проекта" description="Планирование и контроль выполнения" icon={Milestone}>
+        <EmptyState
+          icon={Milestone} title="Этапов пока нет"
+          description="Создайте первый этап, чтобы начать планирование проекта."
+          action={<ActionButton onClick={onCreate} className="px-5 py-3 text-sm"><Plus className="w-4 h-4" /> Создать этап</ActionButton>}
+        />
+      </SectionCard>
     );
   }
 
-  /* =========================================================
-     RENDER
-     ========================================================= */
-
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
-
-      {/* TOOLBAR */}
-      <div className="flex flex-wrap items-center gap-3 border-b border-[var(--border-color)] bg-[var(--hover-1)] px-5 py-4">
-
-        {/* SEARCH */}
-        <div className="relative min-w-[220px] flex-1">
-
-          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
-
-          <input
-            value={search}
-            onChange={event =>
-              setSearch(event.target.value)
-            }
-            placeholder="Поиск по этапам и сотрудникам..."
-            className="
-              h-11
-              w-full
-              rounded-xl
-              border border-[var(--border-color)]
-              bg-[var(--hover-2)]
-              pl-11 pr-4
-              text-sm
-              text-[var(--text-primary)]
-              outline-none
-              transition-colors
-              placeholder:text-[var(--text-muted)]
-              focus:border-[var(--accent)]
-            "
-          />
+    <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] overflow-hidden">
+      <div className="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-[var(--border-color)]">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Название, сотрудник, номер..." className={`${inputCls} pl-11`} />
         </div>
-
-        {/* FILTER */}
-        <Select
-          value={statusFilter}
-          onValueChange={value =>
-            setStatusFilter(
-              value as EffectiveStatus | 'all',
-            )
-          }
-        >
-          <SelectTrigger
-            className="
-              h-11
-              w-[190px]
-              rounded-xl
-              border border-[var(--border-color)]
-              bg-[var(--hover-2)]
-              px-4
-              text-sm
-              text-[var(--text-primary)]
-            "
-          >
-            <Filter className="mr-2 h-4 w-4 text-[var(--text-muted)]" />
-
+        <Select value={statusFilter} onValueChange={v => setStatusFilter(v as EffectiveStatus | 'all')}>
+          <SelectTrigger className="w-[190px] h-12 rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] px-4 text-sm text-[var(--text-primary)]">
+            <Filter className="w-4 h-4 mr-2 text-[var(--text-muted)]" />
             <SelectValue placeholder="Все статусы" />
           </SelectTrigger>
-
           <SelectContent>
-            <SelectItem value="all">
-              Все статусы
-            </SelectItem>
-
-            <SelectItem value="planned">
-              Запланирован
-            </SelectItem>
-
-            <SelectItem value="active">
-              В работе
-            </SelectItem>
-
-            <SelectItem value="on_hold">
-              На паузе
-            </SelectItem>
-
-            <SelectItem value="completed">
-              Завершён
-            </SelectItem>
-
-            <SelectItem value="skipped">
-              Пропущен
-            </SelectItem>
-
-            <SelectItem value="overdue">
-              Просрочен
-            </SelectItem>
+            <SelectItem value="all">Все статусы</SelectItem>
+            {(Object.keys(STATUS) as EffectiveStatus[]).map(s => (
+              <SelectItem key={s} value={s}>{STATUS[s].label}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
-
-        {/* CREATE */}
-        <button
-          type="button"
-          onClick={onCreate}
-          className="
-            inline-flex
-            h-11
-            items-center
-            gap-2
-            rounded-xl
-            bg-[var(--accent)]
-            px-4
-            text-sm
-            font-semibold
-            text-white
-            transition-opacity
-            hover:opacity-90
-          "
-        >
-          <Plus className="h-4 w-4" />
-          Создать
-        </button>
+        <ActionButton onClick={onCreate} className="px-4 py-3 text-sm font-semibold">
+          <Plus className="w-4 h-4" /> Создать этап
+        </ActionButton>
       </div>
 
-      {/* TABLE */}
       <div className="overflow-x-auto">
-
-        <table className="w-full min-w-[1250px]">
-
+        <table className="w-full min-w-[1150px]">
           <thead>
             <tr className="border-b border-[var(--border-color)] bg-[var(--hover-1)]">
-
-              {(
-                [
-                  ['order', '№'],
-                  ['name', 'Название'],
-                  ['status', 'Статус'],
-                  ['dates', 'Плановые сроки'],
-                  ['responsible', 'Ответственный'],
-                ] as [SortKey, string][]
-              ).map(([key, label]) => (
-                <th
-                  key={key}
-                  className="px-5 py-4 text-left"
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleSort(key)}
-                    className="
-                      inline-flex
-                      items-center
-                      gap-2
-                      text-xs
-                      font-semibold
-                      text-[var(--text-muted)]
-                      transition-colors
-                      hover:text-[var(--text-primary)]
-                    "
-                  >
-                    {label}
-
-                    <SortIcon column={key} />
+              {([
+                ['order', '№'], ['name', 'Этап'], ['status', 'Статус'],
+                ['dates', 'Плановые сроки'], ['responsible', 'Ответственный'],
+              ] as [SortKey, string][]).map(([key, label]) => (
+                <th key={key} className="px-5 py-4 text-left">
+                  <button onClick={() => toggleSort(key)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                    {label} <SortIcon column={key} />
                   </button>
                 </th>
               ))}
-
-              <th className="px-5 py-4 text-left text-xs font-semibold text-[var(--text-muted)]">
-                Исполнители
-              </th>
-
+              <th className="px-5 py-4 text-left text-xs font-semibold text-[var(--text-muted)]">Исполнители</th>
               <th className="px-5 py-4 text-left">
-                <button
-                  type="button"
-                  onClick={() => toggleSort('duration')}
-                  className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                >
-                  Дни
-                  <SortIcon column="duration" />
+                <button onClick={() => toggleSort('duration')} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)]">
+                  Дни <SortIcon column="duration" />
                 </button>
               </th>
-
-              <th className="px-5 py-4 text-left text-xs font-semibold text-[var(--text-muted)]">
-                Исполнение
-              </th>
-
-              <th className="w-12" />
+              <th className="w-10" />
             </tr>
           </thead>
-
           <tbody>
-
-            {filtered.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={9}
-                  className="px-6 py-16 text-center"
-                >
-                  <Search className="mx-auto h-10 w-10 text-[var(--text-disabled)]" />
-
-                  <p className="mt-3 text-sm text-[var(--text-muted)]">
-                    Ничего не найдено
-                  </p>
-                </td>
-              </tr>
-            ) : (
-              filtered.map(stage => {
-                const effective = effStatus(stage);
-
-                const responsible = stage.responsible_id
-                  ? responsibles[stage.responsible_id]
-                  : null;
-
-                const overdue = isFactOverPlan(stage);
-                const overdueDays = overrunDays(stage);
-
-                return (
-                  <tr
-                    key={stage.id}
-                    onClick={() => onSelect(stage)}
-                    className={`
-                      group
-                      cursor-pointer
-                      border-b border-[var(--border-color)]
-                      transition-colors
-                      hover:bg-[var(--hover-1)]
-                      ${effective === 'overdue'
-                        ? 'bg-[var(--accent-soft)]/20'
-                        : ''
-                      }
-                    `}
-                  >
-
-                    {/* ORDER */}
-                    <td className="px-5 py-5">
-                      <Badge order={stage.execution_order} />
-                    </td>
-
-                    {/* NAME */}
-                    <td className="min-w-[230px] px-5 py-5">
-
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">
-                        {stage.name}
-                      </p>
-
-                      <p className="mt-1 line-clamp-1 text-xs text-[var(--text-muted)]">
-                        {stage.description || 'Без описания'}
-                      </p>
-                    </td>
-
-                    {/* STATUS */}
-                    <td className="px-5 py-5">
-
-                      <div className="flex flex-wrap gap-2">
-
-                        <Chip status={stage.status} />
-
-                        {effective === 'overdue' && (
-                          <Chip status="overdue" />
-                        )}
+            {!filtered.length ? (
+              <tr><td colSpan={8}><EmptyState icon={Search} title="Ничего не найдено" description="Измените поисковый запрос или фильтр" /></td></tr>
+            ) : filtered.map(stage => {
+              const responsible = stage.responsible_id ? users[stage.responsible_id] : null;
+              const eff = effectiveStatus(stage);
+              return (
+                <tr key={stage.id} onClick={() => onOpen(stage)}
+                  className="group cursor-pointer border-b border-[var(--border-color)] last:border-0 hover:bg-[var(--hover-2)] transition-colors">
+                  <td className="px-5 py-4"><StageNumber order={stage.execution_order} /></td>
+                  <td className="px-5 py-4 min-w-[220px]">
+                    <p className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">{stage.name}</p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)] line-clamp-1">{stage.description || 'Без описания'}</p>
+                  </td>
+                  <td className="px-5 py-4">
+                    <div className="flex flex-wrap gap-1.5">
+                      <StatusBadge status={stage.status} small />
+                      {eff === 'overdue' && <StatusBadge status="overdue" small />}
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 whitespace-nowrap text-sm text-[var(--text-secondary)]">
+                    {formatShort(stage.planned_start)} — {formatShort(stage.planned_end)}
+                  </td>
+                  <td className="px-5 py-4">
+                    {responsible ? (
+                      <div className="flex items-center gap-2">
+                        <Avatar name={responsible.full_name} size="sm" />
+                        <span className="max-w-[150px] truncate text-sm text-[var(--text-secondary)]">{shortName(responsible.full_name)}</span>
                       </div>
-                    </td>
-
-                    {/* DATES */}
-                    <td className="whitespace-nowrap px-5 py-5 text-sm text-[var(--text-secondary)]">
-                      {fmtShort(stage.planned_start)}
-                      {' — '}
-                      {fmtShort(stage.planned_end)}
-                    </td>
-
-                    {/* RESPONSIBLE */}
-                    <td className="px-5 py-5">
-
-                      {responsible ? (
-                        <div className="flex items-center gap-2.5">
-
-                          <Ava
-                            name={responsible.full_name}
-                            size="sm"
-                          />
-
-                          <span className="max-w-[160px] truncate text-sm text-[var(--text-secondary)]">
-                            {responsible.full_name}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-[var(--text-muted)]">
-                          Не назначен
-                        </span>
-                      )}
-                    </td>
-
-                    {/* ASSIGNEES */}
-                    <td className="px-5 py-5">
-
-                      <AssigneesPreview
-                        ids={stage.assignee_ids}
-                        users={responsibles}
-                        maxVisible={3}
-                      />
-                    </td>
-
-                    {/* DURATION */}
-                    <td className="whitespace-nowrap px-5 py-5 text-sm font-medium text-[var(--text-secondary)]">
-
-                      {stage.planned_duration_days != null
-                        ? `${stage.planned_duration_days} дн.`
-                        : '—'}
-                    </td>
-
-                    {/* EXECUTION */}
-                    <td className="px-5 py-5">
-
-                      {stage.started_at ? (
-                        <div className="space-y-1">
-
-                          <p className="whitespace-nowrap text-xs text-[var(--text-muted)]">
-                            {fmtShort(
-                              stage.started_at.slice(0, 10),
-                            )}
-                            {' — '}
-                            {stage.completed_at
-                              ? fmtShort(
-                                stage.completed_at.slice(0, 10),
-                              )
-                              : fmtToday()}
-                          </p>
-
-                          {overdue && (
-                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent)]">
-                              <AlertTriangle className="h-3 w-3" />
-                              +{overdueDays} дн.
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-sm text-[var(--text-muted)]">
-                          —
-                        </span>
-                      )}
-                    </td>
-
-                    {/* ARROW */}
-                    <td className="px-4 py-5">
-
-                      <ChevronRight
-                        className="
-                          h-5 w-5
-                          text-[var(--text-disabled)]
-                          transition-all
-                          group-hover:translate-x-0.5
-                          group-hover:text-[var(--accent)]
-                        "
-                      />
-                    </td>
-                  </tr>
-                );
-              })
-            )}
+                    ) : <span className="text-sm text-[var(--text-muted)]">Не назначен</span>}
+                  </td>
+                  <td className="px-5 py-4"><AssigneeAvatars ids={stage.assignee_ids} users={users} /></td>
+                  <td className="px-5 py-4 text-sm text-[var(--text-secondary)] whitespace-nowrap">
+                    {stage.planned_duration_days != null ? `${stage.planned_duration_days} дн.` : '—'}
+                  </td>
+                  <td className="px-4 py-4">
+                    <ChevronRight className="w-4 h-4 text-[var(--text-disabled)] group-hover:text-[var(--accent)] group-hover:translate-x-0.5 transition-all" />
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
-
-      {/* FOOTER */}
-      <div className="flex items-center justify-between border-t border-[var(--border-color)] bg-[var(--hover-1)] px-5 py-3">
-
-        <span className="text-xs text-[var(--text-muted)]">
-          Показано {filtered.length} из {stages.length}
-        </span>
-
-        <span className="text-xs text-[var(--text-muted)]">
-          Нажмите на этап для просмотра
-        </span>
+      <div className="flex items-center justify-between px-5 py-3 border-t border-[var(--border-color)] text-xs text-[var(--text-muted)]">
+        <span>Показано {filtered.length} из {stages.length}</span>
+        <span>Нажмите на этап для просмотра</span>
       </div>
     </div>
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   OVERVIEW VIEW
-   ════════════════════════════════════════════════════════════════ */
-
-function OverviewView({
-  stages,
-  responsibles,
-  onSelect,
-}: {
-  stages: ProjectStageResponse[];
-  responsibles: Record<string, StageResponsible>;
-  onSelect: (stage: ProjectStageResponse) => void;
-}) {
-  const activeStages = useMemo(
-    () => stages.filter(stage => stage.status === 'active'),
-    [stages],
-  );
-
-  const onHoldStages = useMemo(
-    () => stages.filter(stage => stage.status === 'on_hold'),
-    [stages],
-  );
-
-  const overdueStages = useMemo(
-    () =>
-      stages.filter(
-        stage =>
-          stage.is_overdue &&
-          stage.status !== 'completed' &&
-          stage.status !== 'skipped',
-      ),
-    [stages],
-  );
-
-  const completedWithOverrun = useMemo(
-    () =>
-      stages.filter(
-        stage =>
-          stage.status === 'completed' &&
-          isFactOverPlan(stage),
-      ),
-    [stages],
-  );
-
-  const total = stages.length;
-
-  const completed = stages.filter(
-    stage => stage.status === 'completed',
-  ).length;
-
-  const progress = total
-    ? Math.round((completed / total) * 100)
-    : 0;
-
-  /* =========================================================
-     PARALLEL GROUPS
-     ========================================================= */
-
-  const parallelGroups = useMemo(() => {
-    const groups: ProjectStageResponse[][] = [];
-    const used = new Set<string>();
-
-    const active = sortOrd(activeStages);
-
-    for (const stage of active) {
-      if (used.has(stage.id)) continue;
-
-      const group = [stage];
-
-      used.add(stage.id);
-
-      for (const other of active) {
-        if (used.has(other.id)) continue;
-
-        if (stagesOverlap(stage, other)) {
-          group.push(other);
-          used.add(other.id);
-        }
-      }
-
-      groups.push(group);
-    }
-
-    return groups;
-  }, [activeStages]);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]"
-    >
-
-      {/* LEFT COLUMN */}
-      <div className="space-y-6">
-
-        {/* ACTIVE STAGES */}
-        <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
-
-          {/* HEADER */}
-          <div className="flex items-center gap-3 border-b border-[var(--border-color)] px-6 py-5">
-
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10">
-              <PlayCircle className="h-5 w-5 text-blue-400" />
-            </div>
-
-            <div>
-              <h2 className="text-lg font-bold text-[var(--text-primary)]">
-                Текущие этапы
-              </h2>
-
-              <p className="mt-1 text-sm text-[var(--text-muted)]">
-                {activeStages.length
-                  ? `${activeStages.length} этапов в работе`
-                  : 'Нет активных этапов'}
-              </p>
-            </div>
-          </div>
-
-          {/* CONTENT */}
-          <div className="p-5">
-
-            {!activeStages.length ? (
-              <div className="rounded-xl border border-dashed border-[var(--border-color)] px-5 py-12 text-center">
-
-                <Clock className="mx-auto h-9 w-9 text-[var(--text-disabled)]" />
-
-                <p className="mt-3 text-sm text-[var(--text-muted)]">
-                  Сейчас нет этапов в работе
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-
-                {parallelGroups.map((group, groupIndex) => (
-                  <div key={groupIndex}>
-
-                    {/* PARALLEL LABEL */}
-                    {group.length > 1 && (
-                      <div className="mb-3 flex items-center gap-2 px-1">
-
-                        <Layers className="h-4 w-4 text-blue-400" />
-
-                        <span className="text-xs font-semibold text-blue-400">
-                          Параллельное выполнение
-                        </span>
-
-                        <div className="h-px flex-1 bg-blue-400/15" />
-                      </div>
-                    )}
-
-                    <div
-                      className={
-                        group.length > 1
-                          ? 'grid grid-cols-1 gap-3 border-l-2 border-blue-400/20 pl-3 md:grid-cols-2'
-                          : ''
-                      }
-                    >
-
-                      {group.map(stage => {
-                        const responsible =
-                          stage.responsible_id
-                            ? responsibles[stage.responsible_id]
-                            : null;
-
-                        const overdue = isFactOverPlan(stage);
-                        const overdueDays = overrunDays(stage);
-
-                        const startedAt = stage.started_at
-                          ? parseDate(stage.started_at)
-                          : null;
-
-                        const actualDays = startedAt
-                          ? daysB(startedAt, new Date()) + 1
-                          : 0;
-
-                        return (
-                          <button
-                            key={stage.id}
-                            type="button"
-                            onClick={() => onSelect(stage)}
-                            className={`
-                              group
-                              w-full
-                              rounded-2xl
-                              border
-                              bg-[var(--hover-1)]
-                              p-5
-                              text-left
-                              transition-all
-                              hover:border-[var(--border-hover)]
-                              hover:bg-[var(--hover-2)]
-                              ${overdue
-                                ? 'border-[var(--accent)]/30'
-                                : 'border-[var(--border-color)]'
-                              }
-                            `}
-                          >
-
-                            {/* BADGES */}
-                            <div className="mb-4 flex flex-wrap items-center gap-2">
-
-                              <Badge order={stage.execution_order} />
-
-                              <Chip status={stage.status} />
-
-                              {overdue && (
-                                <span className="inline-flex items-center gap-1 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent-soft)] px-2 py-1 text-xs font-semibold text-[var(--accent)]">
-
-                                  <AlertTriangle className="h-3 w-3" />
-
-                                  +{overdueDays} дн.
-                                </span>
-                              )}
-                            </div>
-
-                            {/* NAME */}
-                            <h3 className="text-base font-bold text-[var(--text-primary)]">
-                              {stage.name}
-                            </h3>
-
-                            <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--text-muted)]">
-                              {stage.description || 'Описание не заполнено'}
-                            </p>
-
-                            {/* DATES */}
-                            <div className="mt-4 grid grid-cols-2 gap-3">
-
-                              <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3">
-
-                                <p className="text-xs text-[var(--text-muted)]">
-                                  Плановые сроки
-                                </p>
-
-                                <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                                  {fmtShort(stage.planned_start)}
-                                  {' — '}
-                                  {fmtShort(stage.planned_end)}
-                                </p>
-                              </div>
-
-                              <div
-                                className={`
-                                  rounded-xl
-                                  border
-                                  p-3
-                                  ${overdue
-                                    ? 'border-[var(--accent)]/25 bg-[var(--accent-soft)]'
-                                    : 'border-[var(--border-color)] bg-[var(--bg-card)]'
-                                  }
-                                `}
-                              >
-
-                                <p className="text-xs text-[var(--text-muted)]">
-                                  Фактически
-                                </p>
-
-                                <p
-                                  className={`
-                                    mt-1
-                                    text-sm
-                                    font-semibold
-                                    ${overdue
-                                      ? 'text-[var(--accent)]'
-                                      : 'text-[var(--text-primary)]'
-                                    }
-                                  `}
-                                >
-                                  {actualDays} дн.
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* PEOPLE */}
-                            <div className="mt-4 border-t border-[var(--border-color)] pt-4">
-
-                              {responsible && (
-                                <div className="mb-3 flex items-center gap-2.5">
-
-                                  <Ava
-                                    name={responsible.full_name}
-                                    size="sm"
-                                  />
-
-                                  <div className="min-w-0">
-
-                                    <p className="text-xs text-[var(--text-muted)]">
-                                      Ответственный
-                                    </p>
-
-                                    <p className="truncate text-sm font-medium text-[var(--text-primary)]">
-                                      {responsible.full_name}
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
-
-                              <div className="flex items-center justify-between gap-3">
-
-                                <span className="inline-flex items-center gap-2 text-xs text-[var(--text-muted)]">
-                                  <Users className="h-4 w-4" />
-                                  Исполнители
-                                </span>
-
-                                <AssigneesPreview
-                                  ids={stage.assignee_ids}
-                                  users={responsibles}
-                                  maxVisible={3}
-                                />
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* OVERDUE / ON HOLD */}
-        {(overdueStages.length > 0 ||
-          onHoldStages.length > 0) && (
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-
-              {/* OVERDUE */}
-              {overdueStages.length > 0 && (
-                <section className="overflow-hidden rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent-soft)]/10">
-
-                  <div className="flex items-center gap-2 border-b border-[var(--accent)]/15 px-5 py-4">
-
-                    <AlertTriangle className="h-4 w-4 text-[var(--accent)]" />
-
-                    <h3 className="text-sm font-bold text-[var(--accent)]">
-                      Отставание от графика
-                    </h3>
-
-                    <span className="ml-auto text-xs font-semibold text-[var(--accent)]">
-                      {overdueStages.length}
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 p-3">
-
-                    {overdueStages.map(stage => (
-                      <button
-                        key={stage.id}
-                        type="button"
-                        onClick={() => onSelect(stage)}
-                        className="
-                        w-full
-                        rounded-xl
-                        border border-[var(--border-color)]
-                        bg-[var(--bg-card)]
-                        p-4
-                        text-left
-                        transition-colors
-                        hover:bg-[var(--hover-2)]
-                      "
-                      >
-                        <Badge order={stage.execution_order} />
-
-                        <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                          {stage.name}
-                        </p>
-
-                        <p className="mt-1 text-xs text-[var(--accent)]">
-                          Срок до {fmtShort(stage.planned_end)}
-                          {' · '}
-                          +{overrunDays(stage)} дн.
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {/* ON HOLD */}
-              {onHoldStages.length > 0 && (
-                <section className="overflow-hidden rounded-2xl border border-amber-500/20 bg-amber-500/5">
-
-                  <div className="flex items-center gap-2 border-b border-amber-500/15 px-5 py-4">
-
-                    <PauseCircle className="h-4 w-4 text-amber-500" />
-
-                    <h3 className="text-sm font-bold text-amber-500">
-                      Приостановлены
-                    </h3>
-
-                    <span className="ml-auto text-xs font-semibold text-amber-500">
-                      {onHoldStages.length}
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 p-3">
-
-                    {onHoldStages.map(stage => (
-                      <button
-                        key={stage.id}
-                        type="button"
-                        onClick={() => onSelect(stage)}
-                        className="
-                        w-full
-                        rounded-xl
-                        border border-[var(--border-color)]
-                        bg-[var(--bg-card)]
-                        p-4
-                        text-left
-                        transition-colors
-                        hover:bg-[var(--hover-2)]
-                      "
-                      >
-                        <Badge order={stage.execution_order} />
-
-                        <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                          {stage.name}
-                        </p>
-
-                        <p className="mt-1 text-xs text-[var(--text-muted)]">
-                          Выполнение приостановлено
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              )}
-            </div>
-          )}
-
-        {/* COMPLETED WITH OVERRUN */}
-        {completedWithOverrun.length > 0 && (
-          <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
-
-            <div className="flex items-center gap-3 border-b border-[var(--border-color)] px-5 py-4">
-
-              <TrendingUp className="h-5 w-5 text-[var(--text-muted)]" />
-
-              <h3 className="text-base font-bold text-[var(--text-primary)]">
-                Завершены с отклонением
-              </h3>
-            </div>
-
-            <div className="divide-y divide-[var(--border-color)]">
-
-              {completedWithOverrun.map(stage => (
-                <button
-                  key={stage.id}
-                  type="button"
-                  onClick={() => onSelect(stage)}
-                  className="
-                    flex
-                    w-full
-                    items-center
-                    justify-between
-                    gap-4
-                    px-5 py-4
-                    text-left
-                    transition-colors
-                    hover:bg-[var(--hover-1)]
-                  "
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-
-                    <Badge order={stage.execution_order} />
-
-                    <span className="truncate text-sm font-semibold text-[var(--text-primary)]">
-                      {stage.name}
-                    </span>
-                  </div>
-
-                  <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[var(--accent)]">
-
-                    <AlertTriangle className="h-3.5 w-3.5" />
-
-                    +{overrunDays(stage)} дн.
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-      </div>
-
-      {/* RIGHT COLUMN */}
-      <div className="space-y-5">
-
-        {/* PROGRESS */}
-        <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
-
-          <h3 className="text-lg font-bold text-[var(--text-primary)]">
-            Прогресс проекта
-          </h3>
-
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Выполнение этапов
-          </p>
-
-          {/* CIRCLE */}
-          <div className="my-7 flex justify-center">
-
-            <div className="relative h-36 w-36">
-
-              <svg
-                viewBox="0 0 100 100"
-                className="h-full w-full -rotate-90"
-              >
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="42"
-                  stroke="var(--hover-3)"
-                  strokeWidth="9"
-                  fill="none"
-                />
-
-                <motion.circle
-                  cx="50"
-                  cy="50"
-                  r="42"
-                  stroke="var(--accent)"
-                  strokeWidth="9"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeDasharray={2 * Math.PI * 42}
-                  initial={{
-                    strokeDashoffset: 2 * Math.PI * 42,
-                  }}
-                  animate={{
-                    strokeDashoffset:
-                      2 *
-                      Math.PI *
-                      42 *
-                      (1 - progress / 100),
-                  }}
-                  transition={{
-                    duration: 0.8,
-                  }}
-                />
-              </svg>
-
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-
-                <span className="text-3xl font-bold text-[var(--text-primary)]">
-                  {progress}%
-                </span>
-
-                <span className="mt-1 text-xs text-[var(--text-muted)]">
-                  {completed} из {total}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* STATUS BREAKDOWN */}
-          <div className="space-y-3 border-t border-[var(--border-color)] pt-5">
-
-            {[
-              {
-                label: 'Завершено',
-                value: completed,
-                color: 'bg-emerald-500',
-              },
-              {
-                label: 'В работе',
-                value: activeStages.length,
-                color: 'bg-blue-500',
-              },
-              {
-                label: 'На паузе',
-                value: onHoldStages.length,
-                color: 'bg-amber-500',
-              },
-              {
-                label: 'Запланировано',
-                value: stages.filter(
-                  stage => stage.status === 'planned',
-                ).length,
-                color: 'bg-slate-400',
-              },
-              {
-                label: 'Просрочено',
-                value: overdueStages.length,
-                color: 'bg-[var(--accent)]',
-              },
-            ].map(item => (
-              <div
-                key={item.label}
-                className="flex items-center justify-between gap-3"
-              >
-                <span className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-
-                  <span
-                    className={`h-2.5 w-2.5 rounded-full ${item.color}`}
-                  />
-
-                  {item.label}
-                </span>
-
-                <span className="text-sm font-semibold text-[var(--text-primary)]">
-                  {item.value}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* NEXT STAGE */}
-        {(() => {
-          const next = sortOrd(
-            stages.filter(
-              stage => stage.status === 'planned',
-            ),
-          )[0];
-
-          if (!next) return null;
-
-          return (
-            <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
-
-              <div className="flex items-center gap-2 border-b border-[var(--border-color)] px-5 py-4">
-
-                <Flag className="h-4 w-4 text-[var(--text-muted)]" />
-
-                <h3 className="text-sm font-bold text-[var(--text-primary)]">
-                  Следующий этап
-                </h3>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onSelect(next)}
-                className="
-                  w-full
-                  p-5
-                  text-left
-                  transition-colors
-                  hover:bg-[var(--hover-1)]
-                "
-              >
-                <div className="flex flex-wrap items-center gap-2">
-
-                  <Badge order={next.execution_order} />
-
-                  <Chip status="planned" />
-                </div>
-
-                <p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">
-                  {next.name}
-                </p>
-
-                <p className="mt-2 inline-flex items-center gap-2 text-xs text-[var(--text-muted)]">
-
-                  <Calendar className="h-3.5 w-3.5" />
-
-                  {fmtShort(next.planned_start)}
-                  {' — '}
-                  {fmtShort(next.planned_end)}
-                </p>
-
-                <div className="mt-4 flex items-center justify-between border-t border-[var(--border-color)] pt-4">
-
-                  <span className="text-xs text-[var(--text-muted)]">
-                    Исполнители
-                  </span>
-
-                  <AssigneesPreview
-                    ids={next.assignee_ids}
-                    users={responsibles}
-                  />
-                </div>
-              </button>
-            </section>
-          );
-        })()}
-      </div>
-    </motion.div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════
-   ROADMAP VIEW
-   ════════════════════════════════════════════════════════════════ */
-
-type GraphCol = ProjectStageResponse[];
-
-function buildGraphColumns(
-  stages: ProjectStageResponse[],
-): GraphCol[] {
-  const ordered = sortOrd(stages);
-
-  const columns: GraphCol[] = [];
-  const placed = new Set<string>();
+/* ═══════════════════════════════════════════════════════════════
+   ROADMAP — PARALLEL GROUPING
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Группировка по пересечению плановых сроков.
+ *
+ * Этапы с пересекающимися датами располагаются в одной колонке.
+ * Статус не влияет на группировку.
+ *
+ * Этапы без дат располагаются последовательно.
+ *
+ * ВАЖНО: используем пересечение с ОБЩИМ интервалом группы,
+ * а не только с первым этапом. Это предотвращает ложное
+ * объединение цепочек пересечений.
+ */
+
+type RoadmapGroup = ProjectStageResponse[];
+
+function buildRoadmapGroups(stages: ProjectStageResponse[]): RoadmapGroup[] {
+  const ordered = sortStages(stages);
+  const groups: RoadmapGroup[] = [];
 
   for (const stage of ordered) {
-    if (placed.has(stage.id)) continue;
+    const start = parseDate(stage.planned_start);
+    const end = parseDate(stage.planned_end);
 
-    if (isRunning(stage)) {
-      const siblings = ordered.filter(other =>
-        !placed.has(other.id) &&
-        other.id !== stage.id &&
-        isRunning(other) &&
-        stagesOverlap(stage, other),
-      );
+    if (!start || !end) {
+      groups.push([stage]);
+      continue;
+    }
 
-      if (siblings.length > 0) {
-        const group = [stage, ...siblings];
+    let added = false;
 
-        group.forEach(item => placed.add(item.id));
+    for (const group of groups) {
+      if (group.some(s => !s.planned_start || !s.planned_end)) continue;
 
-        columns.push(group);
-        continue;
+      const starts = group.map(s => parseDate(s.planned_start)!.getTime());
+      const ends = group.map(s => parseDate(s.planned_end)!.getTime());
+
+      const commonStart = Math.max(...starts);
+      const commonEnd = Math.min(...ends);
+
+      if (start.getTime() <= commonEnd && end.getTime() >= commonStart) {
+        group.push(stage);
+        added = true;
+        break;
       }
     }
 
-    placed.add(stage.id);
-    columns.push([stage]);
+    if (!added) groups.push([stage]);
   }
 
-  return columns;
+  return groups;
 }
 
-const NODE_R = 30;
-const NODE_D = NODE_R * 2;
-const CARD_W = 210;
-const COL_W = CARD_W + 65;
-const ROW_GAP = 285;
-const TOP_PAD = 50;
-const BOTTOM_PAD = 190;
+/* ═══════════════════════════════════════════════════════════════
+   ROADMAP VIEW
+   ═══════════════════════════════════════════════════════════════ */
 
-interface NodePos {
-  id: string;
-  cx: number;
-  cy: number;
-  col: number;
-  row: number;
-  stage: ProjectStageResponse;
-}
+const MAP_NODE = 52;
+const MAP_COL = 270;
+const MAP_ROW = 225;
+const MAP_CARD = 220;
 
-function RoadmapView({
-  stages,
-  responsibles,
-  onSelect,
-}: {
+function RoadmapView({ stages, users, onOpen }: {
   stages: ProjectStageResponse[];
-  responsibles: Record<string, StageResponsible>;
-  onSelect: (stage: ProjectStageResponse) => void;
+  users: UsersMap;
+  onOpen: (stage: ProjectStageResponse) => void;
 }) {
-  const columns = useMemo(
-    () => buildGraphColumns(stages),
-    [stages],
-  );
+  const groups = useMemo(() => buildRoadmapGroups(stages), [stages]);
 
-  const {
-    nodes,
-    edges,
-    svgW,
-    svgH,
-  } = useMemo(() => {
-    const columnCount = columns.length;
+  const maxRows = Math.max(1, ...groups.map(g => g.length));
+  const width = Math.max(700, groups.length * MAP_COL + 80);
+  const height = Math.max(400, maxRows * MAP_ROW + 80);
 
-    const maxRows = Math.max(
-      ...columns.map(column => column.length),
-      1,
-    );
+  const nodes = useMemo(() => {
+    const result: {
+      stage: ProjectStageResponse;
+      x: number;
+      y: number;
+      col: number;
+    }[] = [];
 
-    const graphWidth = columnCount * COL_W;
-    const leftPadding = COL_W / 2;
+    groups.forEach((group, col) => {
+      const groupHeight = (group.length - 1) * MAP_ROW;
+      const totalHeight = (maxRows - 1) * MAP_ROW;
+      const startY = 70 + (totalHeight - groupHeight) / 2;
 
-    const nodePositions: NodePos[] = [];
-
-    columns.forEach((column, columnIndex) => {
-      const centerX =
-        leftPadding + columnIndex * COL_W;
-
-      const columnHeight =
-        (column.length - 1) * ROW_GAP;
-
-      const totalHeight =
-        (maxRows - 1) * ROW_GAP;
-
-      const startY =
-        TOP_PAD +
-        NODE_R +
-        (totalHeight - columnHeight) / 2;
-
-      column.forEach((stage, rowIndex) => {
-        nodePositions.push({
-          id: stage.id,
-          cx: centerX,
-          cy: startY + rowIndex * ROW_GAP,
-          col: columnIndex,
-          row: rowIndex,
+      group.forEach((stage, row) => {
+        result.push({
           stage,
+          x: 140 + col * MAP_COL,
+          y: startY + row * MAP_ROW,
+          col,
         });
       });
     });
 
-    const graphEdges: {
-      from: NodePos;
-      to: NodePos;
-      done: boolean;
+    return result;
+  }, [groups, maxRows]);
+
+  const connections = useMemo(() => {
+    const result: {
+      from: typeof nodes[number];
+      to: typeof nodes[number];
     }[] = [];
 
-    for (
-      let columnIndex = 0;
-      columnIndex < columnCount - 1;
-      columnIndex++
-    ) {
-      const fromNodes = nodePositions.filter(
-        node => node.col === columnIndex,
-      );
+    for (let col = 0; col < groups.length - 1; col++) {
+      const current = nodes.filter(n => n.col === col);
+      const next = nodes.filter(n => n.col === col + 1);
 
-      const toNodes = nodePositions.filter(
-        node => node.col === columnIndex + 1,
-      );
-
-      for (const from of fromNodes) {
-        for (const to of toNodes) {
-          graphEdges.push({
-            from,
-            to,
-            done: from.stage.status === 'completed',
-          });
-        }
-      }
+      current.forEach(from => {
+        next.forEach(to => {
+          result.push({ from, to });
+        });
+      });
     }
 
-    const width = graphWidth + 20;
-
-    const height =
-      TOP_PAD +
-      (maxRows - 1) * ROW_GAP +
-      NODE_D +
-      BOTTOM_PAD;
-
-    return {
-      nodes: nodePositions,
-      edges: graphEdges,
-      svgW: Math.max(width, 600),
-      svgH: Math.max(height, 400),
-    };
-  }, [columns]);
+    return result;
+  }, [nodes, groups.length]);
 
   if (!stages.length) {
     return (
-      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] px-6 py-16 text-center">
-        <MapIcon className="mx-auto h-12 w-12 text-[var(--text-disabled)]" />
-
-        <p className="mt-4 text-sm text-[var(--text-muted)]">
-          Нет этапов для отображения
-        </p>
-      </div>
+      <SectionCard title="Карта проекта" description="Визуальная последовательность этапов" icon={MapIcon}>
+        <EmptyState icon={MapIcon} title="Карта пока пустая" description="Создайте этапы проекта, чтобы увидеть их последовательность." />
+      </SectionCard>
     );
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]"
+    <SectionCard
+      title="Карта проекта"
+      description="Этапы с пересекающимися плановыми сроками расположены параллельно"
+      icon={MapIcon}
+      action={
+        <span className="hidden sm:flex items-center gap-2 text-xs text-[var(--text-muted)]">
+          <Layers className="w-4 h-4" />
+          {groups.filter(g => g.length > 1).length} параллельных групп
+        </span>
+      }
     >
-
-      {/* HEADER */}
-      <div className="flex flex-wrap items-center gap-3 border-b border-[var(--border-color)] bg-[var(--hover-1)] px-6 py-5">
-
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--hover-2)]">
-          <MapIcon className="h-5 w-5 text-[var(--text-secondary)]" />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <h3 className="text-lg font-bold text-[var(--text-primary)]">
-            Карта проекта
-          </h3>
-
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Последовательность выполнения этапов
-          </p>
-        </div>
-
-        {columns.some(column => column.length > 1) && (
-          <span className="inline-flex items-center gap-2 rounded-lg bg-blue-500/10 px-3 py-2 text-xs font-medium text-blue-400">
-            <Layers className="h-4 w-4" />
-            Параллельные этапы
-          </span>
-        )}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-6 py-4 border-b border-[var(--border-color)]">
+        {(['completed', 'active', 'planned', 'on_hold', 'skipped'] as StageStatus[]).map(status => (
+          <div key={status} className="flex items-center gap-2">
+            <span className={`w-2.5 h-2.5 rounded-full ${STATUS[status].dot}`} />
+            <span className="text-xs text-[var(--text-muted)]">{STATUS[status].label}</span>
+          </div>
+        ))}
       </div>
 
-      {/* GRAPH */}
-      <div
-        className="overflow-auto p-6"
-        style={{ maxHeight: 780 }}
-      >
-        <div
-          className="relative mx-auto"
-          style={{
-            width: svgW,
-            height: svgH,
-            minWidth: svgW,
-          }}
-        >
+      <div className="overflow-auto bg-[var(--bg-primary)]" style={{ maxHeight: 780 }}>
+        <div className="relative" style={{ width, height, minWidth: width }}>
 
           {/* CONNECTIONS */}
-          <svg
-            className="pointer-events-none absolute inset-0"
-            width={svgW}
-            height={svgH}
-          >
+          <svg className="absolute inset-0 pointer-events-none" width={width} height={height}>
             <defs>
-              <marker
-                id="stage-arrow-completed"
-                markerWidth="8"
-                markerHeight="6"
-                refX="7"
-                refY="3"
-                orient="auto"
-              >
-                <path
-                  d="M0,0 L8,3 L0,6"
-                  fill="#10b981"
-                />
+              <marker id="map-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                <path d="M0 0 L8 4 L0 8" fill="var(--text-muted)" />
               </marker>
-
-              <marker
-                id="stage-arrow-pending"
-                markerWidth="8"
-                markerHeight="6"
-                refX="7"
-                refY="3"
-                orient="auto"
-              >
-                <path
-                  d="M0,0 L8,3 L0,6"
-                  fill="#64748b"
-                />
+              <marker id="map-arrow-done" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                <path d="M0 0 L8 4 L0 8" fill="var(--success)" />
               </marker>
             </defs>
 
-            {edges.map((edge, index) => {
-              const x1 = edge.from.cx + NODE_R + 4;
-              const y1 = edge.from.cy;
-
-              const x2 = edge.to.cx - NODE_R - 12;
-              const y2 = edge.to.cy;
-
-              const straight =
-                Math.abs(y1 - y2) < 5;
-
-              const middleX = (x1 + x2) / 2;
-
-              const path = straight
-                ? `M${x1},${y1} L${x2},${y2}`
-                : `M${x1},${y1} C${middleX},${y1} ${middleX},${y2} ${x2},${y2}`;
+            {connections.map((connection, index) => {
+              const { from, to } = connection;
+              const x1 = from.x + MAP_NODE / 2 + 4;
+              const x2 = to.x - MAP_NODE / 2 - 12;
+              const middle = (x1 + x2) / 2;
+              const done = from.stage.status === 'completed';
 
               return (
                 <motion.path
                   key={index}
-                  d={path}
+                  d={`M ${x1} ${from.y} C ${middle} ${from.y}, ${middle} ${to.y}, ${x2} ${to.y}`}
                   fill="none"
-                  stroke={
-                    edge.done
-                      ? '#10b981'
-                      : '#64748b'
-                  }
-                  strokeWidth={
-                    edge.done ? 2.5 : 1.5
-                  }
-                  strokeDasharray={
-                    edge.done
-                      ? undefined
-                      : '6 4'
-                  }
-                  markerEnd={
-                    edge.done
-                      ? 'url(#stage-arrow-completed)'
-                      : 'url(#stage-arrow-pending)'
-                  }
-                  initial={{
-                    pathLength: 0,
-                    opacity: 0,
-                  }}
-                  animate={{
-                    pathLength: 1,
-                    opacity: edge.done
-                      ? 0.7
-                      : 0.35,
-                  }}
-                  transition={{
-                    delay: 0.15 + index * 0.03,
-                    duration: 0.45,
-                  }}
+                  stroke={done ? 'var(--success)' : 'var(--text-muted)'}
+                  strokeWidth={done ? 2 : 1.5}
+                  strokeDasharray={done ? undefined : '6 5'}
+                  markerEnd={done ? 'url(#map-arrow-done)' : 'url(#map-arrow)'}
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{ pathLength: 1, opacity: done ? 0.65 : 0.35 }}
+                  transition={{ delay: index * 0.03, duration: 0.5 }}
                 />
               );
             })}
           </svg>
 
+          {/* PARALLEL GROUP INDICATORS */}
+          {groups.map((group, index) => {
+            if (group.length < 2) return null;
+
+            const groupNodes = nodes.filter(n => n.col === index);
+            const top = Math.min(...groupNodes.map(n => n.y));
+            const bottom = Math.max(...groupNodes.map(n => n.y));
+            const x = 140 + index * MAP_COL;
+
+            return (
+              <div key={`group-${index}`} className="absolute pointer-events-none"
+                style={{ left: x - 44, top: top - 30, height: bottom - top + 60 }}>
+                <div className="h-full w-px border-l-2 border-dashed border-blue-500/25" />
+                <span className="absolute -top-7 -left-1 whitespace-nowrap text-[11px] text-blue-400 font-medium">
+                  Параллельно · {group.length}
+                </span>
+              </div>
+            );
+          })}
+
           {/* NODES */}
-          {nodes.map((node, nodeIndex) => {
-            const stage = node.stage;
-
-            const effective = effStatus(stage);
-            const config = STATUS_CFG[effective];
-
-            const StatusIcon = config.icon;
-
+          {nodes.map(({ stage, x, y }, index) => {
+            const eff = effectiveStatus(stage);
+            const config = STATUS[eff];
+            const Icon = config.icon;
+            const responsible = stage.responsible_id ? users[stage.responsible_id] : null;
             const active = stage.status === 'active';
-
-            const responsible = stage.responsible_id
-              ? responsibles[stage.responsible_id]
-              : null;
-
-            const overdue = isFactOverPlan(stage);
-            const overdueDays = overrunDays(stage);
-
-            const assigneeIds = stage.assignee_ids ?? [];
 
             return (
               <motion.div
                 key={stage.id}
-                initial={{
-                  scale: 0,
-                  opacity: 0,
-                }}
-                animate={{
-                  scale: 1,
-                  opacity: 1,
-                }}
-                transition={{
-                  delay: 0.08 + nodeIndex * 0.05,
-                  type: 'spring',
-                  stiffness: 300,
-                  damping: 25,
-                }}
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.05, duration: 0.25 }}
                 className="absolute"
-                style={{
-                  left: node.cx - NODE_R,
-                  top: node.cy - NODE_R,
-                  zIndex: 10,
-                }}
+                style={{ left: x - MAP_NODE / 2, top: y - MAP_NODE / 2, width: MAP_NODE }}
               >
-
-                {/* ACTIVE PULSE */}
                 {active && (
-                  <span
-                    className="absolute animate-ping rounded-full bg-blue-500/15"
-                    style={{
-                      width: NODE_D,
-                      height: NODE_D,
-                    }}
-                  />
+                  <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-ping" />
                 )}
 
-                {/* NODE BUTTON */}
                 <button
-                  type="button"
-                  onClick={() => onSelect(stage)}
-                  className={`
-                    relative
-                    z-10
-                    flex
-                    items-center
-                    justify-center
-                    rounded-full
-                    text-sm
-                    font-bold
-                    text-white
-                    transition-transform
-                    hover:scale-110
-                    ${config.bar}
-                    ${active
-                      ? `ring-4 ${config.ring}`
-                      : ''
-                    }
-                  `}
-                  style={{
-                    width: NODE_D,
-                    height: NODE_D,
-                    boxShadow: 'var(--shadow-md)',
-                  }}
+                  onClick={() => onOpen(stage)}
+                  className={`relative z-10 w-[52px] h-[52px] rounded-full ${config.bar} flex items-center justify-center text-white text-sm font-bold hover:scale-110 transition-transform`}
+                  style={{ boxShadow: 'var(--shadow-md)' }}
+                  title={stage.name}
                 >
                   {String(stage.execution_order).padStart(2, '0')}
 
-                  <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-card)]">
-                    <StatusIcon
-                      className={`h-3.5 w-3.5 ${config.text}`}
-                    />
+                  <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center">
+                    <Icon className={`w-3.5 h-3.5 ${config.text}`} />
                   </span>
                 </button>
 
-                {/* STAGE CARD */}
                 <button
-                  type="button"
-                  onClick={() => onSelect(stage)}
-                  className={`
-                    absolute
-                    rounded-xl
-                    border
-                    bg-[var(--bg-card)]
-                    p-3.5
-                    text-left
-                    transition-colors
-                    hover:bg-[var(--hover-2)]
-                    ${overdue
-                      ? 'border-[var(--accent)]/30'
-                      : 'border-[var(--border-color)]'
-                    }
-                  `}
-                  style={{
-                    top: NODE_D + 12,
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: CARD_W,
-                    boxShadow: 'var(--shadow-sm)',
-                  }}
+                  onClick={() => onOpen(stage)}
+                  className="absolute top-[66px] left-1/2 -translate-x-1/2 text-left p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[var(--border-hover)] hover:bg-[var(--hover-2)] transition-colors"
+                  style={{ width: MAP_CARD, boxShadow: 'var(--shadow-sm)' }}
                 >
-
-                  {/* NAME */}
-                  <h4 className="mb-2 line-clamp-2 text-sm font-bold leading-5 text-[var(--text-primary)]">
+                  <p className="text-sm font-semibold text-[var(--text-primary)] line-clamp-2 leading-5">
                     {stage.name}
-                  </h4>
-
-                  {/* STATUS */}
-                  <p className={`text-xs font-semibold ${config.text}`}>
-                    {config.label}
                   </p>
 
-                  {/* DATES */}
-                  <div className="mt-3 flex items-start gap-2 text-xs text-[var(--text-muted)]">
-
-                    <Calendar className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-
-                    <div>
-                      <p>
-                        {fmtShort(stage.planned_start)}
-                        {' — '}
-                        {fmtShort(stage.planned_end)}
-                      </p>
-
-                      {overdue && (
-                        <p className="mt-1 font-semibold text-[var(--accent)]">
-                          Отклонение +{overdueDays} дн.
-                        </p>
-                      )}
-                    </div>
+                  <div className="mt-2">
+                    <span className={`text-xs font-medium ${config.text}`}>{config.label}</span>
                   </div>
 
-                  {/* RESPONSIBLE */}
+                  <div className="mt-3 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                    <Calendar className="w-3.5 h-3.5 shrink-0" />
+                    {formatShort(stage.planned_start)} — {formatShort(stage.planned_end)}
+                  </div>
+
                   {responsible && (
-                    <div className="mt-3 flex items-center gap-2 border-t border-[var(--border-color)] pt-3">
-
-                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] text-[9px] font-bold text-white">
-                        {getInitials(responsible.full_name)}
-                      </div>
-
-                      <span className="truncate text-xs text-[var(--text-secondary)]">
-                        {responsible.full_name}
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--border-color)]">
+                      <Avatar name={responsible.full_name} size="xs" />
+                      <span className="text-xs text-[var(--text-secondary)] truncate">
+                        {shortName(responsible.full_name)}
                       </span>
                     </div>
                   )}
 
-                  {/* ASSIGNEES */}
-                  {assigneeIds.length > 0 && (
-                    <div className="mt-3 border-t border-[var(--border-color)] pt-3">
+                  {(stage.assignee_ids ?? []).length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-[var(--border-color)] flex items-center justify-between">
+                      <span className="text-[11px] text-[var(--text-muted)]">Исполнители</span>
+                      <AssigneeAvatars ids={stage.assignee_ids} users={users} max={2} />
+                    </div>
+                  )}
 
-                      <div className="mb-2 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
-                        <Users className="h-3.5 w-3.5" />
-                        Исполнители
-                      </div>
-
-                      <AssigneesPreview
-                        ids={assigneeIds}
-                        users={responsibles}
-                        maxVisible={3}
-                      />
+                  {isOverPlan(stage) && (
+                    <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-[var(--accent)]">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      +{overrunDays(stage)} дн.
                     </div>
                   )}
                 </button>
@@ -3160,611 +1033,495 @@ function RoadmapView({
           })}
         </div>
       </div>
+
+      <div className="flex items-start gap-2 px-6 py-4 border-t border-[var(--border-color)]">
+        <Info className="w-4 h-4 text-[var(--text-muted)] shrink-0 mt-0.5" />
+        <p className="text-xs leading-5 text-[var(--text-muted)]">
+          Карта строится по порядку этапов и пересечению плановых сроков. Нажмите на кружок или карточку для просмотра.
+        </p>
+      </div>
+    </SectionCard>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   OVERVIEW — PROJECT SUMMARY
+   ═══════════════════════════════════════════════════════════════ */
+
+function OverviewView({ stages, users, onOpen, onCreate }: {
+  stages: ProjectStageResponse[];
+  users: UsersMap;
+  onOpen: (stage: ProjectStageResponse) => void;
+  onCreate: () => void;
+}) {
+  const total = stages.length;
+  const completed = stages.filter(s => s.status === 'completed');
+  const active = sortStages(stages.filter(s => s.status === 'active'));
+  const paused = stages.filter(s => s.status === 'on_hold');
+  const overdue = stages.filter(s => effectiveStatus(s) === 'overdue');
+  const planned = sortStages(stages.filter(s => s.status === 'planned'));
+  const progress = total ? Math.round(completed.length / total * 100) : 0;
+
+  const nextStage = planned[0];
+
+  const stats = [
+    { label: 'Всего этапов', value: total, icon: Milestone, color: 'text-[var(--text-primary)]', bg: 'bg-[var(--hover-2)]' },
+    { label: 'Завершено', value: completed.length, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+    { label: 'В работе', value: active.length, icon: PlayCircle, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+    { label: 'Просрочено', value: overdue.length, icon: AlertTriangle, color: 'text-[var(--accent)]', bg: 'bg-[var(--accent-soft)]' },
+  ];
+
+  if (!total) {
+    return (
+      <SectionCard title="Сводка проекта" description="Текущее состояние выполнения этапов" icon={Activity}>
+        <EmptyState icon={Milestone} title="Пока нечего показывать"
+          description="Создайте первый этап, чтобы начать отслеживать ход проекта."
+          action={<ActionButton onClick={onCreate} className="px-5 py-3 text-sm"><Plus className="w-4 h-4" /> Создать этап</ActionButton>}
+        />
+      </SectionCard>
+    );
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+
+      {/* KPI */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        {stats.map(item => {
+          const Icon = item.icon;
+          return (
+            <div key={item.label} className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm text-[var(--text-muted)]">{item.label}</p>
+                  <p className="mt-3 text-3xl font-bold text-[var(--text-primary)] tabular-nums">{item.value}</p>
+                </div>
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${item.bg}`}>
+                  <Icon className={`w-5 h-5 ${item.color}`} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_350px] gap-6 items-start">
+
+        {/* MAIN */}
+        <div className="space-y-6">
+
+          <SectionCard
+            title="Сейчас в работе"
+            description={active.length ? `${active.length} активных этапов` : 'Активных этапов нет'}
+            icon={PlayCircle}
+          >
+            {!active.length ? (
+              <EmptyState icon={Clock} title="Нет активных этапов" description="Запущенные этапы будут отображаться здесь." />
+            ) : (
+              <div className="divide-y divide-[var(--border-color)]">
+                {active.map(stage => {
+                  const responsible = stage.responsible_id ? users[stage.responsible_id] : null;
+                  const late = isOverPlan(stage);
+
+                  return (
+                    <button key={stage.id} onClick={() => onOpen(stage)}
+                      className="group w-full text-left px-6 py-5 hover:bg-[var(--hover-2)] transition-colors">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap mb-2">
+                            <StageNumber order={stage.execution_order} />
+                            <StatusBadge status="active" small />
+                            {late && <StatusBadge status="overdue" small />}
+                          </div>
+                          <h3 className="text-base font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+                            {stage.name}
+                          </h3>
+                          <p className="mt-2 text-sm text-[var(--text-muted)] line-clamp-2">
+                            {stage.description || 'Описание не заполнено'}
+                          </p>
+                        </div>
+                        <ChevronRight className="w-5 h-5 shrink-0 text-[var(--text-disabled)] group-hover:text-[var(--accent)]" />
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 pt-4 border-t border-[var(--border-color)]">
+                        <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                          <Calendar className="w-4 h-4 text-[var(--text-muted)]" />
+                          {formatShort(stage.planned_start)} — {formatShort(stage.planned_end)}
+                        </div>
+
+                        {responsible && (
+                          <div className="flex items-center gap-2">
+                            <Avatar name={responsible.full_name} size="xs" />
+                            <span className="text-xs text-[var(--text-secondary)]">{shortName(responsible.full_name)}</span>
+                          </div>
+                        )}
+
+                        <AssigneeAvatars ids={stage.assignee_ids} users={users} />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </SectionCard>
+
+          {/* ATTENTION */}
+          {(overdue.length > 0 || paused.length > 0) && (
+            <SectionCard title="Требуют внимания" description="Просроченные и приостановленные этапы" icon={AlertTriangle}>
+              <div className="divide-y divide-[var(--border-color)]">
+                {[...new Map([...overdue, ...paused].map(s => [s.id, s])).values()].map(stage => (
+                  <button key={stage.id} onClick={() => onOpen(stage)}
+                    className="group flex items-center gap-4 w-full px-6 py-4 text-left hover:bg-[var(--hover-2)] transition-colors">
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${STATUS[effectiveStatus(stage)].dot}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{stage.name}</p>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        {stage.status === 'on_hold' ? 'Выполнение приостановлено' :
+                          `Плановое окончание: ${formatDate(stage.planned_end)}`}
+                      </p>
+                    </div>
+                    <StatusBadge status={effectiveStatus(stage)} small />
+                    <ChevronRight className="w-4 h-4 text-[var(--text-disabled)] group-hover:text-[var(--accent)] shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ALL STAGES */}
+          <SectionCard title="План выполнения" description="Последовательность этапов проекта" icon={ListChecks}>
+            <div className="divide-y divide-[var(--border-color)]">
+              {sortStages(stages).map(stage => {
+                const cfg = STATUS[stage.status];
+                const Icon = cfg.icon;
+
+                return (
+                  <button key={stage.id} onClick={() => onOpen(stage)}
+                    className="group w-full flex items-center gap-4 px-6 py-4 text-left hover:bg-[var(--hover-2)] transition-colors">
+                    <div className={`w-10 h-10 rounded-xl ${cfg.bg} flex items-center justify-center shrink-0`}>
+                      <Icon className={`w-5 h-5 ${cfg.text}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
+                        <span className="text-[var(--text-muted)] mr-2">#{stage.execution_order}</span>
+                        {stage.name}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        {formatShort(stage.planned_start)} — {formatShort(stage.planned_end)}
+                      </p>
+                    </div>
+                    <span className={`hidden sm:block text-xs font-medium ${cfg.text}`}>{cfg.label}</span>
+                    <ChevronRight className="w-4 h-4 text-[var(--text-disabled)] group-hover:text-[var(--accent)] shrink-0" />
+                  </button>
+                );
+              })}
+            </div>
+          </SectionCard>
+        </div>
+
+        {/* SIDEBAR */}
+        <aside className="space-y-5 xl:sticky xl:top-5">
+
+          <SectionCard title="Общий прогресс" icon={Target}>
+            <div className="p-6">
+              <div className="relative w-36 h-36 mx-auto">
+                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="var(--hover-3)" strokeWidth="9" />
+                  <motion.circle
+                    cx="50" cy="50" r="42" fill="none"
+                    stroke="var(--accent)" strokeWidth="9" strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 42}
+                    initial={{ strokeDashoffset: 2 * Math.PI * 42 }}
+                    animate={{ strokeDashoffset: 2 * Math.PI * 42 * (1 - progress / 100) }}
+                    transition={{ duration: 0.8 }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-3xl font-bold text-[var(--text-primary)]">{progress}%</span>
+                  <span className="text-xs text-[var(--text-muted)]">{completed.length} из {total}</span>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-5 border-t border-[var(--border-color)] space-y-3">
+                {([
+                  ['completed', completed.length],
+                  ['active', active.length],
+                  ['on_hold', paused.length],
+                  ['planned', planned.length],
+                ] as [StageStatus, number][]).map(([status, count]) => (
+                  <div key={status} className="flex items-center justify-between">
+                    <span className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                      <span className={`w-2.5 h-2.5 rounded-full ${STATUS[status].dot}`} />
+                      {STATUS[status].label}
+                    </span>
+                    <span className="text-sm font-semibold text-[var(--text-primary)]">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </SectionCard>
+
+          {nextStage && (
+            <SectionCard title="Следующий этап" icon={Flag}>
+              <button onClick={() => onOpen(nextStage)}
+                className="group w-full text-left p-5 hover:bg-[var(--hover-2)] transition-colors">
+                <div className="flex items-center gap-2">
+                  <StageNumber order={nextStage.execution_order} />
+                  <StatusBadge status="planned" small />
+                </div>
+                <p className="mt-3 text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)]">
+                  {nextStage.name}
+                </p>
+                <p className="mt-2 flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {formatShort(nextStage.planned_start)} — {formatShort(nextStage.planned_end)}
+                </p>
+                <div className="mt-4 pt-4 border-t border-[var(--border-color)] flex items-center justify-between">
+                  <span className="text-xs text-[var(--text-muted)]">Исполнители</span>
+                  <AssigneeAvatars ids={nextStage.assignee_ids} users={users} />
+                </div>
+              </button>
+            </SectionCard>
+          )}
+        </aside>
+      </div>
     </motion.div>
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   TIMELINE VIEW
-   ════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   TIMELINE / GANTT
+   ═══════════════════════════════════════════════════════════════ */
 
-function TimelineView({
-  stages,
-  responsibles,
-  projectId,
-  onSelect,
-}: {
+function TimelineView({ stages, users, projectId, onOpen }: {
   stages: ProjectStageResponse[];
-  responsibles: Record<string, StageResponsible>;
+  users: UsersMap;
   projectId: string;
-  onSelect: (stage: ProjectStageResponse) => void;
+  onOpen: (stage: ProjectStageResponse) => void;
 }) {
-  const [scale, setScale] =
-    useState<TimelineScale>('weeks');
+  const [scale, setScale] = useState<TimelineScale>('weeks');
 
   const ordered = useMemo(
-    () =>
-      sortOrd(
-        stages.filter(
-          stage =>
-            stage.planned_start &&
-            stage.planned_end,
-        ),
-      ),
+    () => sortStages(stages.filter(s => s.planned_start && s.planned_end)),
     [stages],
   );
 
-  /* =========================================================
-     DATE RANGE
-     ========================================================= */
-
-  const {
-    minDate,
-    maxDate,
-    totalDays,
-  } = useMemo(() => {
+  const { minDate, maxDate, totalDays } = useMemo(() => {
     if (!ordered.length) {
-      return {
-        minDate: new Date(),
-        maxDate: new Date(),
-        totalDays: 30,
-      };
+      const today = new Date();
+      return { minDate: today, maxDate: today, totalDays: 30 };
     }
 
-    const dates = ordered.flatMap(stage => [
-      parseDate(stage.planned_start)!,
-      parseDate(stage.planned_end)!,
-    ]);
+    const dates: Date[] = [];
 
-    ordered.forEach(stage => {
-      const actualEnd = getActualEnd(stage);
+    ordered.forEach(s => {
+      const start = parseDate(s.planned_start);
+      const end = parseDate(s.planned_end);
+      const actual = actualEnd(s);
 
-      if (actualEnd) {
-        dates.push(actualEnd);
-      }
+      if (start) dates.push(start);
+      if (end) dates.push(end);
+      if (actual) dates.push(actual);
     });
 
-    const minimum = new Date(
-      Math.min(
-        ...dates.map(date => date.getTime()),
-      ),
-    );
+    const min = new Date(Math.min(...dates.map(d => d.getTime())));
+    const max = new Date(Math.max(...dates.map(d => d.getTime())));
 
-    const maximum = new Date(
-      Math.max(
-        ...dates.map(date => date.getTime()),
-      ),
-    );
-
-    minimum.setDate(
-      minimum.getDate() - 2,
-    );
-
-    maximum.setDate(
-      maximum.getDate() + 2,
-    );
+    min.setDate(min.getDate() - 2);
+    max.setDate(max.getDate() + 3);
 
     return {
-      minDate: minimum,
-      maxDate: maximum,
-      totalDays: daysB(minimum, maximum) + 1,
+      minDate: min,
+      maxDate: max,
+      totalDays: Math.max(1, daysBetween(min, max) + 1),
     };
   }, [ordered]);
 
-  const dayWidth =
-    scale === 'days'
-      ? 42
-      : scale === 'weeks'
-        ? 18
-        : 8;
-
-  const timelineWidth = totalDays * dayWidth;
-
-  /* =========================================================
-     TICKS
-     ========================================================= */
+  const dayWidth = scale === 'days' ? 42 : scale === 'weeks' ? 18 : 8;
+  const width = totalDays * dayWidth;
 
   const ticks = useMemo(() => {
-    const result: {
-      date: Date;
-      label: string;
-      major: boolean;
-    }[] = [];
-
+    const result: { date: Date; label: string; major: boolean }[] = [];
     const current = new Date(minDate);
 
     while (current <= maxDate) {
       if (scale === 'days') {
         result.push({
           date: new Date(current),
-          label: current
-            .getDate()
-            .toString()
-            .padStart(2, '0'),
+          label: String(current.getDate()).padStart(2, '0'),
           major: current.getDate() === 1,
         });
-
-        current.setDate(
-          current.getDate() + 1,
-        );
       } else if (scale === 'weeks') {
-        if (
-          current.getDay() === 1 ||
-          !result.length
-        ) {
+        if (current.getDay() === 1 || !result.length) {
           result.push({
             date: new Date(current),
-            label: current.toLocaleDateString(
-              'ru-RU',
-              {
-                day: '2-digit',
-                month: '2-digit',
-              },
-            ),
+            label: current.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
             major: current.getDate() <= 7,
           });
         }
-
-        current.setDate(
-          current.getDate() + 1,
-        );
       } else {
-        if (
-          current.getDate() === 1 ||
-          !result.length
-        ) {
+        if (current.getDate() === 1 || !result.length) {
           result.push({
             date: new Date(current),
-            label: current.toLocaleDateString(
-              'ru-RU',
-              {
-                month: 'short',
-                year: '2-digit',
-              },
-            ),
+            label: current.toLocaleDateString('ru-RU', { month: 'short', year: '2-digit' }),
             major: true,
           });
         }
-
-        current.setDate(
-          current.getDate() + 1,
-        );
       }
+
+      current.setDate(current.getDate() + 1);
     }
 
     return result;
   }, [minDate, maxDate, scale]);
 
   const today = new Date();
-
-  const todayOffset =
-    daysB(minDate, today) * dayWidth;
-
-  const showToday =
-    today >= minDate &&
-    today <= maxDate;
-
-  /* =========================================================
-     EMPTY
-     ========================================================= */
+  const todayOffset = daysBetween(minDate, today) * dayWidth;
+  const showToday = today >= minDate && today <= maxDate;
 
   if (!ordered.length) {
     return (
-      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] px-6 py-16 text-center">
-
-        <GanttChart className="mx-auto h-12 w-12 text-[var(--text-disabled)]" />
-
-        <p className="mt-4 text-sm text-[var(--text-muted)]">
-          Нет этапов с плановыми датами
-        </p>
-      </div>
+      <SectionCard title="Хронология" icon={GanttChart}>
+        <EmptyState icon={CalendarDays} title="Нет этапов с датами" description="Укажите плановые сроки этапов, чтобы построить хронологию." />
+      </SectionCard>
     );
   }
 
-  /* =========================================================
-     RENDER
-     ========================================================= */
-
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]"
-    >
-
-      {/* HEADER */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] px-6 py-5">
-
-        <div>
-          <h3 className="text-lg font-bold text-[var(--text-primary)]">
-            Хронология
-          </h3>
-
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Плановые и фактические сроки выполнения
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-
-          {/* EXPORT */}
+    <SectionCard
+      title="Хронология"
+      description="Плановые и фактические сроки выполнения"
+      icon={GanttChart}
+      action={
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            type="button"
-            onClick={() =>
-              exportTimelineToExcel(
-                ordered,
-                responsibles,
-                projectId,
-              )
-            }
-            className="
-              inline-flex
-              items-center
-              gap-2
-              rounded-xl
-              border border-[var(--border-color)]
-              bg-[var(--hover-2)]
-              px-4 py-2.5
-              text-sm
-              font-medium
-              text-[var(--text-secondary)]
-              transition-colors
-              hover:bg-[var(--hover-3)]
-              hover:text-[var(--text-primary)]
-            "
+            onClick={() => exportTimelineToExcel(ordered, users, projectId)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--hover-2)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           >
-            <FileText className="h-4 w-4" />
-            Экспорт в Excel
+            <Download className="w-4 h-4" /> Excel
           </button>
 
-          {/* SCALE */}
-          <div className="inline-flex rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] p-1">
-
-            {(
-              ['days', 'weeks', 'months'] as TimelineScale[]
-            ).map(item => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setScale(item)}
-                className={`
-                  rounded-lg
-                  px-3 py-2
-                  text-sm
-                  font-medium
-                  transition-colors
-                  ${scale === item
-                    ? 'bg-[var(--accent)] text-white'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                  }
-                `}
-              >
-                {{
-                  days: 'Дни',
-                  weeks: 'Недели',
-                  months: 'Месяцы',
-                }[item]}
+          <div className="flex p-1 rounded-lg border border-[var(--border-color)] bg-[var(--hover-2)]">
+            {(['days', 'weeks', 'months'] as TimelineScale[]).map(s => (
+              <button key={s} onClick={() => setScale(s)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  scale === s ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}>
+                {{ days: 'Дни', weeks: 'Недели', months: 'Месяцы' }[s]}
               </button>
             ))}
           </div>
         </div>
-      </div>
+      }
+    >
+      <div className="flex overflow-hidden">
 
-      {/* TIMELINE */}
-      <div className="flex">
-
-        {/* LEFT SIDE */}
-        <div className="w-[300px] shrink-0 border-r border-[var(--border-color)]">
-
-          <div className="flex h-12 items-center border-b border-[var(--border-color)] bg-[var(--hover-1)] px-4">
-            <span className="text-xs font-semibold text-[var(--text-muted)]">
-              Этап проекта
-            </span>
+        {/* LEFT COLUMN */}
+        <div className="w-[280px] shrink-0 border-r border-[var(--border-color)] bg-[var(--bg-card)]">
+          <div className="h-12 flex items-center px-4 border-b border-[var(--border-color)]">
+            <span className="text-xs font-semibold text-[var(--text-muted)]">Этап проекта</span>
           </div>
 
-          {ordered.map(stage => {
-            const effective = effStatus(stage);
-
-            const overdue = isFactOverPlan(stage);
-
-            return (
-              <button
-                key={stage.id}
-                type="button"
-                onClick={() => onSelect(stage)}
-                className={`
-                  flex
-                  h-20
-                  w-full
-                  items-center
-                  gap-3
-                  border-b border-[var(--border-color)]
-                  px-4
-                  text-left
-                  transition-colors
-                  hover:bg-[var(--hover-1)]
-                  ${overdue
-                    ? 'bg-[var(--accent-soft)]/10'
-                    : ''
-                  }
-                `}
-              >
-
-                <Badge order={stage.execution_order} />
-
-                <span
-                  className={`h-2 w-2 shrink-0 rounded-full ${STATUS_CFG[effective].dot}`}
-                />
-
-                <div className="min-w-0 flex-1">
-
-                  <span className="block truncate text-sm font-medium text-[var(--text-primary)]">
-                    {stage.name}
-                  </span>
-
-                  <div className="mt-1 flex items-center gap-2">
-
-                    <Users className="h-3 w-3 text-[var(--text-muted)]" />
-
-                    <span className="text-xs text-[var(--text-muted)]">
-                      {(stage.assignee_ids ?? []).length} исполн.
-                    </span>
-                  </div>
-
-                  {overdue && (
-                    <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[var(--accent)]">
-                      <AlertTriangle className="h-3 w-3" />
-                      +{overrunDays(stage)} дн.
-                    </span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
+          {ordered.map(s => (
+            <button key={s.id} onClick={() => onOpen(s)}
+              className="group w-full h-[76px] flex items-center gap-3 px-4 text-left border-b border-[var(--border-color)] hover:bg-[var(--hover-2)] transition-colors">
+              <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${STATUS[effectiveStatus(s)].dot}`} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">
+                  {s.execution_order}. {s.name}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {formatShort(s.planned_start)} — {formatShort(s.planned_end)}
+                </p>
+                {isOverPlan(s) && (
+                  <p className="text-xs text-[var(--accent)] mt-0.5">+{overrunDays(s)} дн.</p>
+                )}
+              </div>
+            </button>
+          ))}
         </div>
 
-        {/* RIGHT SIDE */}
-        <div className="min-w-0 flex-1 overflow-x-auto">
+        {/* TIMELINE */}
+        <div className="flex-1 min-w-0 overflow-x-auto">
+          <div className="relative" style={{ width, minWidth: '100%' }}>
 
-          <div
-            className="relative"
-            style={{
-              width: timelineWidth,
-              minWidth: '100%',
-            }}
-          >
-
-            {/* DATE HEADER */}
+            {/* HEADER */}
             <div className="relative h-12 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
-
               {ticks.map((tick, index) => (
-                <div
-                  key={index}
-                  className="absolute inset-y-0 flex items-center"
-                  style={{
-                    left:
-                      daysB(minDate, tick.date) *
-                      dayWidth,
-                  }}
-                >
-                  <span
-                    className={`
-                      whitespace-nowrap
-                      px-1.5
-                      text-xs
-                      ${tick.major
-                        ? 'font-semibold text-[var(--text-primary)]'
-                        : 'text-[var(--text-muted)]'
-                      }
-                    `}
-                  >
-                    {tick.label}
-                  </span>
-                </div>
+                <span key={index}
+                  className={`absolute top-4 px-1 text-xs whitespace-nowrap ${
+                    tick.major ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-muted)]'
+                  }`}
+                  style={{ left: daysBetween(minDate, tick.date) * dayWidth }}>
+                  {tick.label}
+                </span>
               ))}
             </div>
 
-            {/* ROWS */}
             <div className="relative">
-
               {/* GRID */}
-              <div className="pointer-events-none absolute inset-0">
-
+              <div className="absolute inset-0 pointer-events-none">
                 {ticks.map((tick, index) => (
-                  <div
-                    key={index}
-                    className={`
-                      absolute
-                      inset-y-0
-                      w-px
-                      ${tick.major
-                        ? 'bg-[var(--border-color)]'
-                        : 'bg-[var(--border-color)]/50'
-                      }
-                    `}
-                    style={{
-                      left:
-                        daysB(minDate, tick.date) *
-                        dayWidth,
-                    }}
+                  <div key={index}
+                    className={`absolute top-0 bottom-0 w-px ${
+                      tick.major ? 'bg-[var(--border-color)]' : 'bg-[var(--border-color)]/40'
+                    }`}
+                    style={{ left: daysBetween(minDate, tick.date) * dayWidth }}
                   />
                 ))}
               </div>
 
               {/* TODAY */}
               {showToday && (
-                <div
-                  className="pointer-events-none absolute inset-y-0 z-10"
-                  style={{
-                    left: todayOffset,
-                  }}
-                >
-                  <div className="h-full w-0.5 bg-[var(--accent)]" />
-
-                  <span className="absolute left-1 top-0 whitespace-nowrap rounded-md bg-[var(--accent)] px-2 py-1 text-xs font-semibold text-white">
+                <div className="absolute top-0 bottom-0 z-20 pointer-events-none" style={{ left: todayOffset }}>
+                  <div className="w-0.5 h-full bg-[var(--accent)]" />
+                  <span className="absolute top-0 left-1 px-2 py-1 rounded-md bg-[var(--accent)] text-[10px] font-semibold text-white">
                     Сегодня
                   </span>
                 </div>
               )}
 
-              {/* STAGES */}
+              {/* STAGE BARS */}
               {ordered.map((stage, index) => {
-                const effective = effStatus(stage);
-                const config = STATUS_CFG[effective];
+                const start = parseDate(stage.planned_start)!;
+                const end = parseDate(stage.planned_end)!;
+                const config = STATUS[effectiveStatus(stage)];
 
-                const plannedStart =
-                  parseDate(stage.planned_start)!;
+                const left = daysBetween(minDate, start) * dayWidth;
+                const plannedWidth = Math.max(dayWidth, (daysBetween(start, end) + 1) * dayWidth);
 
-                const plannedEnd =
-                  parseDate(stage.planned_end)!;
-
-                const startOffset =
-                  daysB(minDate, plannedStart) *
-                  dayWidth;
-
-                const plannedWidth =
-                  (daysB(plannedStart, plannedEnd) + 1) *
-                  dayWidth;
-
-                const overdue = isFactOverPlan(stage);
-
-                const actualEnd = getActualEnd(stage);
-
-                const overrunWidth =
-                  overdue && actualEnd
-                    ? daysB(plannedEnd, actualEnd) *
-                    dayWidth
-                    : 0;
+                const actual = actualEnd(stage);
+                const late = isOverPlan(stage);
+                const extraWidth = late && actual ? Math.max(0, daysBetween(end, actual) * dayWidth) : 0;
 
                 return (
-                  <div
-                    key={stage.id}
-                    className="relative h-20 border-b border-[var(--border-color)]"
-                  >
+                  <div key={stage.id} className="relative h-[76px] border-b border-[var(--border-color)]">
 
-                    {/* PLANNED BAR */}
                     <motion.button
-                      type="button"
-                      onClick={() => onSelect(stage)}
-                      initial={{
-                        width: 0,
-                        opacity: 0,
-                      }}
-                      animate={{
-                        width: plannedWidth,
-                        opacity: 1,
-                      }}
-                      transition={{
-                        delay: index * 0.05,
-                        duration: 0.35,
-                      }}
-                      whileHover={{
-                        scale: 1.01,
-                      }}
-                      className={`
-                        absolute
-                        top-1/2
-                        flex
-                        h-10
-                        -translate-y-1/2
-                        items-center
-                        overflow-hidden
-                        px-3
-                        text-xs
-                        font-semibold
-                        text-white
-                        ${config.bar}
-                        ${overdue
-                          ? 'rounded-l-xl'
-                          : 'rounded-xl'
-                        }
-                      `}
-                      style={{
-                        left: startOffset,
-                        boxShadow: 'var(--shadow-sm)',
-                      }}
+                      onClick={() => onOpen(stage)}
+                      initial={{ width: 0, opacity: 0 }}
+                      animate={{ width: plannedWidth, opacity: 1 }}
+                      transition={{ delay: index * 0.04, duration: 0.35 }}
+                      className={`absolute top-1/2 -translate-y-1/2 h-9 flex items-center px-3 text-xs font-semibold text-white overflow-hidden ${
+                        late ? 'rounded-l-lg' : 'rounded-lg'
+                      } ${config.bar}`}
+                      style={{ left, boxShadow: 'var(--shadow-sm)' }}
                       title={stage.name}
                     >
-                      <span className="truncate">
-                        #{String(stage.execution_order).padStart(2, '0')}
-                        {' · '}
-                        {stage.name}
-                      </span>
+                      <span className="truncate">{stage.name}</span>
                     </motion.button>
 
-                    {/* OVERRUN */}
-                    {overdue && overrunWidth > 0 && (
+                    {late && extraWidth > 0 && (
                       <motion.button
-                        type="button"
-                        onClick={() => onSelect(stage)}
-                        initial={{
-                          width: 0,
-                          opacity: 0,
-                        }}
-                        animate={{
-                          width: overrunWidth,
-                          opacity: 1,
-                        }}
-                        transition={{
-                          delay: index * 0.05 + 0.2,
-                          duration: 0.3,
-                        }}
-                        className="
-                          absolute
-                          top-1/2
-                          flex
-                          h-10
-                          -translate-y-1/2
-                          items-center
-                          overflow-hidden
-                          rounded-r-xl
-                          bg-[var(--accent)]
-                          px-2
-                          text-xs
-                          font-bold
-                          text-white
-                        "
-                        style={{
-                          left:
-                            startOffset +
-                            plannedWidth,
-                        }}
+                        onClick={() => onOpen(stage)}
+                        initial={{ width: 0 }}
+                        animate={{ width: extraWidth }}
+                        transition={{ delay: index * 0.04 + 0.15, duration: 0.3 }}
+                        className="absolute top-1/2 -translate-y-1/2 h-9 rounded-r-lg bg-[var(--accent)] flex items-center px-2 text-xs font-semibold text-white overflow-hidden"
+                        style={{ left: left + plannedWidth }}
                       >
-                        {overrunWidth > 50 && (
-                          <span className="truncate">
-                            +{overrunDays(stage)} дн.
-                          </span>
-                        )}
+                        {extraWidth > 45 && <span className="truncate">+{overrunDays(stage)} дн.</span>}
                       </motion.button>
-                    )}
-
-                    {/* ACTUAL END */}
-                    {overdue && actualEnd && (
-                      <span
-                        className="
-                          pointer-events-none
-                          absolute
-                          top-1/2
-                          -translate-y-1/2
-                          whitespace-nowrap
-                          text-xs
-                          font-semibold
-                          text-[var(--accent)]
-                        "
-                        style={{
-                          left:
-                            startOffset +
-                            plannedWidth +
-                            overrunWidth +
-                            8,
-                        }}
-                      >
-                        {stage.completed_at
-                          ? fmtShort(
-                            stage.completed_at.slice(0, 10),
-                          )
-                          : 'н.в.'}
-                      </span>
                     )}
                   </div>
                 );
@@ -3773,2715 +1530,1646 @@ function TimelineView({
           </div>
         </div>
       </div>
-    </motion.div>
+
+      <div className="flex flex-wrap items-center gap-5 px-5 py-3 border-t border-[var(--border-color)]">
+        <span className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+          <span className="w-3 h-3 rounded bg-blue-500" /> Выполнение
+        </span>
+        <span className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+          <span className="w-3 h-3 rounded bg-[var(--accent)]" /> Превышение срока
+        </span>
+        <span className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+          <span className="w-0.5 h-3 bg-[var(--accent)]" /> Сегодня
+        </span>
+      </div>
+    </SectionCard>
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   BOARD VIEW
-   ════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   KANBAN BOARD
+   ═══════════════════════════════════════════════════════════════ */
 
-function BoardView({
-  stages,
-  responsibles,
-  onSelect,
-  onMoveStage,
-}: {
+function BoardView({ stages, users, onOpen, onMove }: {
   stages: ProjectStageResponse[];
-  responsibles: Record<string, StageResponsible>;
-  onSelect: (stage: ProjectStageResponse) => void;
-  onMoveStage: (
-    stageId: string,
-    status: ProjectStageStatus,
-  ) => Promise<void>;
+  users: UsersMap;
+  onOpen: (stage: ProjectStageResponse) => void;
+  onMove: (id: string, status: StageStatus) => Promise<void>;
 }) {
-  const columns: ProjectStageStatus[] = [
-    'planned',
-    'active',
-    'on_hold',
-    'completed',
-    'skipped',
-  ];
+  const columns: StageStatus[] = ['planned', 'active', 'on_hold', 'completed', 'skipped'];
 
   const [dragId, setDragId] = useState<string | null>(null);
-  const [overColumn, setOverColumn] =
-    useState<ProjectStageStatus | null>(null);
+  const [overColumn, setOverColumn] = useState<StageStatus | null>(null);
   const [moving, setMoving] = useState(false);
 
   const grouped = useMemo(() => {
-    const result: Record<
-      ProjectStageStatus,
-      ProjectStageResponse[]
-    > = {
-      planned: [],
-      active: [],
-      on_hold: [],
-      completed: [],
-      skipped: [],
+    const result: Record<StageStatus, ProjectStageResponse[]> = {
+      planned: [], active: [], on_hold: [], completed: [], skipped: [],
     };
 
-    sortOrd(stages).forEach(stage => {
-      result[stage.status].push(stage);
-    });
-
+    sortStages(stages).forEach(s => result[s.status].push(s));
     return result;
   }, [stages]);
 
-  const handleDrop = async (
-    status: ProjectStageStatus,
-  ) => {
-    const id = dragId;
+  // Переходы, для которых есть соответствующие операции API.
+  const allowedTransition = (from: StageStatus, to: StageStatus) => {
+    if (from === 'planned') return to === 'active' || to === 'skipped';
+    if (from === 'active') return to === 'on_hold' || to === 'completed';
+    if (from === 'on_hold') return to === 'active' || to === 'skipped';
+    return false;
+  };
 
+  const handleDrop = async (status: StageStatus) => {
+    const id = dragId;
     setDragId(null);
     setOverColumn(null);
 
     if (!id || moving) return;
 
-    const stage = stages.find(item => item.id === id);
-
-    if (!stage || stage.status === status) return;
+    const stage = stages.find(s => s.id === id);
+    if (!stage || !allowedTransition(stage.status, status)) return;
 
     setMoving(true);
-
-    try {
-      await onMoveStage(id, status);
-    } catch {
-      // Уведомление об ошибке показывает родитель.
-    } finally {
-      setMoving(false);
-    }
+    try { await onMove(id, status); }
+    catch { /* Ошибка отображается родителем */ }
+    finally { setMoving(false); }
   };
 
   if (!stages.length) {
     return (
-      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] px-6 py-16 text-center">
-        <LayoutGrid className="mx-auto h-12 w-12 text-[var(--text-disabled)]" />
-
-        <p className="mt-4 text-sm text-[var(--text-muted)]">
-          Нет этапов для отображения
-        </p>
-      </div>
+      <SectionCard title="Доска этапов" icon={LayoutGrid}>
+        <EmptyState icon={LayoutGrid} title="Нет этапов" />
+      </SectionCard>
     );
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5"
-    >
-      {columns.map(column => {
-        const config = STATUS_CFG[column];
-        const Icon = config.icon;
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 px-1">
+        <Info className="w-4 h-4 text-[var(--text-muted)]" />
+        <p className="text-xs text-[var(--text-muted)]">
+          Перетаскивайте карточки между доступными статусами.
+        </p>
+      </div>
 
-        const items = grouped[column];
-        const isOver = overColumn === column;
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+        {columns.map(column => {
+          const cfg = STATUS[column];
+          const Icon = cfg.icon;
+          const items = grouped[column];
+          const isOver = overColumn === column;
 
-        return (
-          <div
-            key={column}
-            onDragOver={event => {
-              event.preventDefault();
+          const dragged = stages.find(s => s.id === dragId);
+          const canDrop = dragged ? allowedTransition(dragged.status, column) : false;
 
-              if (!moving) {
+          return (
+            <div key={column}
+              onDragOver={e => {
+                if (!dragged || !canDrop || moving) return;
+                e.preventDefault();
                 setOverColumn(column);
-              }
-            }}
-            onDragLeave={event => {
-              if (
-                !event.currentTarget.contains(
-                  event.relatedTarget as Node,
-                )
-              ) {
-                setOverColumn(null);
-              }
-            }}
-            onDrop={event => {
-              event.preventDefault();
-              void handleDrop(column);
-            }}
-            className={`
-              flex
-              min-h-[420px]
-              flex-col
-              overflow-hidden
-              rounded-2xl
-              border
-              bg-[var(--bg-card)]
-              transition-all
-              ${isOver
-                ? 'border-[var(--accent)] bg-[var(--accent-soft)]/10'
-                : 'border-[var(--border-color)]'
-              }
-            `}
-          >
-            {/* COLUMN HEADER */}
-            <div className="flex items-center justify-between gap-3 border-b border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-4">
-
-              <div className="flex items-center gap-2">
-
-                <Icon className={`h-4 w-4 ${config.text}`} />
-
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-                  {config.label}
-                </h3>
+              }}
+              onDragLeave={e => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverColumn(null);
+              }}
+              onDrop={e => { e.preventDefault(); void handleDrop(column); }}
+              className={`min-h-[380px] rounded-2xl border flex flex-col overflow-hidden transition-colors ${
+                isOver && canDrop ? 'border-[var(--accent)] bg-[var(--accent-soft)]' :
+                'border-[var(--border-color)] bg-[var(--hover-1)]'
+              }`}
+            >
+              {/* COLUMN HEADER */}
+              <div className="flex items-center justify-between gap-3 px-4 py-4 border-b border-[var(--border-color)]">
+                <div className="flex items-center gap-2">
+                  <Icon className={`w-4 h-4 ${cfg.text}`} />
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">{cfg.label}</h3>
+                </div>
+                <span className="min-w-7 h-7 px-2 rounded-lg bg-[var(--hover-2)] flex items-center justify-center text-xs font-semibold text-[var(--text-secondary)]">
+                  {items.length}
+                </span>
               </div>
 
-              <span className="flex h-7 min-w-7 items-center justify-center rounded-lg bg-[var(--hover-2)] px-2 text-xs font-semibold text-[var(--text-secondary)]">
-                {items.length}
-              </span>
-            </div>
+              {/* CARDS */}
+              <div className="p-3 space-y-3 flex-1">
+                {!items.length && (
+                  <div className={`h-28 rounded-xl border border-dashed flex flex-col items-center justify-center ${
+                    isOver && canDrop ? 'border-[var(--accent)]/40' : 'border-[var(--border-color)]'
+                  }`}>
+                    <Milestone className="w-6 h-6 text-[var(--text-disabled)]" />
+                    <span className="mt-2 text-xs text-[var(--text-muted)]">
+                      {isOver && canDrop ? 'Отпустите этап' : 'Пусто'}
+                    </span>
+                  </div>
+                )}
 
-            {/* COLUMN CONTENT */}
-            <div className="flex-1 space-y-3 p-3">
+                {items.map(stage => {
+                  const responsible = stage.responsible_id ? users[stage.responsible_id] : null;
+                  const late = effectiveStatus(stage) === 'overdue';
 
-              {items.length === 0 && (
-                <div
-                  className={`
-                    flex h-32 flex-col items-center justify-center
-                    rounded-xl border border-dashed
-                    ${isOver
-                      ? 'border-[var(--accent)]/40 bg-[var(--accent-soft)]'
-                      : 'border-[var(--border-color)]'
-                    }
-                  `}
-                >
-                  <Milestone className="h-6 w-6 text-[var(--text-disabled)]" />
-
-                  <p className="mt-2 text-xs text-[var(--text-muted)]">
-                    {isOver ? 'Отпустите этап' : 'Пусто'}
-                  </p>
-                </div>
-              )}
-
-              {items.map(stage => {
-                const responsible = stage.responsible_id
-                  ? responsibles[stage.responsible_id]
-                  : null;
-
-                const effective = effStatus(stage);
-
-                const dragging = dragId === stage.id;
-
-                return (
-                  <motion.div
-                    key={stage.id}
-                    layout
-                    draggable={!moving}
-                    onDragStart={event => {
-                      setDragId(stage.id);
-
-                      if (event.dataTransfer) {
-                        event.dataTransfer.effectAllowed = 'move';
-                      }
-                    }}
-                    onDragEnd={() => {
-                      setDragId(null);
-                      setOverColumn(null);
-                    }}
-                    className={`
-                      rounded-xl
-                      border
-                      bg-[var(--hover-1)]
-                      p-4
-                      cursor-grab
-                      select-none
-                      transition-colors
-                      hover:bg-[var(--hover-2)]
-                      ${effective === 'overdue'
-                        ? 'border-[var(--accent)]/30'
-                        : 'border-[var(--border-color)]'
-                      }
-                      ${dragging ? 'opacity-40' : ''}
-                    `}
-                  >
-                    {/* TOP */}
-                    <div className="mb-3 flex items-center justify-between gap-2">
-
-                      <Badge order={stage.execution_order} />
-
-                      <button
-                        type="button"
-                        onClick={() => onSelect(stage)}
-                        aria-label="Открыть этап"
-                        className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--hover-3)] hover:text-[var(--accent)]"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    {/* NAME */}
-                    <button
-                      type="button"
-                      onClick={() => onSelect(stage)}
-                      className="w-full text-left"
+                  return (
+                    <motion.div
+                      key={stage.id}
+                      layout
+                      draggable={!moving && stage.status !== 'completed' && stage.status !== 'skipped'}
+                      onDragStart={e => {
+                        setDragId(stage.id);
+                        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragEnd={() => { setDragId(null); setOverColumn(null); }}
+                      className={`rounded-xl border bg-[var(--bg-card)] p-4 transition-all ${
+                        late ? 'border-[var(--accent)]/30' : 'border-[var(--border-color)]'
+                      } ${dragId === stage.id ? 'opacity-40' : ''} ${
+                        stage.status === 'completed' || stage.status === 'skipped'
+                          ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
+                      }`}
                     >
-                      <h4 className="text-sm font-bold leading-6 text-[var(--text-primary)]">
-                        {stage.name}
-                      </h4>
-
-                      <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">
-                        {stage.description || 'Без описания'}
-                      </p>
-                    </button>
-
-                    {/* PEOPLE */}
-                    <div className="mt-4 space-y-3 border-t border-[var(--border-color)] pt-4">
-
-                      {responsible && (
-                        <div className="flex items-center gap-2">
-
-                          <Ava
-                            name={responsible.full_name}
-                            size="sm"
-                          />
-
-                          <div className="min-w-0">
-
-                            <p className="text-[11px] text-[var(--text-muted)]">
-                              Ответственный
-                            </p>
-
-                            <p className="truncate text-xs font-medium text-[var(--text-primary)]">
-                              {responsible.full_name}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between gap-2">
-
-                        <span className="text-xs text-[var(--text-muted)]">
-                          Исполнители
-                        </span>
-
-                        <AssigneesPreview
-                          ids={stage.assignee_ids}
-                          users={responsibles}
-                          maxVisible={3}
-                        />
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <StageNumber order={stage.execution_order} />
+                        {late && <AlertTriangle className="w-4 h-4 text-[var(--accent)]" />}
                       </div>
-                    </div>
 
-                    {/* DATE */}
-                    <div className="mt-3 flex items-center gap-2 border-t border-[var(--border-color)] pt-3 text-xs text-[var(--text-muted)]">
+                      <button onClick={() => onOpen(stage)} className="w-full text-left group">
+                        <h4 className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] leading-5">
+                          {stage.name}
+                        </h4>
+                        <p className="mt-2 text-xs text-[var(--text-muted)] line-clamp-2 leading-5">
+                          {stage.description || 'Без описания'}
+                        </p>
+                      </button>
 
-                      <Calendar className="h-3.5 w-3.5" />
+                      <div className="mt-4 pt-3 border-t border-[var(--border-color)] space-y-3">
+                        {responsible && (
+                          <div className="flex items-center gap-2">
+                            <Avatar name={responsible.full_name} size="xs" />
+                            <span className="text-xs text-[var(--text-secondary)] truncate">
+                              {shortName(responsible.full_name)}
+                            </span>
+                          </div>
+                        )}
 
-                      {fmtShort(stage.planned_end)}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-[var(--text-muted)]">Исполнители</span>
+                          <AssigneeAvatars ids={stage.assignee_ids} users={users} max={2} />
+                        </div>
 
-                      {effective === 'overdue' && (
-                        <AlertTriangle className="ml-auto h-4 w-4 text-[var(--accent)]" />
-                      )}
-                    </div>
-                  </motion.div>
-                );
-              })}
-
-              {dragId && items.length > 0 && (
-                <div
-                  className={`
-                    flex h-16 items-center justify-center
-                    rounded-xl border-2 border-dashed
-                    text-xs
-                    ${isOver
-                      ? 'border-[var(--accent)]/40 text-[var(--accent)]'
-                      : 'border-[var(--border-color)] text-[var(--text-muted)]'
-                    }
-                  `}
-                >
-                  {isOver ? 'Отпустите' : 'Перетащите сюда'}
-                </div>
-              )}
+                        <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {formatShort(stage.planned_end)}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        );
-      })}
-    </motion.div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   ANALYTICS VIEW
-   ════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   ANALYTICS
+   ═══════════════════════════════════════════════════════════════ */
 
-function AnalyticsView({
-  stages,
-}: {
+function AnalyticsView({ stages, users, onOpen }: {
   stages: ProjectStageResponse[];
+  users: UsersMap;
+  onOpen: (stage: ProjectStageResponse) => void;
 }) {
   const total = stages.length;
+  const completed = stages.filter(s => s.status === 'completed').length;
+  const active = stages.filter(s => s.status === 'active').length;
+  const overdue = stages.filter(s => effectiveStatus(s) === 'overdue');
+  const late = stages.filter(s => isOverPlan(s));
 
-  const completed = stages.filter(
-    stage => stage.status === 'completed',
-  ).length;
-
-  const active = stages.filter(
-    stage => stage.status === 'active',
-  ).length;
-
-  const overdue = stages.filter(
-    stage =>
-      stage.is_overdue &&
-      stage.status !== 'completed' &&
-      stage.status !== 'skipped',
-  ).length;
-
-  const completedLate = stages.filter(
-    stage => isFactOverPlan(stage),
-  ).length;
+  const progress = total ? Math.round(completed / total * 100) : 0;
 
   const durations = stages
-    .map(stage => stage.planned_duration_days)
-    .filter((value): value is number => value != null);
+    .map(s => s.planned_duration_days)
+    .filter((n): n is number => n != null && n > 0);
 
   const averageDuration = durations.length
-    ? Math.round(
-      durations.reduce((sum, value) => sum + value, 0) /
-      durations.length,
-    )
+    ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
     : 0;
 
-  const totalOverrun = stages.reduce(
-    (sum, stage) => sum + overrunDays(stage),
-    0,
-  );
+  const totalOverrun = stages.reduce((sum, s) => sum + overrunDays(s), 0);
 
-  const assignedUsers = new Set(
-    stages.flatMap(stage => stage.assignee_ids ?? []),
-  );
+  const employeeStats = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; total: number; active: number; completed: number }>();
 
-  const cards = [
-    {
-      label: 'Всего этапов',
-      value: total,
-      icon: Milestone,
-      color: 'text-[var(--text-primary)]',
-      background: 'bg-[var(--hover-2)]',
-    },
-    {
-      label: 'Завершено',
-      value: completed,
-      icon: CheckCircle2,
-      color: 'text-emerald-500',
-      background: 'bg-emerald-500/10',
-    },
-    {
-      label: 'В работе',
-      value: active,
-      icon: PlayCircle,
-      color: 'text-blue-400',
-      background: 'bg-blue-500/10',
-    },
-    {
-      label: 'Просрочено',
-      value: overdue,
-      icon: AlertTriangle,
-      color: 'text-[var(--accent)]',
-      background: 'bg-[var(--accent-soft)]',
-    },
-    {
-      label: 'Исполнителей',
-      value: assignedUsers.size,
-      icon: Users,
-      color: 'text-[var(--text-primary)]',
-      background: 'bg-[var(--hover-2)]',
-    },
-    {
-      label: 'Средняя длительность',
-      value: `${averageDuration} дн.`,
-      icon: Clock,
-      color: 'text-amber-500',
-      background: 'bg-amber-500/10',
-    },
-    {
-      label: 'С превышением',
-      value: completedLate,
-      icon: TrendingUp,
-      color: 'text-orange-400',
-      background: 'bg-orange-500/10',
-    },
-    {
-      label: 'Всего превышено',
-      value: `${totalOverrun} дн.`,
-      icon: AlertTriangle,
-      color: 'text-[var(--accent)]',
-      background: 'bg-[var(--accent-soft)]',
-    },
-  ];
+    stages.forEach(stage => {
+      (stage.assignee_ids ?? []).forEach(id => {
+        if (!map.has(id)) {
+          map.set(id, {
+            id,
+            name: users[id]?.full_name ?? 'Неизвестный сотрудник',
+            total: 0,
+            active: 0,
+            completed: 0,
+          });
+        }
+
+        const entry = map.get(id)!;
+        entry.total++;
+
+        if (stage.status === 'active') entry.active++;
+        if (stage.status === 'completed') entry.completed++;
+      });
+    });
+
+    return [...map.values()].sort((a, b) => b.total - a.total);
+  }, [stages, users]);
+
+  const statusDistribution = (['completed', 'active', 'on_hold', 'planned', 'skipped'] as StageStatus[])
+    .map(status => ({
+      status,
+      count: stages.filter(s => s.status === status).length,
+    }))
+    .filter(item => item.count > 0);
 
   if (!total) {
     return (
-      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-10 text-center">
-        <BarChart3 className="mx-auto h-12 w-12 text-[var(--text-disabled)]" />
-
-        <p className="mt-4 text-sm text-[var(--text-muted)]">
-          Нет данных для аналитики
-        </p>
-      </div>
+      <SectionCard title="Аналитика" icon={BarChart3}>
+        <EmptyState icon={BarChart3} title="Недостаточно данных" description="Аналитика появится после создания этапов." />
+      </SectionCard>
     );
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="space-y-6"
-    >
-      {/* KPI */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
 
-        {cards.map((card, index) => {
-          const Icon = card.icon;
+      {/* MAIN STATS */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        {[
+          { label: 'Выполнено', value: `${progress}%`, desc: `${completed} из ${total} этапов`, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+          { label: 'В работе', value: active, desc: 'Активных этапов', icon: PlayCircle, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+          { label: 'Просрочено', value: overdue.length, desc: 'Требуют внимания', icon: AlertTriangle, color: 'text-[var(--accent)]', bg: 'bg-[var(--accent-soft)]' },
+          { label: 'Средняя длительность', value: `${averageDuration} дн.`, desc: 'Плановая', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+        ].map(item => {
+          const Icon = item.icon;
 
           return (
-            <motion.div
-              key={card.label}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.04 }}
-              className="
-                rounded-2xl
-                border border-[var(--border-color)]
-                bg-[var(--bg-card)]
-                p-5
-              "
-            >
-              <div className="flex items-start justify-between gap-4">
-
+            <div key={item.label} className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] p-5">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm text-[var(--text-muted)]">
-                    {card.label}
-                  </p>
-
-                  <p className="mt-3 text-3xl font-bold text-[var(--text-primary)]">
-                    {card.value}
-                  </p>
+                  <p className="text-sm text-[var(--text-muted)]">{item.label}</p>
+                  <p className="mt-3 text-3xl font-bold text-[var(--text-primary)]">{item.value}</p>
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">{item.desc}</p>
                 </div>
-
-                <div
-                  className={`
-                    flex h-11 w-11 shrink-0
-                    items-center justify-center
-                    rounded-xl
-                    ${card.background}
-                  `}
-                >
-                  <Icon className={`h-5 w-5 ${card.color}`} />
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${item.bg}`}>
+                  <Icon className={`w-5 h-5 ${item.color}`} />
                 </div>
               </div>
-            </motion.div>
+            </div>
           );
         })}
       </div>
 
-      {/* EXECUTION TABLE */}
-      <div className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
-
-        <div className="border-b border-[var(--border-color)] px-6 py-5">
-
-          <h3 className="text-lg font-bold text-[var(--text-primary)]">
-            Сроки и исполнение
-          </h3>
-
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Сравнение плановых и фактических показателей
-          </p>
-        </div>
-
-        <div className="overflow-x-auto">
-
-          <table className="w-full min-w-[850px]">
-
-            <thead>
-              <tr className="border-b border-[var(--border-color)] bg-[var(--hover-1)]">
-
-                {[
-                  'Этап',
-                  'Плановые сроки',
-                  'Фактические сроки',
-                  'План',
-                  'Факт',
-                  'Отклонение',
-                  'Исполнители',
-                ].map(label => (
-                  <th
-                    key={label}
-                    className="px-5 py-4 text-left text-xs font-semibold text-[var(--text-muted)]"
-                  >
-                    {label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {sortOrd(stages).map(stage => {
-                const plannedStart = parseDate(stage.planned_start);
-                const plannedEnd = parseDate(stage.planned_end);
-
-                const actualStart = parseDate(stage.started_at);
-                const actualEnd = getActualEnd(stage);
-
-                const plannedDays =
-                  plannedStart && plannedEnd
-                    ? daysB(plannedStart, plannedEnd) + 1
-                    : null;
-
-                const actualDays =
-                  actualStart && actualEnd
-                    ? daysB(actualStart, actualEnd) + 1
-                    : null;
-
-                const difference =
-                  plannedDays != null && actualDays != null
-                    ? actualDays - plannedDays
-                    : null;
-
-                return (
-                  <tr
-                    key={stage.id}
-                    className="border-b border-[var(--border-color)] hover:bg-[var(--hover-1)]"
-                  >
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-2">
-
-                        <Badge order={stage.execution_order} />
-
-                        <span className="text-sm font-medium text-[var(--text-primary)]">
-                          {stage.name}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="whitespace-nowrap px-5 py-4 text-sm text-[var(--text-secondary)]">
-                      {fmtShort(stage.planned_start)}
-                      {' — '}
-                      {fmtShort(stage.planned_end)}
-                    </td>
-
-                    <td className="whitespace-nowrap px-5 py-4 text-sm text-[var(--text-secondary)]">
-                      {fmtShort(stage.started_at)}
-                      {' — '}
-                      {stage.completed_at
-                        ? fmtShort(stage.completed_at)
-                        : stage.started_at
-                          ? 'н.в.'
-                          : '—'}
-                    </td>
-
-                    <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
-                      {plannedDays ?? '—'}
-                    </td>
-
-                    <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
-                      {actualDays ?? '—'}
-                    </td>
-
-                    <td className="px-5 py-4">
-
-                      {difference == null ? (
-                        <span className="text-sm text-[var(--text-muted)]">
-                          —
-                        </span>
-                      ) : (
-                        <span
-                          className={`
-                            text-sm font-semibold
-                            ${difference > 0
-                              ? 'text-[var(--accent)]'
-                              : difference < 0
-                                ? 'text-emerald-500'
-                                : 'text-[var(--text-secondary)]'
-                            }
-                          `}
-                        >
-                          {difference > 0 ? '+' : ''}
-                          {difference} дн.
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="px-5 py-4 text-sm text-[var(--text-secondary)]">
-                      {(stage.assignee_ids ?? []).length}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════
-   STAGE DETAIL
-   ════════════════════════════════════════════════════════════════ */
-
-function StageDetail({
-  stage,
-  responsible,
-  responsibles,
-  totalStages,
-  currentUserId,
-  onBack,
-  onSave,
-  onDelete,
-  onStart,
-  onComplete,
-  onSkip,
-  onSetAssignees,
-}: {
-  stage: ProjectStageResponse;
-  responsible: StageResponsible | null;
-  responsibles: Record<string, StageResponsible>;
-  totalStages: number;
-  currentUserId?: string;
-  onBack: () => void;
-  onSave: (
-    id: string,
-    payload: StageUpsertPayload,
-  ) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
-  onStart: (id: string) => Promise<void>;
-  onComplete: (id: string) => Promise<void>;
-  onSkip: (id: string) => Promise<void>;
-  onSetAssignees: (
-    stageId: string,
-    ids: string[],
-  ) => Promise<void>;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [action, setAction] = useState<string | null>(null);
-
-  const [form, setForm] = useState<StageForm>(
-    stageToForm(stage),
-  );
-
-  const [assigneesModalOpen, setAssigneesModalOpen] =
-    useState(false);
-
-  const [savingAssignees, setSavingAssignees] =
-    useState(false);
-
-  const assigneeIds = stage.assignee_ids ?? [];
-
-  useEffect(() => {
-    setForm(stageToForm(stage));
-  }, [stage.id, stage.updated_at]);
-
-  const updateForm = <K extends keyof StageForm>(
-    key: K,
-    value: StageForm[K],
-  ) => {
-    setForm(previous => ({
-      ...previous,
-      [key]: value,
-    }));
-  };
-
-  const inputClass = `
-    w-full rounded-xl
-    border border-[var(--border-color)]
-    bg-[var(--hover-2)]
-    px-4 py-3
-    text-sm text-[var(--text-primary)]
-    outline-none
-    transition-colors
-    placeholder:text-[var(--text-muted)]
-    focus:border-[var(--accent)]
-  `;
-
-  const labelClass =
-    'mb-2 block text-sm font-medium text-[var(--text-secondary)]';
-
-  const effective = effStatus(stage);
-  const overdue = isFactOverPlan(stage);
-  const overdueDays = overrunDays(stage);
-
-  const canStart =
-    stage.status === 'planned' ||
-    stage.status === 'on_hold';
-
-  const canComplete = stage.status === 'active';
-
-  const canSkip =
-    stage.status === 'planned' ||
-    stage.status === 'on_hold';
-
-  const userOptions = Object.values(responsibles).sort(
-    (a, b) => a.full_name.localeCompare(b.full_name, 'ru'),
-  );
-
-  const plannedStart = parseDate(stage.planned_start);
-  const plannedEnd = parseDate(stage.planned_end);
-  const actualStart = parseDate(stage.started_at);
-  const actualEnd = getActualEnd(stage);
-
-  const plannedDays =
-    plannedStart && plannedEnd
-      ? daysB(plannedStart, plannedEnd) + 1
-      : null;
-
-  const actualDays =
-    actualStart && actualEnd
-      ? daysB(actualStart, actualEnd) + 1
-      : null;
-
-  /* =========================================================
-     SAVE
-     ========================================================= */
-
-  const handleSave = async () => {
-    const payload = formToPayload(form);
-
-    if (!payload.name || saving) return;
-
-    setSaving(true);
-
-    try {
-      await onSave(stage.id, payload);
-      setEditing(false);
-    } catch {
-      // Ошибка отображается родителем.
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleAction = async (
-    name: string,
-    handler: (id: string) => Promise<void>,
-  ) => {
-    if (action) return;
-
-    setAction(name);
-
-    try {
-      await handler(stage.id);
-    } catch {
-      // Ошибка отображается родителем.
-    } finally {
-      setAction(null);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (
-      !window.confirm(
-        `Удалить этап «${stage.name}»?`,
-      )
-    ) {
-      return;
-    }
-
-    await handleAction('delete', onDelete);
-  };
-
-  const handleSaveAssignees = async (ids: string[]) => {
-    setSavingAssignees(true);
-
-    try {
-      await onSetAssignees(stage.id, ids);
-    } finally {
-      setSavingAssignees(false);
-    }
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: 16 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -16 }}
-      transition={{ duration: 0.2 }}
-      className="space-y-6"
-    >
-      {/* BACK */}
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Назад к этапам
-      </button>
-
-      {/* HEADER */}
-      <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 sm:p-8">
-
-        <div className="flex flex-wrap items-start justify-between gap-5">
-
-          <div className="min-w-0 flex-1">
-
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-
-              <Badge order={stage.execution_order} />
-
-              <Chip status={stage.status} />
-
-              {effective === 'overdue' && (
-                <Chip status="overdue" />
-              )}
-
-              {overdue && (
-                <span className="rounded-lg bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--accent)]">
-                  Отклонение +{overdueDays} дн.
-                </span>
-              )}
-            </div>
-
-            <h1 className="text-2xl font-bold text-[var(--text-primary)] sm:text-3xl">
-              {stage.name}
-            </h1>
-
-            <p className="mt-3 max-w-3xl whitespace-pre-wrap text-sm leading-7 text-[var(--text-secondary)]">
-              {stage.description || 'Описание не заполнено'}
-            </p>
-          </div>
-
-          {!editing && (
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="
-                inline-flex items-center gap-2
-                rounded-xl border border-[var(--border-color)]
-                bg-[var(--hover-2)] px-4 py-3
-                text-sm font-medium text-[var(--text-primary)]
-                hover:bg-[var(--hover-3)]
-              "
-            >
-              <PenSquare className="h-4 w-4" />
-              Редактировать
-            </button>
-          )}
-        </div>
-      </section>
-
-      {/* EDIT MODE */}
-      {editing ? (
-        <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 sm:p-8">
-
-          <h2 className="mb-6 text-xl font-bold text-[var(--text-primary)]">
-            Редактирование этапа
-          </h2>
-
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-
-            <div className="md:col-span-2">
-              <label className={labelClass}>
-                Название этапа
-              </label>
-
-              <input
-                value={form.name}
-                onChange={event =>
-                  updateForm('name', event.target.value)
-                }
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                Номер этапа
-              </label>
-
-              <input
-                type="number"
-                min={1}
-                value={form.order}
-                onChange={event =>
-                  updateForm('order', event.target.value)
-                }
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                Статус
-              </label>
-
-              <Select
-                value={form.status}
-                onValueChange={value =>
-                  updateForm(
-                    'status',
-                    value as ProjectStageStatus,
-                  )
-                }
-              >
-                <SelectTrigger className={inputClass}>
-                  <SelectValue placeholder="Выберите статус" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  <SelectItem value="planned">
-                    Запланирован
-                  </SelectItem>
-
-                  <SelectItem value="active">
-                    В работе
-                  </SelectItem>
-
-                  <SelectItem value="on_hold">
-                    На паузе
-                  </SelectItem>
-
-                  <SelectItem value="completed">
-                    Завершён
-                  </SelectItem>
-
-                  <SelectItem value="skipped">
-                    Пропущен
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                Плановое начало
-              </label>
-
-              <input
-                type="date"
-                value={form.planned_start}
-                onChange={event =>
-                  updateForm(
-                    'planned_start',
-                    event.target.value,
-                  )
-                }
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                Плановое окончание
-              </label>
-
-              <input
-                type="date"
-                value={form.planned_end}
-                onChange={event =>
-                  updateForm(
-                    'planned_end',
-                    event.target.value,
-                  )
-                }
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                Длительность, дней
-              </label>
-
-              <input
-                type="number"
-                min={1}
-                value={form.planned_duration_days}
-                onChange={event =>
-                  updateForm(
-                    'planned_duration_days',
-                    event.target.value,
-                  )
-                }
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                Ответственный
-              </label>
-
-              <Select
-                value={form.responsible_id || '__none__'}
-                onValueChange={value =>
-                  updateForm(
-                    'responsible_id',
-                    value === '__none__' ? '' : value,
-                  )
-                }
-              >
-                <SelectTrigger className={inputClass}>
-                  <SelectValue placeholder="Выберите ответственного" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  <SelectItem value="__none__">
-                    Не назначен
-                  </SelectItem>
-
-                  {userOptions.map(user => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="md:col-span-2">
-              <label className={labelClass}>
-                Описание
-              </label>
-
-              <textarea
-                value={form.description}
-                onChange={event =>
-                  updateForm(
-                    'description',
-                    event.target.value,
-                  )
-                }
-                rows={5}
-                className={`${inputClass} resize-y`}
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className={labelClass}>
-                Критерии приёмки
-              </label>
-
-              <textarea
-                value={form.completion_criteria}
-                onChange={event =>
-                  updateForm(
-                    'completion_criteria',
-                    event.target.value,
-                  )
-                }
-                rows={5}
-                placeholder="Каждый критерий с новой строки"
-                className={`${inputClass} resize-y`}
-              />
-            </div>
-          </div>
-
-          {/* ACTIONS */}
-          <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--border-color)] pt-6">
-
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={!!action}
-              className="
-                inline-flex items-center gap-2
-                rounded-xl border border-[var(--accent)]/20
-                bg-[var(--accent-soft)]
-                px-4 py-3 text-sm font-medium
-                text-[var(--accent)]
-                disabled:opacity-50
-              "
-            >
-              {action === 'delete' ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-
-              Удалить этап
-            </button>
-
-            <div className="flex items-center gap-3">
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEditing(false);
-                  setForm(stageToForm(stage));
-                }}
-                disabled={saving}
-                className="rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] px-4 py-3 text-sm text-[var(--text-secondary)]"
-              >
-                Отмена
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving || !form.name.trim()}
-                className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
-              >
-                {saving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-
-                {saving ? 'Сохранение...' : 'Сохранить'}
-              </button>
-            </div>
-          </div>
-        </section>
-      ) : (
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-
-          {/* LEFT COLUMN */}
-          <div className="space-y-6">
-
-            {/* DATES */}
-            <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
-
-              <h3 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
-                <Calendar className="h-4 w-4 text-[var(--text-muted)]" />
-                Сроки и исполнение
-              </h3>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-
-                {/* PLAN */}
-                <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
-
-                  <div className="mb-4 flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-
-                    <span className="text-sm font-semibold text-blue-400">
-                      Плановые сроки
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+        {/* STATUS DISTRIBUTION */}
+        <SectionCard title="Состояние этапов" description="Распределение по статусам" icon={Activity}>
+          <div className="p-6 space-y-5">
+            {statusDistribution.map(({ status, count }) => {
+              const cfg = STATUS[status];
+              const percent = Math.round(count / total * 100);
+
+              return (
+                <div key={status}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                      <span className={`w-2.5 h-2.5 rounded-full ${cfg.dot}`} />
+                      {cfg.label}
+                    </span>
+                    <span className="text-sm font-semibold text-[var(--text-primary)]">
+                      {count} <span className="text-[var(--text-muted)] font-normal">({percent}%)</span>
                     </span>
                   </div>
-
-                  <div className="space-y-4">
-
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        Начало
-                      </p>
-
-                      <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                        {fmtDate(stage.planned_start)}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        Окончание
-                      </p>
-
-                      <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                        {fmtDate(stage.planned_end)}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        Длительность
-                      </p>
-
-                      <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                        {plannedDays != null
-                          ? `${plannedDays} дн.`
-                          : '—'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ACTUAL */}
-                <div
-                  className={`
-                    rounded-xl border p-4
-                    ${overdue
-                      ? 'border-[var(--accent)]/25 bg-[var(--accent-soft)]'
-                      : 'border-emerald-500/20 bg-emerald-500/5'
-                    }
-                  `}
-                >
-                  <div className="mb-4 flex items-center gap-2">
-
-                    <span
-                      className={`h-2.5 w-2.5 rounded-full ${overdue
-                          ? 'bg-[var(--accent)]'
-                          : 'bg-emerald-500'
-                        }`}
+                  <div className="h-2.5 rounded-full bg-[var(--hover-2)] overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${percent}%` }}
+                      transition={{ duration: 0.6 }}
+                      className={`h-full rounded-full ${cfg.bar}`}
                     />
-
-                    <span
-                      className={`text-sm font-semibold ${overdue
-                          ? 'text-[var(--accent)]'
-                          : 'text-emerald-500'
-                        }`}
-                    >
-                      Фактически
-                    </span>
-                  </div>
-
-                  <div className="space-y-4">
-
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        Начало
-                      </p>
-
-                      <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                        {fmtDate(stage.started_at)}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        Окончание
-                      </p>
-
-                      <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                        {stage.completed_at
-                          ? fmtDate(stage.completed_at)
-                          : stage.started_at
-                            ? 'В работе'
-                            : '—'}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        Длительность
-                      </p>
-
-                      <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                        {actualDays != null
-                          ? `${actualDays} дн.`
-                          : '—'}
-                      </p>
-                    </div>
                   </div>
                 </div>
+              );
+            })}
+          </div>
+        </SectionCard>
+
+        {/* TIMING */}
+        <SectionCard title="Соблюдение сроков" description="Плановые показатели и отклонения" icon={Timer}>
+          <div className="p-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
+                <p className="text-xs text-[var(--text-muted)]">С превышением</p>
+                <p className="mt-2 text-3xl font-bold text-[var(--accent)]">{late.length}</p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">этапов</p>
               </div>
+              <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
+                <p className="text-xs text-[var(--text-muted)]">Всего превышено</p>
+                <p className="mt-2 text-3xl font-bold text-[var(--text-primary)]">{totalOverrun}</p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">дней</p>
+              </div>
+            </div>
 
-              {overdue && (
-                <div className="mt-4 flex items-center gap-2 rounded-xl bg-[var(--accent-soft)] p-3 text-sm font-medium text-[var(--accent)]">
-
-                  <AlertTriangle className="h-4 w-4" />
-
-                  Превышение планового срока на {overdueDays} дн.
-                </div>
-              )}
-            </section>
-
-            {/* RESPONSIBLE */}
-            <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
-
-              <h3 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
-
-                <User className="h-4 w-4 text-[var(--text-muted)]" />
-
-                Ответственный
-              </h3>
-
-              {responsible ? (
-                <div className="flex items-center gap-4">
-
-                  <Ava name={responsible.full_name} />
-
-                  <div className="min-w-0">
-
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">
-                      {responsible.full_name}
-                    </p>
-
-                    {responsible.role && (
-                      <p className="mt-1 text-xs text-[var(--text-muted)]">
-                        {responsible.role}
-                      </p>
-                    )}
-
-                    {responsible.email && (
-                      <p className="mt-1 break-all text-xs text-[var(--text-muted)]">
-                        {responsible.email}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-[var(--text-muted)]">
-                  Ответственный не назначен
+            <div className="mt-5 p-4 rounded-xl bg-[var(--hover-2)]">
+              <div className="flex items-start gap-3">
+                <Info className="w-4 h-4 text-[var(--text-muted)] shrink-0 mt-0.5" />
+                <p className="text-xs leading-6 text-[var(--text-muted)]">
+                  Превышение рассчитывается по фактической дате завершения или текущей дате для выполняемых этапов относительно планового окончания.
                 </p>
-              )}
-            </section>
-
-            {/* ASSIGNEES */}
-            <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
-
-              <div className="flex items-center justify-between gap-3 border-b border-[var(--border-color)] px-6 py-5">
-
-                <div className="flex items-center gap-3">
-
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--hover-2)]">
-                    <Users className="h-5 w-5 text-[var(--text-secondary)]" />
-                  </div>
-
-                  <div>
-                    <h3 className="text-base font-bold text-[var(--text-primary)]">
-                      Исполнители
-                    </h3>
-
-                    <p className="mt-1 text-xs text-[var(--text-muted)]">
-                      Сотрудники, назначенные на этап
-                    </p>
-                  </div>
-                </div>
-
-                <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-[var(--hover-2)] px-2 text-sm font-semibold text-[var(--text-secondary)]">
-                  {assigneeIds.length}
-                </span>
               </div>
+            </div>
+          </div>
+        </SectionCard>
+      </div>
 
-              <div className="p-6">
+      {/* EMPLOYEE LOAD */}
+      <SectionCard title="Загрузка исполнителей" description="Распределение этапов между сотрудниками" icon={Users}>
+        {!employeeStats.length ? (
+          <EmptyState icon={Users} title="Исполнители не назначены" description="Назначьте сотрудников на этапы, чтобы увидеть распределение нагрузки." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[600px]">
+              <thead>
+                <tr className="border-b border-[var(--border-color)] bg-[var(--hover-1)]">
+                  {['Сотрудник', 'Всего этапов', 'В работе', 'Завершено', 'Нагрузка'].map(label => (
+                    <th key={label} className="px-6 py-4 text-left text-xs font-semibold text-[var(--text-muted)]">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {employeeStats.map(employee => {
+                  const maxLoad = Math.max(...employeeStats.map(e => e.total), 1);
 
-                {assigneeIds.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-8 text-center">
-
-                    <Users className="mx-auto h-9 w-9 text-[var(--text-disabled)]" />
-
-                    <p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">
-                      Исполнители не назначены
-                    </p>
-
-                    <p className="mt-1 text-xs text-[var(--text-muted)]">
-                      Добавьте сотрудников для выполнения этапа
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-
-                    {assigneeIds.map(id => {
-                      const employee = responsibles[id];
-
-                      return (
-                        <div
-                          key={id}
-                          className="flex items-center gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] p-3"
-                        >
-                          <Ava
-                            name={employee?.full_name}
-                            size="sm"
-                          />
-
-                          <div className="min-w-0 flex-1">
-
-                            <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
-                              {employee?.full_name ?? 'Пользователь'}
-                            </p>
-
-                            {employee?.email && (
-                              <p className="mt-1 truncate text-xs text-[var(--text-muted)]">
-                                {employee.email}
-                              </p>
-                            )}
-                          </div>
-
-                          {id === currentUserId && (
-                            <span className="rounded-lg bg-[var(--hover-2)] px-2 py-1 text-xs text-[var(--text-secondary)]">
-                              Вы
-                            </span>
-                          )}
+                  return (
+                    <tr key={employee.id} className="border-b last:border-0 border-[var(--border-color)] hover:bg-[var(--hover-2)]">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <Avatar name={employee.name} size="sm" />
+                          <span className="text-sm font-medium text-[var(--text-primary)]">{employee.name}</span>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setAssigneesModalOpen(true)}
-                  className="
-                    mt-4 flex w-full items-center justify-center gap-2
-                    rounded-xl border border-[var(--border-color)]
-                    bg-[var(--hover-2)] px-4 py-3
-                    text-sm font-semibold text-[var(--text-primary)]
-                    transition-colors
-                    hover:bg-[var(--hover-3)]
-                  "
-                >
-                  <UserPlus className="h-4 w-4" />
-
-                  {assigneeIds.length
-                    ? 'Управление исполнителями'
-                    : 'Назначить исполнителей'}
-                </button>
-              </div>
-            </section>
-
-            {/* SERVICE INFO */}
-            <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
-
-              <h3 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
-                <Settings2 className="h-4 w-4 text-[var(--text-muted)]" />
-                Служебная информация
-              </h3>
-
-              <div className="space-y-4">
-
-                {[
-                  {
-                    label: 'ID',
-                    value: stage.id,
-                  },
-                  {
-                    label: 'Порядок',
-                    value: `Этап ${stage.execution_order} из ${totalStages}`,
-                  },
-                  {
-                    label: 'Создан',
-                    value: fmtDT(stage.created_at),
-                  },
-                  {
-                    label: 'Обновлён',
-                    value: fmtDT(stage.updated_at),
-                  },
-                ].map(item => (
-                  <div
-                    key={item.label}
-                    className="flex justify-between gap-4 text-sm"
-                  >
-                    <span className="shrink-0 text-[var(--text-muted)]">
-                      {item.label}
-                    </span>
-
-                    <span className="break-all text-right text-[var(--text-secondary)]">
-                      {item.value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </section>
+                      </td>
+                      <td className="px-6 py-4 text-sm font-semibold text-[var(--text-primary)]">{employee.total}</td>
+                      <td className="px-6 py-4 text-sm text-blue-400">{employee.active}</td>
+                      <td className="px-6 py-4 text-sm text-emerald-500">{employee.completed}</td>
+                      <td className="px-6 py-4 w-[200px]">
+                        <div className="h-2 rounded-full bg-[var(--hover-3)] overflow-hidden">
+                          <div className="h-full rounded-full bg-[var(--accent)]"
+                            style={{ width: `${employee.total / maxLoad * 100}%` }} />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
+        )}
+      </SectionCard>
 
-          {/* RIGHT COLUMN */}
-          <div className="space-y-6">
-
-            {/* CRITERIA */}
-            <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
-
-              <h3 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
-                <ListChecks className="h-4 w-4 text-[var(--text-muted)]" />
-                Критерии приёмки
-              </h3>
-
-              {!stage.completion_criteria.length ? (
-                <p className="text-sm text-[var(--text-muted)]">
-                  Критерии не указаны
-                </p>
-              ) : (
-                <div className="space-y-4">
-
-                  {stage.completion_criteria.map(
-                    (criterion, index) => (
-                      <div
-                        key={index}
-                        className="flex items-start gap-3"
-                      >
-                        <Target className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]" />
-
-                        <p className="text-sm leading-6 text-[var(--text-secondary)]">
-                          {criterion}
-                        </p>
-                      </div>
-                    ),
-                  )}
-                </div>
-              )}
-            </section>
-
-            {/* ACTIONS */}
-            <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
-
-              <h3 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
-                <Flag className="h-4 w-4 text-[var(--text-muted)]" />
-                Действия
-              </h3>
-
-              <div className="space-y-3">
-
-                {canStart && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleAction('start', onStart)
-                    }
-                    disabled={!!action}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3.5 text-sm font-semibold text-white disabled:opacity-50"
-                  >
-                    {action === 'start' ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <PlayCircle className="h-4 w-4" />
-                    )}
-
-                    {action === 'start'
-                      ? 'Запускаем...'
-                      : 'Начать этап'}
-                  </button>
-                )}
-
-                {canComplete && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleAction('complete', onComplete)
-                    }
-                    disabled={!!action}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-sm font-semibold text-white disabled:opacity-50"
-                  >
-                    {action === 'complete' ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="h-4 w-4" />
-                    )}
-
-                    {action === 'complete'
-                      ? 'Завершаем...'
-                      : 'Завершить этап'}
-                  </button>
-                )}
-
-                {canSkip && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleAction('skip', onSkip)
-                    }
-                    disabled={!!action}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] px-4 py-3.5 text-sm font-medium text-[var(--text-primary)] disabled:opacity-50"
-                  >
-                    <SkipForward className="h-4 w-4" />
-
-                    {action === 'skip'
-                      ? 'Пропускаем...'
-                      : 'Пропустить этап'}
-                  </button>
-                )}
-
-                {!canStart && !canComplete && !canSkip && (
-                  <p className="py-4 text-center text-sm text-[var(--text-muted)]">
-                    Нет доступных действий
+      {/* PROBLEM STAGES */}
+      {late.length > 0 && (
+        <SectionCard title="Этапы с отклонениями" description="Превышение плановых сроков" icon={AlertTriangle}>
+          <div className="divide-y divide-[var(--border-color)]">
+            {sortStages(late).map(stage => (
+              <button key={stage.id} onClick={() => onOpen(stage)}
+                className="group w-full flex items-center gap-4 px-6 py-4 text-left hover:bg-[var(--hover-2)] transition-colors">
+                <StageNumber order={stage.execution_order} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">
+                    {stage.name}
                   </p>
-                )}
-              </div>
-            </section>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    Плановое окончание: {formatDate(stage.planned_end)}
+                  </p>
+                </div>
+                <span className="flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)] shrink-0">
+                  <AlertTriangle className="w-4 h-4" />
+                  +{overrunDays(stage)} дн.
+                </span>
+                <ChevronRight className="w-4 h-4 text-[var(--text-disabled)] group-hover:text-[var(--accent)]" />
+              </button>
+            ))}
           </div>
-        </div>
+        </SectionCard>
       )}
-
-      {/* MODAL */}
-      <AssigneesModal
-        open={assigneesModalOpen}
-        onClose={() => setAssigneesModalOpen(false)}
-        users={responsibles}
-        selectedIds={assigneeIds}
-        currentUserId={currentUserId}
-        saving={savingAssignees}
-        onSave={handleSaveAssignees}
-      />
     </motion.div>
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   CREATE STAGE
-   ════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   STAGE FORM — CREATE / EDIT
+   ═══════════════════════════════════════════════════════════════ */
 
-function CreateStage({
+function StageFormView({
+  stage,
   nextOrder,
-  responsibles,
-  onBack,
-  onSubmit,
+  users,
+  saving,
+  onSave,
+  onCancel,
 }: {
+  stage?: ProjectStageResponse;
   nextOrder: number;
-  responsibles: Record<string, StageResponsible>;
-  onBack: () => void;
-  onSubmit: (payload: StageUpsertPayload) => Promise<void>;
+  users: UsersMap;
+  saving: boolean;
+  onSave: (payload: StagePayload) => Promise<void>;
+  onCancel: () => void;
 }) {
-  const [form, setForm] = useState<StageForm>(
-    emptyForm(nextOrder),
+  const editing = !!stage;
+  const [form, setForm] = useState<StageForm>(() =>
+    stage ? stageToForm(stage) : emptyForm(nextOrder),
   );
 
-  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const updateForm = <K extends keyof StageForm>(
-    key: K,
-    value: StageForm[K],
-  ) => {
-    setForm(previous => ({
-      ...previous,
-      [key]: value,
+  const update = <K extends keyof StageForm>(key: K, value: StageForm[K]) => {
+    setForm(prev => ({ ...prev, [key]: value }));
+    setErrors(prev => ({ ...prev, [key]: '' }));
+  };
+
+  const updateCriterion = (index: number, value: string) => {
+    setForm(prev => ({
+      ...prev,
+      completion_criteria: prev.completion_criteria.map((item, i) => i === index ? value : item),
     }));
   };
 
-  const users = Object.values(responsibles).sort(
-    (a, b) => a.full_name.localeCompare(b.full_name, 'ru'),
+  const addCriterion = () => {
+    setForm(prev => ({
+      ...prev,
+      completion_criteria: [...prev.completion_criteria, ''],
+    }));
+  };
+
+  const removeCriterion = (index: number) => {
+    setForm(prev => ({
+      ...prev,
+      completion_criteria: prev.completion_criteria.filter((_, i) => i !== index),
+    }));
+  };
+
+  const validate = () => {
+    const next: Record<string, string> = {};
+
+    if (!form.name.trim()) next.name = 'Укажите название этапа';
+
+    if (!Number.isInteger(Number(form.order)) || Number(form.order) < 1) {
+      next.order = 'Номер должен быть положительным целым числом';
+    }
+
+    if (form.planned_start && form.planned_end && form.planned_end < form.planned_start) {
+      next.planned_end = 'Дата окончания не может быть раньше начала';
+    }
+
+    if (
+      form.planned_duration_days &&
+      (!Number.isInteger(Number(form.planned_duration_days)) || Number(form.planned_duration_days) < 1)
+    ) {
+      next.planned_duration_days = 'Введите положительное целое число';
+    }
+
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const submit = async () => {
+    if (saving || !validate()) return;
+    await onSave(formToPayload(form));
+  };
+
+  const userOptions = useMemo(
+    () => Object.values(users).sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru')),
+    [users],
   );
 
-  const inputClass =
-    'w-full rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]';
+  const completedFields = [
+    !!form.name.trim(),
+    !!form.planned_start && !!form.planned_end,
+    !!form.description.trim(),
+    form.completion_criteria.some(c => c.trim()),
+  ];
 
-  const labelClass =
-    'mb-2 block text-sm font-medium text-[var(--text-secondary)]';
-
-  const handleSubmit = async () => {
-    const payload = formToPayload(form);
-
-    if (!payload.name || saving) return;
-
-    setSaving(true);
-
-    try {
-      await onSubmit(payload);
-    } catch {
-      // Ошибка отображается родителем.
-    } finally {
-      setSaving(false);
-    }
-  };
+  const completedCount = completedFields.filter(Boolean).length;
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 16 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -16 }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      {/* BACK */}
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Назад к этапам
-      </button>
-
       {/* HEADER */}
-      <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
-
-        <div className="flex items-center gap-3">
-
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent-soft)]">
-            <Plus className="h-5 w-5 text-[var(--accent)]" />
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <button onClick={onCancel}
+            className="w-11 h-11 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--hover-2)] transition-colors"
+            title="Назад">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
 
           <div>
-            <h1 className="text-xl font-bold text-[var(--text-primary)]">
-              Новый этап
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">
+              {editing ? 'Редактирование этапа' : 'Новый этап'}
             </h1>
-
             <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Заполните информацию об этапе проекта
+              {editing ? stage.name : 'Планирование нового этапа проекта'}
             </p>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={saving || !form.name.trim()}
-          className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Plus className="h-4 w-4" />
-          )}
+        <ActionButton onClick={submit} disabled={saving} className="px-5 py-3 text-sm font-semibold">
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {saving ? 'Сохранение...' : editing ? 'Сохранить изменения' : 'Создать этап'}
+        </ActionButton>
+      </div>
 
-          {saving ? 'Создание...' : 'Создать этап'}
-        </button>
-      </section>
-
-      {/* FORM */}
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_330px] gap-6 items-start">
 
         {/* MAIN */}
         <div className="space-y-6">
 
-          <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
-
-            <h2 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
-              <Milestone className="h-4 w-4 text-[var(--text-muted)]" />
-              Основные данные
-            </h2>
-
-            <div className="space-y-5">
+          {/* GENERAL */}
+          <SectionCard title="Основная информация" description="Название, порядок и ответственный" icon={Milestone}>
+            <div className="p-6 space-y-5">
 
               <div>
-                <label className={labelClass}>
-                  Название этапа
-                </label>
-
+                <label className={labelCls}>Название этапа <span className="text-[var(--accent)]">*</span></label>
                 <input
                   value={form.name}
-                  onChange={event =>
-                    updateForm('name', event.target.value)
-                  }
-                  placeholder="Например, тестирование"
-                  className={inputClass}
+                  onChange={e => update('name', e.target.value)}
+                  placeholder="Например, разработка и тестирование"
+                  className={`${inputCls} ${errors.name ? 'border-red-500' : ''}`}
                 />
+                {errors.name && <p className="mt-2 text-xs text-red-500">{errors.name}</p>}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className={labelClass}>
-                    Номер
-                  </label>
-
+                  <label className={labelCls}>Порядковый номер</label>
                   <input
-                    type="number"
-                    min={1}
+                    type="number" min={1}
                     value={form.order}
-                    onChange={event =>
-                      updateForm('order', event.target.value)
-                    }
-                    className={inputClass}
+                    onChange={e => update('order', e.target.value)}
+                    className={inputCls}
                   />
+                  {errors.order && <p className="mt-2 text-xs text-red-500">{errors.order}</p>}
                 </div>
 
-            <div>
-              <label className={labelClass}>
-                Статус
-              </label>
-
-              <Select
-                value={form.status}
-                onValueChange={value =>
-                  updateForm(
-                    'status',
-                    value as ProjectStageStatus,
-                  )
-                }
-              >
-                <SelectTrigger className={inputClass}>
-                  <SelectValue placeholder="Выберите статус" />
-                </SelectTrigger>
-
+                <div>
+                  <label className={labelCls}>Ответственный</label>
+                  <Select
+                    value={form.responsible_id || '__none__'}
+                    onValueChange={value => update('responsible_id', value === '__none__' ? '' : value)}
+                  >
+                    <SelectTrigger className={`${inputCls} h-[46px]`}>
+                      <SelectValue placeholder="Выберите сотрудника" />
+                    </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="planned">
-                        Запланирован
-                      </SelectItem>
-
-                      <SelectItem value="active">
-                        В работе
-                      </SelectItem>
-
-                      <SelectItem value="on_hold">
-                        На паузе
-                      </SelectItem>
-
-                      <SelectItem value="completed">
-                        Завершён
-                      </SelectItem>
-
-                      <SelectItem value="skipped">
-                        Пропущен
-                      </SelectItem>
+                      <SelectItem value="__none__">Не назначен</SelectItem>
+                      {userOptions.map(user => (
+                        <SelectItem key={user.id} value={user.id}>{user.full_name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
+              {editing && (
+                <div className="flex items-start gap-3 rounded-xl bg-[var(--hover-2)] p-4">
+                  <Info className="w-4 h-4 text-[var(--text-muted)] shrink-0 mt-0.5" />
+                  <p className="text-xs leading-6 text-[var(--text-muted)]">
+                    Статус этапа изменяется на странице просмотра. Это позволяет корректно фиксировать даты начала, приостановки и завершения.
+                  </p>
+                </div>
+              )}
+            </div>
+          </SectionCard>
+
+          {/* PLANNING */}
+          <SectionCard title="Планирование сроков" description="Плановые даты выполнения этапа" icon={CalendarDays}>
+            <div className="p-6 space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Плановое начало</label>
+                  <input type="date" value={form.planned_start}
+                    onChange={e => update('planned_start', e.target.value)} className={inputCls} />
+                </div>
+
+                <div>
+                  <label className={labelCls}>Плановое окончание</label>
+                  <input type="date" min={form.planned_start || undefined}
+                    value={form.planned_end}
+                    onChange={e => update('planned_end', e.target.value)} className={inputCls} />
+                  {errors.planned_end && <p className="mt-2 text-xs text-red-500">{errors.planned_end}</p>}
+                </div>
+              </div>
+
               <div>
-                <label className={labelClass}>
-                  Ответственный
-                </label>
-
-                <Select
-                  value={form.responsible_id || '__none__'}
-                  onValueChange={value =>
-                    updateForm(
-                      'responsible_id',
-                      value === '__none__' ? '' : value,
-                    )
-                  }
-                >
-                  <SelectTrigger className={inputClass}>
-                    <SelectValue placeholder="Выберите сотрудника" />
-                  </SelectTrigger>
-
-                  <SelectContent>
-                    <SelectItem value="__none__">
-                      Не назначен
-                    </SelectItem>
-
-                    {users.map(user => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <label className={labelCls}>Плановая длительность, дней</label>
+                <input type="number" min={1} value={form.planned_duration_days}
+                  onChange={e => update('planned_duration_days', e.target.value)}
+                  placeholder="Не указана" className={inputCls} />
+                {errors.planned_duration_days && (
+                  <p className="mt-2 text-xs text-red-500">{errors.planned_duration_days}</p>
+                )}
+                <p className="mt-2 text-xs text-[var(--text-muted)]">
+                  Укажите длительность, если она отличается от календарного периода.
+                </p>
               </div>
             </div>
-          </section>
+          </SectionCard>
 
-          {/* DATES */}
-          <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
-
-            <h2 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
-              <Calendar className="h-4 w-4 text-[var(--text-muted)]" />
-              Плановые сроки
-            </h2>
-
-            <div className="space-y-4">
-
-              <div>
-                <label className={labelClass}>
-                  Начало
-                </label>
-
-                <input
-                  type="date"
-                  value={form.planned_start}
-                  onChange={event =>
-                    updateForm(
-                      'planned_start',
-                      event.target.value,
-                    )
-                  }
-                  className={inputClass}
-                />
-              </div>
-
-              <div>
-                <label className={labelClass}>
-                  Окончание
-                </label>
-
-                <input
-                  type="date"
-                  value={form.planned_end}
-                  onChange={event =>
-                    updateForm(
-                      'planned_end',
-                      event.target.value,
-                    )
-                  }
-                  className={inputClass}
-                />
-              </div>
-
-              <div>
-                <label className={labelClass}>
-                  Длительность, дней
-                </label>
-
-                <input
-                  type="number"
-                  min={1}
-                  value={form.planned_duration_days}
-                  onChange={event =>
-                    updateForm(
-                      'planned_duration_days',
-                      event.target.value,
-                    )
-                  }
-                  className={inputClass}
-                />
-              </div>
+          {/* DESCRIPTION */}
+          <SectionCard title="Описание этапа" description="Цели, задачи и ожидаемые результаты" icon={FileText}>
+            <div className="p-6">
+              <textarea
+                value={form.description}
+                onChange={e => update('description', e.target.value)}
+                placeholder="Опишите, что необходимо выполнить в рамках этого этапа..."
+                rows={7}
+                className={`${inputCls} resize-y min-h-[180px] leading-7`}
+              />
             </div>
-          </section>
+          </SectionCard>
+
+          {/* CRITERIA */}
+          <SectionCard
+            title="Критерии приёмки"
+            description="Условия, необходимые для завершения этапа"
+            icon={ListChecks}
+            action={
+              <button onClick={addCriterion}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--hover-2)] text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                <Plus className="w-4 h-4" /> Добавить
+              </button>
+            }
+          >
+            <div className="p-6 space-y-3">
+              {!form.completion_criteria.length ? (
+                <div className="py-8 text-center rounded-xl border border-dashed border-[var(--border-color)]">
+                  <Target className="w-7 h-7 mx-auto text-[var(--text-disabled)]" />
+                  <p className="mt-3 text-sm text-[var(--text-muted)]">Критерии пока не добавлены</p>
+                  <button onClick={addCriterion} className="mt-3 text-sm font-medium text-[var(--accent)]">
+                    Добавить первый критерий
+                  </button>
+                </div>
+              ) : (
+                form.completion_criteria.map((criterion, index) => (
+                  <div key={index} className="flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-lg bg-[var(--hover-2)] flex items-center justify-center text-xs font-semibold text-[var(--text-muted)] shrink-0">
+                      {index + 1}
+                    </span>
+                    <input
+                      value={criterion}
+                      onChange={e => updateCriterion(index, e.target.value)}
+                      placeholder="Условие завершения этапа"
+                      className={`${inputCls} flex-1`}
+                    />
+                    <button onClick={() => removeCriterion(index)}
+                      className="p-2.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+                      title="Удалить критерий">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </SectionCard>
         </div>
 
-        {/* DESCRIPTION */}
-        <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+        {/* SIDEBAR */}
+        <aside className="space-y-5 xl:sticky xl:top-5">
 
-          <h2 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
-            <FileText className="h-4 w-4 text-[var(--text-muted)]" />
-            Описание
-          </h2>
+          <SectionCard title={editing ? 'Редактирование' : 'Создание этапа'} icon={Settings2}>
+            <div className="p-5 space-y-5">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm text-[var(--text-secondary)]">Заполнение</span>
+                  <span className="text-sm font-semibold text-[var(--text-primary)]">{completedCount}/4</span>
+                </div>
+                <div className="h-2 rounded-full bg-[var(--hover-3)] overflow-hidden">
+                  <div className="h-full rounded-full bg-[var(--accent)] transition-all"
+                    style={{ width: `${completedCount / 4 * 100}%` }} />
+                </div>
+              </div>
 
-          <textarea
-            value={form.description}
-            onChange={event =>
-              updateForm('description', event.target.value)
-            }
-            placeholder="Опишите задачи и цели этапа"
-            className={`${inputClass} min-h-[280px] resize-y`}
-          />
-        </section>
+              <div className="space-y-3">
+                {[
+                  { label: 'Название', ready: completedFields[0] },
+                  { label: 'Плановые сроки', ready: completedFields[1] },
+                  { label: 'Описание', ready: completedFields[2] },
+                  { label: 'Критерии приёмки', ready: completedFields[3] },
+                ].map(item => (
+                  <div key={item.label} className="flex items-center gap-3">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                      item.ready ? 'bg-emerald-500/15 text-emerald-500' : 'bg-[var(--hover-2)] text-[var(--text-muted)]'
+                    }`}>
+                      {item.ready ? <Check className="w-3.5 h-3.5" /> : <CircleDot className="w-3.5 h-3.5" />}
+                    </div>
+                    <span className="flex-1 text-sm text-[var(--text-secondary)]">{item.label}</span>
+                    <span className={`text-xs ${item.ready ? 'text-emerald-500' : 'text-[var(--text-muted)]'}`}>
+                      {item.ready ? 'Готово' : 'Не заполнено'}
+                    </span>
+                  </div>
+                ))}
+              </div>
 
-        {/* CRITERIA */}
-        <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+              <div className="pt-5 border-t border-[var(--border-color)] space-y-3">
+                <ActionButton onClick={submit} disabled={saving}
+                  className="w-full px-5 py-3 text-sm font-semibold">
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  {saving ? 'Сохранение...' : editing ? 'Сохранить' : 'Создать этап'}
+                </ActionButton>
 
-          <h2 className="mb-5 flex items-center gap-2 text-base font-bold text-[var(--text-primary)]">
-            <ListChecks className="h-4 w-4 text-[var(--text-muted)]" />
-            Критерии приёмки
-          </h2>
+                <button onClick={onCancel} disabled={saving}
+                  className="w-full px-4 py-3 rounded-xl text-sm font-medium text-[var(--text-muted)] hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)]">
+                  Отмена
+                </button>
+              </div>
+            </div>
+          </SectionCard>
 
-          <p className="mb-4 text-sm text-[var(--text-muted)]">
-            Каждый критерий укажите с новой строки
-          </p>
-
-          <textarea
-            value={form.completion_criteria}
-            onChange={event =>
-              updateForm(
-                'completion_criteria',
-                event.target.value,
-              )
-            }
-            placeholder={'Утверждено ТЗ\nПройдены тесты'}
-            className={`${inputClass} min-h-[280px] resize-y`}
-          />
-        </section>
+          <div className="flex items-start gap-3 p-4 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)]">
+            <Info className="w-4 h-4 text-[var(--text-muted)] shrink-0 mt-0.5" />
+            <p className="text-xs leading-6 text-[var(--text-muted)]">
+              После создания этапа можно назначить нескольких исполнителей и управлять выполнением.
+            </p>
+          </div>
+        </aside>
       </div>
     </motion.div>
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   PROJECT STAGES SECTION
-   ════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   STAGE DETAIL
+   ═══════════════════════════════════════════════════════════════ */
 
-interface SectionProps {
-  projectId: string;
-}
+function StageDetail({
+  stage,
+  users,
+  currentUserId,
+  totalStages,
+  busy,
+  onBack,
+  onEdit,
+  onDelete,
+  onAction,
+  onSetAssignees,
+}: {
+  stage: ProjectStageResponse;
+  users: UsersMap;
+  currentUserId?: string;
+  totalStages: number;
+  busy: boolean;
+  onBack: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onAction: (action: 'start' | 'pause' | 'resume' | 'complete' | 'skip') => Promise<void>;
+  onSetAssignees: (ids: string[]) => Promise<void>;
+}) {
+  const [assigneesOpen, setAssigneesOpen] = useState(false);
+  const [savingAssignees, setSavingAssignees] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
-export function ProjectStagesSection({
-  projectId,
-}: SectionProps) {
-  const { user } = useAuthStore();
+  const responsible = stage.responsible_id ? users[stage.responsible_id] : null;
+  const assigneeIds = stage.assignee_ids ?? [];
 
-  const [stages, setStages] =
-    useState<ProjectStageResponse[]>([]);
+  const effective = effectiveStatus(stage);
+  const config = STATUS[effective];
 
-  const [responsibles, setResponsibles] =
-    useState<Record<string, StageResponsible>>({});
+  const canStart = stage.status === 'planned';
+  const canPause = stage.status === 'active';
+  const canResume = stage.status === 'on_hold';
+  const canComplete = stage.status === 'active';
+  const canSkip = stage.status === 'planned' || stage.status === 'on_hold';
 
-  const [loading, setLoading] = useState(true);
+  const plannedStart = parseDate(stage.planned_start);
+  const plannedEnd = parseDate(stage.planned_end);
+  const started = parseDate(stage.started_at);
+  const finished = actualEnd(stage);
 
-  const [view, setView] =
-    useState<ViewType>('table');
+  const plannedDays = plannedStart && plannedEnd ? daysBetween(plannedStart, plannedEnd) + 1 : null;
+  const actualDays = started && finished ? Math.max(1, daysBetween(started, finished) + 1) : null;
 
-  const [screen, setScreen] =
-    useState<SectionScreen>({ type: 'list' });
+  const late = isOverPlan(stage);
+  const lateDays = overrunDays(stage);
 
-  const [toasts, setToasts] =
-    useState<Toast[]>([]);
+  const saveAssignees = async (ids: string[]) => {
+    setSavingAssignees(true);
+    try { await onSetAssignees(ids); }
+    finally { setSavingAssignees(false); }
+  };
 
-  /* =========================================================
-     TOASTS
-     ========================================================= */
-
-  const push = useCallback(
-    (
-      title: string,
-      type: Toast['type'] = 'info',
-    ) => {
-      const id =
-        Date.now() + Math.random();
-
-      setToasts(previous => [
-        ...previous,
-        {
-          id,
-          title,
-          type,
-        },
-      ]);
-
-      window.setTimeout(() => {
-        setToasts(previous =>
-          previous.filter(toast => toast.id !== id),
-        );
-      }, 3500);
-    },
-    [],
+  const actionButton = (
+    action: 'start' | 'pause' | 'resume' | 'complete' | 'skip',
+    label: string,
+    Icon: React.ElementType,
+    primary = false,
+  ) => (
+    primary ? (
+      <ActionButton onClick={() => void onAction(action)} disabled={busy}
+        className="w-full px-5 py-3 text-sm font-semibold">
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon className="w-4 h-4" />}
+        {label}
+      </ActionButton>
+    ) : (
+      <button onClick={() => void onAction(action)} disabled={busy}
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--hover-3)] disabled:opacity-50 transition-colors">
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon className="w-4 h-4" />}
+        {label}
+      </button>
+    )
   );
 
-  /* =========================================================
-     LOAD USERS
-     ========================================================= */
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
 
+      {/* BACK */}
+      <button onClick={onBack}
+        className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+        <ArrowLeft className="w-4 h-4" /> Все этапы
+      </button>
+
+      {/* HEADER */}
+      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] p-6 sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap mb-4">
+              <StageNumber order={stage.execution_order} />
+              <StatusBadge status={stage.status} />
+              {effective === 'overdue' && <StatusBadge status="overdue" />}
+            </div>
+
+            <h1 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] break-words">
+              {stage.name}
+            </h1>
+
+            <p className="mt-3 text-sm text-[var(--text-muted)]">
+              Этап {stage.execution_order} из {totalStages}
+            </p>
+          </div>
+
+          {/* HEADER ACTIONS */}
+          <div className="flex items-center gap-2">
+            <button onClick={onEdit} disabled={busy}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--hover-3)] disabled:opacity-50">
+              <Pencil className="w-4 h-4" /> Редактировать
+            </button>
+
+            <div className="relative">
+              <button onClick={() => setMenuOpen(v => !v)} disabled={busy}
+                title="Дополнительные действия"
+                className="w-11 h-11 rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--hover-3)]">
+                <MoreHorizontal className="w-5 h-5" />
+              </button>
+
+              {menuOpen && (
+                <>
+                  <button className="fixed inset-0 z-20 cursor-default" onClick={() => setMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-2 z-30 w-52 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-1.5"
+                    style={{ boxShadow: 'var(--shadow-lg)' }}>
+                    <button onClick={() => { setMenuOpen(false); onDelete(); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-[var(--accent)] hover:bg-[var(--accent-soft)] text-left">
+                      <Trash2 className="w-4 h-4" /> Удалить этап
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
+
+        {/* MAIN */}
+        <div className="space-y-6">
+
+          {/* DESCRIPTION */}
+          <SectionCard title="Описание этапа" icon={FileText}>
+            <div className="p-6">
+              {stage.description ? (
+                <p className="text-sm sm:text-base leading-8 text-[var(--text-secondary)] whitespace-pre-wrap">
+                  {stage.description}
+                </p>
+              ) : (
+                <p className="text-sm text-[var(--text-muted)]">Описание не заполнено</p>
+              )}
+            </div>
+          </SectionCard>
+
+          {/* DATES */}
+          <SectionCard title="Сроки выполнения" description="Плановые и фактические показатели" icon={CalendarDays}>
+            <div className="p-6 space-y-5">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
+                  <div className="flex items-center gap-2 mb-5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">План</h3>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Начало</p>
+                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">{formatDate(stage.planned_start)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Окончание</p>
+                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">{formatDate(stage.planned_end)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Длительность</p>
+                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                        {plannedDays != null ? `${plannedDays} дн.` : '—'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
+                  <div className="flex items-center gap-2 mb-5">
+                    <span className={`w-2.5 h-2.5 rounded-full ${late ? 'bg-[var(--accent)]' : 'bg-emerald-500'}`} />
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">Факт</h3>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Начало</p>
+                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">{formatDate(stage.started_at)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Окончание</p>
+                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                        {stage.completed_at ? formatDate(stage.completed_at) : stage.started_at ? 'Выполняется' : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Длительность</p>
+                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                        {actualDays != null ? `${actualDays} дн.` : '—'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {late && (
+                <div className="flex items-start gap-3 rounded-xl border border-[var(--accent)]/20 bg-[var(--accent-soft)] p-4">
+                  <AlertTriangle className="w-5 h-5 text-[var(--accent)] shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--accent)]">Превышение планового срока</p>
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                      Фактическое выполнение превышает план на {lateDays} дн.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {plannedDays != null && actualDays != null && plannedDays > 0 && (
+                <div className="space-y-4 pt-4 border-t border-[var(--border-color)]">
+                  <div>
+                    <div className="flex justify-between mb-2 text-xs text-[var(--text-muted)]">
+                      <span>Плановая длительность</span>
+                      <span>{plannedDays} дн.</span>
+                    </div>
+                    <div className="h-2.5 rounded-full bg-[var(--hover-3)]">
+                      <div className="h-full w-full rounded-full bg-blue-500/70" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between mb-2 text-xs text-[var(--text-muted)]">
+                      <span>Фактическая длительность</span>
+                      <span>{actualDays} дн.</span>
+                    </div>
+                    <div className="h-2.5 rounded-full bg-[var(--hover-3)] overflow-hidden">
+                      <div className={`h-full rounded-full ${late ? 'bg-[var(--accent)]' : 'bg-emerald-500'}`}
+                        style={{ width: `${Math.min(100, actualDays / plannedDays * 100)}%` }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </SectionCard>
+
+          {/* CRITERIA */}
+          <SectionCard title="Критерии приёмки" description="Условия завершения этапа" icon={ListChecks}>
+            {!stage.completion_criteria.length ? (
+              <div className="p-6 text-sm text-[var(--text-muted)]">Критерии не указаны</div>
+            ) : (
+              <div className="divide-y divide-[var(--border-color)]">
+                {stage.completion_criteria.map((criterion, index) => (
+                  <div key={index} className="flex items-start gap-3 px-6 py-4">
+                    <div className="w-8 h-8 rounded-lg bg-[var(--hover-2)] flex items-center justify-center shrink-0">
+                      <Target className="w-4 h-4 text-[var(--accent)]" />
+                    </div>
+                    <p className="flex-1 pt-1 text-sm leading-6 text-[var(--text-secondary)]">{criterion}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+        </div>
+
+        {/* SIDEBAR */}
+        <aside className="space-y-5 xl:sticky xl:top-5">
+
+          {/* STATUS ACTIONS */}
+          <SectionCard title="Управление этапом" description="Текущее состояние и действия" icon={Flag}>
+            <div className="p-5 space-y-4">
+              <div className={`flex items-center gap-3 rounded-xl border ${config.border} ${config.bg} p-4`}>
+                <div className={`w-10 h-10 rounded-xl bg-[var(--bg-card)] flex items-center justify-center ${config.text}`}>
+                  <config.icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs text-[var(--text-muted)]">Текущий статус</p>
+                  <p className={`mt-1 text-sm font-semibold ${config.text}`}>{config.label}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {canStart && actionButton('start', 'Начать этап', PlayCircle, true)}
+                {canResume && actionButton('resume', 'Возобновить', PlayCircle, true)}
+                {canComplete && actionButton('complete', 'Завершить этап', CheckCircle2, true)}
+                {canPause && actionButton('pause', 'Приостановить', PauseCircle)}
+                {canSkip && actionButton('skip', 'Пропустить этап', SkipForward)}
+
+                {!canStart && !canPause && !canResume && !canComplete && !canSkip && (
+                  <p className="py-3 text-center text-sm text-[var(--text-muted)]">
+                    Доступных действий нет
+                  </p>
+                )}
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* RESPONSIBLE */}
+          <SectionCard title="Ответственный" icon={User}>
+            <div className="p-5">
+              {responsible ? (
+                <div className="flex items-center gap-3">
+                  <Avatar name={responsible.full_name} size="lg" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{responsible.full_name}</p>
+                    {responsible.email && (
+                      <p className="mt-1 text-xs text-[var(--text-muted)] truncate">{responsible.email}</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-[var(--text-muted)]">Не назначен</p>
+              )}
+            </div>
+          </SectionCard>
+
+          {/* ASSIGNEES */}
+          <SectionCard
+            title="Исполнители"
+            description={`${assigneeIds.length} назначено`}
+            icon={Users}
+            action={
+              <button onClick={() => setAssigneesOpen(true)}
+                className="p-2 rounded-lg bg-[var(--hover-2)] text-[var(--text-secondary)] hover:text-[var(--accent)]"
+                title="Управление исполнителями">
+                <UserPlus className="w-4 h-4" />
+              </button>
+            }
+          >
+            <div className="p-5 space-y-3">
+              {!assigneeIds.length ? (
+                <div className="py-5 text-center">
+                  <Users className="w-8 h-8 mx-auto text-[var(--text-disabled)]" />
+                  <p className="mt-3 text-sm text-[var(--text-muted)]">Исполнители не назначены</p>
+                </div>
+              ) : (
+                assigneeIds.map(id => {
+                  const employee = users[id];
+                  return (
+                    <div key={id} className="flex items-center gap-3">
+                      <Avatar name={employee?.full_name} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                          {employee?.full_name ?? 'Пользователь'}
+                        </p>
+                        {employee?.email && <p className="text-xs text-[var(--text-muted)] truncate">{employee.email}</p>}
+                      </div>
+                      {id === currentUserId && (
+                        <span className="text-[11px] px-2 py-1 rounded-md bg-[var(--hover-2)] text-[var(--text-muted)]">Вы</span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+
+              <button onClick={() => setAssigneesOpen(true)}
+                className="w-full flex items-center justify-center gap-2 mt-3 px-4 py-3 rounded-xl border border-dashed border-[var(--border-color)] text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] transition-colors">
+                <UserPlus className="w-4 h-4" />
+                {assigneeIds.length ? 'Изменить исполнителей' : 'Назначить исполнителей'}
+              </button>
+            </div>
+          </SectionCard>
+
+          {/* SERVICE INFO */}
+          <SectionCard title="Информация" icon={Info}>
+            <div className="p-5 space-y-4">
+              {[
+                { label: 'Порядок', value: `${stage.execution_order} из ${totalStages}` },
+                { label: 'Создан', value: formatDateTime(stage.created_at) },
+                { label: 'Обновлён', value: formatDateTime(stage.updated_at) },
+              ].map(item => (
+                <div key={item.label} className="flex items-start justify-between gap-3">
+                  <span className="text-xs text-[var(--text-muted)]">{item.label}</span>
+                  <span className="text-xs text-[var(--text-secondary)] text-right">{item.value}</span>
+                </div>
+              ))}
+              <div className="pt-3 border-t border-[var(--border-color)]">
+                <p className="text-xs text-[var(--text-muted)]">ID этапа</p>
+                <p className="mt-1 text-xs font-mono break-all text-[var(--text-secondary)]">{stage.id}</p>
+              </div>
+            </div>
+          </SectionCard>
+        </aside>
+      </div>
+
+      <AssigneesModal
+        open={assigneesOpen}
+        users={users}
+        selectedIds={assigneeIds}
+        currentUserId={currentUserId}
+        saving={savingAssignees}
+        onSave={saveAssignees}
+        onClose={() => setAssigneesOpen(false)}
+      />
+    </motion.div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PROJECT STAGES PAGE
+   ═══════════════════════════════════════════════════════════════ */
+
+export default function ProjectStagesPage() {
+  const { id: projectId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
+
+  const [project, setProject] = useState<Project | null>(null);
+  const [stages, setStages] = useState<ProjectStageResponse[]>([]);
+  const [users, setUsers] = useState<UsersMap>({});
+
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [view, setView] = useState<ViewType>('table');
+  const [screen, setScreen] = useState<Screen>({ type: 'list' });
+
+  const [editing, setEditing] = useState(false);
+  const [deletingStage, setDeletingStage] = useState<ProjectStageResponse | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const push = useCallback((message: string, type: Toast['type'] = 'info') => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id, message, type }]);
+    window.setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
+  }, []);
+
+  const loadProject = useCallback(async () => {
+    if (!projectId) return null;
+
+    const data = await projectsApi.getById(projectId);
+    setProject(data);
+    setStages(sortStages(data.stages ?? []));
+    return data;
+  }, [projectId]);
+
+  /* LOAD */
+  useEffect(() => {
+    if (!projectId) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await projectsApi.getById(projectId);
+        if (!cancelled) {
+          setProject(data);
+          setStages(sortStages(data.stages ?? []));
+        }
+      } catch (error) {
+        console.error('Failed to load project:', error);
+        if (!cancelled) push('Не удалось загрузить проект', 'error');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => { cancelled = true; };
+  }, [projectId, push]);
+
+  /* LOAD USERS */
   useEffect(() => {
     let cancelled = false;
 
-    const loadUsers = async () => {
+    const load = async () => {
       try {
-        const result: Record<
-          string,
-          StageResponsible
-        > = {};
-
+        const result: UsersMap = {};
         let page = 1;
         let totalPages = 1;
 
         do {
-          const response =
-            await usersApi.getAllUsers(page, 100);
-
+          const response = await usersApi.getAllUsers(page, 100);
           if (cancelled) return;
 
-          response.items.forEach(item => {
-            result[item.id] = {
-              id: item.id,
-              full_name:
-                item.full_name ||
-                item.email ||
-                'Без имени',
-              email: item.email,
+          response.items.forEach(u => {
+            result[u.id] = {
+              id: u.id,
+              full_name: u.full_name || u.email || 'Без имени',
+              email: u.email,
             };
           });
 
           totalPages = response.total_pages;
-          page += 1;
-        } while (
-          page <= totalPages &&
-          !cancelled
-        );
+          page++;
+        } while (page <= totalPages && !cancelled);
 
-        if (!cancelled) {
-          setResponsibles(result);
-        }
+        if (!cancelled) setUsers(result);
       } catch (error) {
-        console.error(
-          'Failed to load users:',
-          error,
-        );
-
-        if (!cancelled) {
-          push(
-            'Не удалось загрузить сотрудников',
-            'error',
-          );
-        }
+        console.error('Failed to load users:', error);
+        if (!cancelled) push('Не удалось загрузить сотрудников', 'error');
       }
     };
 
-    void loadUsers();
-
-    return () => {
-      cancelled = true;
-    };
+    void load();
+    return () => { cancelled = true; };
   }, [push]);
 
-  /* =========================================================
-     LOAD PROJECT
-     ========================================================= */
+  const selectedStage = screen.type === 'detail'
+    ? stages.find(s => s.id === screen.stageId) ?? null
+    : null;
 
-  useEffect(() => {
-    let cancelled = false;
+  const goList = () => {
+    setScreen({ type: 'list' });
+    setEditing(false);
+  };
 
-    const loadProject = async () => {
-      setLoading(true);
+  const goDetail = (stage: ProjectStageResponse) => {
+    setScreen({ type: 'detail', stageId: stage.id });
+    setEditing(false);
+  };
 
-      try {
-        const project =
-          await projectsApi.getById(projectId);
+  const goCreate = () => {
+    setEditing(false);
+    setScreen({ type: 'create' });
+  };
 
-        if (cancelled) return;
+  /* CREATE */
+  const createStage = async (payload: StagePayload) => {
+    if (!projectId || busy) return;
+    setBusy(true);
 
-        setStages(sortOrd(project.stages ?? []));
-      } catch (error) {
-        console.error(
-          'Failed to load project:',
-          error,
-        );
+    try {
+      const beforeIds = new Set(stages.map(s => s.id));
 
-        if (!cancelled) {
-          push(
-            'Не удалось загрузить проект',
-            'error',
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+      const response = await projectsApi.createStage(projectId, {
+        name: payload.name,
+        description: payload.description ?? undefined,
+        execution_order: payload.order,
+        planned_start: payload.planned_start,
+        planned_end: payload.planned_end,
+        responsible_id: payload.responsible_id ?? undefined,
+        completion_criteria: payload.completion_criteria,
+      } as any);
+
+      const updatedStages = sortStages(response.stages ?? []);
+      setStages(updatedStages);
+
+      const created = updatedStages.find(s => !beforeIds.has(s.id));
+
+      if (created) goDetail(created);
+      else goList();
+
+      push('Этап успешно создан', 'success');
+    } catch (error) {
+      console.error('Create stage:', error);
+      push('Не удалось создать этап', 'error');
+      throw error;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /* UPDATE */
+  const updateStage = async (payload: StagePayload) => {
+    if (!projectId || !selectedStage || busy) return;
+    setBusy(true);
+
+    try {
+      const stage = selectedStage;
+
+      await projectsApi.updateStage(projectId, stage.id, {
+        name: payload.name,
+        description: payload.description,
+        responsible_id: payload.responsible_id,
+        completion_criteria: payload.completion_criteria,
+        planned_start: payload.planned_start,
+        planned_end: payload.planned_end,
+      } as any);
+
+      if (payload.order !== stage.execution_order) {
+        const reordered = sortStages(stages).filter(s => s.id !== stage.id);
+        const position = Math.max(0, Math.min(payload.order - 1, reordered.length));
+        reordered.splice(position, 0, stage);
+
+        await projectsApi.reorderStages(projectId, reordered.map(s => s.id));
       }
-    };
 
-    void loadProject();
+      await loadProject();
+      setEditing(false);
+      push('Этап обновлён', 'success');
+    } catch (error) {
+      console.error('Update stage:', error);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, push]);
+      try { await loadProject(); } catch { /* Ошибка уже обрабатывается */ }
 
-  /* =========================================================
-     HELPERS
-     ========================================================= */
+      push('Не удалось сохранить изменения', 'error');
+      throw error;
+    } finally {
+      setBusy(false);
+    }
+  };
 
-  const commit = useCallback(
-    (next: ProjectStageResponse[]) => {
-      setStages(sortOrd(next));
-    },
-    [],
-  );
+  /* DELETE */
+  const deleteStage = async () => {
+    if (!projectId || !deletingStage || busy) return;
+    setBusy(true);
 
-  const selectedStage = useMemo(() => {
-    if (screen.type !== 'detail') {
-      return null;
+    try {
+      await projectsApi.deleteStage(projectId, deletingStage.id);
+      await loadProject();
+
+      setDeletingStage(null);
+      goList();
+
+      push('Этап удалён', 'success');
+    } catch (error) {
+      console.error('Delete stage:', error);
+      push('Не удалось удалить этап', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /* STATUS ACTIONS */
+  const changeStatus = async (
+    stageId: string,
+    action: 'start' | 'pause' | 'resume' | 'complete' | 'skip',
+  ) => {
+    if (!projectId || busy) return;
+
+    const stage = stages.find(s => s.id === stageId);
+    if (!stage) return;
+
+    const allowed =
+      (action === 'start' && stage.status === 'planned') ||
+      (action === 'pause' && stage.status === 'active') ||
+      (action === 'resume' && stage.status === 'on_hold') ||
+      (action === 'complete' && stage.status === 'active') ||
+      (action === 'skip' && (stage.status === 'planned' || stage.status === 'on_hold'));
+
+    if (!allowed) {
+      push('Этот переход статуса недоступен', 'error');
+      return;
     }
 
+    setBusy(true);
+
+    try {
+      switch (action) {
+        case 'start':
+          await projectsApi.startStage(projectId, stageId);
+          break;
+        case 'pause':
+          await projectsApi.pauseStage(projectId, stageId);
+          break;
+        case 'resume':
+          await projectsApi.resumeStage(projectId, stageId);
+          break;
+        case 'complete':
+          await projectsApi.completeStage(projectId, stageId);
+          break;
+        case 'skip':
+          await projectsApi.skipStage(projectId, stageId);
+          break;
+      }
+
+      await loadProject();
+
+      const messages = {
+        start: 'Этап запущен',
+        pause: 'Этап приостановлен',
+        resume: 'Этап возобновлён',
+        complete: 'Этап завершён',
+        skip: 'Этап пропущен',
+      };
+
+      push(messages[action], 'success');
+    } catch (error) {
+      console.error('Stage status action:', error);
+      push('Не удалось изменить статус этапа', 'error');
+      throw error;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /* KANBAN */
+  const moveStage = async (stageId: string, status: StageStatus) => {
+    const stage = stages.find(s => s.id === stageId);
+    if (!stage || stage.status === status) return;
+
+    if (status === 'active') {
+      await changeStatus(stageId, stage.status === 'on_hold' ? 'resume' : 'start');
+    } else if (status === 'on_hold') {
+      await changeStatus(stageId, 'pause');
+    } else if (status === 'completed') {
+      await changeStatus(stageId, 'complete');
+    } else if (status === 'skipped') {
+      await changeStatus(stageId, 'skip');
+    }
+  };
+
+  /* ASSIGNEES */
+  const setAssignees = async (stageId: string, ids: string[]) => {
+    if (!projectId) return;
+
+    try {
+      await projectsApi.setStageAssignees(projectId, stageId, [...new Set(ids)]);
+      await loadProject();
+      push('Исполнители обновлены', 'success');
+    } catch (error) {
+      console.error('Set assignees:', error);
+      push('Не удалось сохранить исполнителей', 'error');
+      throw error;
+    }
+  };
+
+  /* LOADING */
+  if (loading) return <LoadingState />;
+
+  if (!projectId || !project) {
     return (
-      stages.find(
-        stage => stage.id === screen.stageId,
-      ) ?? null
+      <div className="max-w-[1600px] mx-auto">
+        <EmptyState
+          icon={FolderOpen}
+          title="Проект не найден"
+          description="Не удалось получить данные проекта."
+          action={
+            <ActionButton onClick={() => navigate('/projects')} className="px-5 py-3 text-sm">
+              <ArrowLeft className="w-4 h-4" /> К проектам
+            </ActionButton>
+          }
+        />
+      </div>
     );
-  }, [stages, screen]);
-
-  const goList = useCallback(() => {
-    setScreen({ type: 'list' });
-  }, []);
-
-  const goDetail = useCallback(
-    (stage: ProjectStageResponse) => {
-      setScreen({
-        type: 'detail',
-        stageId: stage.id,
-        editing: false,
-      });
-    },
-    [],
-  );
-
-  const goCreate = useCallback(() => {
-    setScreen({ type: 'create' });
-  }, []);
-
-  const reloadProject = useCallback(async () => {
-    const project =
-      await projectsApi.getById(projectId);
-
-    commit(project.stages ?? []);
-
-    return project;
-  }, [projectId, commit]);
-
-  /* =========================================================
-     CREATE STAGE
-     ========================================================= */
-
-  const handleCreate = useCallback(
-    async (payload: StageUpsertPayload) => {
-      try {
-        const apiPayload = {
-          name: payload.name,
-          description: payload.description ?? undefined,
-          execution_order: payload.order,
-          planned_start: payload.planned_start,
-          planned_end: payload.planned_end,
-          responsible_id:
-            payload.responsible_id ?? undefined,
-          completion_criteria:
-            payload.completion_criteria,
-        };
-
-        const project = await projectsApi.createStage(
-          projectId,
-          apiPayload as any,
-        );
-
-        const sorted = sortOrd(project.stages ?? []);
-
-        commit(sorted);
-
-        const newStage = [...sorted]
-          .reverse()
-          .find(stage => stage.name === payload.name);
-
-        if (newStage) {
-          goDetail(newStage);
-        } else {
-          goList();
-        }
-
-        push(
-          `Этап «${payload.name}» создан`,
-          'success',
-        );
-      } catch (error) {
-        console.error(
-          'Create stage error:',
-          error,
-        );
-
-        push(
-          'Не удалось создать этап',
-          'error',
-        );
-
-        throw error;
-      }
-    },
-    [
-      projectId,
-      commit,
-      goDetail,
-      goList,
-      push,
-    ],
-  );
-
-  /* =========================================================
-     UPDATE STAGE
-     ========================================================= */
-
-    const handleUpdate = useCallback(
-    async (
-      stageId: string,
-      payload: StageUpsertPayload,
-    ) => {
-      try {
-        const current = stages.find(
-          stage => stage.id === stageId,
-        );
-
-        if (!current) {
-          throw new Error('Stage not found');
-        }
-
-        const apiPayload = {
-          name: payload.name,
-          description: payload.description,
-          responsible_id: payload.responsible_id,
-          completion_criteria: payload.completion_criteria,
-          planned_start: payload.planned_start,
-          planned_end: payload.planned_end,
-        };
-
-        await projectsApi.updateStage(
-          projectId,
-          stageId,
-          apiPayload as any,
-        );
-
-        // ✅ Перечитываем проект целиком — так UI всегда актуален
-        await reloadProject();
-
-        push(
-          `Этап «${payload.name}» сохранён`,
-          'success',
-        );
-      } catch (error) {
-        console.error('Update stage error:', error);
-
-        push('Не удалось сохранить этап', 'error');
-
-        throw error;
-      }
-    },
-    [stages, projectId, reloadProject, push],
-  );
-
-  /* =========================================================
-     DELETE STAGE
-     ========================================================= */
-
-  const handleDelete = useCallback(
-    async (stageId: string) => {
-      try {
-        await projectsApi.deleteStage(
-          projectId,
-          stageId,
-        );
-
-        await reloadProject();
-
-        goList();
-
-        push(
-          'Этап удалён',
-          'success',
-        );
-      } catch (error) {
-        console.error(
-          'Delete stage error:',
-          error,
-        );
-
-        push(
-          'Не удалось удалить этап',
-          'error',
-        );
-
-        throw error;
-      }
-    },
-    [
-      projectId,
-      reloadProject,
-      goList,
-      push,
-    ],
-  );
-
-  /* =========================================================
-     QUICK ACTIONS
-     ========================================================= */
-
-  const quickAction = useCallback(
-    async (
-      stageId: string,
-      type: 'start' | 'complete' | 'skip',
-    ) => {
-      try {
-        if (type === 'start') {
-          await projectsApi.startStage(
-            projectId,
-            stageId,
-          );
-        } else if (type === 'complete') {
-          await projectsApi.completeStage(
-            projectId,
-            stageId,
-          );
-        } else {
-          await projectsApi.skipStage(
-            projectId,
-            stageId,
-          );
-        }
-
-        await reloadProject();
-
-        const messages = {
-          start: 'Этап запущен',
-          complete: 'Этап завершён',
-          skip: 'Этап пропущен',
-        };
-
-        push(messages[type], 'success');
-      } catch (error) {
-        console.error(
-          'Stage action error:',
-          error,
-        );
-
-        push(
-          'Не удалось выполнить действие',
-          'error',
-        );
-
-        throw error;
-      }
-    },
-    [
-      projectId,
-      reloadProject,
-      push,
-    ],
-  );
-
-  /* =========================================================
-     MOVE STAGE
-     ========================================================= */
-
-  const handleMoveStage = useCallback(
-    async (
-      stageId: string,
-      newStatus: ProjectStageStatus,
-    ) => {
-      const current = stages.find(
-        stage => stage.id === stageId,
-      );
-
-      if (!current || current.status === newStatus) {
-        return;
-      }
-
-      try {
-        if (newStatus === 'active') {
-          await projectsApi.startStage(
-            projectId,
-            stageId,
-          );
-        } else if (newStatus === 'completed') {
-          await projectsApi.completeStage(
-            projectId,
-            stageId,
-          );
-        } else if (newStatus === 'skipped') {
-          await projectsApi.skipStage(
-            projectId,
-            stageId,
-          );
-        } else {
-          throw new Error(
-            'Перемещение в выбранный статус не поддерживается API',
-          );
-        }
-
-        await reloadProject();
-
-        push(
-          `Статус этапа: ${STATUS_CFG[newStatus].label}`,
-          'success',
-        );
-      } catch (error) {
-        console.error(
-          'Move stage error:',
-          error,
-        );
-
-        push(
-          'Не удалось изменить статус',
-          'error',
-        );
-
-        throw error;
-      }
-    },
-    [
-      stages,
-      projectId,
-      reloadProject,
-      push,
-    ],
-  );
-
-  /* =========================================================
-     SET ASSIGNEES
-     ========================================================= */
-
-  const handleSetAssignees = useCallback(
-    async (
-      stageId: string,
-      userIds: string[],
-    ) => {
-      try {
-        const uniqueIds = [...new Set(userIds)];
-
-        const updatedStage =
-          await projectsApi.setStageAssignees(
-            projectId,
-            stageId,
-            uniqueIds,
-          );
-
-        // Обновляем данные этапа из ответа API.
-        setStages(previous =>
-          previous.map(stage =>
-            stage.id === stageId
-              ? {
-                ...stage,
-                ...updatedStage,
-                assignee_ids:
-                  updatedStage.assignee_ids ?? uniqueIds,
-              }
-              : stage,
-          ),
-        );
-
-        // Синхронизируемся с сервером.
-        try {
-          await reloadProject();
-        } catch (reloadError) {
-          console.error(
-            'Failed to refresh project after assignee update:',
-            reloadError,
-          );
-        }
-
-        push(
-          'Исполнители обновлены',
-          'success',
-        );
-      } catch (error) {
-        console.error(
-          'Failed to set stage assignees:',
-          error,
-        );
-
-        push(
-          'Не удалось сохранить исполнителей',
-          'error',
-        );
-
-        throw error;
-      }
-    },
-    [
-      projectId,
-      reloadProject,
-      push,
-    ],
-  );
-
-  /* =========================================================
-     LOADING
-     ========================================================= */
-
-  if (loading) {
-    return <PageSkeleton />;
   }
 
-  /* =========================================================
-     RENDER
-     ========================================================= */
-
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-[1900px] mx-auto space-y-6 pb-12 animate-in fade-in duration-500">
 
-      <AnimatePresence mode="wait">
+      {/* PAGE HEADER */}
+      <div className="flex flex-wrap items-center justify-between gap-5">
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate(`/projects/${projectId}`)}
+            title="Вернуться к проекту"
+            className="w-11 h-11 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--hover-2)]">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
 
-        {/* LIST */}
-        {screen.type === 'list' && (
-          <motion.div
-            key="stages-list"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-          >
-            {/* VIEW NAVIGATION */}
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-
-              <ViewTabs
-                view={view}
-                onChange={setView}
-              />
-
-              {stages.length > 0 && view !== 'table' && (
-                <button
-                  type="button"
-                  onClick={goCreate}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white"
-                >
-                  <Plus className="h-4 w-4" />
-                  Создать этап
-                </button>
-              )}
+          <div>
+            <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] mb-1">
+              <Link to="/projects" className="hover:text-[var(--accent)]">Проекты</Link>
+              <ChevronRight className="w-3.5 h-3.5" />
+              <Link to={`/projects/${projectId}`} className="hover:text-[var(--accent)]">{project.name}</Link>
+              <ChevronRight className="w-3.5 h-3.5" />
+              <span className="text-[var(--text-secondary)]">Этапы</span>
             </div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)]">
+              Этапы проекта
+            </h1>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              {project.name} <span className="mx-1">·</span> {project.key}
+            </p>
+          </div>
+        </div>
 
-            {/* CURRENT VIEW */}
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={view}
-                initial={{
-                  opacity: 0,
-                  y: 8,
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                exit={{
-                  opacity: 0,
-                  y: -8,
-                }}
-                transition={{
-                  duration: 0.15,
-                }}
-              >
+        {screen.type === 'list' && view !== 'table' && (
+          <ActionButton onClick={goCreate} className="px-5 py-3 text-sm font-semibold">
+            <Plus className="w-4 h-4" /> Создать этап
+          </ActionButton>
+        )}
+      </div>
 
-                {view === 'table' && (
-                  <TableView
-                    stages={stages}
-                    responsibles={responsibles}
-                    onSelect={goDetail}
-                    onCreate={goCreate}
-                  />
-                )}
+      {/* CONTENT */}
+      <AnimatePresence mode="wait">
+        {screen.type === 'list' && (
+          <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }} className="space-y-5">
 
-                {view === 'overview' && (
-                  <OverviewView
-                    stages={stages}
-                    responsibles={responsibles}
-                    onSelect={goDetail}
-                  />
-                )}
+            <ViewNavigation view={view} onChange={setView} />
 
-                {view === 'roadmap' && (
-                  <RoadmapView
-                    stages={stages}
-                    responsibles={responsibles}
-                    onSelect={goDetail}
-                  />
-                )}
+            {view === 'table' && (
+              <TableView stages={stages} users={users} onOpen={goDetail} onCreate={goCreate} />
+            )}
 
-                {view === 'timeline' && (
-                  <TimelineView
-                    stages={stages}
-                    responsibles={responsibles}
-                    projectId={projectId}
-                    onSelect={goDetail}
-                  />
-                )}
+            {view === 'overview' && (
+              <OverviewView stages={stages} users={users} onOpen={goDetail} onCreate={goCreate} />
+            )}
 
-                {view === 'board' && (
-                  <BoardView
-                    stages={stages}
-                    responsibles={responsibles}
-                    onSelect={goDetail}
-                    onMoveStage={handleMoveStage}
-                  />
-                )}
+            {view === 'roadmap' && (
+              <RoadmapView stages={stages} users={users} onOpen={goDetail} />
+            )}
 
-                {view === 'analytics' && (
-                  <AnalyticsView
-                    stages={stages}
-                  />
-                )}
-              </motion.div>
-            </AnimatePresence>
+            {view === 'timeline' && (
+              <TimelineView stages={stages} users={users} projectId={projectId} onOpen={goDetail} />
+            )}
+
+            {view === 'board' && (
+              <BoardView stages={stages} users={users} onOpen={goDetail} onMove={moveStage} />
+            )}
+
+            {view === 'analytics' && (
+              <AnalyticsView stages={stages} users={users} onOpen={goDetail} />
+            )}
           </motion.div>
         )}
 
-        {/* DETAIL */}
         {screen.type === 'detail' && selectedStage && (
-          <StageDetail
-            key={selectedStage.id}
-            stage={selectedStage}
-            responsible={
-              selectedStage.responsible_id
-                ? responsibles[selectedStage.responsible_id] ?? null
-                : null
-            }
-            responsibles={responsibles}
-            totalStages={stages.length}
-            currentUserId={user?.id}
-            onBack={goList}
-            onSave={handleUpdate}
-            onDelete={handleDelete}
-            onStart={stageId =>
-              quickAction(stageId, 'start')
-            }
-            onComplete={stageId =>
-              quickAction(stageId, 'complete')
-            }
-            onSkip={stageId =>
-              quickAction(stageId, 'skip')
-            }
-            onSetAssignees={handleSetAssignees}
-          />
+          <motion.div key={`detail-${selectedStage.id}`} initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            {editing ? (
+              <StageFormView
+                stage={selectedStage}
+                nextOrder={selectedStage.execution_order}
+                users={users}
+                saving={busy}
+                onSave={updateStage}
+                onCancel={() => setEditing(false)}
+              />
+            ) : (
+              <StageDetail
+                stage={selectedStage}
+                users={users}
+                currentUserId={user?.id}
+                totalStages={stages.length}
+                busy={busy}
+                onBack={goList}
+                onEdit={() => setEditing(true)}
+                onDelete={() => setDeletingStage(selectedStage)}
+                onAction={action => changeStatus(selectedStage.id, action)}
+                onSetAssignees={ids => setAssignees(selectedStage.id, ids)}
+              />
+            )}
+          </motion.div>
         )}
 
-        {/* CREATE */}
         {screen.type === 'create' && (
-          <CreateStage
-            key="create-stage"
+          <StageFormView
+            key="create"
             nextOrder={stages.length + 1}
-            responsibles={responsibles}
-            onBack={goList}
-            onSubmit={handleCreate}
+            users={users}
+            saving={busy}
+            onSave={createStage}
+            onCancel={goList}
           />
         )}
       </AnimatePresence>
 
-      {/* TOASTS */}
+      {/* DELETE CONFIRMATION */}
+      {deletingStage && (
+        <DeleteStageModal
+          stage={deletingStage}
+          loading={busy}
+          onConfirm={deleteStage}
+          onClose={() => setDeletingStage(null)}
+        />
+      )}
+
       <Toasts
-        toasts={toasts}
-        onClose={id =>
-          setToasts(previous =>
-            previous.filter(toast => toast.id !== id),
-          )
-        }
+        items={toasts}
+        onClose={id => setToasts(prev => prev.filter(t => t.id !== id))}
       />
     </div>
   );
 }
-
-/* ════════════════════════════════════════════════════════════════
-   DEFAULT EXPORT
-   ════════════════════════════════════════════════════════════════ */
-
-export default ProjectStagesSection;

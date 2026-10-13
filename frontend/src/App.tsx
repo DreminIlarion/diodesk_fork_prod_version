@@ -35,6 +35,7 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
 const NewProjectPage = lazy(() => import('./pages/NewProjectPage'));
 const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage'));
+const ProjectStagesPage = lazy(() => import('./pages/ProjectStagesPage'));
 const ProductsTab = lazy(() => import('./pages/ProductsPage'));
 const CreateProductPage = lazy(() => import('./pages/CreateProductPage'));
 const TasksPage = lazy(() => import('./pages/TasksPage'));
@@ -85,6 +86,14 @@ export default function App() {
               <Route path="/projects" element={<LazyRoute><ProjectsPage /></LazyRoute>} />
               <Route path="/projects/new" element={<LazyRoute><NewProjectPage /></LazyRoute>} />
               <Route path="/projects/:id" element={<LazyRoute><ProjectDetailPage /></LazyRoute>} />
+              <Route
+                path="/projects/:id/stages"
+                element={
+                  <LazyRoute>
+                    <ProjectStagesPage />
+                  </LazyRoute>
+                }
+              />
               <Route path="/my-company" element={<LazyRoute><ProtectedRoute><MyCompanyPage /></ProtectedRoute></LazyRoute>} />
               <Route path="/invitations" element={<LazyRoute><ProtectedRoute><InvitationsPage /></ProtectedRoute></LazyRoute>} />
               <Route path="/products" element={<LazyRoute><ProtectedRoute><ProductsTab /></ProtectedRoute></LazyRoute>} />
