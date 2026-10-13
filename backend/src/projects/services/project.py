@@ -344,6 +344,8 @@ class ProjectService:
             description=data.description,
             responsible_id=data.responsible_id,
             completion_criteria=data.completion_criteria,
+            planned_start=data.planned_start,
+            planned_end=data.planned_end,
         )
         await self.project_repo.update(project)
         await self.uow.commit()

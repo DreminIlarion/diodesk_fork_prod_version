@@ -153,6 +153,8 @@ class ProjectStage(Entity):
             description: str | None = None,
             responsible_id: UUID | None = None,
             completion_criteria: list[str] | None = None,
+            planned_start: date | None = None,
+            planned_end: date | None = None,
     ) -> None:
         """
         Обновить справочную информацию этапа.
@@ -175,6 +177,18 @@ class ProjectStage(Entity):
 
         if completion_criteria is not None and completion_criteria != self.completion_criteria:
             self.completion_criteria = completion_criteria
+            changed = True
+
+        if planned_start is not None and planned_start != self.planned_start:
+            if planned_end is not None and planned_start > planned_end:
+                raise InvariantViolationError("planned_start cannot be after planned_end")
+            self.planned_start = planned_start
+            changed = True
+
+        if planned_end is not None and planned_end != self.planned_end:
+            if self.planned_start is not None and self.planned_start > planned_end:
+                raise InvariantViolationError("planned_end cannot be before planned_start")
+            self.planned_end = planned_end
             changed = True
 
         if changed:
@@ -506,18 +520,7 @@ class Project(AggregateRoot):
         if not stage:
             raise NotFoundError(f"Stage with ID {stage_id} does not exist in project")
 
-        next_order = self.get_next_executable_order()
-        if next_order is None:
-            raise InvalidStateError(
-                "Cannot start any stage at the moment "
-                "(previous groups not completed or active stages exist)"
-            )
-
-        if stage.execution_order != next_order:
-            raise InvalidStateError(
-                f"Cannot start stage '{stage.name}'. "
-                f"Next available execution_order is {next_order}"
-            )
+        
 
         stage.start()
         self.updated_at = current_datetime()
@@ -568,39 +571,16 @@ class Project(AggregateRoot):
         """
         Пропустить этап проекта.
 
-        Правила:
-        - Можно пропустить только этап из следующей доступной группы (execution_order)
-        - В группе уже не должно быть ACTIVE этапов
-        - Все предыдущие группы должны быть завершены
+        Параллельность не ограничена — можно пропустить любой этап.
         """
 
         stage = self.find_stage(stage_id)
         if stage is None:
             raise NotFoundError(f"Stage with ID {stage_id} does not exist")
 
-        if stage.status != ProjectStageStatus.PLANNED:
-            raise InvalidStateError(
-                f"Only PLANNED stages can be skipped. Current status: {stage.status}"
-            )
-
-        next_executable_order = self.get_next_executable_order()
-
-        if next_executable_order is None:
-            raise InvalidStateError(
-                "No stage can be skipped at the moment. "
-                "Either all stages are completed or there are active stages."
-            )
-
-        if stage.execution_order != next_executable_order:
-            raise InvalidStateError(
-                f"Cannot skip stage '{stage.name}' (execution_order={stage.execution_order}). "
-                f"Next available execution_order is {next_executable_order}."
-            )
-
         stage.skip()
         self.updated_at = current_datetime()
 
-        # Проверяем, не завершился ли проект после пропуска
         if all(
             s.status in {ProjectStageStatus.COMPLETED, ProjectStageStatus.SKIPPED}
             for s in self.stages

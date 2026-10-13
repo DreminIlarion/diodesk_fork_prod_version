@@ -93,6 +93,9 @@ class ProjectStageUpdate(BaseModel):
     responsible_id: UUID | None = Field(None, description="Ответственный за проведение этапа")
     completion_criteria: list[str] | None = Field(None, description="Критерии завершения")
 
+    planned_start: date | None = Field(None, description="Плановая дата начала")
+    planned_end: date | None = Field(None, description="Плановая дата завершения")
+
 
 class ProjectStagePlan(BaseModel):
     """

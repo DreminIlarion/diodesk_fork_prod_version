@@ -5544,23 +5544,23 @@ function CreateStage({
                   />
                 </div>
 
-                <div>
-                  <label className={labelClass}>
-                    Статус
-                  </label>
+            <div>
+              <label className={labelClass}>
+                Статус
+              </label>
 
-                  <Select
-                    value={form.status}
-                    onValueChange={value =>
-                      updateForm(
-                        'status',
-                        value as ProjectStageStatus,
-                      )
-                    }
-                  >
-                    <SelectTrigger className={inputClass}>
-                      <SelectValue placeholder="Статус" />
-                    </SelectTrigger>
+              <Select
+                value={form.status}
+                onValueChange={value =>
+                  updateForm(
+                    'status',
+                    value as ProjectStageStatus,
+                  )
+                }
+              >
+                <SelectTrigger className={inputClass}>
+                  <SelectValue placeholder="Выберите статус" />
+                </SelectTrigger>
 
                     <SelectContent>
                       <SelectItem value="planned">
@@ -6025,7 +6025,7 @@ export function ProjectStagesSection({
      UPDATE STAGE
      ========================================================= */
 
-  const handleUpdate = useCallback(
+    const handleUpdate = useCallback(
     async (
       stageId: string,
       payload: StageUpsertPayload,
@@ -6043,46 +6043,33 @@ export function ProjectStagesSection({
           name: payload.name,
           description: payload.description,
           responsible_id: payload.responsible_id,
-          completion_criteria:
-            payload.completion_criteria,
+          completion_criteria: payload.completion_criteria,
           planned_start: payload.planned_start,
           planned_end: payload.planned_end,
         };
 
-        const updatedStage =
-          await projectsApi.updateStage(
-            projectId,
-            stageId,
-            apiPayload as any,
-          );
-
-        commit(
-          stages.map(stage =>
-            stage.id === stageId
-              ? { ...stage, ...updatedStage }
-              : stage,
-          ),
+        await projectsApi.updateStage(
+          projectId,
+          stageId,
+          apiPayload as any,
         );
+
+        // ✅ Перечитываем проект целиком — так UI всегда актуален
+        await reloadProject();
 
         push(
           `Этап «${payload.name}» сохранён`,
           'success',
         );
       } catch (error) {
-        console.error(
-          'Update stage error:',
-          error,
-        );
+        console.error('Update stage error:', error);
 
-        push(
-          'Не удалось сохранить этап',
-          'error',
-        );
+        push('Не удалось сохранить этап', 'error');
 
         throw error;
       }
     },
-    [stages, projectId, commit, push],
+    [stages, projectId, reloadProject, push],
   );
 
   /* =========================================================

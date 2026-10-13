@@ -79,7 +79,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
           />
 
           <span className="font-bold text-[var(--text-primary)] text-lg">
-            ДИО Деск
+            DIO Desk
           </span>
         </div>
 
