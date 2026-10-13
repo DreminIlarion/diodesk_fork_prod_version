@@ -8,6 +8,7 @@ from ..dependencies import ProjectMemberServiceDep, ProjectServiceDep
 from ..schemas import (
     NewProjectStagesOrder,
     ProjectResponse,
+    ProjectStageAssigneesUpdate,
     ProjectStageCreate,
     ProjectStagePlan,
     ProjectStageResponse,
@@ -160,6 +161,28 @@ async def schedule_project_stage(
         service: ProjectServiceDep,
 ) -> ProjectStageResponse:
     return await service.schedule_stage(
+        project_id=project_id,
+        stage_id=stage_id,
+        data=data,
+        current_subject=current_subject,
+    )
+
+
+
+@router.patch(
+    path="/{project_id}/stages/{stage_id}/assignees",
+    status_code=status.HTTP_200_OK,
+    response_model=ProjectStageResponse,
+    summary="Назначить исполнителей этапа",
+)
+async def set_project_stage_assignees(
+        project_id: UUID,
+        stage_id: UUID,
+        data: ProjectStageAssigneesUpdate,
+        current_subject: CurrentSubjectDep,
+        service: ProjectServiceDep,
+) -> ProjectStageResponse:
+    return await service.set_stage_assignees(
         project_id=project_id,
         stage_id=stage_id,
         data=data,

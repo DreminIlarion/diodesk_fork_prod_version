@@ -134,6 +134,9 @@ class ProjectStageResponse(BaseModel):
     planned_duration_days: NonNegativeInt | None = Field(
         None, description="Продолжительность этапа в днях"
     )
+    assignee_ids: list[UUID] = Field(
+        default_factory=list, description="ID исполнителей, назначенных на этап"
+    )
 
 
 class ProjectResponse(ProjectBase):
@@ -187,4 +190,14 @@ class ProjectReference(BaseModel):
 
     id: UUID = Field(description="Идентификатор проекта")
     key: str = Field(description="Уникальный ключ проекта для UI", examples=["PRJ01"])
-    name: str = Field(description="Название проекта", examples=["Внедрение хуйни"])
+    name: str = Field(description="Название проекта", examples=["Внедрение "])
+
+
+
+
+class ProjectStageAssigneesUpdate(BaseModel):
+    """Полная замена списка исполнителей этапа."""
+
+    user_ids: list[UUID] = Field(
+        default_factory=list, description="Новый список исполнителей этапа"
+    )

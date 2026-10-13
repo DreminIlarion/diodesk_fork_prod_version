@@ -24,6 +24,7 @@ from ..schemas import (
     ProjectCreate,
     ProjectDetailedResponse,
     ProjectResponse,
+    ProjectStageAssigneesUpdate,
     ProjectStageCreate,
     ProjectStagePlan,
     ProjectStageResponse,
@@ -374,6 +375,47 @@ class ProjectService:
             raise NotFoundError(f"Project stage with ID {stage_id} does not exists in project")
 
         stage.establish_planned_schedule(start=data.planned_start, end=data.planned_end)
+        await self.project_repo.update(project)
+        await self.uow.commit()
+
+        return map_project_stage_to_response(stage)
+
+
+
+    async def set_stage_assignees(
+            self,
+            project_id: UUID,
+            stage_id: UUID,
+            data: ProjectStageAssigneesUpdate,
+            current_subject: Subject,
+    ) -> ProjectStageResponse:
+        """
+        Полная замена списка исполнителей этапа.
+        """
+
+        project = await get_or_raise_404(self.project_repo.read, project_id, Project)
+
+        permission = await self.authz_service.can_manage_project(
+            subject=current_subject, project_id=project.id
+        )
+        if not permission.allowed:
+            raise PermissionDeniedError(permission.reason)
+
+        stage = project.find_stage(stage_id)
+        if stage is None:
+            raise NotFoundError(
+                f"Project stage with ID {stage_id} does not exist in project"
+            )
+
+        # убрать тех, кого больше нет
+        for uid in list(stage.assignee_ids):
+            if uid not in data.user_ids:
+                stage.remove_assignee(uid)
+
+        # добавить новых
+        for uid in data.user_ids:
+            stage.add_assignee(uid)
+
         await self.project_repo.update(project)
         await self.uow.commit()
 
