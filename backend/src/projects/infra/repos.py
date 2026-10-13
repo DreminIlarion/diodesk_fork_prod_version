@@ -11,8 +11,12 @@ from ..domain.dtos import ProjectFilters
 
 from ..domain.entities import Project, ProjectMember, ProjectStage
 from ..domain.vo import MemberRole, ProjectKey
-from .models import ProjectMemberOrm, ProjectOrm, ProjectStageOrm
-
+from .models import (
+    ProjectMemberOrm,
+    ProjectOrm,
+    ProjectStageAssigneeOrm,
+    ProjectStageOrm,
+)
 
 class ProjectMemberMapper(ModelMapper[ProjectMember, ProjectMemberOrm]):
     @staticmethod
@@ -82,6 +86,14 @@ class ProjectStageMapper(ModelMapper[ProjectStage, ProjectStageOrm]):
             responsible_id=entity.responsible_id,
             description=entity.description,
             completion_criteria=entity.completion_criteria,
+            assignees=[
+                ProjectStageAssigneeOrm(
+                    stage_id=entity.id,
+                    user_id=uid,
+                    created_by=uid,
+                )
+                for uid in entity.assignee_ids
+            ],
         )
 
 
