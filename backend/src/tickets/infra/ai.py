@@ -1,7 +1,8 @@
 from langchain.agents import create_agent
 from langchain.agents.structured_output import ToolStrategy
 
-from ...core.ai import YANDEX_GPT_CONFIG, get_llm, load_prompt
+from ...core.ai import YANDEX_GPT_CONFIG, get_llm
+from ...core.prompts import load_prompt
 from ..schemas import PredictionResponse, TicketPredict
 
 model = get_llm(YANDEX_GPT_CONFIG)

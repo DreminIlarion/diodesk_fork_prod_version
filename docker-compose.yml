@@ -130,6 +130,19 @@ services:
       MAIL_SMTP_PASSWORD: ${MAIL_SMTP_PASSWORD}
       MAIL_DEFAULT_FROM_EMAIL: ${MAIL_DEFAULT_FROM_EMAIL}
       MAIL_SUPPORT_EMAIL: ${MAIL_SUPPORT_EMAIL}
+
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: 9200
+      OPENSEARCH_USE_SSL: "false"
+      OPENSEARCH_VERIFY_CERTS: "false"
+      OPENSEARCH_NUMBER_OF_SHARDS: 1
+      OPENSEARCH_NUMBER_OF_REPLICAS: 0
+
+      AITUNNEL_BASE_URL: ${AITUNNEL_BASE_URL:-https://api.aitunnel.ru/v1}
+      AITUNNEL_API_KEY: ${AITUNNEL_API_KEY:-<API_KEY>}
+      AITUNNEL_EMBEDDING_MODEL: ${AITUNNEL_EMBEDDING_MODEL:-text-embedding-3-small}
+      AITUNNEL_EMBEDDING_DIMENSIONS: ${AITUNNEL_EMBEDDING_DIMENSIONS:-1024}
+
     depends_on:
       postgres:
         condition: service_healthy
@@ -140,7 +153,43 @@ services:
       languagetool:
         condition: service_healthy
       rabbitmq:                          
-        condition: service_healthy       
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+
+  knowledge-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command:
+      - faststream
+      - run
+      - src.knowledge.worker:app
+    restart: unless-stopped
+    environment:
+      RABBIT_HOST: rabbitmq
+      RABBIT_PORT: 5672
+      RABBIT_USER: ${RABBIT_USER}
+      RABBIT_PASSWORD: ${RABBIT_PASSWORD}
+
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: 9200
+      OPENSEARCH_USE_SSL: "false"
+      OPENSEARCH_VERIFY_CERTS: "false"
+
+      AITUNNEL_BASE_URL: ${AITUNNEL_BASE_URL:-https://api.aitunnel.ru/v1}
+      AITUNNEL_API_KEY: ${AITUNNEL_API_KEY:-<API_KEY>}
+      AITUNNEL_EMBEDDING_MODEL: ${AITUNNEL_EMBEDDING_MODEL:-text-embedding-3-small}
+      AITUNNEL_EMBEDDING_DIMENSIONS: ${AITUNNEL_EMBEDDING_DIMENSIONS:-1024}
+      AITUNNEL_CLASSIFICATION_MODEL: ${AITUNNEL_CLASSIFICATION_MODEL:-gpt-4.1-nano}
+      AITUNNEL_CLASSIFICATION_BATCH_SIZE: ${AITUNNEL_CLASSIFICATION_BATCH_SIZE:-20}
+      AITUNNEL_CLASSIFICATION_MAX_TOKENS: ${AITUNNEL_CLASSIFICATION_MAX_TOKENS:-2048}
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
 
   frontend:
     build:
@@ -171,6 +220,7 @@ services:
       - MINIO_SECRET_ACCESS_KEY=${MINIO_SECRET_ACCESS_KEY}
       - YANDEX_S3_BUCKET=backups
       - YANDEX_S3_ENDPOINT=https://storage.yandexcloud.net
+
     command: |
       /bin/sh -c "
       apk add --no-cache postgresql-client curl openssl
@@ -242,6 +292,34 @@ services:
     depends_on:
       - loki
 
+  opensearch:
+    image: opensearchproject/opensearch:3.8.0
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms1g -Xmx1g"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:9200/_cluster/health?wait_for_status=yellow"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
 volumes:
   postgres_data:
   redis_data:
@@ -250,3 +328,4 @@ volumes:
   prometheus_data:
   grafana_data:
   loki_data:
+  opensearch_data:

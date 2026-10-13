@@ -1,6 +1,8 @@
 from typing import override
 
-from sqlalchemy import Select, cast, select
+from collections.abc import Collection
+
+from sqlalchemy import Select, cast, or_, select
 from sqlalchemy.dialects.postgresql import JSONB, array, ARRAY, VARCHAR
 from src.shared.infra.repos import ModelMapper, SqlAlchemyRepository
 from src.shared.schemas import Page, Pagination
@@ -83,7 +85,34 @@ class SqlUserRepository(SqlAlchemyRepository[User, UserOrm]):
         result = await self.session.execute(stmt)
         model = result.scalar_one_or_none()
         return None if model is None else self.model_mapper.to_entity(model)
-    
+
+    async def search(
+            self,
+            query: str | None = None,
+            *,
+            roles: Collection[UserRole] | None = None,
+            active_only: bool = True,
+            limit: int = 20,
+    ) -> list[User]:
+        stmt = self._apply_user_filters(
+            select(self.model), UserFilters(roles=set(roles) if roles else None),
+        )
+
+        if query:
+            stmt = stmt.where(or_(
+                self.model.full_name.icontains(query, autoescape=True),
+                self.model.email.icontains(query, autoescape=True),
+                self.model.username.icontains(query, autoescape=True),
+            ))
+
+        if active_only:
+            stmt = stmt.where(self.model.is_active.is_(True))
+
+        stmt = stmt.order_by(self.model.full_name.asc().nulls_last()).limit(limit)
+        models = (await self.session.execute(stmt)).scalars().all()
+
+        return [self.model_mapper.to_entity(model) for model in models]
+
     async def get_customer_admins(self, counterparty_id: UUID) -> list[User]:
         stmt = select(self.model).where(
             self.model.counterparty_id == counterparty_id,

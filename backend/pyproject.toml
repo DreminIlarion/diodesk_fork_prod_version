@@ -13,6 +13,7 @@ dependencies = [
     "asyncpg>=0.31.0",
     "faker>=40.11.1",
     "fastapi[all]>=0.135.1",
+    "fastmcp>=4.0.10",
     "faststream[rabbit]>=0.6.7",
     "freezegun>=1.5.5",
     "html2text>=2025.4.15",
@@ -39,6 +40,8 @@ dependencies = [
     "taskiq>=0.12.4",
     "testcontainers[minio,postgres]>=4.14.2",
     "unidecode>=1.4.0",
+    "openai>=2.29.0,<3.0.0",
+    "opensearch-py[async]>=3.1.0,<4.0.0",
 ]
 
 [tool.ruff]

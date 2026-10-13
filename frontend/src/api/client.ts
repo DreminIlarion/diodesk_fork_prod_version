@@ -1073,6 +1073,12 @@ export const tasksApi = {
     return response.data;
   },
 
+  // Получить задачу
+  get: async (taskId: string): Promise<TaskResponse> => {
+    const response = await api.get<TaskResponse>(`/api/v1/tasks/${taskId}`);
+    return response.data;
+  },
+
   // Создать задачу
   create: async (data: TaskCreateInput): Promise<TaskResponse> => {
     const response = await api.post<TaskResponse>('/api/v1/tasks', data);
@@ -1161,12 +1167,8 @@ export interface NotificationStreamPayload {
   notification: Notification;
 }
 
-function getNotificationStreamUrl() {
-  return (
-    import.meta.env.VITE_NOTIFICATIONS_STREAM_URL ||
-    'http://10.1.50.109:8001/notifications/stream'
-  );
-}
+// Поток уведомлений идёт через тот же адрес API, что и остальные запросы
+const NOTIFICATIONS_URL = `${API_URL ?? ''}/api/v1/notifications`;
 
 function getAccessTokenForSSE(): string | null {
   // Используем тот же источник токена что и в apiClient
@@ -1176,45 +1178,29 @@ function getAccessTokenForSSE(): string | null {
 function parseNotificationStreamData(raw: string): NotificationStreamPayload | null {
   if (!raw?.trim()) return null;
 
-  // 1. Сначала пробуем как обычный JSON
   try {
     return JSON.parse(raw);
-  } catch {
-    // fallback ниже
-  }
-
-  // 2. Fallback для python dict string:
-  // {'a': 1, 'b': False} -> {"a": 1, "b": false}
-  try {
-    const normalized = raw
-      .replace(/\bTrue\b/g, 'true')
-      .replace(/\bFalse\b/g, 'false')
-      .replace(/\bNone\b/g, 'null')
-      .replace(/'/g, '"');
-
-    return JSON.parse(normalized);
   } catch (err) {
     console.error('[notifications] Failed to parse stream payload:', err, raw);
     return null;
   }
 }
-const NOTIFICATIONS_BASE = 'http://10.1.50.109:8001';
 
 export const notificationsApi = {
   getAll: async (page = 1, size = 20, unreadOnly = false) => {
-    const response = await api.get(`${NOTIFICATIONS_BASE}/notifications`, {
+    const response = await api.get(NOTIFICATIONS_URL, {
       params: { page, size, unread_only: unreadOnly },
     });
     return response.data;
   },
 
   getUnreadCount: async () => {
-    const response = await api.get(`${NOTIFICATIONS_BASE}/notifications/unread-count`);
+    const response = await api.get(`${NOTIFICATIONS_URL}/unread-count`);
     return response.data.unread_count;
   },
 
   markAsRead: async (notificationId: string) => {
-    const response = await api.patch(`${NOTIFICATIONS_BASE}/notifications/${notificationId}/read`);
+    const response = await api.patch(`${NOTIFICATIONS_URL}/${notificationId}/read`);
     return response.data;
   },
 
@@ -1233,7 +1219,7 @@ export const notificationsApi = {
     const token = getAccessTokenForSSE();
     if (!token) throw new Error('No access token for notifications stream');
 
-    return fetchEventSource(getNotificationStreamUrl(), {
+    return fetchEventSource(`${NOTIFICATIONS_URL}/stream`, {
       method: 'GET',
       signal,
       openWhenHidden: true,

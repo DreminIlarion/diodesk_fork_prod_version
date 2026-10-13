@@ -1,3 +1,4 @@
+from src.comments.domain.vo import AggregateType
 from src.comments.infra.models import CommentOrm, ReactionOrm
 from src.media.infra.repo import AttachmentMapper
 from src.shared.domain.vo import Tag
@@ -35,6 +36,9 @@ class CommentMapper(ModelMapper[Comment, CommentOrm]):
             updated_at=entity.updated_at,
             deleted_at=entity.deleted_at,
             ticket_id=entity.ticket_id,
+            # Модуль комментариев (и MCP) ищет комментарии по агрегату
+            aggregate_type=AggregateType.TICKET,
+            aggregate_id=entity.ticket_id,
             author_id=entity.author_id,
             text=entity.text,
             visibility=entity.type,

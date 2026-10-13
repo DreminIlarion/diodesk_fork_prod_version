@@ -7,19 +7,8 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
+from src.core.database import Base  # пакет src регистрирует модели всех модулей
 from src.core.settings import settings
-from src.core.database import Base
-
-from src.crm.infra.models import CounterpartyOrm
-from src.iam.infra.models import InvitationOrm, UserOrm
-from src.media.infra.models import AttachmentOrm
-from src.notifications.infra.models import NotificationOrm, UserPreferenceOrm
-from src.products.infra.models import SoftwareProductOrm
-from src.projects.infra.models import ProjectMemberOrm, ProjectOrm
-from src.tasks.infra.models import TaskOrm, TaskSequence
-from src.tickets.infra.models import TicketOrm
-from src.comments.infra.models import CommentOrm, ReactionOrm
-from src.activity_logs.infra.models import ActivityLogOrm
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

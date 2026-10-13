@@ -33,6 +33,7 @@ import {
 } from '../components/helpers/TicketEditor';
 
 import { TicketDescriptionContent } from '../components/helpers/TicketDescriptionContent';
+import { object } from 'zod';
 
 /* ───────────────── types ───────────────── */
 
@@ -2323,12 +2324,16 @@ const loadUsers = useCallback(async (q: string, p: number) => {
           payload.due_date = dueDate || null;
         }
 
-        if (
-          assigneeId !==
-          (task.assignee_id ?? '')
-        ) {
-          payload.assignee_id =
-            assigneeId || null;
+        const assigneeChanged =
+          assigneeId !== (task.assignee_id ?? '');
+
+        if (assigneeChanged && !assigneeId) {
+          toast({
+            title: 'Выберите исполнителя',
+            description: 'Снятие исполнителя этим действием не поддерживается.',
+            variant: 'destructive',
+          });
+          return;
         }
 
         if (
@@ -2352,6 +2357,12 @@ const loadUsers = useCallback(async (q: string, p: number) => {
             task.id,
             payload as TaskUpdateInput,
           );
+        }
+
+        if (assigneeChanged) {
+          await tasksApi.assign(task.id, {
+            assignee_id: assigneeId,
+          });
         }
 
         /*
@@ -3916,6 +3927,8 @@ export default function TasksPage() {
   const up = sp.get('project_id');
   const ua = sp.get('assignee_id');
   const ut = sp.get('ticket_id');
+  // Ссылка на конкретную задачу (например, из ИИ-чата) открывает её карточку
+  const linkedTaskId = sp.get('task_id');
   const shouldCreate = sp.get('create') === '1';
 
   const boardScrollRef = useRef<HTMLDivElement>(null);
@@ -4063,6 +4076,25 @@ export default function TasksPage() {
   useEffect(() => {
     if (shouldCreate && ut) setCreate('backlog');
   }, [shouldCreate, ut]);
+
+  useEffect(() => {
+    if (!linkedTaskId) return;
+
+    let cancelled = false;
+    tasksApi
+      .get(linkedTaskId)
+      .then((task) => {
+        if (!cancelled) setView(task);
+      })
+      .catch(() => {
+        if (!cancelled)
+          toast({ title: 'Задача не найдена или недоступна', variant: 'destructive' });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [linkedTaskId, toast]);
 
   useEffect(() => {
     if (up) setMode('project');

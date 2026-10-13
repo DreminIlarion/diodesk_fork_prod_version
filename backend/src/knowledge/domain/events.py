@@ -31,3 +31,11 @@ class ArticleEdited(Event):
     article_id: UUID
     title: str
     edited_by: UUID
+
+
+@dataclass(frozen=True, kw_only=True)
+class ArticleArchived(Event):
+    """Статья архивирована."""
+
+    article_id: UUID
+    archived_by: UUID
