@@ -748,6 +748,8 @@ function TableView({ stages, users, onOpen, onCreate }: {
    ROADMAP — PARALLEL GROUPING
    ═══════════════════════════════════════════════════════════════ */
 
+type RoadmapGroup = ProjectStageResponse[];
+
 /**
  * Группировка по пересечению плановых сроков.
  *
@@ -757,12 +759,8 @@ function TableView({ stages, users, onOpen, onCreate }: {
  * Этапы без дат располагаются последовательно.
  *
  * ВАЖНО: используем пересечение с ОБЩИМ интервалом группы,
- * а не только с первым этапом. Это предотвращает ложное
- * объединение цепочек пересечений.
+ * а не только с первым этапом.
  */
-
-type RoadmapGroup = ProjectStageResponse[];
-
 function buildRoadmapGroups(stages: ProjectStageResponse[]): RoadmapGroup[] {
   const ordered = sortStages(stages);
   const groups: RoadmapGroup[] = [];
@@ -799,10 +797,6 @@ function buildRoadmapGroups(stages: ProjectStageResponse[]): RoadmapGroup[] {
 
   return groups;
 }
-
-/* ═══════════════════════════════════════════════════════════════
-   ROADMAP VIEW
-   ═══════════════════════════════════════════════════════════════ */
 
 const MAP_NODE = 52;
 const MAP_COL = 270;
