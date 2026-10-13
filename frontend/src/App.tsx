@@ -42,6 +42,7 @@ const LurvDetailPage = lazy(() => import('./pages/LurvDetailPage'));
 const FeedbacksPage  = lazy(() => import('./pages/FeedbacksPage'));
 
 const WorkflowPage = lazy(() => import('./pages/WorkflowPage'));
+const GlobalPage = lazy(() => import('./pages/GlobalPage'));
 
 
 export default function App() {
@@ -58,6 +59,8 @@ export default function App() {
             <Route path="/lurvs" element={<LazyRoute><LurvDetailPage /></LazyRoute>} />
 
             <Route path="/workflows" element={<LazyRoute><ProtectedRoute><WorkflowPage /></ProtectedRoute></LazyRoute>} /> 
+
+            <Route path="/global" element={<LazyRoute><GlobalPage />} </LazyRoute> }/>
 
 
             <Route path="/tasks" element={<LazyRoute><ProtectedRoute><TasksPage /></ProtectedRoute></LazyRoute>} />
