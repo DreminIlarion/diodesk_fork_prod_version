@@ -1,12 +1,10 @@
 from typing import Literal
 
 from dataclasses import dataclass
-from functools import lru_cache
 
-import yaml
 from langchain_openai import ChatOpenAI
 
-from .settings import PROMPTS_DIR, settings
+from .settings import settings
 
 
 @dataclass(frozen=True)
@@ -41,11 +39,3 @@ def get_llm(config: LLMConfig) -> ChatOpenAI:
         temperature=config.temperature,
         max_tokens=config.max_tokens,
     )
-
-
-@lru_cache(maxsize=128)
-def load_prompt(name: str) -> dict[str, str]:
-    file_path = PROMPTS_DIR / f"{name}.yaml"
-
-    with open(file_path, encoding="utf-8") as file:
-        return yaml.safe_load(file)
