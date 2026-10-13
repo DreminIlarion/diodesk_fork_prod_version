@@ -387,9 +387,8 @@ function ViewNavigation({ view, onChange }: {
         return (
           <button
             key={item.id} onClick={() => onChange(item.id)}
-            className={`relative flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-              active ? 'text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)]'
-            }`}
+            className={`relative flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${active ? 'text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-2)]'
+              }`}
           >
             {active && <motion.div layoutId="stages-active-tab" className="absolute inset-0 rounded-lg bg-[var(--accent)]" transition={{ type: 'spring', stiffness: 350, damping: 30 }} />}
             <Icon className="relative w-4 h-4" />
@@ -495,9 +494,8 @@ function AssigneesModal({ open, users, selectedIds, currentUserId, saving, onSav
                 return (
                   <button
                     key={u.id} onClick={() => toggle(u.id)} disabled={saving}
-                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-colors disabled:opacity-50 ${
-                      checked ? 'border-[var(--accent)]/30 bg-[var(--accent-soft)]' : 'border-transparent hover:bg-[var(--hover-2)]'
-                    }`}
+                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-colors disabled:opacity-50 ${checked ? 'border-[var(--accent)]/30 bg-[var(--accent-soft)]' : 'border-transparent hover:bg-[var(--hover-2)]'
+                      }`}
                   >
                     <Avatar name={u.full_name} size="md" />
                     <div className="min-w-0 flex-1">
@@ -507,9 +505,8 @@ function AssigneesModal({ open, users, selectedIds, currentUserId, saving, onSav
                       </div>
                       {u.email && <p className="mt-0.5 text-xs text-[var(--text-muted)] truncate">{u.email}</p>}
                     </div>
-                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
-                      checked ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'
-                    }`}>
+                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${checked ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border-color)]'
+                      }`}>
                       {checked && <Check className="w-3.5 h-3.5 text-white" />}
                     </div>
                   </button>
@@ -748,8 +745,6 @@ function TableView({ stages, users, onOpen, onCreate }: {
    ROADMAP — PARALLEL GROUPING
    ═══════════════════════════════════════════════════════════════ */
 
-type RoadmapGroup = ProjectStageResponse[];
-
 /**
  * Группировка по пересечению плановых сроков.
  *
@@ -759,8 +754,12 @@ type RoadmapGroup = ProjectStageResponse[];
  * Этапы без дат располагаются последовательно.
  *
  * ВАЖНО: используем пересечение с ОБЩИМ интервалом группы,
- * а не только с первым этапом.
+ * а не только с первым этапом. Это предотвращает ложное
+ * объединение цепочек пересечений.
  */
+
+type RoadmapGroup = ProjectStageResponse[];
+
 function buildRoadmapGroups(stages: ProjectStageResponse[]): RoadmapGroup[] {
   const ordered = sortStages(stages);
   const groups: RoadmapGroup[] = [];
@@ -797,228 +796,354 @@ function buildRoadmapGroups(stages: ProjectStageResponse[]): RoadmapGroup[] {
 
   return groups;
 }
+/* ═══════════════════════════════════════════════════════════════
+   ROADMAP VIEW (старая — колонки по порядку)
+   ═══════════════════════════════════════════════════════════════ */
 
-const MAP_NODE = 52;
-const MAP_COL = 270;
-const MAP_ROW = 225;
-const MAP_CARD = 220;
+type GraphCol = ProjectStageResponse[];
 
-function RoadmapView({ stages, users, onOpen }: {
+function buildGraphColumns(stages: ProjectStageResponse[]): GraphCol[] {
+  const ordered = sortStages(stages);
+  const columns: GraphCol[] = [];
+  const placed = new Set<string>();
+
+  for (const stage of ordered) {
+    if (placed.has(stage.id)) continue;
+
+    if (stage.status === 'active' || stage.status === 'on_hold') {
+      const siblings = ordered.filter(other =>
+        !placed.has(other.id) &&
+        other.id !== stage.id &&
+        (other.status === 'active' || other.status === 'on_hold') &&
+        stagesOverlap(stage, other),
+      );
+
+      if (siblings.length > 0) {
+        const group = [stage, ...siblings];
+        group.forEach(item => placed.add(item.id));
+        columns.push(group);
+        continue;
+      }
+    }
+
+    placed.add(stage.id);
+    columns.push([stage]);
+  }
+
+  return columns;
+}
+
+const NODE_R = 30;
+const NODE_D = NODE_R * 2;
+const CARD_W = 210;
+const COL_W = CARD_W + 65;
+const ROW_GAP = 285;
+const TOP_PAD = 50;
+const BOTTOM_PAD = 190;
+
+interface NodePos {
+  id: string;
+  cx: number;
+  cy: number;
+  col: number;
+  row: number;
+  stage: ProjectStageResponse;
+}
+
+function RoadmapView({
+  stages,
+  users,
+  onOpen,
+}: {
   stages: ProjectStageResponse[];
   users: UsersMap;
   onOpen: (stage: ProjectStageResponse) => void;
 }) {
-  const groups = useMemo(() => buildRoadmapGroups(stages), [stages]);
+  const columns = useMemo(() => buildGraphColumns(stages), [stages]);
 
-  const maxRows = Math.max(1, ...groups.map(g => g.length));
-  const width = Math.max(700, groups.length * MAP_COL + 80);
-  const height = Math.max(400, maxRows * MAP_ROW + 80);
+  const { nodes, edges, svgW, svgH } = useMemo(() => {
+    const columnCount = columns.length;
+    const maxRows = Math.max(...columns.map(c => c.length), 1);
+    const graphWidth = columnCount * COL_W;
+    const leftPadding = COL_W / 2;
 
-  const nodes = useMemo(() => {
-    const result: {
-      stage: ProjectStageResponse;
-      x: number;
-      y: number;
-      col: number;
-    }[] = [];
+    const nodePositions: NodePos[] = [];
 
-    groups.forEach((group, col) => {
-      const groupHeight = (group.length - 1) * MAP_ROW;
-      const totalHeight = (maxRows - 1) * MAP_ROW;
-      const startY = 70 + (totalHeight - groupHeight) / 2;
+    columns.forEach((column, columnIndex) => {
+      const centerX = leftPadding + columnIndex * COL_W;
+      const columnHeight = (column.length - 1) * ROW_GAP;
+      const totalHeight = (maxRows - 1) * ROW_GAP;
+      const startY = TOP_PAD + NODE_R + (totalHeight - columnHeight) / 2;
 
-      group.forEach((stage, row) => {
-        result.push({
+      column.forEach((stage, rowIndex) => {
+        nodePositions.push({
+          id: stage.id,
+          cx: centerX,
+          cy: startY + rowIndex * ROW_GAP,
+          col: columnIndex,
+          row: rowIndex,
           stage,
-          x: 140 + col * MAP_COL,
-          y: startY + row * MAP_ROW,
-          col,
         });
       });
     });
 
-    return result;
-  }, [groups, maxRows]);
+    const graphEdges: { from: NodePos; to: NodePos; done: boolean }[] = [];
 
-  const connections = useMemo(() => {
-    const result: {
-      from: typeof nodes[number];
-      to: typeof nodes[number];
-    }[] = [];
+    for (let ci = 0; ci < columnCount - 1; ci++) {
+      const fromNodes = nodePositions.filter(n => n.col === ci);
+      const toNodes = nodePositions.filter(n => n.col === ci + 1);
 
-    for (let col = 0; col < groups.length - 1; col++) {
-      const current = nodes.filter(n => n.col === col);
-      const next = nodes.filter(n => n.col === col + 1);
-
-      current.forEach(from => {
-        next.forEach(to => {
-          result.push({ from, to });
-        });
-      });
+      for (const from of fromNodes) {
+        for (const to of toNodes) {
+          graphEdges.push({
+            from,
+            to,
+            done: from.stage.status === 'completed',
+          });
+        }
+      }
     }
 
-    return result;
-  }, [nodes, groups.length]);
+    const width = graphWidth + 20;
+    const height =
+      TOP_PAD + (maxRows - 1) * ROW_GAP + NODE_D + BOTTOM_PAD;
+
+    return {
+      nodes: nodePositions,
+      edges: graphEdges,
+      svgW: Math.max(width, 600),
+      svgH: Math.max(height, 400),
+    };
+  }, [columns]);
 
   if (!stages.length) {
     return (
-      <SectionCard title="Карта проекта" description="Визуальная последовательность этапов" icon={MapIcon}>
-        <EmptyState icon={MapIcon} title="Карта пока пустая" description="Создайте этапы проекта, чтобы увидеть их последовательность." />
+      <SectionCard
+        title="Карта проекта"
+        description="Визуальная последовательность этапов"
+        icon={MapIcon}
+      >
+        <EmptyState
+          icon={MapIcon}
+          title="Карта пока пустая"
+          description="Создайте этапы проекта, чтобы увидеть их последовательность."
+        />
       </SectionCard>
     );
   }
 
   return (
-    <SectionCard
-      title="Карта проекта"
-      description="Этапы с пересекающимися плановыми сроками расположены параллельно"
-      icon={MapIcon}
-      action={
-        <span className="hidden sm:flex items-center gap-2 text-xs text-[var(--text-muted)]">
-          <Layers className="w-4 h-4" />
-          {groups.filter(g => g.length > 1).length} параллельных групп
-        </span>
-      }
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]"
     >
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-6 py-4 border-b border-[var(--border-color)]">
-        {(['completed', 'active', 'planned', 'on_hold', 'skipped'] as StageStatus[]).map(status => (
-          <div key={status} className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${STATUS[status].dot}`} />
-            <span className="text-xs text-[var(--text-muted)]">{STATUS[status].label}</span>
-          </div>
-        ))}
+      <div className="flex flex-wrap items-center gap-3 border-b border-[var(--border-color)] bg-[var(--hover-1)] px-6 py-5">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--hover-2)]">
+          <MapIcon className="h-5 w-5 text-[var(--text-secondary)]" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h3 className="text-lg font-bold text-[var(--text-primary)]">
+            Карта проекта
+          </h3>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Последовательность выполнения этапов
+          </p>
+        </div>
+
+        {columns.some(c => c.length > 1) && (
+          <span className="inline-flex items-center gap-2 rounded-lg bg-blue-500/10 px-3 py-2 text-xs font-medium text-blue-400">
+            <Layers className="h-4 w-4" />
+            Параллельные этапы
+          </span>
+        )}
       </div>
 
-      <div className="overflow-auto bg-[var(--bg-primary)]" style={{ maxHeight: 780 }}>
-        <div className="relative" style={{ width, height, minWidth: width }}>
-
-          {/* CONNECTIONS */}
-          <svg className="absolute inset-0 pointer-events-none" width={width} height={height}>
+      <div className="overflow-auto p-6" style={{ maxHeight: 780 }}>
+        <div
+          className="relative mx-auto"
+          style={{ width: svgW, height: svgH, minWidth: svgW }}
+        >
+          <svg
+            className="pointer-events-none absolute inset-0"
+            width={svgW}
+            height={svgH}
+          >
             <defs>
-              <marker id="map-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-                <path d="M0 0 L8 4 L0 8" fill="var(--text-muted)" />
+              <marker
+                id="stage-arrow-completed"
+                markerWidth="8"
+                markerHeight="6"
+                refX="7"
+                refY="3"
+                orient="auto"
+              >
+                <path d="M0,0 L8,3 L0,6" fill="#10b981" />
               </marker>
-              <marker id="map-arrow-done" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-                <path d="M0 0 L8 4 L0 8" fill="var(--success)" />
+              <marker
+                id="stage-arrow-pending"
+                markerWidth="8"
+                markerHeight="6"
+                refX="7"
+                refY="3"
+                orient="auto"
+              >
+                <path d="M0,0 L8,3 L0,6" fill="#64748b" />
               </marker>
             </defs>
 
-            {connections.map((connection, index) => {
-              const { from, to } = connection;
-              const x1 = from.x + MAP_NODE / 2 + 4;
-              const x2 = to.x - MAP_NODE / 2 - 12;
-              const middle = (x1 + x2) / 2;
-              const done = from.stage.status === 'completed';
+            {edges.map((edge, index) => {
+              const x1 = edge.from.cx + NODE_R + 4;
+              const y1 = edge.from.cy;
+              const x2 = edge.to.cx - NODE_R - 12;
+              const y2 = edge.to.cy;
+
+              const straight = Math.abs(y1 - y2) < 5;
+              const middleX = (x1 + x2) / 2;
+
+              const d = straight
+                ? `M${x1},${y1} L${x2},${y2}`
+                : `M${x1},${y1} C${middleX},${y1} ${middleX},${y2} ${x2},${y2}`;
 
               return (
                 <motion.path
                   key={index}
-                  d={`M ${x1} ${from.y} C ${middle} ${from.y}, ${middle} ${to.y}, ${x2} ${to.y}`}
+                  d={d}
                   fill="none"
-                  stroke={done ? 'var(--success)' : 'var(--text-muted)'}
-                  strokeWidth={done ? 2 : 1.5}
-                  strokeDasharray={done ? undefined : '6 5'}
-                  markerEnd={done ? 'url(#map-arrow-done)' : 'url(#map-arrow)'}
+                  stroke={edge.done ? '#10b981' : '#64748b'}
+                  strokeWidth={edge.done ? 2.5 : 1.5}
+                  strokeDasharray={edge.done ? undefined : '6 4'}
+                  markerEnd={
+                    edge.done
+                      ? 'url(#stage-arrow-completed)'
+                      : 'url(#stage-arrow-pending)'
+                  }
                   initial={{ pathLength: 0, opacity: 0 }}
-                  animate={{ pathLength: 1, opacity: done ? 0.65 : 0.35 }}
-                  transition={{ delay: index * 0.03, duration: 0.5 }}
+                  animate={{
+                    pathLength: 1,
+                    opacity: edge.done ? 0.7 : 0.35,
+                  }}
+                  transition={{ delay: 0.15 + index * 0.03, duration: 0.45 }}
                 />
               );
             })}
           </svg>
 
-          {/* PARALLEL GROUP INDICATORS */}
-          {groups.map((group, index) => {
-            if (group.length < 2) return null;
-
-            const groupNodes = nodes.filter(n => n.col === index);
-            const top = Math.min(...groupNodes.map(n => n.y));
-            const bottom = Math.max(...groupNodes.map(n => n.y));
-            const x = 140 + index * MAP_COL;
-
-            return (
-              <div key={`group-${index}`} className="absolute pointer-events-none"
-                style={{ left: x - 44, top: top - 30, height: bottom - top + 60 }}>
-                <div className="h-full w-px border-l-2 border-dashed border-blue-500/25" />
-                <span className="absolute -top-7 -left-1 whitespace-nowrap text-[11px] text-blue-400 font-medium">
-                  Параллельно · {group.length}
-                </span>
-              </div>
-            );
-          })}
-
-          {/* NODES */}
-          {nodes.map(({ stage, x, y }, index) => {
-            const eff = effectiveStatus(stage);
-            const config = STATUS[eff];
+          {nodes.map((node, nodeIndex) => {
+            const stage = node.stage;
+            const effective = effectiveStatus(stage);
+            const config = STATUS[effective];
             const Icon = config.icon;
-            const responsible = stage.responsible_id ? users[stage.responsible_id] : null;
+
             const active = stage.status === 'active';
+            const responsible = stage.responsible_id
+              ? users[stage.responsible_id]
+              : null;
+            const overdue = isOverPlan(stage);
+            const overdueDays = overrunDays(stage);
+            const assigneeIds = stage.assignee_ids ?? [];
 
             return (
               <motion.div
                 key={stage.id}
-                initial={{ opacity: 0, scale: 0.85 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.05, duration: 0.25 }}
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{
+                  delay: 0.08 + nodeIndex * 0.05,
+                  type: 'spring',
+                  stiffness: 300,
+                  damping: 25,
+                }}
                 className="absolute"
-                style={{ left: x - MAP_NODE / 2, top: y - MAP_NODE / 2, width: MAP_NODE }}
+                style={{
+                  left: node.cx - NODE_R,
+                  top: node.cy - NODE_R,
+                  zIndex: 10,
+                }}
               >
                 {active && (
-                  <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-ping" />
+                  <span
+                    className="absolute animate-ping rounded-full bg-blue-500/15"
+                    style={{ width: NODE_D, height: NODE_D }}
+                  />
                 )}
 
                 <button
+                  type="button"
                   onClick={() => onOpen(stage)}
-                  className={`relative z-10 w-[52px] h-[52px] rounded-full ${config.bar} flex items-center justify-center text-white text-sm font-bold hover:scale-110 transition-transform`}
-                  style={{ boxShadow: 'var(--shadow-md)' }}
-                  title={stage.name}
+                  className={`relative z-10 flex items-center justify-center rounded-full text-sm font-bold text-white transition-transform hover:scale-110 ${config.bar} ${active ? `ring-4 ${config.ring}` : ''
+                    }`}
+                  style={{
+                    width: NODE_D,
+                    height: NODE_D,
+                    boxShadow: 'var(--shadow-md)',
+                  }}
                 >
                   {String(stage.execution_order).padStart(2, '0')}
 
-                  <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center">
-                    <Icon className={`w-3.5 h-3.5 ${config.text}`} />
+                  <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-card)]">
+                    <Icon className={`h-3.5 w-3.5 ${config.text}`} />
                   </span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => onOpen(stage)}
-                  className="absolute top-[66px] left-1/2 -translate-x-1/2 text-left p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[var(--border-hover)] hover:bg-[var(--hover-2)] transition-colors"
-                  style={{ width: MAP_CARD, boxShadow: 'var(--shadow-sm)' }}
+                  className={`absolute rounded-xl border bg-[var(--bg-card)] p-3.5 text-left transition-colors hover:bg-[var(--hover-2)] ${overdue
+                      ? 'border-[var(--accent)]/30'
+                      : 'border-[var(--border-color)]'
+                    }`}
+                  style={{
+                    top: NODE_D + 12,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: CARD_W,
+                    boxShadow: 'var(--shadow-sm)',
+                  }}
                 >
-                  <p className="text-sm font-semibold text-[var(--text-primary)] line-clamp-2 leading-5">
+                  <h4 className="mb-2 line-clamp-2 text-sm font-bold leading-5 text-[var(--text-primary)]">
                     {stage.name}
+                  </h4>
+
+                  <p className={`text-xs font-semibold ${config.text}`}>
+                    {config.label}
                   </p>
 
-                  <div className="mt-2">
-                    <span className={`text-xs font-medium ${config.text}`}>{config.label}</span>
-                  </div>
-
-                  <div className="mt-3 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
-                    <Calendar className="w-3.5 h-3.5 shrink-0" />
-                    {formatShort(stage.planned_start)} — {formatShort(stage.planned_end)}
+                  <div className="mt-3 flex items-start gap-2 text-xs text-[var(--text-muted)]">
+                    <Calendar className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <div>
+                      <p>
+                        {formatShort(stage.planned_start)}
+                        {' — '}
+                        {formatShort(stage.planned_end)}
+                      </p>
+                      {overdue && (
+                        <p className="mt-1 font-semibold text-[var(--accent)]">
+                          Отклонение +{overdueDays} дн.
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   {responsible && (
-                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--border-color)]">
-                      <Avatar name={responsible.full_name} size="xs" />
-                      <span className="text-xs text-[var(--text-secondary)] truncate">
-                        {shortName(responsible.full_name)}
+                    <div className="mt-3 flex items-center gap-2 border-t border-[var(--border-color)] pt-3">
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] text-[9px] font-bold text-white">
+                        {getInitials(responsible.full_name)}
+                      </div>
+                      <span className="truncate text-xs text-[var(--text-secondary)]">
+                        {responsible.full_name}
                       </span>
                     </div>
                   )}
 
-                  {(stage.assignee_ids ?? []).length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-[var(--border-color)] flex items-center justify-between">
-                      <span className="text-[11px] text-[var(--text-muted)]">Исполнители</span>
-                      <AssigneeAvatars ids={stage.assignee_ids} users={users} max={2} />
-                    </div>
-                  )}
-
-                  {isOverPlan(stage) && (
-                    <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-[var(--accent)]">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      +{overrunDays(stage)} дн.
+                  {assigneeIds.length > 0 && (
+                    <div className="mt-3 border-t border-[var(--border-color)] pt-3">
+                      <div className="mb-2 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                        <Users className="h-3.5 w-3.5" />
+                        Исполнители
+                      </div>
+                      <AssigneeAvatars ids={assigneeIds} users={users} max={3} />
                     </div>
                   )}
                 </button>
@@ -1027,14 +1152,7 @@ function RoadmapView({ stages, users, onOpen }: {
           })}
         </div>
       </div>
-
-      <div className="flex items-start gap-2 px-6 py-4 border-t border-[var(--border-color)]">
-        <Info className="w-4 h-4 text-[var(--text-muted)] shrink-0 mt-0.5" />
-        <p className="text-xs leading-5 text-[var(--text-muted)]">
-          Карта строится по порядку этапов и пересечению плановых сроков. Нажмите на кружок или карточку для просмотра.
-        </p>
-      </div>
-    </SectionCard>
+    </motion.div>
   );
 }
 
@@ -1398,9 +1516,8 @@ function TimelineView({ stages, users, projectId, onOpen }: {
           <div className="flex p-1 rounded-lg border border-[var(--border-color)] bg-[var(--hover-2)]">
             {(['days', 'weeks', 'months'] as TimelineScale[]).map(s => (
               <button key={s} onClick={() => setScale(s)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  scale === s ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                }`}>
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${scale === s ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  }`}>
                 {{ days: 'Дни', weeks: 'Недели', months: 'Месяцы' }[s]}
               </button>
             ))}
@@ -1443,9 +1560,8 @@ function TimelineView({ stages, users, projectId, onOpen }: {
             <div className="relative h-12 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
               {ticks.map((tick, index) => (
                 <span key={index}
-                  className={`absolute top-4 px-1 text-xs whitespace-nowrap ${
-                    tick.major ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-muted)]'
-                  }`}
+                  className={`absolute top-4 px-1 text-xs whitespace-nowrap ${tick.major ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-muted)]'
+                    }`}
                   style={{ left: daysBetween(minDate, tick.date) * dayWidth }}>
                   {tick.label}
                 </span>
@@ -1457,9 +1573,8 @@ function TimelineView({ stages, users, projectId, onOpen }: {
               <div className="absolute inset-0 pointer-events-none">
                 {ticks.map((tick, index) => (
                   <div key={index}
-                    className={`absolute top-0 bottom-0 w-px ${
-                      tick.major ? 'bg-[var(--border-color)]' : 'bg-[var(--border-color)]/40'
-                    }`}
+                    className={`absolute top-0 bottom-0 w-px ${tick.major ? 'bg-[var(--border-color)]' : 'bg-[var(--border-color)]/40'
+                      }`}
                     style={{ left: daysBetween(minDate, tick.date) * dayWidth }}
                   />
                 ))}
@@ -1496,9 +1611,8 @@ function TimelineView({ stages, users, projectId, onOpen }: {
                       initial={{ width: 0, opacity: 0 }}
                       animate={{ width: plannedWidth, opacity: 1 }}
                       transition={{ delay: index * 0.04, duration: 0.35 }}
-                      className={`absolute top-1/2 -translate-y-1/2 h-9 flex items-center px-3 text-xs font-semibold text-white overflow-hidden ${
-                        late ? 'rounded-l-lg' : 'rounded-lg'
-                      } ${config.bar}`}
+                      className={`absolute top-1/2 -translate-y-1/2 h-9 flex items-center px-3 text-xs font-semibold text-white overflow-hidden ${late ? 'rounded-l-lg' : 'rounded-lg'
+                        } ${config.bar}`}
                       style={{ left, boxShadow: 'var(--shadow-sm)' }}
                       title={stage.name}
                     >
@@ -1627,10 +1741,9 @@ function BoardView({ stages, users, onOpen, onMove }: {
                 if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverColumn(null);
               }}
               onDrop={e => { e.preventDefault(); void handleDrop(column); }}
-              className={`min-h-[380px] rounded-2xl border flex flex-col overflow-hidden transition-colors ${
-                isOver && canDrop ? 'border-[var(--accent)] bg-[var(--accent-soft)]' :
-                'border-[var(--border-color)] bg-[var(--hover-1)]'
-              }`}
+              className={`min-h-[380px] rounded-2xl border flex flex-col overflow-hidden transition-colors ${isOver && canDrop ? 'border-[var(--accent)] bg-[var(--accent-soft)]' :
+                  'border-[var(--border-color)] bg-[var(--hover-1)]'
+                }`}
             >
               {/* COLUMN HEADER */}
               <div className="flex items-center justify-between gap-3 px-4 py-4 border-b border-[var(--border-color)]">
@@ -1646,9 +1759,8 @@ function BoardView({ stages, users, onOpen, onMove }: {
               {/* CARDS */}
               <div className="p-3 space-y-3 flex-1">
                 {!items.length && (
-                  <div className={`h-28 rounded-xl border border-dashed flex flex-col items-center justify-center ${
-                    isOver && canDrop ? 'border-[var(--accent)]/40' : 'border-[var(--border-color)]'
-                  }`}>
+                  <div className={`h-28 rounded-xl border border-dashed flex flex-col items-center justify-center ${isOver && canDrop ? 'border-[var(--accent)]/40' : 'border-[var(--border-color)]'
+                    }`}>
                     <Milestone className="w-6 h-6 text-[var(--text-disabled)]" />
                     <span className="mt-2 text-xs text-[var(--text-muted)]">
                       {isOver && canDrop ? 'Отпустите этап' : 'Пусто'}
@@ -1670,12 +1782,10 @@ function BoardView({ stages, users, onOpen, onMove }: {
                         if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
                       }}
                       onDragEnd={() => { setDragId(null); setOverColumn(null); }}
-                      className={`rounded-xl border bg-[var(--bg-card)] p-4 transition-all ${
-                        late ? 'border-[var(--accent)]/30' : 'border-[var(--border-color)]'
-                      } ${dragId === stage.id ? 'opacity-40' : ''} ${
-                        stage.status === 'completed' || stage.status === 'skipped'
+                      className={`rounded-xl border bg-[var(--bg-card)] p-4 transition-all ${late ? 'border-[var(--accent)]/30' : 'border-[var(--border-color)]'
+                        } ${dragId === stage.id ? 'opacity-40' : ''} ${stage.status === 'completed' || stage.status === 'skipped'
                           ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between gap-2 mb-3">
                         <StageNumber order={stage.execution_order} />
@@ -2263,9 +2373,8 @@ function StageFormView({
                   { label: 'Критерии приёмки', ready: completedFields[3] },
                 ].map(item => (
                   <div key={item.label} className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                      item.ready ? 'bg-emerald-500/15 text-emerald-500' : 'bg-[var(--hover-2)] text-[var(--text-muted)]'
-                    }`}>
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${item.ready ? 'bg-emerald-500/15 text-emerald-500' : 'bg-[var(--hover-2)] text-[var(--text-muted)]'
+                      }`}>
                       {item.ready ? <Check className="w-3.5 h-3.5" /> : <CircleDot className="w-3.5 h-3.5" />}
                     </div>
                     <span className="flex-1 text-sm text-[var(--text-secondary)]">{item.label}</span>
