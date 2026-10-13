@@ -61,6 +61,7 @@ class ProjectStageMapper(ModelMapper[ProjectStage, ProjectStageOrm]):
             responsible_id=model.responsible_id,
             description=model.description,
             completion_criteria=model.completion_criteria,
+            assignee_ids=[a.user_id for a in model.assignees],
         )
 
     @staticmethod

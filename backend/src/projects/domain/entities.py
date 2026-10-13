@@ -86,6 +86,7 @@ class ProjectStage(Entity):
 
     description: str | None = None
     completion_criteria: list[str] = field(default_factory=list)
+    assignee_ids: list[UUID] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -208,6 +209,20 @@ class ProjectStage(Entity):
             raise InvalidStateError(f"Cannot skip a stage with status {self.status}")
 
         self.status = ProjectStageStatus.SKIPPED
+        self.updated_at = current_datetime()
+
+    def add_assignee(self, user_id: UUID) -> None:
+        """Добавить исполнителя на этап."""
+        if user_id in self.assignee_ids:
+            return
+        self.assignee_ids.append(user_id)
+        self.updated_at = current_datetime()
+
+    def remove_assignee(self, user_id: UUID) -> None:
+        """Убрать исполнителя с этапа."""
+        if user_id not in self.assignee_ids:
+            return
+        self.assignee_ids.remove(user_id)
         self.updated_at = current_datetime()
 
 
@@ -377,7 +392,9 @@ class Project(AggregateRoot):
 
     def get_next_executable_order(self) -> int | None:
         """
-        Возвращает следующий этап который можно начинать.
+        Возвращает номер первой НЕ завершённой группы этапов.
+        Группа доступна для старта, если все предыдущие группы завершены/пропущены.
+        Параллельные этапы внутри группы стартуют по одному.
         """
 
         if not self.stages:
@@ -386,17 +403,11 @@ class Project(AggregateRoot):
         max_order = self.get_last_execution_order()
 
         for order in range(1, max_order + 1):
-            group_stage = self.get_stages_by_execution_order(order)
-
-            if any(stage.status == ProjectStageStatus.ACTIVE for stage in group_stage):
-                return None
-
-            if not self.is_execution_order_completed(order) and \
-                    all(self.is_execution_order_completed(prev) for prev in range(1, order)):
-                return order
+            if all(self.is_execution_order_completed(prev) for prev in range(1, order)):
+                if not self.is_execution_order_completed(order):
+                    return order
 
         return None
-
     def _sort_stages(self) -> None:
         """
         Сортировка этапов проекта по их порядку.
