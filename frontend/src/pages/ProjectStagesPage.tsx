@@ -1137,15 +1137,7 @@ function RoadmapView({
                     </div>
                   )}
 
-                  {assigneeIds.length > 0 && (
-                    <div className="mt-3 border-t border-[var(--border-color)] pt-3">
-                      <div className="mb-2 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
-                        <Users className="h-3.5 w-3.5" />
-                        Исполнители
-                      </div>
-                      <AssigneeAvatars ids={assigneeIds} users={users} max={3} />
-                    </div>
-                  )}
+                  
                 </button>
               </motion.div>
             );
