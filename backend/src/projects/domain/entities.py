@@ -550,20 +550,18 @@ class Project(AggregateRoot):
 
     def remove_stage(self, stage_id: UUID) -> None:
         """
-        Удалить этап проекта (удалять можно только запланированные или пропущенные этапы).
+        Удалить этап проекта (без ограничений по статусу).
         """
 
         stage = self.find_stage(stage_id)
         if stage is None:
             raise NotFoundError(f"Stage with ID {stage_id} does not exist in project")
 
-        if stage.status in {ProjectStageStatus.ACTIVE, ProjectStageStatus.COMPLETED}:
-            raise InvalidStateError("Only PLANNED or SKIPPED stages can be removed")
-
         self.stages.remove(stage)
 
-        for i, stage in enumerate(sorted(self.stages, key=lambda s: s.execution_order), start=1):
-            stage.order = i
+        # Перенумеровать оставшиеся этапы по порядку
+        for i, s in enumerate(sorted(self.stages, key=lambda x: x.execution_order), start=1):
+            s.execution_order = i
 
         self.updated_at = current_datetime()
 
