@@ -1610,31 +1610,21 @@ export default function NewTicketPage() {
         reporter_id: actualReporter?.id,
       };
 
-      if (ticketViewType === 'company') {
-        data.counterparty_id = DIO_COMPANY_ID;
-        if (selectedProject) {
-          data.project_id = selectedProject.id;
-        }
-        if (selectedStage) {
-          data.stage_id = selectedStage.id;
-        }
-      } else if (isCustomer && customerCounterparty) {
-        data.counterparty_id = customerCounterparty.id;
-        if (selectedProject) {
-          data.project_id = selectedProject.id;
-        }
-        if (selectedStage) {
-          data.stage_id = selectedStage.id;
-        }
-      } else if (selectedProject) {
-        data.project_id = selectedProject.id;
-        data.counterparty_id = selectedProject.counterparty_id;
-        if (selectedStage) {
-          data.stage_id = selectedStage.id;
-        }
-      } else if (selectedCounterparty) {
-        data.counterparty_id = selectedCounterparty.id;
-      }
+      if (selectedProject) {
+  // Если выбран проект — counterparty_id НЕ шлём, backend возьмёт его из проекта
+  data.project_id = selectedProject.id;
+
+  if (selectedStage) {
+    data.stage_id = selectedStage.id;
+  }
+} else if (ticketViewType === 'company') {
+  // Компания без проекта → просто counterparty
+  data.counterparty_id = DIO_COMPANY_ID;
+} else if (isCustomer && customerCounterparty) {
+  data.counterparty_id = customerCounterparty.id;
+} else if (selectedCounterparty) {
+  data.counterparty_id = selectedCounterparty.id;
+}
 
       const ticket = await ticketsApi.create(data);
 
@@ -2363,7 +2353,7 @@ export default function NewTicketPage() {
                             )}
                           </div>
                         </div>
-)}
+
                                 {/* Этап — если выбран проект */}
                       {selectionType === 'project' && selectedProject && (
                         <div className="mt-5">
