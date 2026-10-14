@@ -2353,7 +2353,7 @@ export default function NewTicketPage() {
                             )}
                           </div>
                         </div>
-
+)}
                                 {/* Этап — если выбран проект */}
                       {selectionType === 'project' && selectedProject && (
                         <div className="mt-5">
