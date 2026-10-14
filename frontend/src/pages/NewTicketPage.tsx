@@ -2458,7 +2458,7 @@ export default function NewTicketPage() {
             </div>
           </div>
         )}
-
+                      )}
 
                       {/* Если «Прочая» и вид = контрагент — показываем выбранного контрагента */}
                       {selectionType === 'counterparty' &&
