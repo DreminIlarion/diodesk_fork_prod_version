@@ -3,6 +3,8 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
+from ddf.application.dsl import Expression
+
 from src.shared.domain.repos import Repository
 from src.shared.domain.vo import Priority, Tag
 from src.shared.schemas import Page, Pagination
@@ -67,18 +69,10 @@ class TaskRepository(Repository[Task]):
             self,
             pagination: Pagination,
             *,
-            project_id: UUID | None = None,
-            ticket_id: UUID | None = None,
-            assignee_id: UUID | None = None,
-            created_by: UUID | None = None,  # ← добавить
-            reviewer_id: UUID | None = None,
-            # Дополнительные фильтры
-            priorities: list[Priority] | None = None,
-            overdue_only: bool = False,
+            query: Expression | None = None,
     ) -> dict[TaskStatus, Page[TaskView]]:
         """
         Группировка задач по статусам.
-        Учитывает переданное пространство имён, если project_id is None -
-        вернуться все строке где project_id равен None.
+        Применяет переданное DDF DSL-выражение.
         Возвращает облегченные модели представления задач.
         """

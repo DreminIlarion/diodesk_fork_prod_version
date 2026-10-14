@@ -1,19 +1,19 @@
 from typing import Annotated, Literal
 
-from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
+from ddf.application.dsl import Expression
 from fastapi import Body
 from pydantic import BaseModel, Field, NonNegativeFloat, NonNegativeInt
 
 from src.iam.schemas import UserReference
-from src.projects.schemas import ProjectReference
-from src.tickets.schemas import TicketPreview
 from src.media.schemas import AttachmentResponse
+from src.projects.schemas import ProjectReference
 from src.shared.domain.vo import Priority, Tag
 from src.shared.schemas import Page
+from src.tickets.schemas import TicketPreview
 
 from .domain.vo import ReviewDecision, TaskStatus
 
@@ -189,39 +189,58 @@ class KanbanContext(BaseModel):
         "internal",
         "assignee",
         "my",
-    ] = Field(..., description="Контекст просмотра задач на Kanban доске")
+    ] = Field(..., description="Контекст просмотра задач на Kanban-доске")
 
 
 class ProjectKanbanContext(KanbanContext):
-    type: Literal["project", "ticket", "internal", "assignee", "my"] = "project"
+    type: Literal["project"] = "project"
     project_id: UUID = Field(..., description="ID проекта")
 
 
 class TicketKanbanContext(KanbanContext):
-    type: Literal["project", "ticket", "internal", "assignee", "my"] = "ticket"
+    type: Literal["ticket"] = "ticket"
     ticket_id: UUID = Field(..., description="ID тикета")
 
 
 class InternalKanbanContext(KanbanContext):
-    type: Literal["project", "ticket", "internal", "assignee", "my"] = "internal"
+    type: Literal["internal"] = "internal"
 
 
 class AssigneeKanbanContext(KanbanContext):
-    type: Literal["project", "ticket", "internal", "assignee", "my"] = "assignee"
+    type: Literal["assignee"] = "assignee"
     assignee_id: UUID = Field(..., description="ID исполнителя задачи")
 
 
 class MyTasksKanbanContext(KanbanContext):
-    type: Literal["project", "ticket", "internal", "assignee", "my"] = "my"
+    type: Literal["my"] = "my"
 
 
-KanbanContextType = (
+KanbanContextType = Annotated[
+    (
         ProjectKanbanContext
         | TicketKanbanContext
         | InternalKanbanContext
         | AssigneeKanbanContext
         | MyTasksKanbanContext
-)
+    ),
+    Field(discriminator="type"),
+]
+
+
+class KanbanSearchRequest(BaseModel):
+    """Расширенный запрос канбан-доски с DDF DSL."""
+
+    context: KanbanContextType = Field(
+        ...,
+        description="Контекст просмотра канбан-доски",
+    )
+    query: Expression | None = Field(
+        None,
+        description="DDF DSL фильтр задач",
+    )
+
+
+type KanbanRequest = KanbanSearchRequest | KanbanContextType
 
 
 class KanbanColumn(BaseModel):
@@ -239,11 +258,3 @@ class KanbanBoard(BaseModel):
     columns: list[KanbanColumn] = Field(default_factory=list, description="Колонки Kanban")
 
     total_tasks: NonNegativeInt = Field(..., description="Всего задач")
-
-
-@dataclass(frozen=True)
-class KanbanFilters:
-    """Фильтры для работы с канбан доской"""
-
-    priorities: list[Priority] | None = None
-    overdue_only: bool = False

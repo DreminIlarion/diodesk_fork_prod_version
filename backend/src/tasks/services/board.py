@@ -1,5 +1,8 @@
 from uuid import UUID
 
+from ddf.application.dsl import Expression
+
+from src.iam.domain.authz import Subject
 from src.iam.domain.entities import User
 from src.iam.domain.repos import UserRepository
 from src.projects.domain.entities import Project
@@ -7,17 +10,16 @@ from src.projects.domain.repos import ProjectRepository
 from src.tickets.domain.entities import Ticket
 from src.tickets.domain.repos import TicketRepository
 
-from ...iam.schemas import CurrentUser
 from ...shared.schemas import Pagination
 from ..domain.consts import TASK_STATUS_LABEL_MAP
 from ..domain.repos import TaskRepository, TaskView
+from ..dsl import apply_kanban_context
 from ..mappers import map_task_view_to_response
 from ..schemas import (
     KanbanBoard,
     KanbanColumn,
     KanbanContextType,
-    KanbanFilters,
-    TaskViewResponse
+    TaskViewResponse,
 )
 
 
@@ -35,38 +37,26 @@ class TaskBoardService:
         self.project_repo = project_repo
 
     async def get_kanban_board(
-            self,
-            pagination: Pagination,
-            context: KanbanContextType,
-            filters: KanbanFilters,
-            current_user: CurrentUser,
+        self,
+        pagination: Pagination,
+        context: KanbanContextType,
+        query: Expression | None,
+        current_subject: Subject,
     ) -> KanbanBoard:
         """Получение канбан доски с задачами"""
 
         # 2. Определение контекста задач
-        kwargs = {}
-        if context.type == "project":
-
-            kwargs = {"project_id": context.project_id}
-
-        elif context.type == "ticket":
-            kwargs = {"ticket_id": context.ticket_id}
-
-        elif context.type == "assignee":
-            kwargs = {"assignee_id": context.assignee_id}
-
-        elif context.type == "my":
-            kwargs = {
-                "created_by": current_user.id,
-                "assignee_id": current_user.id,
-                "reviewer_id": current_user.id,
-            }
-            
-
-        kwargs.update({"priorities": filters.priorities, "overdue_only": filters.overdue_only})
+        query = apply_kanban_context(
+            context,
+            current_subject_id=current_subject.id,
+            query=query,
+        )
 
         # 3. Формирование канбан доски
-        groups = await self.task_repo.get_grouped_by_status(pagination, **kwargs)
+        groups = await self.task_repo.get_grouped_by_status(
+            pagination,
+            query=query,
+        )
 
         all_tasks = [
             task

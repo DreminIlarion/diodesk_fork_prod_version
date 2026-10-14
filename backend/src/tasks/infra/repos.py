@@ -1,19 +1,183 @@
+from typing import Any, ClassVar
+
+from collections.abc import Callable
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import and_, func, or_, select
+from ddf.application.dsl import Condition, Expression, Group, Negation
+from ddf.infra.database.sqlalchemy.filters import compile_filter
+from sqlalchemy import ColumnElement, and_, func, not_, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.media.infra.repo import AttachmentMapper
 from src.shared.domain.vo import Priority, Tag
 from src.shared.infra.repos import ModelMapper, SqlAlchemyRepository
 from src.shared.schemas import Page, Pagination
-from src.shared.utils.time import current_datetime
 
 from ..domain.entities import Task
 from ..domain.repos import TaskView
 from ..domain.vo import StoryPoints, TaskNumber, TaskStatus
 from .models import TaskOrm, TaskSequence
+
+TASK_FILTER_WHITELIST = (
+    "id",
+    "number",
+    "title",
+    "description",
+    "status",
+    "priority",
+    "storyPoints",
+    "assigneeId",
+    "reviewerId",
+    "dueDate",
+    "projectId",
+    "ticketId",
+    "createdBy",
+    "createdAt",
+    "updatedAt",
+    "startedAt",
+    "completedAt",
+    "estimatedHours",
+    "actualHours",
+    "tags",
+)
+
+
+def _to_uuid(value: Any) -> UUID:
+    return value if isinstance(value, UUID) else UUID(str(value))
+
+
+def _to_date(value: Any) -> date:
+    if isinstance(value, datetime):
+        return value.date()
+
+    if isinstance(value, date):
+        return value
+
+    return date.fromisoformat(str(value))
+
+
+def _to_datetime(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        return value
+
+    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+
+
+_FIELD_VALUE_CONVERTERS: dict[str, Callable[[Any], Any]] = {
+    "id": _to_uuid,
+    "status": TaskStatus,
+    "priority": Priority,
+    "assigneeId": _to_uuid,
+    "reviewerId": _to_uuid,
+    "projectId": _to_uuid,
+    "ticketId": _to_uuid,
+    "createdBy": _to_uuid,
+    "dueDate": _to_date,
+    "createdAt": _to_datetime,
+    "updatedAt": _to_datetime,
+    "startedAt": _to_datetime,
+    "completedAt": _to_datetime,
+}
+
+
+def _normalize_task_condition(condition: Condition) -> Condition:
+    """Приводит значения DSL к типам ORM-модели."""
+
+    converter = _FIELD_VALUE_CONVERTERS.get(condition.field)
+    if converter is None or condition.value is None:
+        return condition
+
+    if condition.op in {"$in", "$nin"}:
+        if not isinstance(condition.value, list):
+            return condition
+
+        value = [converter(item) for item in condition.value]
+    else:
+        value = converter(condition.value)
+
+    return condition.model_copy(update={"value": value})
+
+
+def _compile_tags_condition(
+    condition: Condition,
+) -> ColumnElement[bool]:
+    """Компилирует фильтрацию JSONB-тегов с семантикой «любой из»."""
+
+    if condition.op not in {"$in", "$nin"}:
+        raise ValueError("Tags support only '$in' and '$nin' operators.")
+
+    if not isinstance(condition.value, list) or not condition.value:
+        raise ValueError("Tags filter expects a non-empty list.")
+
+    if not all(isinstance(tag, str) for tag in condition.value):
+        raise ValueError("Every tag must be a string.")
+
+    matches_any_tag = or_(
+        *(
+            TaskOrm.tags.contains([{"name": tag}])
+            for tag in condition.value
+        )
+    )
+
+    if condition.op == "$nin":
+        return not_(matches_any_tag)
+
+    return matches_any_tag
+
+
+def _compile_task_search(query: str) -> ColumnElement[bool]:
+    """Компилирует текстовый поиск по номеру, заголовку и описанию."""
+
+    pattern = f"%{query}%"
+
+    return or_(
+        TaskOrm.number.ilike(pattern),
+        TaskOrm.title.ilike(pattern),
+        TaskOrm.description.ilike(pattern),
+    )
+
+
+def _compile_task_expression(
+    expression: Expression,
+) -> ColumnElement[bool]:
+    """Компилирует DDF DSL в SQLAlchemy-условие."""
+
+    if isinstance(expression, Condition):
+        if expression.field == "tags":
+            return _compile_tags_condition(expression)
+
+        return compile_filter(
+            TaskOrm,
+            _normalize_task_condition(expression),
+            TASK_FILTER_WHITELIST,
+            _compile_task_search,
+        )
+
+    if isinstance(expression, Group):
+        filters = tuple(
+            _compile_task_expression(child)
+            for child in expression.filters
+        )
+
+        if not filters:
+            raise ValueError("Filter group cannot be empty.")
+
+        if expression.op == "$and":
+            return and_(*filters)
+
+        return or_(*filters)
+
+    if isinstance(expression, Negation):
+        return not_(_compile_task_expression(expression.filter_))
+
+    return compile_filter(
+        TaskOrm,
+        expression,
+        TASK_FILTER_WHITELIST,
+        _compile_task_search,
+    )
 
 
 class TaskMapper(ModelMapper[Task, TaskOrm]):
@@ -108,6 +272,7 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
 class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
     model = TaskOrm
     model_mapper = TaskMapper
+    filter_whitelist: ClassVar[tuple[str, ...]] = TASK_FILTER_WHITELIST
 
     async def get_by_number(self, number: TaskNumber) -> Task | None:
         stmt = select(self.model).where(self.model.number == number.value)
@@ -148,55 +313,13 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
             self,
             pagination: Pagination,
             *,
-            project_id: UUID | None = None,
-            ticket_id: UUID | None = None,
-            assignee_id: UUID | None = None,
-            created_by: UUID | None = None,  # ← добавить
-            reviewer_id: UUID | None = None,
-            # Дополнительные фильтры
-            priorities: list[Priority] | None = None,
-            overdue_only: bool = False,
+            query: Expression | None = None,
     ) -> dict[TaskStatus, Page[TaskView]]:
         # Общие условия фильтрации (исключаем удалённые задачи)
         conditions = [self.model.deleted_at.is_(None)]
 
-        # Применение фильтра по проекту
-        if project_id is not None:
-            conditions.append(self.model.project_id == project_id)
-
-        # Остальные фильтры
-        if ticket_id is not None:
-            conditions.append(self.model.ticket_id == ticket_id)
-
-        user_conditions = []
-
-        if assignee_id is not None:
-            user_conditions.append(
-                self.model.assignee_id == assignee_id
-            )
-
-        if created_by is not None:
-            user_conditions.append(
-                self.model.created_by == created_by
-            )
-
-        if reviewer_id is not None:
-            user_conditions.append(
-                self.model.reviewer_id == reviewer_id
-            )
-
-        if user_conditions:
-            conditions.append(or_(*user_conditions))  
-
-        if priorities is not None:
-            conditions.append(self.model.priority.in_(priorities))
-
-        if overdue_only:
-            today = current_datetime().date()
-            conditions.extend([
-                self.model.due_date < today,
-                self.model.status.notin_([TaskStatus.DONE, TaskStatus.CANCELLED]),
-            ])
+        if query is not None:
+            conditions.append(_compile_task_expression(query))
 
         # Пагинация задач для каждого статуса
         grouped: dict[TaskStatus, Page[TaskView]] = {}
