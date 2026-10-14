@@ -2,7 +2,8 @@ from datetime import datetime
 from enum import StrEnum, auto
 from uuid import UUID
 
-from pydantic import BaseModel, Field, NonNegativeFloat, NonNegativeInt
+from ddf.application.dsl import Expression
+from pydantic import BaseModel, ConfigDict, Field, NonNegativeFloat, NonNegativeInt
 
 from src.crm.schemas import CounterpartyReference
 from src.iam.domain.vo import UserRole
@@ -12,6 +13,40 @@ from src.projects.schemas import ProjectReference
 from src.shared.domain.vo import Priority
 
 from .domain.vo import CommentType, ReactionType, TicketStatus, TicketType
+
+
+class LegacyTicketActors(BaseModel):
+    """Старый формат фильтров по участникам заявки."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    assignee_id: UUID | None = None
+    reporter_id: UUID | None = None
+    creator_id: UUID | None = None
+
+
+class LegacyTicketSearch(BaseModel):
+    """Старое тело /tickets/search, оставленное для совместимости."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+
+    search_query: str | None = None
+    tags: list[str] | None = None
+
+    counterparty_id: UUID | None = None
+    project_ids: list[UUID] | None = None
+
+    statuses: list[TicketStatus] | None = None
+    priorities: Priority | list[Priority] | None = None
+    ticket_type: TicketType | None = Field(default=None, alias="type")
+
+    actors: LegacyTicketActors | None = None
+
+
+type TicketSearchRequest = Expression | LegacyTicketSearch
 
 
 class CommentResponse(BaseModel):
@@ -68,7 +103,8 @@ class TicketBase(BaseModel):
     description: str = Field(..., description="Описание проблемы")
     type: TicketType = Field(..., description="Вид тикета")
     priority: Priority = Field(
-        ..., description="Приоритет выполнения (чем выше приоритет, тем быстрее время реакции)",
+        ...,
+        description="Приоритет выполнения (чем выше приоритет, тем быстрее время реакции)",
     )
     project_id: UUID | None = Field(
         None, description="ID проекта, к которому нужно привязать тикет"
@@ -121,7 +157,8 @@ class TicketViewResponse(BaseModel):
 
     counterparty: CounterpartyReference | None = Field(None, description="Контрагент заявки")
     project: ProjectReference | None = Field(
-        None, description="Проект, которому принадлежит заявка",
+        None,
+        description="Проект, которому принадлежит заявка",
     )
 
     number: str = Field(..., description="Номер тикета", examples=["РОМ-26-00012456"])
@@ -178,7 +215,7 @@ class TicketCreate(TicketBase):
 
     priority: Priority = Field(
         Priority.MEDIUM,
-        description="Приоритет выполнения (чем выше приоритет, тем быстрее время реакции)"
+        description="Приоритет выполнения (чем выше приоритет, тем быстрее время реакции)",
     )
 
 

@@ -1,15 +1,19 @@
 from uuid import UUID
 
+from ddf.application.dsl import Condition, Expression
+
 from src.iam.domain.authz import Subject
 from src.iam.domain.entities import User
+from src.iam.domain.exceptions import PermissionDeniedError
 from src.iam.mappers import map_user_to_reference
 from src.shared.domain.repos import get_or_raise_404
+from src.shared.dsl import and_expressions
 from src.shared.schemas import Page, Pagination
 
 from ..consts import PARTICIPANT_FIELDS
 from ..data_loaders import ReferenceLoader
 from ..domain.entities import Ticket
-from ..domain.repos import TicketFilters, TicketRepository
+from ..domain.repos import TicketRepository
 from ..mappers import map_ticket_to_view_response
 from ..schemas import TicketParticipant, TicketViewResponse
 
@@ -17,11 +21,7 @@ from ..schemas import TicketParticipant, TicketViewResponse
 def _collect_participants_ids(ticket: Ticket) -> set[UUID]:
     """Собирает уникальные идентификаторы участников заявки."""
 
-    return {
-        uid
-        for _, field in PARTICIPANT_FIELDS
-        if (uid := getattr(ticket, field)) is not None
-    }
+    return {uid for _, field in PARTICIPANT_FIELDS if (uid := getattr(ticket, field)) is not None}
 
 
 def _build_participants(ticket: Ticket, users: dict[UUID, User]) -> list[TicketParticipant]:
@@ -50,40 +50,39 @@ def _build_participants(ticket: Ticket, users: dict[UUID, User]) -> list[TicketP
 
 
 class TicketQueryService:
-    def __init__(
-            self,
-            ticket_repo: TicketRepository,
-            reference_loader: ReferenceLoader
-    ) -> None:
+    def __init__(self, ticket_repo: TicketRepository, reference_loader: ReferenceLoader) -> None:
         self.ticket_repo = ticket_repo
         self.reference_loader = reference_loader
 
     async def get_tickets(
-            self, pagination: Pagination, filters: TicketFilters | None = None,
-            current_subject: Subject | None = None,
+        self,
+        pagination: Pagination,
+        query: Expression | None = None,
+        current_subject: Subject | None = None,
     ) -> Page[TicketViewResponse]:
         # Принудительный фильтр для клиентов
-        if (
-                current_subject is not None
-                and current_subject.has_any_role(["customer", "customer_admin"])
-        ):
-            client_cp_id = current_subject.counterparty_id
-            if filters is None:
-                filters = TicketFilters(counterparty_id=client_cp_id)
-            else:
-                filters = TicketFilters(
-                    search_query=filters.search_query,
-                    tags=filters.tags,
-                    counterparty_id=client_cp_id or filters.counterparty_id,
-                    project_ids=filters.project_ids,
-                    # stage_ids=filters.stage_ids,
-                    statuses=filters.statuses,
-                    priorities=filters.priorities,
-                    type=filters.type,
-                    actors=filters.actors,
-                    time_range=filters.time_range,
-                )
-        page = await self.ticket_repo.paginate(pagination, filters=filters)
+        if current_subject is not None and current_subject.has_any_role([
+            "customer",
+            "customer_admin",
+        ]):
+            counterparty_id = current_subject.counterparty_id
+
+            if counterparty_id is None:
+                raise PermissionDeniedError("Customer must be associated with a counterparty")
+
+            query = and_expressions(
+                query,
+                Condition(
+                    field="counterpartyId",
+                    op="$eq",
+                    value=counterparty_id,
+                ),
+            )
+
+        page = await self.ticket_repo.paginate(
+            pagination,
+            query=query,
+        )
 
         relations = await self.reference_loader.load(
             users={

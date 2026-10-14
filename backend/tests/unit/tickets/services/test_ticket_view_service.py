@@ -3,30 +3,27 @@ from uuid import uuid4
 import pytest
 
 from src.iam.domain.vo import UserRole
-from src.iam.schemas import CurrentUser
 from src.shared.schemas import Pagination
 from src.tickets.domain.vo import TicketNumber
 from src.tickets.services import TicketQueryService
 
 
 @pytest.fixture
-def ticket_view_service(fake_ticket_repo, ticket_scope_service, ticket_data_loader):
+def ticket_view_service(fake_ticket_repo, ticket_data_loader):
     return TicketQueryService(
         ticket_repo=fake_ticket_repo,
-        ticket_scope_service=ticket_scope_service,
         reference_loader=ticket_data_loader,
     )
 
 
 @pytest.mark.asyncio
 class TestGetTickets:
-
     async def test_get_tickets_success(
-            self,
-            ticket_view_service,
-            user_factory,
-            counterparty_factory,
-            ticket_factory,
+        self,
+        ticket_view_service,
+        user_factory,
+        counterparty_factory,
+        ticket_factory,
     ):
         """Успешное получение тикетов с пагинацией"""
 
@@ -37,7 +34,7 @@ class TestGetTickets:
         reporter_full_name = "Иванов Иван Иванович"
         assignee_full_name = "Петров Пётр Петрович"
 
-        user = await user_factory(
+        await user_factory(
             id=reporter_id,
             role=UserRole.CUSTOMER,
             counterparty_id=counterparty_id,
@@ -62,12 +59,6 @@ class TestGetTickets:
 
         # Проверка результата
         page = await ticket_view_service.get_tickets(
-            current_user=CurrentUser(
-                user_id=reporter_id,
-                email=user.email,
-                role=user.role,
-                counterparty_id=counterparty_id,
-            ),
             pagination=Pagination(page=1, size=10),
         )
 
@@ -75,6 +66,6 @@ class TestGetTickets:
 
         assert page.total_items == excepted_total_items
 
-        assert page.items[0].counterparty_name == counterparty_name
-        assert page.items[0].reporter_full_name == reporter_full_name
-        assert page.items[1].assignee_full_name == assignee_full_name
+        assert page.items[0].counterparty.name == counterparty_name
+        assert page.items[0].reporter.full_name == reporter_full_name
+        assert page.items[1].assignee.full_name == assignee_full_name

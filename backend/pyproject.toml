@@ -2,7 +2,7 @@
 name = "backend"
 version = "0.1.0"
 description = "Add your description here"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "aiobotocore>=3.3.0",
     "aiosmtplib>=5.1.0",
@@ -34,11 +34,12 @@ dependencies = [
     "pytz>=2026.1.post1",
     "redis>=7.4.0",
     "ruff==0.15.7",
-    "sqlalchemy>=2.0.48",
+    "sqlalchemy[asyncio]>=2.0.48",
     "sse-starlette>=3.4.4",
     "taskiq>=0.12.4",
     "testcontainers[minio,postgres]>=4.14.2",
     "unidecode>=1.4.0",
+    "py-ddd-framework[sqlalchemy] @ git+https://github.com/Andr171p/py-ddd-framework.git@fix/critical-bugs",
 ]
 
 [tool.ruff]
