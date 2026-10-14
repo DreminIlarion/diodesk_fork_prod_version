@@ -38,6 +38,7 @@ def map_project_stage_to_response(stage: ProjectStage) -> ProjectStageResponse:
         completion_criteria=stage.completion_criteria,
         is_overdue=stage.is_overdue,
         planned_duration_days=stage.planned_duration_days,
+        assignee_ids=list(stage.assignee_ids),
     )
 
 

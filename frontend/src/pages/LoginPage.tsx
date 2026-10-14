@@ -63,7 +63,7 @@ export default function LoginPageV2() {
                 alt="ДИО-Консалт"
                 className="w-12 h-12 object-contain"
               />
-              <span className="text-2xl font-bold text-[var(--text-primary)]">ДИО Деск</span>
+              <span className="text-2xl font-bold text-[var(--text-primary)]">DIO Desk</span>
             </div>
 
             <div className="max-w-md">
@@ -102,7 +102,7 @@ export default function LoginPageV2() {
                 className="w-16 h-16 object-contain"
               />
             </div>
-            <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-1">ДИО Деск</h1>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-1">DIO Desk</h1>
             <p className="text-sm text-[var(--text-primary)]/60">Система управления заявками</p>
           </div>
 
@@ -110,7 +110,7 @@ export default function LoginPageV2() {
           <div className="glass-card-static p-8 lg:p-10 space-y-6">
             {/* Header */}
             <div>
-              <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Вход в ДИО Деск</h2>
+              <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Вход в DIO Desk</h2>
               <p className="text-sm text-[var(--text-primary)]/60">
                 Используйте учётные данные, выданные администратором
               </p>

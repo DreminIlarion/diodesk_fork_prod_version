@@ -1,160 +1,510 @@
-import React, { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Loader2,
   ArrowLeft,
-  ArrowRight,
   Check,
-  X,
-  Globe,
+  ChevronRight,
+  Loader2,
+  Package,
   Server,
+  Globe,
   Smartphone,
   Monitor,
   Cpu,
   Code,
   HelpCircle,
-  Package,
+  AlertCircle,
+  RefreshCw,
+  Save,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+
 import { productsApi } from '../api/client';
 import { DynamicAttributesFields } from '../components/helpers/DynamicAttributesFields';
 import { useToast } from '../components/ui/use-toast';
+import { ActionButton } from '../components/ui/ActionButton';
 
-// ─── Reuse constants ───
+/* ═══════════════════════════════════════════════════════════════════
+   TYPES
+   ═══════════════════════════════════════════════════════════════════ */
+
+type ProductCategory =
+  | 'ERP'
+  | 'WEB'
+  | 'MOBILE'
+  | 'API'
+  | 'DESKTOP'
+  | 'HARDWARE'
+  | 'OTHER';
+
+type ProductStatus =
+  | 'active'
+  | 'beta'
+  | 'deprecated';
+
+interface ProductForm {
+  name: string;
+  vendor: string;
+  category: ProductCategory | '';
+  description: string;
+  version: string;
+  status: ProductStatus;
+  attributes: Record<string, any>;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CONSTANTS
+   ═══════════════════════════════════════════════════════════════════ */
 
 const PRODUCT_CATEGORIES = [
-  { value: 'ERP', label: 'ERP-система', icon: Server },
-  { value: 'WEB', label: 'Веб-приложение', icon: Globe },
-  { value: 'MOBILE', label: 'Мобильное приложение', icon: Smartphone },
-  { value: 'API', label: 'API / Сервис', icon: Code },
-  { value: 'DESKTOP', label: 'Десктоп-приложение', icon: Monitor },
-  { value: 'HARDWARE', label: 'Оборудование', icon: Cpu },
-  { value: 'OTHER', label: 'Прочее', icon: HelpCircle },
+  {
+    value: 'ERP',
+    label: 'ERP-система',
+    description: 'Корпоративные системы',
+    icon: Server,
+  },
+  {
+    value: 'WEB',
+    label: 'Веб-приложение',
+    description: 'Сайты и веб-сервисы',
+    icon: Globe,
+  },
+  {
+    value: 'MOBILE',
+    label: 'Мобильное приложение',
+    description: 'Приложения для смартфонов',
+    icon: Smartphone,
+  },
+  {
+    value: 'API',
+    label: 'API / Сервис',
+    description: 'Интеграции и API',
+    icon: Code,
+  },
+  {
+    value: 'DESKTOP',
+    label: 'Десктоп-приложение',
+    description: 'Программы для компьютеров',
+    icon: Monitor,
+  },
+  {
+    value: 'HARDWARE',
+    label: 'Оборудование',
+    description: 'Серверы и устройства',
+    icon: Cpu,
+  },
+  {
+    value: 'OTHER',
+    label: 'Прочее',
+    description: 'Другие продукты',
+    icon: HelpCircle,
+  },
 ] as const;
 
 const PRODUCT_STATUSES = [
-  { value: 'active', label: 'Активный' },
-  { value: 'beta', label: 'Бета' },
-  { value: 'deprecated', label: 'Устаревший' },
+  {
+    value: 'active',
+    label: 'Активный',
+  },
+  {
+    value: 'beta',
+    label: 'Бета',
+  },
+  {
+    value: 'deprecated',
+    label: 'Устаревший',
+  },
 ] as const;
 
-const getCategoryLabel = (v: string) =>
-  PRODUCT_CATEGORIES.find((c) => c.value === v)?.label ?? v;
-
-const getStatusLabel = (v: string) =>
-  PRODUCT_STATUSES.find((s) => s.value === v)?.label ?? v;
-
 const ATTRIBUTE_LABELS: Record<string, string> = {
-  license_type: 'Лицензия', environment: 'Среда', db_connection_ref: 'Подключение к БД',
-  modules_enabled: 'Модули', max_concurrent_users: 'Макс. пользователей',
-  integration_points: 'Интеграции', backup_policy_ref: 'Политика бэкапов',
-  base_url: 'URL', admin_url: 'Админ-панель', hosting_provider: 'Хостинг',
-  tech_stack: 'Стек', ssl_expiry_date: 'SSL до', cdn_enabled: 'CDN',
-  cms_or_platform: 'Платформа', platform: 'Платформа', app_store_url: 'App Store',
-  google_play_url: 'Google Play', min_os_version: 'Мин. ОС', sdk_framework: 'Фреймворк',
-  push_provider: 'Push', backend_api_version: 'API версия', swagger_url: 'Swagger',
-  auth_method: 'Авторизация', rate_limit: 'Rate Limit', versioning_strategy: 'Версионирование',
-  webhook_endpoints: 'Webhooks', health_check_url: 'Health Check', data_format: 'Формат',
-  os_compatibility: 'ОС', architecture: 'Архитектура', default_install_path: 'Путь установки',
-  runtime_dependencies: 'Зависимости', auto_update_enabled: 'Автообновление',
-  distribution_method: 'Дистрибуция', model_sku: 'Модель', firmware_version: 'Прошивка',
-  network_config: 'Сеть', physical_location: 'Расположение', warranty_expiry: 'Гарантия до',
-  maintenance_contract_ref: 'Договор ТО', monitoring_agent: 'Мониторинг',
-  serial_prefix_pattern: 'Серийный №', notes: 'Заметки', support_group: 'Поддержка',
+  license_type: 'Лицензия',
+  environment: 'Среда',
+  db_connection_ref: 'Подключение к БД',
+  modules_enabled: 'Модули',
+  max_concurrent_users: 'Макс. пользователей',
+  integration_points: 'Интеграции',
+  backup_policy_ref: 'Политика резервного копирования',
+
+  base_url: 'URL',
+  admin_url: 'Админ-панель',
+  hosting_provider: 'Хостинг',
+  tech_stack: 'Технологический стек',
+  ssl_expiry_date: 'Срок действия SSL',
+  cdn_enabled: 'CDN',
+  cms_or_platform: 'Платформа',
+
+  platform: 'Платформа',
+  app_store_url: 'App Store',
+  google_play_url: 'Google Play',
+  min_os_version: 'Минимальная версия ОС',
+  sdk_framework: 'Фреймворк',
+  push_provider: 'Push-уведомления',
+
+  backend_api_version: 'Версия API',
+  swagger_url: 'Swagger',
+  auth_method: 'Авторизация',
+  rate_limit: 'Ограничение запросов',
+  versioning_strategy: 'Версионирование',
+  webhook_endpoints: 'Webhooks',
+  health_check_url: 'Health Check',
+  data_format: 'Формат данных',
+
+  os_compatibility: 'Совместимость с ОС',
+  architecture: 'Архитектура',
+  default_install_path: 'Путь установки',
+  runtime_dependencies: 'Зависимости',
+  auto_update_enabled: 'Автообновление',
+  distribution_method: 'Способ распространения',
+
+  model_sku: 'Модель',
+  firmware_version: 'Версия прошивки',
+  network_config: 'Сетевые настройки',
+  physical_location: 'Расположение',
+  warranty_expiry: 'Гарантия до',
+  maintenance_contract_ref: 'Договор обслуживания',
+  monitoring_agent: 'Мониторинг',
+  serial_prefix_pattern: 'Серийный номер',
+
+  notes: 'Заметки',
+  support_group: 'Группа поддержки',
 };
 
-const getAttrLabel = (key: string) => ATTRIBUTE_LABELS[key] || key.replace(/_/g, ' ');
-
-const formatAttrValue = (value: any): string => {
-  if (value === true) return 'Да';
-  if (value === false) return 'Нет';
-  if (Array.isArray(value)) return value.join(', ');
-  return String(value);
+const EMPTY_FORM: ProductForm = {
+  name: '',
+  vendor: '',
+  category: '',
+  description: '',
+  version: '',
+  status: 'active',
+  attributes: {},
 };
 
-const getInitialAttributes = (schemaResponse: any): Record<string, any> => {
-  const props = schemaResponse?.schema?.properties || {};
+/* ═══════════════════════════════════════════════════════════════════
+   STYLES
+   ═══════════════════════════════════════════════════════════════════ */
+
+const INPUT_CLASS = `
+  w-full
+  px-4 py-3.5
+  rounded-xl
+  border border-[var(--border-color)]
+  bg-[var(--hover-2)]
+  text-base
+  text-[var(--text-primary)]
+  placeholder:text-[var(--text-primary)]/30
+  focus:outline-none
+  focus:border-[var(--accent)]/40
+  focus:ring-2
+  focus:ring-[var(--accent-ring)]
+  transition-all
+`;
+
+const LABEL_CLASS = `
+  block
+  mb-2
+  text-sm
+  font-medium
+  text-[var(--text-primary)]/70
+`;
+
+/* ═══════════════════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════════════════ */
+
+const getCategoryLabel = (value: string): string =>
+  PRODUCT_CATEGORIES.find(
+    category => category.value === value
+  )?.label || value;
+
+const getStatusLabel = (value: string): string =>
+  PRODUCT_STATUSES.find(
+    status => status.value === value
+  )?.label || value;
+
+const getInitialAttributes = (
+  schemaResponse: any,
+): Record<string, any> => {
+  const properties = schemaResponse?.schema?.properties || {};
   const result: Record<string, any> = {};
-  Object.entries(props).forEach(([key, raw]: [string, any]) => {
-    if (raw.anyOf) result[key] = raw.default ?? null;
-    else if (raw.default !== undefined) result[key] = raw.default;
-    else if (raw.type === 'boolean') result[key] = false;
-    else if (raw.type === 'array') result[key] = [];
-    else result[key] = null;
+
+  Object.entries(properties).forEach(([key, raw]) => {
+    const property = raw as any;
+
+    if (property.default !== undefined) {
+      result[key] = property.default;
+    } else if (property.anyOf) {
+      result[key] = null;
+    } else if (property.type === 'boolean') {
+      result[key] = false;
+    } else if (property.type === 'array') {
+      result[key] = [];
+    } else {
+      result[key] = null;
+    }
   });
+
   return result;
 };
 
-const cleanAttributes = (attrs: Record<string, any>, required: string[]): Record<string, any> => {
-  const reqSet = new Set(required);
+const cleanAttributes = (
+  attributes: Record<string, any>,
+  required: string[],
+): Record<string, any> => {
+  const requiredSet = new Set(required);
   const result: Record<string, any> = {};
-  Object.entries(attrs).forEach(([key, value]) => {
-    const isEmpty = value === null || value === '' || (Array.isArray(value) && value.length === 0);
-    if (isEmpty && !reqSet.has(key)) return;
+
+  Object.entries(attributes).forEach(([key, value]) => {
+    const empty =
+      value === null ||
+      value === undefined ||
+      value === '' ||
+      (Array.isArray(value) && value.length === 0);
+
+    if (empty && !requiredSet.has(key)) {
+      return;
+    }
+
     result[key] = value;
   });
+
   return result;
 };
 
-const EMPTY_FORM = {
-  name: '', vendor: '', category: '', description: '', version: '', status: 'active',
-  attributes: {} as Record<string, any>,
+const isAttributeFilled = (value: any): boolean => {
+  if (value === null || value === undefined) {
+    return false;
+  }
+
+  if (typeof value === 'string') {
+    return value.trim().length > 0;
+  }
+
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+
+  return true;
 };
 
-const STEPS = ['Основное', 'Атрибуты', 'Проверка'];
+/* ═══════════════════════════════════════════════════════════════════
+   FIELD
+   ═══════════════════════════════════════════════════════════════════ */
 
-// ─── Page ─────────
+function FormField({
+  label,
+  required = false,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <label className={LABEL_CLASS}>
+        {label}
+
+        {required && (
+          <span className="ml-1 text-[var(--accent)]">
+            *
+          </span>
+        )}
+      </label>
+
+      {children}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SECTION HEADER
+   ═══════════════════════════════════════════════════════════════════ */
+
+function SectionHeader({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: React.ElementType;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="px-6 py-5 border-b border-[var(--border-color)]">
+      <div className="flex items-center gap-3">
+        <div
+          className="
+            w-10 h-10
+            rounded-xl
+            bg-[var(--hover-2)]
+            flex items-center justify-center
+            shrink-0
+          "
+        >
+          <Icon className="w-5 h-5 text-[var(--text-primary)]/50" />
+        </div>
+
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+            {title}
+          </h2>
+
+          {description && (
+            <p className="mt-0.5 text-sm text-[var(--text-primary)]/40">
+              {description}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAIN PAGE
+   ═══════════════════════════════════════════════════════════════════ */
 
 export default function CreateProductPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [step, setStep] = useState(0);
-  const [creating, setCreating] = useState(false);
-  const [schemaLoading, setSchemaLoading] = useState(false);
+  const [form, setForm] = useState<ProductForm>({
+    ...EMPTY_FORM,
+  });
+
   const [schema, setSchema] = useState<any | null>(null);
-  const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [schemaLoading, setSchemaLoading] = useState(false);
+  const [schemaError, setSchemaError] = useState(false);
+  const [creating, setCreating] = useState(false);
 
-  const updateForm = (key: string, value: any) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
+  // Защита от устаревших ответов API
+  const categoryRequestRef = useRef(0);
 
-  const updateAttribute = (key: string, value: any) =>
-    setForm((prev) => ({
+  /* ═══════════════════════════════════════════════════════════════
+     UPDATE FORM
+     ═══════════════════════════════════════════════════════════════ */
+
+  const updateForm = <K extends keyof ProductForm>(
+    key: K,
+    value: ProductForm[K],
+  ) => {
+    setForm(prev => ({
       ...prev,
-      attributes: { ...prev.attributes, [key]: value },
+      [key]: value,
     }));
-
-  const handleCategoryChange = useCallback(async (category: string) => {
-    setForm((prev) => ({ ...prev, category, attributes: {} }));
-    setSchema(null);
-    if (!category) return;
-
-    setSchemaLoading(true);
-    try {
-      const res = await productsApi.getCategorySchema(category);
-      setSchema(res);
-      setForm((prev) => ({ ...prev, attributes: getInitialAttributes(res) }));
-    } catch {
-      toast({ title: 'Ошибка', description: 'Не удалось загрузить схему', variant: 'destructive' });
-    } finally {
-      setSchemaLoading(false);
-    }
-  }, [toast]);
-
-  const canGoNext = () => {
-    if (step === 0) return !!(form.name.trim() && form.vendor.trim() && form.category);
-    if (step === 1) {
-      const req = schema?.schema?.required || [];
-      return req.every((k: string) => {
-        const v = form.attributes[k];
-        return v !== null && v !== '' && v !== undefined;
-      });
-    }
-    return true;
   };
 
+  const updateAttribute = (
+    key: string,
+    value: any,
+  ) => {
+    setForm(prev => ({
+      ...prev,
+      attributes: {
+        ...prev.attributes,
+        [key]: value,
+      },
+    }));
+  };
+
+  /* ═══════════════════════════════════════════════════════════════
+     CATEGORY
+     ═══════════════════════════════════════════════════════════════ */
+
+  const handleCategoryChange = useCallback(
+    async (category: ProductCategory) => {
+      const requestId = ++categoryRequestRef.current;
+
+      setForm(prev => ({
+        ...prev,
+        category,
+        attributes: {},
+      }));
+
+      setSchema(null);
+      setSchemaError(false);
+      setSchemaLoading(true);
+
+      try {
+        const response =
+          await productsApi.getCategorySchema(category);
+
+        // Игнорируем ответ предыдущего запроса
+        if (requestId !== categoryRequestRef.current) {
+          return;
+        }
+
+        setSchema(response);
+
+        setForm(prev => {
+          // Дополнительная защита от смены категории
+          if (prev.category !== category) {
+            return prev;
+          }
+
+          return {
+            ...prev,
+            attributes: getInitialAttributes(response),
+          };
+        });
+      } catch (error) {
+        if (requestId !== categoryRequestRef.current) {
+          return;
+        }
+
+        setSchemaError(true);
+
+        toast({
+          title: 'Ошибка',
+          description: 'Не удалось загрузить атрибуты категории',
+          variant: 'destructive',
+        });
+      } finally {
+        if (requestId === categoryRequestRef.current) {
+          setSchemaLoading(false);
+        }
+      }
+    },
+    [toast],
+  );
+
+  /* ═══════════════════════════════════════════════════════════════
+     VALIDATION
+     ═══════════════════════════════════════════════════════════════ */
+
+  const requiredAttributes: string[] =
+    schema?.schema?.required || [];
+
+  const totalRequiredAttributes = requiredAttributes.length;
+
+  const filledRequiredAttributes = requiredAttributes.filter(
+    key => isAttributeFilled(form.attributes[key])
+  ).length;
+
+  const basicValid =
+    form.name.trim().length > 0 &&
+    form.vendor.trim().length > 0 &&
+    form.category !== '';
+
+  const attributesValid =
+    form.category !== '' &&
+    !schemaLoading &&
+    !schemaError &&
+    schema !== null &&
+    filledRequiredAttributes === totalRequiredAttributes;
+
+  const formValid = basicValid && attributesValid;
+
+  const canCreate = formValid && !creating;
+
+  /* ═══════════════════════════════════════════════════════════════
+     CREATE
+     ═══════════════════════════════════════════════════════════════ */
+
   const handleCreate = async () => {
+    if (!canCreate) return;
+
     setCreating(true);
-    const requiredAttrs = schema?.schema?.required || [];
+
     try {
       await productsApi.createProduct({
         name: form.name.trim(),
@@ -163,283 +513,561 @@ export default function CreateProductPage() {
         description: form.description.trim() || undefined,
         version: form.version.trim() || undefined,
         status: form.status,
-        attributes: cleanAttributes(form.attributes, requiredAttrs),
+        attributes: cleanAttributes(
+          form.attributes,
+          requiredAttributes,
+        ),
       });
-      toast({ title: 'Успешно', description: 'Продукт создан' });
+
+      toast({
+        title: 'Продукт создан',
+        description: 'Продукт успешно добавлен в каталог',
+      });
+
       navigate('/products');
-    } catch (err: any) {
-      const message = err?.response?.data?.error?.message || 'Не удалось создать продукт';
-      toast({ title: 'Ошибка', description: message, variant: 'destructive' });
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.error?.public_message ||
+        error?.response?.data?.error?.message ||
+        error?.response?.data?.detail ||
+        'Не удалось создать продукт';
+
+      toast({
+        title: 'Ошибка создания',
+        description:
+          typeof message === 'string'
+            ? message
+            : 'Проверьте заполненные данные',
+        variant: 'destructive',
+      });
     } finally {
       setCreating(false);
     }
   };
 
-  const attrEntries = Object.entries(form.attributes || {}).filter(
-    ([, v]) => v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)
-  );
+  /* ═══════════════════════════════════════════════════════════════
+     RENDER
+     ═══════════════════════════════════════════════════════════════ */
 
   return (
-    <div className="max-w-7xl mx-auto pb-12">
-      {/* Top bar */}
-      <div className="flex items-center gap-3 mb-8">
+    <div className="w-full max-w-[1500px] mx-auto px-1 md:px-3 pb-16">
+
+      {/* =========================================================
+          PAGE HEADER
+      ========================================================= */}
+      <div className="flex items-center gap-4 mb-7">
         <button
+          type="button"
           onClick={() => navigate('/products')}
-          className="p-2 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/50 transition-colors"
+          aria-label="Вернуться к продуктам"
+          className="
+            p-2.5
+            rounded-xl
+            border border-[var(--border-color)]
+            bg-[var(--hover-1)]
+            hover:bg-[var(--hover-2)]
+            text-[var(--text-primary)]/50
+            hover:text-[var(--text-primary)]
+            transition-colors
+          "
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft className="w-5 h-5" />
         </button>
-        <div>
-          <h1 className="text-lg font-semibold text-[var(--text-primary)]">Новый продукт</h1>
-          <p className="text-base text-[var(--text-primary)]/40">Заполните информацию о продукте</p>
+
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">
+            Новый продукт
+          </h1>
+
+          <p className="mt-1 text-sm text-[var(--text-primary)]/40">
+            Добавление продукта в каталог
+          </p>
         </div>
       </div>
 
-      {/* Stepper */}
-      <div className="flex items-center gap-0 mb-8">
-        {STEPS.map((label, i) => (
-          <React.Fragment key={label}>
-            <button
-              onClick={() => { if (i < step) setStep(i); }}
-              className={`flex items-center gap-2 ${i <= step ? 'cursor-pointer' : 'cursor-default'
-                }`}
-            >
-              <span
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-base font-bold transition-colors ${i < step
-                    ? 'bg-[var(--success)] text-[var(--text-primary)]'
-                    : i === step
-                      ? 'bg-[var(--accent)] text-white'
-                      : 'bg-[var(--hover-2)] text-[var(--text-primary)]/25'
-                  }`}
-              >
-                {i < step ? <Check size={14} /> : i + 1}
-              </span>
-              <span className={`text-base hidden sm:inline ${i === step ? 'text-[var(--text-primary)] font-medium' : i < step ? 'text-[var(--text-primary)]/50' : 'text-[var(--text-primary)]/25'
-                }`}>
-                {label}
-              </span>
-            </button>
-            {i < STEPS.length - 1 && (
-              <div className={`flex-1 h-px mx-4 ${i < step ? 'bg-[var(--success)]/40' : 'bg-[var(--hover-2)]'}`} />
-            )}
-          </React.Fragment>
-        ))}
-      </div>
+      {/* =========================================================
+          MAIN LAYOUT
+      ========================================================= */}
+      <div
+        className="
+          grid grid-cols-1
+          xl:grid-cols-[minmax(0,1fr)_320px]
+          gap-6
+          items-start
+        "
+      >
+        {/* =====================================================
+            LEFT CONTENT
+        ===================================================== */}
+        <div className="min-w-0 space-y-5">
 
-      {/* Content */}
-      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-primary)] p-6">
-        {/* Step 0: Basic info */}
-        {step === 0 && (
-          <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <FormField label="Название" required>
-                <input
-                  value={form.name}
-                  onChange={(e) => updateForm('name', e.target.value)}
-                  placeholder="Например: 1С Бухгалтерия"
-                  className="w-full px-4 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] text-base transition-colors"
-                />
-              </FormField>
+          {/* ===================================================
+              BASIC INFORMATION
+          =================================================== */}
+          <section
+            className="
+              rounded-2xl
+              border border-[var(--border-color)]
+              bg-[var(--hover-1)]
+              overflow-hidden
+            "
+          >
+            <SectionHeader
+              icon={Package}
+              title="Основная информация"
+              description="Общие сведения о продукте"
+            />
 
-              <FormField label="Вендор" required>
-                <input
-                  value={form.vendor}
-                  onChange={(e) => updateForm('vendor', e.target.value)}
-                  placeholder="Например: 1С"
-                  className="w-full px-4 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] text-base transition-colors"
-                />
-              </FormField>
-            </div>
+            <div className="p-5 sm:p-6 space-y-6">
 
-            <FormField label="Категория" required>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                {PRODUCT_CATEGORIES.map((cat) => {
-                  const Icon = cat.icon;
-                  const sel = form.category === cat.value;
-                  return (
-                    <button
-                      key={cat.value}
-                      onClick={() => handleCategoryChange(cat.value)}
-                      className={`flex items-center gap-2.5 px-3 py-3 rounded-xl border text-left transition-all text-base ${sel
-                          ? 'border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--text-primary)]'
-                          : 'border-[var(--border-color)] bg-[var(--hover-1)] text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)] hover:border-[var(--border-color)]'
-                        }`}
-                    >
-                      <div className={`w-8 h-8 rounded-lg bg-[var(--hover-2)] flex items-center justify-center ${sel ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'}`}>
-                        <Icon size={16} />
-                      </div>
-                      <span>{cat.label}</span>
-                    </button>
-                  );
-                })}
+              {/* NAME / VENDOR */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField label="Название" required>
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={e =>
+                      updateForm('name', e.target.value)
+                    }
+                    placeholder="Например: 1С Бухгалтерия"
+                    className={INPUT_CLASS}
+                  />
+                </FormField>
+
+                <FormField label="Производитель" required>
+                  <input
+                    type="text"
+                    value={form.vendor}
+                    onChange={e =>
+                      updateForm('vendor', e.target.value)
+                    }
+                    placeholder="Например: 1С"
+                    className={INPUT_CLASS}
+                  />
+                </FormField>
               </div>
-            </FormField>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <FormField label="Версия">
-                <input
-                  value={form.version}
-                  onChange={(e) => updateForm('version', e.target.value)}
-                  placeholder="3.0.1"
-                  className="w-full px-4 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] text-base transition-colors"
+              {/* CATEGORY */}
+              <FormField label="Категория" required>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {PRODUCT_CATEGORIES.map(category => {
+                    const Icon = category.icon;
+                    const selected =
+                      form.category === category.value;
+
+                    return (
+                      <button
+                        key={category.value}
+                        type="button"
+                        onClick={() =>
+                          handleCategoryChange(category.value)
+                        }
+                        disabled={creating}
+                        aria-pressed={selected}
+                        className={`
+                          relative
+                          flex items-center gap-3
+                          min-h-[70px]
+                          px-4 py-3
+                          rounded-xl
+                          border
+                          text-left
+                          transition-all duration-150
+                          disabled:opacity-50
+
+                          ${
+                            selected
+                              ? 'border-[var(--accent)]/50 bg-[var(--accent)]/[0.06]'
+                              : 'border-[var(--border-color)] bg-[var(--bg-card)] hover:bg-[var(--hover-2)] hover:border-[var(--border-hover)]'
+                          }
+                        `}
+                      >
+                        <div
+                          className={`
+                            w-9 h-9
+                            rounded-lg
+                            flex items-center justify-center
+                            shrink-0
+
+                            ${
+                              selected
+                                ? 'bg-[var(--accent)]/10 text-[var(--accent)]'
+                                : 'bg-[var(--hover-2)] text-[var(--text-primary)]/40'
+                            }
+                          `}
+                        >
+                          <Icon className="w-5 h-5" />
+                        </div>
+
+                        <span className="flex-1 min-w-0 text-sm font-medium text-[var(--text-primary)]">
+                          {category.label}
+                        </span>
+
+                        {selected && (
+                          <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </FormField>
+
+              {/* VERSION / STATUS */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <FormField label="Версия">
+                  <input
+                    type="text"
+                    value={form.version}
+                    onChange={e =>
+                      updateForm('version', e.target.value)
+                    }
+                    placeholder="Например: 3.0.1"
+                    className={INPUT_CLASS}
+                  />
+                </FormField>
+
+                <FormField label="Статус">
+                  <div className="grid grid-cols-3 gap-2">
+                    {PRODUCT_STATUSES.map(status => {
+                      const selected =
+                        form.status === status.value;
+
+                      return (
+                        <button
+                          key={status.value}
+                          type="button"
+                          onClick={() =>
+                            updateForm('status', status.value)
+                          }
+                          disabled={creating}
+                          aria-pressed={selected}
+                          className={`
+                            flex items-center justify-center gap-1.5
+                            min-h-[50px]
+                            px-2 py-3
+                            rounded-xl
+                            border
+                            text-sm font-medium
+                            transition-colors
+                            disabled:opacity-50
+
+                            ${
+                              selected
+                                ? 'border-[var(--accent)]/40 bg-[var(--accent)]/10 text-[var(--text-primary)]'
+                                : 'border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)]/45 hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)]'
+                            }
+                          `}
+                        >
+                          {selected && (
+                            <Check className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+                          )}
+
+                          <span>{status.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </FormField>
+              </div>
+
+              {/* DESCRIPTION */}
+              <FormField label="Описание">
+                <textarea
+                  value={form.description}
+                  onChange={e =>
+                    updateForm('description', e.target.value)
+                  }
+                  placeholder="Краткое описание продукта..."
+                  rows={4}
+                  className={`${INPUT_CLASS} resize-none`}
                 />
               </FormField>
-
-              <FormField label="Статус">
-                <select
-                  value={form.status}
-                  onChange={(e) => updateForm('status', e.target.value)}
-                  className="w-full px-4 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-base focus:outline-none focus:border-[var(--accent)] transition-colors"
-                >
-                  {PRODUCT_STATUSES.map((s) => (
-                    <option key={s.value} value={s.value} className="bg-[var(--bg-primary)]">{s.label}</option>
-                  ))}
-                </select>
-              </FormField>
             </div>
+          </section>
 
-            <FormField label="Описание">
-              <textarea
-                value={form.description}
-                onChange={(e) => updateForm('description', e.target.value)}
-                rows={3}
-                placeholder="Краткое описание..."
-                className="w-full px-4 py-2.5 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] text-base transition-colors resize-none"
-              />
-            </FormField>
-          </div>
-        )}
+          {/* ===================================================
+              DYNAMIC ATTRIBUTES
+          =================================================== */}
+          <section
+            className="
+              rounded-2xl
+              border border-[var(--border-color)]
+              bg-[var(--hover-1)]
+              overflow-hidden
+            "
+          >
+            <SectionHeader
+              icon={Server}
+              title="Атрибуты продукта"
+              description={
+                form.category
+                  ? `Параметры категории «${getCategoryLabel(form.category)}»`
+                  : 'Дополнительные параметры зависят от категории'
+              }
+            />
 
-        {/* Step 1: Attributes */}
-        {step === 1 && (
-          <div className="space-y-5">
-            <div>
-              <h3 className="text-[var(--text-primary)] font-medium">
-                Атрибуты — {getCategoryLabel(form.category)}
+            <div className="p-5 sm:p-6">
+
+              {!form.category ? (
+                <div className="py-12 text-center">
+                  <Package className="w-10 h-10 mx-auto text-[var(--text-primary)]/15" />
+
+                  <p className="mt-3 text-sm text-[var(--text-primary)]/40">
+                    Выберите категорию продукта
+                  </p>
+                </div>
+              ) : schemaLoading ? (
+                <div className="flex items-center justify-center gap-3 py-14">
+                  <Loader2 className="w-5 h-5 text-[var(--accent)] animate-spin" />
+
+                  <span className="text-sm text-[var(--text-primary)]/45">
+                    Загружаем атрибуты...
+                  </span>
+                </div>
+              ) : schemaError || !schema ? (
+                <div className="py-12 text-center">
+                  <AlertCircle className="w-9 h-9 mx-auto text-[var(--text-primary)]/25" />
+
+                  <p className="mt-3 text-sm text-[var(--text-primary)]/50">
+                    Не удалось загрузить атрибуты
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleCategoryChange(form.category as ProductCategory)
+                    }
+                    className="
+                      inline-flex items-center gap-2
+                      mt-4 px-4 py-2
+                      rounded-lg
+                      bg-[var(--hover-2)]
+                      hover:bg-[var(--hover-3)]
+                      text-sm font-medium
+                      text-[var(--text-primary)]/70
+                      transition-colors
+                    "
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Повторить
+                  </button>
+                </div>
+              ) : (
+                <DynamicAttributesFields
+                  schemaResponse={schema}
+                  values={form.attributes}
+                  onChange={updateAttribute}
+                  labels={ATTRIBUTE_LABELS}
+                />
+              )}
+            </div>
+          </section>
+        </div>
+
+        {/* =====================================================
+            RIGHT SIDEBAR
+        ===================================================== */}
+        <aside className="xl:sticky xl:top-5 space-y-4">
+
+          {/* SUMMARY */}
+          <div
+            className="
+              rounded-2xl
+              border border-[var(--border-color)]
+              bg-[var(--hover-1)]
+              overflow-hidden
+            "
+          >
+            <div className="px-5 py-4 border-b border-[var(--border-color)]">
+              <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                Новый продукт
               </h3>
-              <p className="text-base text-[var(--text-primary)]/40 mt-0.5">
-                Поля со звёздочкой обязательны
+
+              <p className="mt-1 text-sm text-[var(--text-primary)]/40 truncate">
+                {form.name || 'Название не указано'}
               </p>
             </div>
 
-            {schemaLoading ? (
-              <div className="flex items-center justify-center gap-2 py-16 text-[var(--text-primary)]/40 text-base">
-                <Loader2 size={18} className="animate-spin" />
-                Загрузка полей...
-              </div>
-            ) : schema ? (
-              <DynamicAttributesFields
-                schemaResponse={schema}
-                values={form.attributes}
-                onChange={updateAttribute}
-                labels={ATTRIBUTE_LABELS}
-              />
-            ) : (
-              <div className="py-16 text-base text-[var(--text-primary)]/40 text-center">
-                Схема не загружена
-              </div>
-            )}
-          </div>
-        )}
+            <div className="p-5 space-y-5">
 
-        {/* Step 2: Review */}
-        {step === 2 && (
-          <div className="space-y-5">
-            <h3 className="text-[var(--text-primary)] font-medium">Проверьте данные</h3>
+              {/* BASIC STATUS */}
+              <div className="flex items-center gap-3">
+                <div
+                  className={`
+                    w-7 h-7
+                    rounded-full
+                    flex items-center justify-center
+                    shrink-0
 
-            <div className="rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] divide-y divide-[var(--border-color)]">
-              <SummaryRow label="Название" value={form.name} />
-              <SummaryRow label="Вендор" value={form.vendor} />
-              <SummaryRow label="Категория" value={getCategoryLabel(form.category)} />
-              <SummaryRow label="Статус" value={getStatusLabel(form.status)} />
-              {form.version && <SummaryRow label="Версия" value={form.version} />}
-              {form.description && <SummaryRow label="Описание" value={form.description} />}
-            </div>
-
-            {attrEntries.length > 0 && (
-              <div>
-                <div className="text-base text-[var(--text-primary)]/35 mb-2">Атрибуты</div>
-                <div className="rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] divide-y divide-[var(--border-color)]">
-                  {attrEntries.map(([key, value]) => (
-                    <SummaryRow key={key} label={getAttrLabel(key)} value={formatAttrValue(value)} />
-                  ))}
+                    ${
+                      basicValid
+                        ? 'bg-emerald-500/15 text-emerald-500'
+                        : 'bg-[var(--hover-2)] text-[var(--text-primary)]/35'
+                    }
+                  `}
+                >
+                  {basicValid ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <span className="text-xs font-medium">1</span>
+                  )}
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between mt-6">
-        <div>
-          {step > 0 ? (
-            <button
-              onClick={() => setStep((s) => s - 1)}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/60 text-base transition-colors"
+                <span className="flex-1 text-sm text-[var(--text-primary)]">
+                  Основные данные
+                </span>
+
+                <span
+                  className={`text-xs ${
+                    basicValid
+                      ? 'text-emerald-500'
+                      : 'text-[var(--text-primary)]/35'
+                  }`}
+                >
+                  {basicValid ? 'Готово' : 'Заполните'}
+                </span>
+              </div>
+
+              {/* ATTRIBUTES STATUS */}
+              <div className="flex items-center gap-3">
+                <div
+                  className={`
+                    w-7 h-7
+                    rounded-full
+                    flex items-center justify-center
+                    shrink-0
+
+                    ${
+                      attributesValid
+                        ? 'bg-emerald-500/15 text-emerald-500'
+                        : 'bg-[var(--hover-2)] text-[var(--text-primary)]/35'
+                    }
+                  `}
+                >
+                  {attributesValid ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <span className="text-xs font-medium">2</span>
+                  )}
+                </div>
+
+                <span className="flex-1 text-sm text-[var(--text-primary)]">
+                  Атрибуты
+                </span>
+
+                <span
+                  className={`text-xs ${
+                    attributesValid
+                      ? 'text-emerald-500'
+                      : 'text-[var(--text-primary)]/35'
+                  }`}
+                >
+                  {attributesValid
+                    ? 'Готово'
+                    : `${filledRequiredAttributes}/${totalRequiredAttributes}`}
+                </span>
+              </div>
+
+              {/* DETAILS */}
+              <div className="pt-4 border-t border-[var(--border-color)] space-y-3">
+                <div className="flex justify-between gap-3 text-sm">
+                  <span className="text-[var(--text-primary)]/40">
+                    Категория
+                  </span>
+
+                  <span className="text-right font-medium text-[var(--text-primary)]/70">
+                    {form.category
+                      ? getCategoryLabel(form.category)
+                      : '—'}
+                  </span>
+                </div>
+
+                <div className="flex justify-between gap-3 text-sm">
+                  <span className="text-[var(--text-primary)]/40">
+                    Статус
+                  </span>
+
+                  <span className="font-medium text-[var(--text-primary)]/70">
+                    {getStatusLabel(form.status)}
+                  </span>
+                </div>
+
+                {form.version && (
+                  <div className="flex justify-between gap-3 text-sm">
+                    <span className="text-[var(--text-primary)]/40">
+                      Версия
+                    </span>
+
+                    <span className="font-mono text-[var(--text-primary)]/70">
+                      {form.version}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* CREATE ACTION */}
+          <div
+            className="
+              rounded-2xl
+              border border-[var(--border-color)]
+              bg-[var(--hover-1)]
+              p-4
+            "
+          >
+            <ActionButton
+              type="button"
+              onClick={handleCreate}
+              disabled={!canCreate}
+              className="w-full px-5 py-3.5 text-sm font-semibold"
             >
-              <ArrowLeft size={14} />
-              Назад
-            </button>
-          ) : (
+              {creating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Создаём...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  Создать продукт
+                </>
+              )}
+            </ActionButton>
+
+            {!formValid && (
+              <p className="mt-3 text-center text-xs text-[var(--text-primary)]/35">
+                {!basicValid
+                  ? 'Заполните название, производителя и категорию'
+                  : schemaLoading
+                    ? 'Загружаем атрибуты'
+                    : schemaError
+                      ? 'Не удалось загрузить атрибуты'
+                      : 'Заполните обязательные атрибуты'}
+              </p>
+            )}
+
             <button
+              type="button"
               onClick={() => navigate('/products')}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/60 text-base transition-colors"
+              disabled={creating}
+              className="
+                w-full mt-2
+                px-4 py-2.5
+                rounded-xl
+                text-sm font-medium
+                text-[var(--text-primary)]/45
+                hover:text-[var(--text-primary)]
+                hover:bg-[var(--hover-2)]
+                transition-colors
+                disabled:opacity-50
+              "
             >
               Отмена
             </button>
-          )}
-        </div>
-
-        <div>
-          {step < 2 ? (
-            <button
-              onClick={() => setStep((s) => s + 1)}
-              disabled={!canGoNext()}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent)] text-white text-base font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Далее
-              <ArrowRight size={14} />
-            </button>
-          ) : (
-            <button
-              onClick={handleCreate}
-              disabled={creating}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent)] text-white text-base font-medium transition-colors disabled:opacity-50"
-            >
-              {creating ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-              Создать продукт
-            </button>
-          )}
-        </div>
+          </div>
+        </aside>
       </div>
     </div>
   );
 }
-
-// ─── Sub-components ────
-
-const FormField = ({
-  label,
-  required,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) => (
-  <div className="space-y-2">
-    <label className="block text-base text-[var(--text-primary)]/60">
-      {label}
-      {required && <span className="ml-1 text-[var(--accent)]">*</span>}
-    </label>
-    {children}
-  </div>
-);
-
-const SummaryRow = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex items-start px-4 py-3">
-    <span className="text-base text-[var(--text-primary)]/35 w-[130px] flex-shrink-0">{label}</span>
-    <span className="text-base text-[var(--text-primary)]/75 break-words">{value}</span>
-  </div>
-);

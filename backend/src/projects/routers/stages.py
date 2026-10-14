@@ -8,6 +8,7 @@ from ..dependencies import ProjectMemberServiceDep, ProjectServiceDep
 from ..schemas import (
     NewProjectStagesOrder,
     ProjectResponse,
+    ProjectStageAssigneesUpdate,
     ProjectStageCreate,
     ProjectStagePlan,
     ProjectStageResponse,
@@ -164,4 +165,61 @@ async def schedule_project_stage(
         stage_id=stage_id,
         data=data,
         current_subject=current_subject,
+    )
+
+
+
+@router.patch(
+    path="/{project_id}/stages/{stage_id}/assignees",
+    status_code=status.HTTP_200_OK,
+    response_model=ProjectStageResponse,
+    summary="Назначить исполнителей этапа",
+)
+async def set_project_stage_assignees(
+        project_id: UUID,
+        stage_id: UUID,
+        data: ProjectStageAssigneesUpdate,
+        current_subject: CurrentSubjectDep,
+        service: ProjectServiceDep,
+) -> ProjectStageResponse:
+    return await service.set_stage_assignees(
+        project_id=project_id,
+        stage_id=stage_id,
+        data=data,
+        current_subject=current_subject,
+    )
+
+
+
+@router.post(
+    path="/{project_id}/stages/{stage_id}/pause",
+    status_code=status.HTTP_200_OK,
+    response_model=ProjectResponse,
+    summary="Приостановить этап проекта",
+)
+async def pause_project_stage(
+        project_id: UUID,
+        stage_id: UUID,
+        current_subject: CurrentSubjectDep,
+        service: ProjectServiceDep,
+) -> ProjectResponse:
+    return await service.pause_stage(
+        project_id=project_id, stage_id=stage_id, current_subject=current_subject
+    )
+
+
+@router.post(
+    path="/{project_id}/stages/{stage_id}/resume",
+    status_code=status.HTTP_200_OK,
+    response_model=ProjectResponse,
+    summary="Возобновить этап проекта",
+)
+async def resume_project_stage(
+        project_id: UUID,
+        stage_id: UUID,
+        current_subject: CurrentSubjectDep,
+        service: ProjectServiceDep,
+) -> ProjectResponse:
+    return await service.resume_stage(
+        project_id=project_id, stage_id=stage_id, current_subject=current_subject
     )

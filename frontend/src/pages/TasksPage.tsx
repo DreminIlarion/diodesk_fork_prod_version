@@ -21,6 +21,8 @@ import type {
   SimpleUser, CounterpartyCustomer,
 } from '../types';
 
+import { ActionButton } from '../components/ui/ActionButton';
+
 import TaskAnalytics from '../components/tasks/TaskAnalytics';
 
 import {
@@ -4665,7 +4667,7 @@ export default function TasksPage() {
     <div className="flex flex-col h-full animate-in fade-in duration-500" onDragEnd={onDE}>
       <div className="flex-shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Задачи</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-[var(--text-primary)] mb-1.5">Задачи</h1>
           {!loading && (
             <span className="px-2 py-0.5 rounded bg-[var(--hover-2)] text-xs text-[var(--text-primary)]/50">
               {Math.max(total - done, 0)} активных · {done} завершено
@@ -4774,13 +4776,13 @@ export default function TasksPage() {
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
-          <button
-            onClick={() => setCreate('backlog')}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-sm font-medium hover:bg-[var(--accent)]/90 transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Новая задача
-          </button>
+          <ActionButton
+  onClick={() => setCreate('backlog')}
+  className="px-4 py-2 text-sm font-medium"
+>
+  <Plus className="w-4 h-4" />
+  Новая задача
+</ActionButton>
         </div>
       </div>
 

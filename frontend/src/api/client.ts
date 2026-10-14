@@ -624,6 +624,33 @@ export const projectsApi = {
     return response.data;
   },
 
+  // Назначение нескольких исполнителей этапа
+setStageAssignees: async (
+  projectId: string,
+  stageId: string,
+  userIds: string[]
+): Promise<ProjectStageResponse> => {
+  const response = await api.patch<ProjectStageResponse>(
+    `/api/v1/projects/${projectId}/stages/${stageId}/assignees`,
+    {
+      user_ids: userIds,
+    }
+  );
+
+  return response.data;
+},
+  // Приостановить этап
+  pauseStage: async (projectId: string, stageId: string): Promise<Project> => {
+    const response = await api.post<Project>(`/api/v1/projects/${projectId}/stages/${stageId}/pause`);
+    return response.data;
+  },
+
+  // Возобновить этап
+  resumeStage: async (projectId: string, stageId: string): Promise<Project> => {
+    const response = await api.post<Project>(`/api/v1/projects/${projectId}/stages/${stageId}/resume`);
+    return response.data;
+  },
+
 
 };
 

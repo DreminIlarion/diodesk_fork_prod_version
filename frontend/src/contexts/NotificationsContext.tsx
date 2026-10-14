@@ -27,7 +27,7 @@ export function useNotifications() {
   return useContext(NotificationsContext);
 }
 
-const ORIGINAL_TITLE = document.title || 'ДИО Деск';
+const ORIGINAL_TITLE = document.title || 'DIO Desk';
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuthStore();

@@ -35,56 +35,80 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
 const NewProjectPage = lazy(() => import('./pages/NewProjectPage'));
 const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage'));
+const ProjectStagesPage = lazy(() => import('./pages/ProjectStagesPage'));
 const ProductsTab = lazy(() => import('./pages/ProductsPage'));
 const CreateProductPage = lazy(() => import('./pages/CreateProductPage'));
 const TasksPage = lazy(() => import('./pages/TasksPage'));
 const LurvDetailPage = lazy(() => import('./pages/LurvDetailPage'));
-const FeedbacksPage  = lazy(() => import('./pages/FeedbacksPage'));
+const FeedbacksPage = lazy(() => import('./pages/FeedbacksPage'));
 
 const WorkflowPage = lazy(() => import('./pages/WorkflowPage'));
+const GlobalPage = lazy(() => import('./pages/GlobalPage'));
 
 
 export default function App() {
   return (
     <NotificationsProvider>
-    <ThemeProvider>
-      <>
-        <Routes>
-          <Route path="/login" element={<LazyRoute><LoginPage /></LazyRoute>} />
-          <Route path="/auth/invite/accept" element={<LazyRoute><RegisterPage /></LazyRoute>} />
-          <Route element={<Layout />}>
-            <Route path="/dashboard" element={<LazyRoute><DashboardPage /></LazyRoute>} />
-
-            <Route path="/lurvs" element={<LazyRoute><LurvDetailPage /></LazyRoute>} />
-
-            <Route path="/workflows" element={<LazyRoute><ProtectedRoute><WorkflowPage /></ProtectedRoute></LazyRoute>} /> 
+      <ThemeProvider>
+        <>
+          <Routes>
+            <Route path="/login" element={<LazyRoute><LoginPage /></LazyRoute>} />
+            <Route path="/auth/invite/accept" element={<LazyRoute><RegisterPage /></LazyRoute>} />
 
 
-            <Route path="/tasks" element={<LazyRoute><ProtectedRoute><TasksPage /></ProtectedRoute></LazyRoute>} />
-            <Route path="/tickets" element={<LazyRoute><TicketsPage /></LazyRoute>} />
-            <Route path="/tickets/new" element={<LazyRoute><NewTicketPage /></LazyRoute>} />
-            <Route path="/tickets/:ticketNumber" element={<LazyRoute><TicketDetailPage /></LazyRoute>} />
-            <Route path="/counterparties" element={<LazyRoute><CounterpartiesPage /></LazyRoute>} />
-            <Route path="/counterparties/new" element={<LazyRoute><NewCounterpartyPage /></LazyRoute>} />
-            <Route path="/counterparties/:id" element={<LazyRoute><CounterpartyDetailPage /></LazyRoute>} />
-            <Route path="/projects" element={<LazyRoute><ProjectsPage /></LazyRoute>} />
-            <Route path="/projects/new" element={<LazyRoute><NewProjectPage /></LazyRoute>} />
-            <Route path="/projects/:id" element={<LazyRoute><ProjectDetailPage /></LazyRoute>} />
-            <Route path="/my-company" element={<LazyRoute><ProtectedRoute><MyCompanyPage /></ProtectedRoute></LazyRoute>} />
-            <Route path="/invitations" element={<LazyRoute><ProtectedRoute><InvitationsPage /></ProtectedRoute></LazyRoute>} />
-            <Route path="/products" element={<LazyRoute><ProtectedRoute><ProductsTab /></ProtectedRoute></LazyRoute>} />
-            <Route path="/products/new" element={<LazyRoute><ProtectedRoute><CreateProductPage /></ProtectedRoute></LazyRoute>} />
-            <Route path="/notifications" element={<LazyRoute><NotificationsPage /></LazyRoute>} />
-            <Route path="/profile" element={<LazyRoute><ProfilePage /></LazyRoute>} />
+            <Route
+              path="/global"
+              element={
+                <LazyRoute>
+                  <ProtectedRoute>
+                    <GlobalPage />
+                  </ProtectedRoute>
+                </LazyRoute>
+              }
+            />
+            <Route element={<Layout />}>
+              <Route path="/dashboard" element={<LazyRoute><DashboardPage /></LazyRoute>} />
+
+              <Route path="/lurvs" element={<LazyRoute><LurvDetailPage /></LazyRoute>} />
+
+              <Route path="/workflows" element={<LazyRoute><ProtectedRoute><WorkflowPage /></ProtectedRoute></LazyRoute>} />
+
+              <Route path="/global" element={<LazyRoute><GlobalPage /></LazyRoute>} />
 
 
-            <Route path="/feedbacks" element={<LazyRoute><FeedbacksPage /></LazyRoute>} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          </Route>
-        </Routes>
-        <Toaster />
-      </>
-    </ThemeProvider>
+              <Route path="/tasks" element={<LazyRoute><ProtectedRoute><TasksPage /></ProtectedRoute></LazyRoute>} />
+              <Route path="/tickets" element={<LazyRoute><TicketsPage /></LazyRoute>} />
+              <Route path="/tickets/new" element={<LazyRoute><NewTicketPage /></LazyRoute>} />
+              <Route path="/tickets/:ticketNumber" element={<LazyRoute><TicketDetailPage /></LazyRoute>} />
+              <Route path="/counterparties" element={<LazyRoute><CounterpartiesPage /></LazyRoute>} />
+              <Route path="/counterparties/new" element={<LazyRoute><NewCounterpartyPage /></LazyRoute>} />
+              <Route path="/counterparties/:id" element={<LazyRoute><CounterpartyDetailPage /></LazyRoute>} />
+              <Route path="/projects" element={<LazyRoute><ProjectsPage /></LazyRoute>} />
+              <Route path="/projects/new" element={<LazyRoute><NewProjectPage /></LazyRoute>} />
+              <Route path="/projects/:id" element={<LazyRoute><ProjectDetailPage /></LazyRoute>} />
+              <Route
+                path="/projects/:id/stages"
+                element={
+                  <LazyRoute>
+                    <ProjectStagesPage />
+                  </LazyRoute>
+                }
+              />
+              <Route path="/my-company" element={<LazyRoute><ProtectedRoute><MyCompanyPage /></ProtectedRoute></LazyRoute>} />
+              <Route path="/invitations" element={<LazyRoute><ProtectedRoute><InvitationsPage /></ProtectedRoute></LazyRoute>} />
+              <Route path="/products" element={<LazyRoute><ProtectedRoute><ProductsTab /></ProtectedRoute></LazyRoute>} />
+              <Route path="/products/new" element={<LazyRoute><ProtectedRoute><CreateProductPage /></ProtectedRoute></LazyRoute>} />
+              <Route path="/notifications" element={<LazyRoute><NotificationsPage /></LazyRoute>} />
+              <Route path="/profile" element={<LazyRoute><ProfilePage /></LazyRoute>} />
+
+
+              <Route path="/feedbacks" element={<LazyRoute><FeedbacksPage /></LazyRoute>} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            </Route>
+          </Routes>
+          <Toaster />
+        </>
+      </ThemeProvider>
     </NotificationsProvider>
   );
 }

@@ -114,7 +114,7 @@ export default function InviteAcceptPage() {
               className="w-20 h-20 object-contain"
             />
           </div>
-          <h1 className="text-2xl font-bold text-white">ДИО Деск</h1>
+          <h1 className="text-2xl font-bold text-white">DIO Desk</h1>
           <p className="text-neutral-500 mt-1">Регистрация по приглашению</p>
         </div>
 

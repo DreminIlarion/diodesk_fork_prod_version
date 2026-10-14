@@ -321,7 +321,7 @@ export default function RegisterPage() {
               />
             </div>
             <h1 className="text-2xl font-bold text-[var(--text-primary)]">
-              Регистрация в ДИО Деск
+              Регистрация в DIO Desk
             </h1>
             <p className="text-sm text-[var(--text-primary)]/50 mt-1">
               Создайте аккаунт для работы с заявками и проектами

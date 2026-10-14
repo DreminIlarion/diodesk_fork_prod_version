@@ -8,7 +8,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ...core.database import Base
 from ..domain.vo import MemberRole, ProjectStageStatus, ProjectStatus
 
-
 class ProjectMemberOrm(Base):
     __tablename__ = "project_members"
 
@@ -49,6 +48,11 @@ class ProjectStageOrm(Base):
         foreign_keys=[project_id],
     )
 
+    assignees: Mapped[list["ProjectStageAssigneeOrm"]] = relationship(
+        lazy="selectin",
+        foreign_keys="ProjectStageAssigneeOrm.stage_id",
+    )
+
     __table_args__ = (
         Index("ix_project_stages_project_order", "project_id", "execution_order"),
         Index("ix_project_stages_status", "status"),
@@ -85,4 +89,22 @@ class ProjectOrm(Base):
         Index("ix_projects_owner_status", "owner_id", "status"),
         Index("ix_projects_counterparty", "counterparty_id"),
         Index("ix_projects_key", "key"),
+    )
+
+
+
+
+class ProjectStageAssigneeOrm(Base):
+    __tablename__ = "project_stage_assignees"
+
+    stage_id: Mapped[UUID] = mapped_column(
+        ForeignKey("project_stages.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[UUID] = mapped_column(nullable=False)
+    created_by: Mapped[UUID] = mapped_column(nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("stage_id", "user_id", name="uq_stage_assignee"),
+        Index("ix_project_stage_assignees_stage", "stage_id"),
+        Index("ix_project_stage_assignees_user", "user_id"),
     )

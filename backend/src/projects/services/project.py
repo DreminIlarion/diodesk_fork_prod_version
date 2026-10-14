@@ -9,6 +9,8 @@ from src.shared.domain.exceptions import AlreadyExistsError, NotFoundError
 from src.shared.domain.repos import UnitOfWork, finalize, get_or_raise_404
 from src.shared.schemas import Page
 
+from ..infra.repos import SqlProjectStageAssigneeRepository
+
 from ..domain.authz import ProjectAuthZService
 from ..domain.entities import Project
 from ..domain.repos import ProjectMemberRepository, ProjectRepository
@@ -24,6 +26,7 @@ from ..schemas import (
     ProjectCreate,
     ProjectDetailedResponse,
     ProjectResponse,
+    ProjectStageAssigneesUpdate,
     ProjectStageCreate,
     ProjectStagePlan,
     ProjectStageResponse,
@@ -38,11 +41,13 @@ class ProjectService:
             uow: UnitOfWork,
             project_repo: ProjectRepository,
             member_repo: ProjectMemberRepository,
+            stage_assignee_repo: SqlProjectStageAssigneeRepository,
             event_publisher: EventPublisher,
     ) -> None:
         self.uow = uow
         self.project_repo = project_repo
         self.member_repo = member_repo
+        self.stage_assignee_repo = stage_assignee_repo
         self.authz_service = ProjectAuthZService(member_repo)
         self.event_publisher = event_publisher
 
@@ -292,6 +297,42 @@ class ProjectService:
 
         return map_project_to_response(project)
 
+    async def pause_stage(
+            self, project_id: UUID, stage_id: UUID, current_subject: Subject
+    ) -> ProjectResponse:
+        """Приостановить этап."""
+        project = await get_or_raise_404(self.project_repo.read, project_id, Project)
+
+        permission = await self.authz_service.can_manage_project(
+            subject=current_subject, project_id=project.id
+        )
+        if not permission.allowed:
+            raise PermissionDeniedError(permission.reason)
+
+        project.pause_stage(stage_id)
+        await self.project_repo.update(project)
+        await self.uow.commit()
+
+        return map_project_to_response(project)
+
+    async def resume_stage(
+            self, project_id: UUID, stage_id: UUID, current_subject: Subject
+    ) -> ProjectResponse:
+        """Возобновить этап после паузы."""
+        project = await get_or_raise_404(self.project_repo.read, project_id, Project)
+
+        permission = await self.authz_service.can_manage_project(
+            subject=current_subject, project_id=project.id
+        )
+        if not permission.allowed:
+            raise PermissionDeniedError(permission.reason)
+
+        project.resume_stage(stage_id)
+        await self.project_repo.update(project)
+        await self.uow.commit()
+
+        return map_project_to_response(project)
+
     async def remove_stage(
             self, project_id: UUID, stage_id: UUID, current_subject: Subject
     ) -> ProjectResponse:
@@ -343,6 +384,8 @@ class ProjectService:
             description=data.description,
             responsible_id=data.responsible_id,
             completion_criteria=data.completion_criteria,
+            planned_start=data.planned_start,
+            planned_end=data.planned_end,
         )
         await self.project_repo.update(project)
         await self.uow.commit()
@@ -376,5 +419,41 @@ class ProjectService:
         stage.establish_planned_schedule(start=data.planned_start, end=data.planned_end)
         await self.project_repo.update(project)
         await self.uow.commit()
+
+        return map_project_stage_to_response(stage)
+
+
+
+    async def set_stage_assignees(
+            self,
+            project_id: UUID,
+            stage_id: UUID,
+            data: ProjectStageAssigneesUpdate,
+            current_subject: Subject,
+    ) -> ProjectStageResponse:
+        project = await get_or_raise_404(self.project_repo.read, project_id, Project)
+
+        permission = await self.authz_service.can_manage_project(
+            subject=current_subject, project_id=project.id
+        )
+        if not permission.allowed:
+            raise PermissionDeniedError(permission.reason)
+
+        stage = project.find_stage(stage_id)
+        if stage is None:
+            raise NotFoundError(
+                f"Project stage with ID {stage_id} does not exist in project"
+            )
+
+        await self.stage_assignee_repo.replace(
+            stage_id=stage_id,
+            user_ids=list(data.user_ids),
+            created_by=current_subject.id,
+        )
+        await self.uow.commit()
+
+        # Перечитываем, чтобы вернуть актуальные assignee_ids
+        project = await get_or_raise_404(self.project_repo.read, project_id, Project)
+        stage = project.find_stage(stage_id)
 
         return map_project_stage_to_response(stage)

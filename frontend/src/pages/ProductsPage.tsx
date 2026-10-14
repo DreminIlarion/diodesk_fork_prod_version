@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { productsApi } from '../api/client';
 import { useNavigate } from 'react-router-dom';
+import { ActionButton } from '../components/ui/ActionButton';
 
 // ─── Constants ────
 
@@ -421,13 +422,13 @@ export default function ProductsPage() {
           >
             <RefreshCcw size={18} />
           </button>
-          <button
-            onClick={() => navigate('/products/new')}
-            className="btn-primary py-4 px-8 text-base font-semibold"
-          >
-            <Plus size={18} />
-            Добавить продукт
-          </button>
+<ActionButton
+  onClick={() => navigate('/products/new')}
+  className="py-4 px-8 text-base font-semibold"
+>
+  <Plus size={18} />
+  Добавить продукт
+</ActionButton>
         </div>
       </div>
 

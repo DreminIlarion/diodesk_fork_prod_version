@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { counterpartiesApi } from '../api/client';
 import type { Counterparty } from '../types';
-
+import { ActionButton } from '../components/ui/ActionButton';
 /* ──────────────
    CONSTANTS
    ────────────── */
@@ -622,13 +622,13 @@ const [quickFilter, setQuickFilter] = useState<'all' | 'head' | 'branches' | 'ac
           </p>
         </div>
 
-        <button
-          onClick={() => navigate('/counterparties/new')}
-          className="btn-primary py-4 px-8 text-base font-semibold"
-        >
-          <Plus className="w-5 h-5" />
-          Добавить контрагента
-        </button>
+<ActionButton
+  onClick={() => navigate('/counterparties/new')}
+  className="py-4 px-8 text-base font-semibold"
+>
+  <Plus size={18} />
+  Добавить контрагента
+</ActionButton>
       </div>
 
       {/* Stats */}

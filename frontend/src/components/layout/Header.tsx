@@ -79,7 +79,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
           />
 
           <span className="font-bold text-[var(--text-primary)] text-lg">
-            ДИО Деск
+            DIO Desk
           </span>
         </div>
 
@@ -130,7 +130,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
               "
             >
               <img
-                src="https://storage.yandexcloud.net/b.fotovssylku.ru/2026/10/06/ChatGPT-Image-6-OKT.-2026-G.-10_02_51.png"
+                src="https://storage.yandexcloud.net/b.fotovssylku.ru/2026/10/05/GLYNTEVYI-LOGOTIP-d_i-S-AI-SKEMAMI.png"
                 alt=""
                 className="
                   w-8

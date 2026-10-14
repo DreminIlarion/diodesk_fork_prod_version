@@ -93,6 +93,9 @@ class ProjectStageUpdate(BaseModel):
     responsible_id: UUID | None = Field(None, description="Ответственный за проведение этапа")
     completion_criteria: list[str] | None = Field(None, description="Критерии завершения")
 
+    planned_start: date | None = Field(None, description="Плановая дата начала")
+    planned_end: date | None = Field(None, description="Плановая дата завершения")
+
 
 class ProjectStagePlan(BaseModel):
     """
@@ -133,6 +136,9 @@ class ProjectStageResponse(BaseModel):
     is_overdue: bool = Field(..., description="Просрочены ли сроки выполнения")
     planned_duration_days: NonNegativeInt | None = Field(
         None, description="Продолжительность этапа в днях"
+    )
+    assignee_ids: list[UUID] = Field(
+        default_factory=list, description="ID исполнителей, назначенных на этап"
     )
 
 
@@ -187,4 +193,14 @@ class ProjectReference(BaseModel):
 
     id: UUID = Field(description="Идентификатор проекта")
     key: str = Field(description="Уникальный ключ проекта для UI", examples=["PRJ01"])
-    name: str = Field(description="Название проекта", examples=["Внедрение хуйни"])
+    name: str = Field(description="Название проекта", examples=["Внедрение "])
+
+
+
+
+class ProjectStageAssigneesUpdate(BaseModel):
+    """Полная замена списка исполнителей этапа."""
+
+    user_ids: list[UUID] = Field(
+        default_factory=list, description="Новый список исполнителей этапа"
+    )

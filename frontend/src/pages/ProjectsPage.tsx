@@ -9,7 +9,7 @@ import { useAuthStore } from '../stores/authStore';
 import type { Project } from '../types';
 import type { ReactNode } from 'react';
 import { projectsApi, counterpartiesApi } from '../api/client';
-
+import { ActionButton } from '../components/ui/ActionButton';
 /* ═══ КОНСТАНТЫ ═══ */
 
 const ROLE_OPTIONS = [
@@ -1002,10 +1002,13 @@ export default function ProjectsPage() {
         </div>
 
         {canCreateProject && (
-          <button onClick={() => navigate('/projects/new')}
-            className="btn-primary py-4 px-8 text-base font-semibold flex items-center gap-2">
-            <Plus size={18} /> Создать проект
-          </button>
+         <ActionButton
+  onClick={() => navigate('/projects/new')}
+  className="py-4 px-8 text-base font-semibold"
+>
+  <Plus size={18} />
+  Создать проект
+</ActionButton>
         )}
       </div>
 
