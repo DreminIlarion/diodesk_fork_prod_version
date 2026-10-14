@@ -21,6 +21,7 @@ class TaskOrm(Base):
 
     ticket_id: Mapped[UUID | None] = mapped_column(nullable=True)
     project_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    stage_id: Mapped[UUID | None] = mapped_column(nullable=True, index=True)
 
     number: Mapped[str] = mapped_column(unique=True)
     title: Mapped[str]
