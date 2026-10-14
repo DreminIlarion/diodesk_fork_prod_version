@@ -82,7 +82,7 @@ class TicketService:
 
             return TicketCreationContext(
                 project_id=data.project_id,
-                # stage_id=data.stage_id,
+                stage_id=data.stage_id,
                 project_key=project.key,
                 counterparty_id=project.counterparty_id,
                 counterparty_name=None,
