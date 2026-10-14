@@ -1689,6 +1689,11 @@ export default function TicketsPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const [counterpartyFilter, setCounterpartyFilter] = useState('');
   const [projectFilter, setProjectFilter] = useState<string[]>([]);
+  const [stageFilter, setStageFilter] = useState<string[]>([]);
+
+  const [projectStages, setProjectStages] = useState<ProjectStageResponse[]>([]);
+
+  const [loadingStages, setLoadingStages] = useState(false);
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [reporterFilter, setReporterFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -1840,6 +1845,57 @@ export default function TicketsPage() {
     }
   }, [showFilters]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (projectFilter.length === 0) {
+        setProjectStages([]);
+        setStageFilter([]);
+        return;
+      }
+
+      setLoadingStages(true);
+
+      try {
+        const allStages: ProjectStageResponse[] = [];
+
+        for (const projectId of projectFilter) {
+          try {
+            const project = await projectsApi.getById(projectId);
+            allStages.push(...(project.stages ?? []));
+          } catch {
+            // пропускаем недоступные проекты
+          }
+        }
+
+        if (cancelled) return;
+
+        const sorted = allStages
+          .sort((a, b) => a.execution_order - b.execution_order)
+          .filter(s => !stageFilter.length || stageFilter.includes(s.id));
+
+        setProjectStages(allStages);
+
+        // Сбросить этапы, которые больше не принадлежат выбранным проектам
+        setStageFilter(prev => prev.filter(id => allStages.some(s => s.id === id)));
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Failed to load stages:', error);
+          setProjectStages([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingStages(false);
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectFilter]);
+
   /* ── Сборка параметров фильтрации ── */
   const buildFilters = useCallback(() => ({
     query: debouncedSearch || undefined,
@@ -1852,11 +1908,12 @@ export default function TicketsPage() {
     reporter_id: showReporterFilter && reporterFilter ? reporterFilter : undefined,
     created_after: dateFrom || undefined,
     created_before: dateTo || undefined,
+    stage_ids: stageFilter.length > 0 ? stageFilter : undefined,
   }), [
     debouncedSearch, statusFilter, priorityFilter, typeFilter,
     counterpartyFilter, projectFilter, assigneeFilter, reporterFilter,
     dateFrom, dateTo,
-    showCounterpartyFilter, showAssigneeFilter, showReporterFilter,
+    showCounterpartyFilter, showAssigneeFilter, showReporterFilter, stageFilter
   ]);
 
   // 5. В loadTickets — не сбрасывать page
@@ -1949,6 +2006,8 @@ export default function TicketsPage() {
     setTypeFilter('');
     setCounterpartyFilter('');
     setProjectFilter([]);
+    setStageFilter([]);
+    setProjectStages([]);
     setAssigneeFilter('');
     setReporterFilter('');
     setSearch('');
@@ -2028,16 +2087,19 @@ export default function TicketsPage() {
   /* ── Счётчики ── */
   const hasFilters = !!(
     statusFilter.length || priorityFilter || typeFilter ||
+    stageFilter.length ||
     (showCounterpartyFilter && counterpartyFilter) ||
     projectFilter.length ||
     (showAssigneeFilter && assigneeFilter) ||
     (showReporterFilter && reporterFilter) ||
     dateFrom || dateTo
+    
   );
   const hasActiveFilters = !!(hasFilters || debouncedSearch);
 
   const activeFiltersCount = [
     statusFilter.length > 0,
+    stageFilter.length > 0,
     !!priorityFilter,
     !!typeFilter,
     showCounterpartyFilter && !!counterpartyFilter,
@@ -2067,10 +2129,23 @@ export default function TicketsPage() {
     sublabel: p.key,
   }));
 
+  const stageOptions: DropdownOption[] = projectStages.map(s => {
+    const project = projects.find(p => p.id === s.project_id);
+
+    return {
+      value: s.id,
+      label: s.name,
+      sublabel: project ? `${project.key} · этап ${s.execution_order}` : `Этап ${s.execution_order}`,
+    };
+  });
+
   const handleStatClick = (type: 'new' | 'in_progress' | 'critical') => {
     setPage(1);
     setProjectFilter([]);
     setTypeFilter('');
+
+        setStageFilter([]);
+    setProjectStages([]);
     setCounterpartyFilter('');
     setAssigneeFilter('');
     setReporterFilter('');
@@ -2128,31 +2203,31 @@ export default function TicketsPage() {
           </p>
         </div>
         <button
-  type="button"
-  onClick={() => navigate('/tickets/new')}
-  className="create-ticket-btn"
->
-  <span className="create-ticket-btn__trace" aria-hidden="true">
-    <svg
-      viewBox="0 0 300 56"
-      preserveAspectRatio="none"
-    >
-      <rect
-        x="1"
-        y="1"
-        width="298"
-        height="54"
-        rx="12"
-        ry="12"
-        pathLength="100"
-      />
-    </svg>
-  </span>
+          type="button"
+          onClick={() => navigate('/tickets/new')}
+          className="create-ticket-btn"
+        >
+          <span className="create-ticket-btn__trace" aria-hidden="true">
+            <svg
+              viewBox="0 0 300 56"
+              preserveAspectRatio="none"
+            >
+              <rect
+                x="1"
+                y="1"
+                width="298"
+                height="54"
+                rx="12"
+                ry="12"
+                pathLength="100"
+              />
+            </svg>
+          </span>
 
-  <Plus size={18} />
+          <Plus size={18} />
 
-  <span>Создать заявку</span>
-</button>
+          <span>Создать заявку</span>
+        </button>
       </div>
 
       {/* ── Stats ── */}
@@ -2333,6 +2408,19 @@ export default function TicketsPage() {
               loading={loadingProjects}
             />
 
+            {projectFilter.length > 0 && (
+              <FilterDropdown
+                label="Этап"
+                options={stageOptions}
+                value={stageFilter}
+                onChange={v => setStageFilter(Array.isArray(v) ? v : [v])}
+                placeholder="Все этапы"
+                searchable
+                multiple
+                loading={loadingStages}
+              />
+            )}
+
             {showAssigneeFilter && (
               <FilterDropdown
                 label="Исполнитель"
@@ -2420,6 +2508,12 @@ export default function TicketsPage() {
             <FilterTag key={p}
               label={projects.find(proj => proj.id === p)?.name || 'Проект'}
               onRemove={() => setProjectFilter(projectFilter.filter(f => f !== p))} />
+          ))}
+
+          {stageFilter.map(s => (
+            <FilterTag key={s}
+              label={projectStages.find(st => st.id === s)?.name || 'Этап'}
+              onRemove={() => setStageFilter(stageFilter.filter(f => f !== s))} />
           ))}
           {showAssigneeFilter && assigneeFilter && (
             <FilterTag
