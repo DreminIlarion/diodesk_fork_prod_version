@@ -916,7 +916,7 @@ export default function NewTicketPage() {
     setProjects([]);
   }, [ticketViewType, selectedCounterparty?.id, selectionType]);
 
-    useEffect(() => {
+  useEffect(() => {
     let cancelled = false;
 
     const run = async () => {
@@ -1610,7 +1610,7 @@ export default function NewTicketPage() {
         reporter_id: actualReporter?.id,
       };
 
-            if (ticketViewType === 'company') {
+      if (ticketViewType === 'company') {
         data.counterparty_id = DIO_COMPANY_ID;
         if (selectedProject) {
           data.project_id = selectedProject.id;
@@ -2025,8 +2025,8 @@ export default function NewTicketPage() {
                       >
                         <Building2
                           className={`h-7 w-7 shrink-0 ${ticketViewType === 'counterparty'
-                              ? 'text-blue-400'
-                              : 'text-[var(--text-primary)]/45'
+                            ? 'text-blue-400'
+                            : 'text-[var(--text-primary)]/45'
                             }`}
                         />
                         <div className="min-w-0 flex-1">
@@ -2065,8 +2065,8 @@ export default function NewTicketPage() {
                       >
                         <FolderOpen
                           className={`h-7 w-7 shrink-0 ${ticketViewType === 'company'
-                              ? 'text-emerald-400'
-                              : 'text-[var(--text-primary)]/45'
+                            ? 'text-emerald-400'
+                            : 'text-[var(--text-primary)]/45'
                             }`}
                         />
                         <div className="min-w-0 flex-1">
@@ -2227,8 +2227,8 @@ export default function NewTicketPage() {
                         >
                           <FolderOpen
                             className={`h-6 w-6 shrink-0 ${selectionType === 'project'
-                                ? 'text-amber-400'
-                                : 'text-[var(--text-primary)]/45'
+                              ? 'text-amber-400'
+                              : 'text-[var(--text-primary)]/45'
                               }`}
                           />
                           <div className="min-w-0 flex-1">
@@ -2260,8 +2260,8 @@ export default function NewTicketPage() {
                         >
                           <Building2
                             className={`h-6 w-6 shrink-0 ${selectionType === 'counterparty'
-                                ? 'text-blue-400'
-                                : 'text-[var(--text-primary)]/45'
+                              ? 'text-blue-400'
+                              : 'text-[var(--text-primary)]/45'
                               }`}
                           />
                           <div className="min-w-0 flex-1">
@@ -2363,102 +2363,101 @@ export default function NewTicketPage() {
                             )}
                           </div>
                         </div>
-
+)}
                                 {/* Этап — если выбран проект */}
-        {selectionType === 'project' && selectedProject && (
-          <div className="mt-5">
-            <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
-              Этап проекта
-              <span className="ml-2 text-sm font-normal text-[var(--text-primary)]/45">
-                (необязательно)
-              </span>
-            </label>
+                      {selectionType === 'project' && selectedProject && (
+                        <div className="mt-5">
+                          <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
+                            Этап проекта
+                            <span className="ml-2 text-sm font-normal text-[var(--text-primary)]/45">
+                              (необязательно)
+                            </span>
+                          </label>
 
-            <div ref={stageDropdownRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setShowStageDropdown((v) => !v)}
-                className="
+                          <div ref={stageDropdownRef} className="relative">
+                            <button
+                              type="button"
+                              onClick={() => setShowStageDropdown((v) => !v)}
+                              className="
                   flex h-[52px] w-full items-center justify-between gap-3
                   rounded-xl border border-[var(--border-color)]
                   bg-[var(--hover-1)] px-4
                   text-left transition-colors
                   hover:border-[var(--accent)]/40
                 "
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <Milestone className="h-5 w-5 shrink-0 text-[var(--text-primary)]/45" />
-                  <span className="truncate text-base text-[var(--text-primary)]">
-                    {selectedStage
-                      ? `${selectedStage.execution_order}. ${selectedStage.name}`
-                      : loadingStages
-                        ? 'Загружаем этапы...'
-                        : projectStages.length === 0
-                          ? 'В проекте нет этапов'
-                          : 'Выберите этап'}
-                  </span>
-                </div>
+                            >
+                              <div className="flex min-w-0 items-center gap-3">
+                                <Milestone className="h-5 w-5 shrink-0 text-[var(--text-primary)]/45" />
+                                <span className="truncate text-base text-[var(--text-primary)]">
+                                  {selectedStage
+                                    ? `${selectedStage.execution_order}. ${selectedStage.name}`
+                                    : loadingStages
+                                      ? 'Загружаем этапы...'
+                                      : projectStages.length === 0
+                                        ? 'В проекте нет этапов'
+                                        : 'Выберите этап'}
+                                </span>
+                              </div>
 
-                <ChevronDown
-                  className={`h-5 w-5 shrink-0 text-[var(--text-primary)]/45 transition-transform ${
-                    showStageDropdown ? 'rotate-180' : ''
-                  }`}
-                />
-              </button>
+                              <ChevronDown
+                                className={`h-5 w-5 shrink-0 text-[var(--text-primary)]/45 transition-transform ${showStageDropdown ? 'rotate-180' : ''
+                                  }`}
+                              />
+                            </button>
 
-              {showStageDropdown && projectStages.length > 0 && (
-                <Dropdown>
-                  {/* Сбросить выбор */}
-                  {selectedStage && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedStage(null);
-                        setShowStageDropdown(false);
-                      }}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
-                    >
-                      <X className="h-4 w-4 text-[var(--text-primary)]/45" />
-                      <span className="text-base text-[var(--text-primary)]/60">
-                        Без этапа
-                      </span>
-                    </button>
-                  )}
+                            {showStageDropdown && projectStages.length > 0 && (
+                              <Dropdown>
+                                {/* Сбросить выбор */}
+                                {selectedStage && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedStage(null);
+                                      setShowStageDropdown(false);
+                                    }}
+                                    className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
+                                  >
+                                    <X className="h-4 w-4 text-[var(--text-primary)]/45" />
+                                    <span className="text-base text-[var(--text-primary)]/60">
+                                      Без этапа
+                                    </span>
+                                  </button>
+                                )}
 
-                  {projectStages.map((stage) => (
-                    <button
-                      key={stage.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedStage(stage);
-                        setShowStageDropdown(false);
-                      }}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
-                    >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center">
-                        <Milestone className="h-5 w-5 text-amber-400" />
-                      </div>
+                                {projectStages.map((stage) => (
+                                  <button
+                                    key={stage.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedStage(stage);
+                                      setShowStageDropdown(false);
+                                    }}
+                                    className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
+                                  >
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                                      <Milestone className="h-5 w-5 text-amber-400" />
+                                    </div>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-base font-medium text-[var(--text-primary)]">
-                          {stage.name}
+                                    <div className="min-w-0 flex-1">
+                                      <div className="truncate text-base font-medium text-[var(--text-primary)]">
+                                        {stage.name}
+                                      </div>
+                                      <div className="text-sm text-[var(--text-primary)]/45">
+                                        Этап {stage.execution_order} · {stage.status}
+                                      </div>
+                                    </div>
+
+                                    {selectedStage?.id === stage.id && (
+                                      <Check className="h-5 w-5 text-emerald-400" />
+                                    )}
+                                  </button>
+                                ))}
+                              </Dropdown>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-sm text-[var(--text-primary)]/45">
-                          Этап {stage.execution_order} · {stage.status}
-                        </div>
-                      </div>
+                      )}
 
-                      {selectedStage?.id === stage.id && (
-                        <Check className="h-5 w-5 text-emerald-400" />
-                      )}
-                    </button>
-                  ))}
-                </Dropdown>
-              )}
-            </div>
-          </div>
-        )}
-                      )}
 
                       {/* Если «Прочая» и вид = контрагент — показываем выбранного контрагента */}
                       {selectionType === 'counterparty' &&
@@ -3247,7 +3246,7 @@ export default function NewTicketPage() {
                         Привязка
                       </p>
 
-                                            {selectedProject ? (
+                      {selectedProject ? (
                         <div>
                           <div className="flex items-center gap-3">
                             <FolderOpen className="h-5 w-5 text-amber-400" />
