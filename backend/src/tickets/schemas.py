@@ -101,10 +101,10 @@ class TicketPreview(BaseModel):
     type: TicketType = Field(..., description="Тип заявки")
     status: TicketStatus = Field(..., description="Текущий статус")
     priority: Priority = Field(..., description="Приоритет")
-    # stage_id: UUID | None = Field(
-    #     None,
-    #     description="ID этапа проекта",
-    # )
+    stage_id: UUID | None = Field(
+        None,
+        description="ID этапа проекта",
+    )
 
 
 class TicketViewResponse(BaseModel):
