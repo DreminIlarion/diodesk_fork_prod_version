@@ -2,7 +2,7 @@ from typing import Any
 
 from uuid import UUID
 
-from sqlalchemy import TEXT, Computed, Enum, Index, text
+from sqlalchemy import TEXT, CheckConstraint, Computed, Enum, Index, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,6 +16,7 @@ class SoftwareProductOrm(Base):
     name: Mapped[str]
     vendor: Mapped[str]
     category: Mapped[ProductCategory] = mapped_column(Enum(ProductCategory))
+    registration_number: Mapped[str | None] = mapped_column(nullable=True)
     description: Mapped[str | None] = mapped_column(TEXT, nullable=True)
     version: Mapped[str | None] = mapped_column(nullable=True)
     status: Mapped[ProductStatus] = mapped_column(Enum(ProductStatus))
@@ -40,6 +41,13 @@ class SoftwareProductOrm(Base):
     )
 
     __table_args__ = (
+        CheckConstraint(
+            "registration_number IS NULL OR btrim(registration_number) <> ''",
+            name="ck_software_products_registration_number_not_blank",
+        ),
+        UniqueConstraint(
+            "registration_number", name="uq_software_products_registration_number"
+        ),
         # 1. GIN индекс для полнотекстового поиска (@@ оператор)
         Index("ix_software_products_search", "search_vector", postgresql_using="gin"),
 

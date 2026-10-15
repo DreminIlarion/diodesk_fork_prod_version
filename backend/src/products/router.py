@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, status
 
 from ..iam.dependencies import CurrentUserDep, require_role
@@ -11,6 +13,7 @@ from .schemas import (
     AttributesSchemaResponse,
     ProductCreate,
     ProductResponse,
+    ProductUpdate,
     get_product_attributes_schema,
 )
 
@@ -28,8 +31,26 @@ async def create_product(
         current_user: CurrentUserDep, data: ProductCreate, service: ProductServiceDep
 ) -> ProductResponse:
     return await service.create(
-        data, created_by=current_user.id, created_by_role=current_user.roles[0] if current_user.roles else None
+        data,
+        created_by=current_user.id,
+        created_by_role=current_user.roles[0] if current_user.roles else None,
     )
+
+
+@router.patch(
+    path="/{product_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=ProductResponse,
+    dependencies=[Depends(require_role(SUPPORT_TEAM))],
+    summary="Обновить программный продукт",
+)
+async def update_product(
+        product_id: UUID,
+        data: ProductUpdate,
+        current_user: CurrentUserDep,
+        service: ProductServiceDep,
+) -> ProductResponse:
+    return await service.update(product_id, data, updated_by=current_user.id)
 
 
 @router.get(
