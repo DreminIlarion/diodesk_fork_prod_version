@@ -7,7 +7,7 @@ import {
   Calendar, UserPlus, UserCheck, CheckCircle2, X, Plus,
   Search, Settings, AlertCircle, RefreshCw, Tag, Edit,
   Paperclip as PaperclipIcon, MessageCircle, Building2, Phone, Mail, ChevronRight, FolderOpen,
-  Archive, Star, Check,
+  Archive, Star, Check,Milestone
 } from 'lucide-react';
 import {
   ticketsApi,
@@ -1066,6 +1066,33 @@ export default function TicketDetailPage() {
 
   const canEdit = ['new', 'pending_approval', 'open', 'reopened'].includes(ticket?.status || '');
 
+    /* ═══════════════════════════════════════════════════════════════════
+     ЭТАП ЗАЯВКИ
+     ═══════════════════════════════════════════════════════════════════ */
+
+  const ticketStageId = (ticket as any)?.stage_id as string | undefined;
+
+  const ticketStage = useMemo(() => {
+    if (!ticketStageId || !project?.stages) return null;
+    return project.stages.find(s => s.id === ticketStageId) ?? null;
+  }, [ticketStageId, project?.stages]);
+
+  const STAGE_STATUS_LABELS: Record<string, string> = {
+    planned: 'Запланирован',
+    active: 'В работе',
+    on_hold: 'На паузе',
+    completed: 'Завершён',
+    skipped: 'Пропущен',
+  };
+
+  const STAGE_STATUS_DOT: Record<string, string> = {
+    planned: 'bg-slate-400',
+    active: 'bg-blue-500',
+    on_hold: 'bg-amber-500',
+    completed: 'bg-emerald-500',
+    skipped: 'bg-neutral-500',
+  };
+
   /* ═══════════════════════════════════════════════════════════════════
      RENDER GUARDS
      ═══════════════════════════════════════════════════════════════════ */
@@ -1941,48 +1968,86 @@ export default function TicketDetailPage() {
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Загружаем проект…
                 </div>
-              ) : project ? (
-                <Link
-                  to={`/projects/${project.id}`}
-                  className="group block rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 hover:bg-[var(--hover-2)] hover:border-[var(--border-hover)] transition-colors"
-                >
-                  <div className="flex items-start gap-3">
+                            ) : project ? (
+                <>
+                  <Link
+                    to={`/projects/${project.id}`}
+                    className="group block rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 hover:bg-[var(--hover-2)] hover:border-[var(--border-hover)] transition-colors"
+                  >
+                    <div className="flex items-start gap-3">
 
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-base font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+                          {project.name || 'Без названия'}
+                        </p>
 
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-base font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
-                        {project.name || 'Без названия'}
-                      </p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          {project.key && (
+                            <span className="font-mono text-sm text-[var(--text-primary)]/40">
+                              {project.key}
+                            </span>
+                          )}
 
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        {project.key && (
-                          <span className="font-mono text-sm text-[var(--text-primary)]/40">
-                            {project.key}
+                          <span
+                            className={[
+                              'rounded-md border px-2 py-0.5 text-[15px] font-medium',
+                              project.status === 'active'
+                                ? 'status-resolved'
+                                : 'status-closed',
+                            ].join(' ')}
+                          >
+                            {project.status === 'active' ? 'Активен' : 'Архив'}
                           </span>
-                        )}
+                        </div>
 
-                        <span
-                          className={[
-                            'rounded-md border px-2 py-0.5 text-[15px] font-medium',
-                            project.status === 'active'
-                              ? 'status-resolved'
-                              : 'status-closed',
-                          ].join(' ')}
-                        >
-                          {project.status === 'active' ? 'Активен' : 'Архив'}
-                        </span>
+                        {project.description && (
+                          <p className="mt-3 line-clamp-2 text-sm leading-5 text-[var(--text-primary)]/45">
+                            {project.description}
+                          </p>
+                        )}
                       </div>
 
-                      {project.description && (
-                        <p className="mt-3 line-clamp-2 text-sm leading-5 text-[var(--text-primary)]/45">
-                          {project.description}
-                        </p>
-                      )}
+                      <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[var(--text-primary)]/25 group-hover:text-[var(--accent)] group-hover:translate-x-0.5 transition-all" />
                     </div>
+                  </Link>
 
-                    <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[var(--text-primary)]/25 group-hover:text-[var(--accent)] group-hover:translate-x-0.5 transition-all" />
-                  </div>
-                </Link>
+                  {/* ── ЭТАП ── */}
+                  {ticketStage && (
+                    <Link
+                      to={`/projects/${project.id}/stages`}
+                      className="group mt-3 block rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 hover:bg-[var(--hover-2)] hover:border-[var(--border-hover)] transition-colors"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                          <Milestone className="w-4 h-4 text-amber-400" />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span
+                              className={`w-2 h-2 rounded-full ${STAGE_STATUS_DOT[ticketStage.status] || 'bg-slate-400'}`}
+                            />
+                            <span className="text-xs text-[var(--text-primary)]/45">
+                              Этап {String(ticketStage.execution_order).padStart(2, '0')}
+                            </span>
+                          </div>
+
+                          <p className="truncate text-base font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+                            {ticketStage.name}
+                          </p>
+
+                          <p className="mt-1 text-xs text-[var(--text-primary)]/45">
+                            {STAGE_STATUS_LABELS[ticketStage.status] || ticketStage.status}
+                            {ticketStage.planned_end &&
+                              ` · до ${new Date(ticketStage.planned_end).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}`}
+                          </p>
+                        </div>
+
+                        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[var(--text-primary)]/25 group-hover:text-[var(--accent)] group-hover:translate-x-0.5 transition-all" />
+                      </div>
+                    </Link>
+                  )}
+                </>
               ) : null}
             </section>
           )}

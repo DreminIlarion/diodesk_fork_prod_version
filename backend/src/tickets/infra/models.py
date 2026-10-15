@@ -21,10 +21,10 @@ class TicketOrm(Base):
     __tablename__ = "tickets"
 
     project_id: Mapped[UUID | None] = mapped_column(nullable=True)
-    # stage_id: Mapped[UUID | None] = mapped_column(
-    #     ForeignKey("project_stages.id", ondelete="SET NULL"),
-    #     nullable=True,
-    # )
+    stage_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("project_stages.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     counterparty_id: Mapped[UUID | None] = mapped_column(nullable=True)
     product_id: Mapped[UUID | None] = mapped_column(nullable=True)
 
@@ -70,7 +70,7 @@ class TicketOrm(Base):
     )
     __table_args__ = (
         Index("ix_tickets_search_vector", "search_vector", postgresql_using="gin"),
-        # Index("ix_tickets_stage_id", "stage_id"),
+        Index("ix_tickets_stage_id", "stage_id"),
     )
 
 TicketOrm.has_attachments = column_property(

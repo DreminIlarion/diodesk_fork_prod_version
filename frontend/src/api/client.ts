@@ -700,6 +700,7 @@ export const ticketsApi = {
       reporter_id?: string;                    //  Добавлено
       created_after?: string;
       created_before?: string;
+      stage_ids?: string[];
     }
   ): Promise<PaginatedResponse<TicketListItem>> => {
     const response = await api.post<PaginatedResponse<TicketListItem>>(
@@ -727,6 +728,8 @@ export const ticketsApi = {
 
         //  Проекты (массив)
         project_ids: filters?.project_ids || undefined,
+
+        stage_ids: filters?.stage_ids || undefined,
 
         //  Акторы (исполнитель и автор)
         actors: (filters?.assignee_id || filters?.reporter_id) ? {

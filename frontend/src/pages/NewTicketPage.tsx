@@ -29,6 +29,7 @@ import {
   User,
   X,
   Zap,
+  Milestone,
 } from 'lucide-react';
 
 import { useAuthStore } from '../stores/authStore';
@@ -43,6 +44,7 @@ import { attachmentsApi } from '../api/attachments';
 import type {
   Counterparty,
   Project,
+  ProjectStageResponse,
   TicketPriority,
   TicketTag,
   TicketType,
@@ -364,7 +366,7 @@ function SelectSearch({
         }}
       />
 
-      
+
     </div>
   );
 }
@@ -436,12 +438,12 @@ export default function NewTicketPage() {
       draft.current?.descriptionBlocks?.length
         ? draft.current.descriptionBlocks
         : [
-            {
-              id: 'init',
-              type: 'text',
-              value: '',
-            },
-          ],
+          {
+            id: 'init',
+            type: 'text',
+            value: '',
+          },
+        ],
     );
 
   const description = serializeBlocks(descriptionBlocks);
@@ -481,8 +483,8 @@ export default function NewTicketPage() {
     draft.current?.selectionType ?? null,
   );
   const [ticketViewType, setTicketViewType] = useState<TicketViewType | null>(
-  draft.current?.ticketViewType ?? null,
-);
+    draft.current?.ticketViewType ?? null,
+  );
 
   const [selectedCounterparty, setSelectedCounterparty] =
     useState<Counterparty | null>(null);
@@ -504,6 +506,18 @@ export default function NewTicketPage() {
 
   const [selectedProject, setSelectedProject] =
     useState<Project | null>(null);
+
+  const [projectStages, setProjectStages] =
+    useState<ProjectStageResponse[]>([]);
+
+  const [selectedStage, setSelectedStage] =
+    useState<ProjectStageResponse | null>(null);
+
+  const [loadingStages, setLoadingStages] = useState(false);
+
+  const [showStageDropdown, setShowStageDropdown] = useState(false);
+
+  const stageDropdownRef = useRef<HTMLDivElement>(null);
 
   const [projectSearch, setProjectSearch] = useState(
     draft.current?.projectSearch || '',
@@ -596,12 +610,12 @@ export default function NewTicketPage() {
 
   const currentUserAsReporter: SimpleUser | null = currentUserId
     ? {
-        id: currentUserId,
-        username: user?.username || '',
-        full_name: user?.full_name || null,
-        email: user?.email || '',
-        role: user?.role,
-      }
+      id: currentUserId,
+      username: user?.username || '',
+      full_name: user?.full_name || null,
+      email: user?.email || '',
+      role: user?.role,
+    }
     : null;
 
   const actualReporter = selectedReporter || currentUserAsReporter;
@@ -682,14 +696,14 @@ export default function NewTicketPage() {
           tags,
           selectionType,
 
-          ticketViewType, 
+          ticketViewType,
 
           selectedCounterpartyId: selectedCounterparty?.id || null,
 
           selectedCounterpartyName: selectedCounterparty
             ? selectedCounterparty.name ||
-              selectedCounterparty.legal_name ||
-              ''
+            selectedCounterparty.legal_name ||
+            ''
             : null,
 
           selectedProjectId: selectedProject?.id || null,
@@ -729,7 +743,7 @@ export default function NewTicketPage() {
     priority,
     type,
     tags,
-    ticketViewType,  
+    ticketViewType,
     selectionType,
     selectedCounterparty,
     selectedProject,
@@ -881,26 +895,65 @@ export default function NewTicketPage() {
     }
   }, [canSelectCounterparty]);
 
-useEffect(() => {
-  if (ticketViewType === 'company') {
-    // Все проекты компании Дио-Консалт
-    loadProjects(DIO_COMPANY_ID);
-    return;
-  }
+  useEffect(() => {
+    if (ticketViewType === 'company') {
+      // Все проекты компании Дио-Консалт
+      loadProjects(DIO_COMPANY_ID);
+      return;
+    }
 
-  if (ticketViewType === 'counterparty' && selectedCounterparty) {
-    // Только проекты выбранного контрагента
-    loadProjects(selectedCounterparty.id);
-    return;
-  }
+    if (ticketViewType === 'counterparty' && selectedCounterparty) {
+      // Только проекты выбранного контрагента
+      loadProjects(selectedCounterparty.id);
+      return;
+    }
 
-  if (selectionType === 'project' && ticketViewType === 'company') {
-    loadProjects(DIO_COMPANY_ID);
-    return;
-  }
+    if (selectionType === 'project' && ticketViewType === 'company') {
+      loadProjects(DIO_COMPANY_ID);
+      return;
+    }
 
-  setProjects([]);
-}, [ticketViewType, selectedCounterparty?.id, selectionType]);
+    setProjects([]);
+  }, [ticketViewType, selectedCounterparty?.id, selectionType]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!selectedProject) {
+        setProjectStages([]);
+        setSelectedStage(null);
+        return;
+      }
+
+      setLoadingStages(true);
+
+      try {
+        const project = await projectsApi.getById(selectedProject.id);
+
+        if (cancelled) return;
+
+        const sorted = [...(project.stages ?? [])].sort(
+          (a, b) => a.execution_order - b.execution_order,
+        );
+
+        setProjectStages(sorted);
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Failed to load stages:', error);
+          setProjectStages([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingStages(false);
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProject?.id]);
 
   useEffect(() => {
     const cpId =
@@ -1220,6 +1273,9 @@ useEffect(() => {
     setSelectedProject(null);
     setSelectedReporter(null);
 
+    setSelectedStage(null);
+    setProjectStages([]);
+
     setCounterpartySearch('');
     setProjectSearch('');
     setReporterSearch('');
@@ -1249,6 +1305,7 @@ useEffect(() => {
 
   const selectProject = async (project: Project) => {
     setSelectedProject(project);
+    setSelectedStage(null); // ← сброс этапа при смене проекта
     setProjectSearch(prjName(project));
 
     setShowProjectDropdown(false);
@@ -1333,42 +1390,42 @@ useEffect(() => {
   // =============================================================================
 
   const validateStep1 = () => {
-  const errors: string[] = [];
+    const errors: string[] = [];
 
-  if (!title.trim()) {
-    errors.push('Укажите тему заявки');
-  }
-
-  if (!hasDescription) {
-    errors.push('Добавьте описание заявки');
-  }
-
-  if (canSelectCounterparty) {
-    if (ticketViewType === null) {
-      errors.push('Выберите вид заявки');
+    if (!title.trim()) {
+      errors.push('Укажите тему заявки');
     }
 
-    if (ticketViewType === 'counterparty' && !selectedCounterparty) {
-      errors.push('Выберите контрагента');
+    if (!hasDescription) {
+      errors.push('Добавьте описание заявки');
     }
 
-    if (ticketViewType !== null && selectionType === null) {
-      errors.push('Выберите привязку заявки');
+    if (canSelectCounterparty) {
+      if (ticketViewType === null) {
+        errors.push('Выберите вид заявки');
+      }
+
+      if (ticketViewType === 'counterparty' && !selectedCounterparty) {
+        errors.push('Выберите контрагента');
+      }
+
+      if (ticketViewType !== null && selectionType === null) {
+        errors.push('Выберите привязку заявки');
+      }
+
+      if (selectionType === 'project' && !selectedProject) {
+        errors.push('Выберите проект');
+      }
     }
 
-    if (selectionType === 'project' && !selectedProject) {
-      errors.push('Выберите проект');
+    if (!actualReporter?.id) {
+      errors.push('Укажите инициатора');
     }
-  }
 
-  if (!actualReporter?.id) {
-    errors.push('Укажите инициатора');
-  }
+    setValidationErrors(errors);
 
-  setValidationErrors(errors);
-
-  return errors.length === 0;
-};
+    return errors.length === 0;
+  };
 
   const goToNextStep = () => {
     if (step === 1 && !validateStep1()) return;
@@ -1385,27 +1442,27 @@ useEffect(() => {
   };
 
   useEffect(() => {
-  setValidationErrors((current) =>
-    current.filter((error) => {
-      if (error === 'Укажите тему заявки' && title.trim()) return false;
-      if (error === 'Добавьте описание заявки' && hasDescription) return false;
-      if (error === 'Выберите вид заявки' && ticketViewType !== null) return false;
-      if (error === 'Выберите контрагента' && selectedCounterparty) return false;
-      if (error === 'Выберите привязку заявки' && selectionType !== null) return false;
-      if (error === 'Выберите проект' && selectedProject) return false;
-      if (error === 'Укажите инициатора' && actualReporter?.id) return false;
-      return true;
-    }),
-  );
-}, [
-  title,
-  descriptionBlocks,
-  ticketViewType,
-  selectedCounterparty,
-  selectionType,
-  selectedProject,
-  actualReporter?.id,
-]);
+    setValidationErrors((current) =>
+      current.filter((error) => {
+        if (error === 'Укажите тему заявки' && title.trim()) return false;
+        if (error === 'Добавьте описание заявки' && hasDescription) return false;
+        if (error === 'Выберите вид заявки' && ticketViewType !== null) return false;
+        if (error === 'Выберите контрагента' && selectedCounterparty) return false;
+        if (error === 'Выберите привязку заявки' && selectionType !== null) return false;
+        if (error === 'Выберите проект' && selectedProject) return false;
+        if (error === 'Укажите инициатора' && actualReporter?.id) return false;
+        return true;
+      }),
+    );
+  }, [
+    title,
+    descriptionBlocks,
+    ticketViewType,
+    selectedCounterparty,
+    selectionType,
+    selectedProject,
+    actualReporter?.id,
+  ]);
 
   // =============================================================================
   // Files
@@ -1499,6 +1556,8 @@ useEffect(() => {
     setSelectedCounterparty(null);
     setSelectedProject(null);
     setSelectedReporter(null);
+    setSelectedStage(null);
+    setProjectStages([]);
 
     setCounterpartySearch('');
     setProjectSearch('');
@@ -1551,20 +1610,18 @@ useEffect(() => {
         reporter_id: actualReporter?.id,
       };
 
-      if (ticketViewType === 'company') {
-  // Заявка компании Дио-Консалт
-  data.counterparty_id = DIO_COMPANY_ID;
-  if (selectedProject) {
-    data.project_id = selectedProject.id;
+      if (selectedProject) {
+  // Если выбран проект — counterparty_id НЕ шлём, backend возьмёт его из проекта
+  data.project_id = selectedProject.id;
+
+  if (selectedStage) {
+    data.stage_id = selectedStage.id;
   }
+} else if (ticketViewType === 'company') {
+  // Компания без проекта → просто counterparty
+  data.counterparty_id = DIO_COMPANY_ID;
 } else if (isCustomer && customerCounterparty) {
   data.counterparty_id = customerCounterparty.id;
-  if (selectedProject) {
-    data.project_id = selectedProject.id;
-  }
-} else if (selectedProject) {
-  data.project_id = selectedProject.id;
-  data.counterparty_id = selectedProject.counterparty_id;
 } else if (selectedCounterparty) {
   data.counterparty_id = selectedCounterparty.id;
 }
@@ -1741,18 +1798,18 @@ useEffect(() => {
   );
 
   const nextButtonDisabled =
-  step === 1 &&
-  (!title.trim() ||
-    !hasDescription ||
-    !actualReporter?.id ||
-    // для не-клиента требуем выбранный вид
-    (canSelectCounterparty && ticketViewType === null) ||
-    // если вид «контрагент» — нужен контрагент
-    (ticketViewType === 'counterparty' && !selectedCounterparty) ||
-    // привязка обязательна
-    (ticketViewType !== null && selectionType === null) ||
-    // если привязка «по проекту» — нужен проект
-    (selectionType === 'project' && !selectedProject));
+    step === 1 &&
+    (!title.trim() ||
+      !hasDescription ||
+      !actualReporter?.id ||
+      // для не-клиента требуем выбранный вид
+      (canSelectCounterparty && ticketViewType === null) ||
+      // если вид «контрагент» — нужен контрагент
+      (ticketViewType === 'counterparty' && !selectedCounterparty) ||
+      // привязка обязательна
+      (ticketViewType !== null && selectionType === null) ||
+      // если привязка «по проекту» — нужен проект
+      (selectionType === 'project' && !selectedProject));
 
   const backButtonLabel =
     step === 2 ? 'К описанию' : 'К классификации';
@@ -1769,37 +1826,37 @@ useEffect(() => {
       {/* Header */}
 
       <header className="mb-7">
-  <div className="flex items-start justify-between gap-4">
-    <div>
-      <button
-        type="button"
-        onClick={() => navigate('/tickets')}
-        className="mb-5 inline-flex items-center gap-2 text-base font-medium
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <button
+              type="button"
+              onClick={() => navigate('/tickets')}
+              className="mb-5 inline-flex items-center gap-2 text-base font-medium
                    text-[var(--text-primary)]/60 transition-colors hover:text-[var(--text-primary)]"
-      >
-        <ArrowLeft className="h-5 w-5" />
-        К заявкам
-      </button>
+            >
+              <ArrowLeft className="h-5 w-5" />
+              К заявкам
+            </button>
 
-      <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">
-        Новая заявка
-      </h1>
-      <p className="mt-1.5 text-base text-[var(--text-primary)]/50">
-        Заполните информацию о заявке
-      </p>
-    </div>
+            <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">
+              Новая заявка
+            </h1>
+            <p className="mt-1.5 text-base text-[var(--text-primary)]/50">
+              Заполните информацию о заявке
+            </p>
+          </div>
 
-    <button
-      type="button"
-      onClick={() => setShowExitConfirm(true)}
-      aria-label="Закрыть"
-      className="rounded-xl p-2.5 text-[var(--text-primary)]/45
+          <button
+            type="button"
+            onClick={() => setShowExitConfirm(true)}
+            aria-label="Закрыть"
+            className="rounded-xl p-2.5 text-[var(--text-primary)]/45
                  transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)]"
-    >
-      <X className="h-6 w-6" />
-    </button>
-  </div>
-</header>
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+      </header>
 
       {/* Stepper */}
 
@@ -1831,12 +1888,11 @@ useEffect(() => {
               className={`
                 relative flex items-center justify-center gap-3
                 px-3 py-4 text-base font-medium transition
-                ${
-                  active
-                    ? 'bg-[var(--hover-2)] text-[var(--text-primary)]'
-                    : done
-                      ? 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)]'
-                      : 'cursor-default text-[var(--text-primary)]/35'
+                ${active
+                  ? 'bg-[var(--hover-2)] text-[var(--text-primary)]'
+                  : done
+                    ? 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-2)]'
+                    : 'cursor-default text-[var(--text-primary)]/35'
                 }
               `}
             >
@@ -1844,12 +1900,11 @@ useEffect(() => {
                 className={`
                   flex h-8 w-8 shrink-0 items-center justify-center
                   rounded-full text-sm font-semibold
-                  ${
-                    active
-                      ? 'bg-[var(--accent)] text-white'
-                      : done
-                        ? 'bg-emerald-500/15 text-emerald-400'
-                        : 'bg-[var(--hover-2)]'
+                  ${active
+                    ? 'bg-[var(--accent)] text-white'
+                    : done
+                      ? 'bg-emerald-500/15 text-emerald-400'
+                      : 'bg-[var(--hover-2)]'
                   }
                 `}
               >
@@ -1923,508 +1978,604 @@ useEffect(() => {
 
               {/* Binding */}
 
-{canSelectCounterparty && (
-  <>
-    {/* ═══ Вид заявки ═══ */}
-    <section>
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold text-[var(--text-primary)]">
-          Вид заявки
-        </h2>
-        <p className="mt-1 text-base text-[var(--text-primary)]/50">
-          Кому относится заявка?
-        </p>
-      </div>
+              {canSelectCounterparty && (
+                <>
+                  {/* ═══ Вид заявки ═══ */}
+                  <section>
+                    <div className="mb-4">
+                      <h2 className="text-xl font-semibold text-[var(--text-primary)]">
+                        Вид заявки
+                      </h2>
+                      <p className="mt-1 text-base text-[var(--text-primary)]/50">
+                        Кому относится заявка?
+                      </p>
+                    </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        {/* Заявка контрагента */}
-        <button
-          type="button"
-          onClick={() => {
-            setTicketViewType('counterparty');
-            setSelectionType(null);
-            setSelectedCounterparty(null);
-            setSelectedProject(null);
-            setCounterpartySearch('');
-            setProjectSearch('');
-          }}
-          className={`
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {/* Заявка контрагента */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTicketViewType('counterparty');
+                          setSelectionType(null);
+                          setSelectedCounterparty(null);
+                          setSelectedProject(null);
+                          setCounterpartySearch('');
+                          setProjectSearch('');
+                          setSelectedStage(null);
+                          setProjectStages([]);
+                        }}
+                        className={`
             flex min-h-[84px] items-center gap-4
             rounded-xl border px-5 text-left transition
             ${ticketViewType === 'counterparty'
-              ? 'border-blue-500/50 bg-blue-500/10'
-              : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'}
+                            ? 'border-blue-500/50 bg-blue-500/10'
+                            : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'}
           `}
-        >
-          <Building2
-            className={`h-7 w-7 shrink-0 ${
-              ticketViewType === 'counterparty'
-                ? 'text-blue-400'
-                : 'text-[var(--text-primary)]/45'
-            }`}
-          />
-          <div className="min-w-0 flex-1">
-            <div className="text-base font-semibold text-[var(--text-primary)]">
-              Заявка контрагента
-            </div>
-            <div className="text-sm text-[var(--text-primary)]/45">
-              Обращение от клиента
-            </div>
-          </div>
-          {ticketViewType === 'counterparty' && (
-            <CheckCircle2 className="h-5 w-5 shrink-0 text-blue-400" />
-          )}
-        </button>
+                      >
+                        <Building2
+                          className={`h-7 w-7 shrink-0 ${ticketViewType === 'counterparty'
+                            ? 'text-blue-400'
+                            : 'text-[var(--text-primary)]/45'
+                            }`}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-base font-semibold text-[var(--text-primary)]">
+                            Заявка контрагента
+                          </div>
+                          <div className="text-sm text-[var(--text-primary)]/45">
+                            Обращение от клиента
+                          </div>
+                        </div>
+                        {ticketViewType === 'counterparty' && (
+                          <CheckCircle2 className="h-5 w-5 shrink-0 text-blue-400" />
+                        )}
+                      </button>
 
-        {/* Заявка компании */}
-        <button
-          type="button"
-          onClick={() => {
-            setTicketViewType('company');
-            setSelectionType(null);
-            setSelectedCounterparty(null);
-            setSelectedProject(null);
-            setCounterpartySearch('');
-            setProjectSearch('');
-          }}
-          className={`
+                      {/* Заявка компании */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTicketViewType('company');
+                          setSelectionType(null);
+                          setSelectedCounterparty(null);
+                          setSelectedProject(null);
+                          setCounterpartySearch('');
+                          setProjectSearch('');
+                          setSelectedStage(null);
+                          setProjectStages([]);
+                        }}
+                        className={`
             flex min-h-[84px] items-center gap-4
             rounded-xl border px-5 text-left transition
             ${ticketViewType === 'company'
-              ? 'border-emerald-500/50 bg-emerald-500/10'
-              : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'}
+                            ? 'border-emerald-500/50 bg-emerald-500/10'
+                            : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'}
           `}
-        >
-          <FolderOpen
-            className={`h-7 w-7 shrink-0 ${
-              ticketViewType === 'company'
-                ? 'text-emerald-400'
-                : 'text-[var(--text-primary)]/45'
-            }`}
-          />
-          <div className="min-w-0 flex-1">
-            <div className="text-base font-semibold text-[var(--text-primary)]">
-              Заявка компании
-            </div>
-            <div className="text-sm text-[var(--text-primary)]/45">
-              Внутренняя заявка
-            </div>
-          </div>
-          {ticketViewType === 'company' && (
-            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
-          )}
-        </button>
-      </div>
-    </section>
-
-    {/* ═══ Контрагент (сразу после выбора "Заявка контрагента") ═══ */}
-    {ticketViewType === 'counterparty' && (
-      <section>
-        <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
-          Контрагент <span className="ml-1 text-red-400">*</span>
-        </label>
-
-        <div className="flex items-center gap-2">
-          <div ref={counterpartyDropdownRef} className="relative flex-1">
-            <SelectSearch
-              value={counterpartySearch}
-              loading={loadingCounterparties}
-              placeholder="Название или ИНН"
-              onChange={(value) => {
-                setCounterpartySearch(value);
-                if (selectedCounterparty) setSelectedCounterparty(null);
-                setShowCounterpartyDropdown(true);
-                loadCounterparties(value);
-              }}
-              onFocus={() => {
-                setShowCounterpartyDropdown(true);
-                if (!counterparties.length) loadCounterparties();
-              }}
-            />
-
-            {showCounterpartyDropdown && (
-              <Dropdown>
-                {loadingCounterparties ? (
-                  <DropdownEmpty>Загружаем контрагентов...</DropdownEmpty>
-                ) : counterparties.length === 0 ? (
-                  <DropdownEmpty>Контрагенты не найдены</DropdownEmpty>
-                ) : (
-                  counterparties.map((cp) => (
-                    <button
-                      key={cp.id}
-                      type="button"
-                      onClick={() => selectCounterparty(cp)}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
-                    >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center">
-                        <Building2 className="h-5 w-5 text-blue-400" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-base font-medium text-[var(--text-primary)]">
-                          {cpName(cp)}
-                        </div>
-                        {cp.inn && (
-                          <div className="text-sm text-[var(--text-primary)]/45">
-                            ИНН {cp.inn}
+                      >
+                        <FolderOpen
+                          className={`h-7 w-7 shrink-0 ${ticketViewType === 'company'
+                            ? 'text-emerald-400'
+                            : 'text-[var(--text-primary)]/45'
+                            }`}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-base font-semibold text-[var(--text-primary)]">
+                            Заявка компании
                           </div>
+                          <div className="text-sm text-[var(--text-primary)]/45">
+                            Внутренняя заявка
+                          </div>
+                        </div>
+                        {ticketViewType === 'company' && (
+                          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
                         )}
-                      </div>
-                      {selectedCounterparty?.id === cp.id && (
-                        <Check className="h-5 w-5 text-emerald-400" />
-                      )}
-                    </button>
-                  ))
-                )}
-              </Dropdown>
-            )}
-          </div>
+                      </button>
+                    </div>
+                  </section>
 
-          {selectedCounterparty && (
-            <button
-              type="button"
-              onClick={() => navigate(`/counterparties/${selectedCounterparty.id}`)}
-              title="Перейти к контрагенту"
-              className="flex h-[52px] w-[52px] shrink-0 items-center justify-center
+                  {/* ═══ Контрагент (сразу после выбора "Заявка контрагента") ═══ */}
+                  {ticketViewType === 'counterparty' && (
+                    <section>
+                      <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
+                        Контрагент <span className="ml-1 text-red-400">*</span>
+                      </label>
+
+                      <div className="flex items-center gap-2">
+                        <div ref={counterpartyDropdownRef} className="relative flex-1">
+                          <SelectSearch
+                            value={counterpartySearch}
+                            loading={loadingCounterparties}
+                            placeholder="Название или ИНН"
+                            onChange={(value) => {
+                              setCounterpartySearch(value);
+                              if (selectedCounterparty) setSelectedCounterparty(null);
+                              setShowCounterpartyDropdown(true);
+                              loadCounterparties(value);
+                            }}
+                            onFocus={() => {
+                              setShowCounterpartyDropdown(true);
+                              if (!counterparties.length) loadCounterparties();
+                            }}
+                          />
+
+                          {showCounterpartyDropdown && (
+                            <Dropdown>
+                              {loadingCounterparties ? (
+                                <DropdownEmpty>Загружаем контрагентов...</DropdownEmpty>
+                              ) : counterparties.length === 0 ? (
+                                <DropdownEmpty>Контрагенты не найдены</DropdownEmpty>
+                              ) : (
+                                counterparties.map((cp) => (
+                                  <button
+                                    key={cp.id}
+                                    type="button"
+                                    onClick={() => selectCounterparty(cp)}
+                                    className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
+                                  >
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                                      <Building2 className="h-5 w-5 text-blue-400" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="truncate text-base font-medium text-[var(--text-primary)]">
+                                        {cpName(cp)}
+                                      </div>
+                                      {cp.inn && (
+                                        <div className="text-sm text-[var(--text-primary)]/45">
+                                          ИНН {cp.inn}
+                                        </div>
+                                      )}
+                                    </div>
+                                    {selectedCounterparty?.id === cp.id && (
+                                      <Check className="h-5 w-5 text-emerald-400" />
+                                    )}
+                                  </button>
+                                ))
+                              )}
+                            </Dropdown>
+                          )}
+                        </div>
+
+                        {selectedCounterparty && (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/counterparties/${selectedCounterparty.id}`)}
+                            title="Перейти к контрагенту"
+                            className="flex h-[52px] w-[52px] shrink-0 items-center justify-center
                          rounded-xl border border-[var(--border-color)]
                          bg-[var(--hover-1)] text-[var(--text-primary)]/60
                          transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--accent)]"
-            >
-              <ArrowRight className="h-5 w-5" />
-            </button>
-          )}
-        </div>
-      </section>
-    )}
+                          >
+                            <ArrowRight className="h-5 w-5" />
+                          </button>
+                        )}
+                      </div>
+                    </section>
+                  )}
 
-    {/* ═══ Компания (с кнопкой «Перейти») ═══ */}
-{ticketViewType === 'company' && (
-  <section>
-    <div className="flex items-center gap-2">
-      <div className="flex flex-1 items-center gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-5 py-4">
-        <Building2 className="h-5 w-5 shrink-0 text-emerald-400" />
-        <div>
-          <p className="text-base font-medium text-[var(--text-primary)]">
-            Дио-Консалт
-          </p>
-          <p className="text-sm text-[var(--text-primary)]/50">
-            Заявка будет привязана к компании
-          </p>
-        </div>
-      </div>
+                  {/* ═══ Компания (с кнопкой «Перейти») ═══ */}
+                  {ticketViewType === 'company' && (
+                    <section>
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-1 items-center gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-5 py-4">
+                          <Building2 className="h-5 w-5 shrink-0 text-emerald-400" />
+                          <div>
+                            <p className="text-base font-medium text-[var(--text-primary)]">
+                              Дио-Консалт
+                            </p>
+                            <p className="text-sm text-[var(--text-primary)]/50">
+                              Заявка будет привязана к компании
+                            </p>
+                          </div>
+                        </div>
 
-      <button
-        type="button"
-        onClick={() => navigate(`/counterparties/${DIO_COMPANY_ID}`)}
-        title="Перейти к компании"
-        className="flex h-[68px] w-[52px] shrink-0 items-center justify-center
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/counterparties/${DIO_COMPANY_ID}`)}
+                          title="Перейти к компании"
+                          className="flex h-[68px] w-[52px] shrink-0 items-center justify-center
                    rounded-xl border border-[var(--border-color)]
                    bg-[var(--hover-1)] text-[var(--text-primary)]/60
                    transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--accent)]"
-      >
-        <ArrowRight className="h-5 w-5" />
-      </button>
-    </div>
-  </section>
-)}
+                        >
+                          <ArrowRight className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </section>
+                  )}
 
-    {/* ═══ Привязка заявки ═══ */}
-    {ticketViewType !== null && (
-      <section>
-        <div className="mb-4">
-          <h2 className="text-xl font-semibold text-[var(--text-primary)]">
-            Привязка заявки
-          </h2>
-          <p className="mt-1 text-base text-[var(--text-primary)]/50">
-            {ticketViewType === 'company'
-              ? 'Проект компании или прочая заявка'
-              : 'Проект контрагента или прочая заявка'}
-          </p>
-        </div>
+                  {/* ═══ Привязка заявки ═══ */}
+                  {ticketViewType !== null && (
+                    <section>
+                      <div className="mb-4">
+                        <h2 className="text-xl font-semibold text-[var(--text-primary)]">
+                          Привязка заявки
+                        </h2>
+                        <p className="mt-1 text-base text-[var(--text-primary)]/50">
+                          {ticketViewType === 'company'
+                            ? 'Проект компании или прочая заявка'
+                            : 'Проект контрагента или прочая заявка'}
+                        </p>
+                      </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => {
-              setSelectionType('project');
-              setSelectedProject(null);
-            }}
-            className={`
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectionType('project');
+                            setSelectedProject(null);
+                            setSelectedStage(null);
+                            setProjectStages([]);
+                          }}
+                          className={`
               flex min-h-[64px] items-center gap-3
               rounded-xl border px-4 text-left transition
               ${selectionType === 'project'
-                ? 'border-amber-500/50 bg-amber-500/10'
-                : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'}
+                              ? 'border-amber-500/50 bg-amber-500/10'
+                              : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'}
             `}
-          >
-            <FolderOpen
-              className={`h-6 w-6 shrink-0 ${
-                selectionType === 'project'
-                  ? 'text-amber-400'
-                  : 'text-[var(--text-primary)]/45'
-              }`}
-            />
-            <div className="min-w-0 flex-1">
-              <div className="text-base font-semibold text-[var(--text-primary)]">
-                Заявка по проекту
-              </div>
-              <div className="text-sm text-[var(--text-primary)]/45">
-                Привязать к проекту
-              </div>
-            </div>
-            {selectionType === 'project' && (
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-amber-400" />
-            )}
-          </button>
+                        >
+                          <FolderOpen
+                            className={`h-6 w-6 shrink-0 ${selectionType === 'project'
+                              ? 'text-amber-400'
+                              : 'text-[var(--text-primary)]/45'
+                              }`}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-base font-semibold text-[var(--text-primary)]">
+                              Заявка по проекту
+                            </div>
+                            <div className="text-sm text-[var(--text-primary)]/45">
+                              Привязать к проекту
+                            </div>
+                          </div>
+                          {selectionType === 'project' && (
+                            <CheckCircle2 className="h-5 w-5 shrink-0 text-amber-400" />
+                          )}
+                        </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setSelectionType('counterparty');
-              setSelectedProject(null);
-            }}
-            className={`
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectionType('counterparty');
+                            setSelectedProject(null);
+                          }}
+                          className={`
               flex min-h-[64px] items-center gap-3
               rounded-xl border px-4 text-left transition
               ${selectionType === 'counterparty'
-                ? 'border-blue-500/50 bg-blue-500/10'
-                : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'}
+                              ? 'border-blue-500/50 bg-blue-500/10'
+                              : 'border-[var(--border-color)] bg-[var(--hover-1)]/50 hover:bg-[var(--hover-1)]'}
             `}
-          >
-            <Building2
-              className={`h-6 w-6 shrink-0 ${
-                selectionType === 'counterparty'
-                  ? 'text-blue-400'
-                  : 'text-[var(--text-primary)]/45'
-              }`}
-            />
-            <div className="min-w-0 flex-1">
-              <div className="text-base font-semibold text-[var(--text-primary)]">
-                Прочая заявка
-              </div>
-              <div className="text-sm text-[var(--text-primary)]/45">
-                {ticketViewType === 'company'
-                  ? 'Привязать к компании Дио-Консалт'
-                  : 'Привязать к контрагенту'}
-              </div>
-            </div>
-            {selectionType === 'counterparty' && (
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-blue-400" />
-            )}
-          </button>
-        </div>
-
-        {/* Проект — если выбрали «по проекту» */}
-        {selectionType === 'project' && (
-          <div className="mt-5">
-            <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
-              {ticketViewType === 'company' ? 'Проект компании' : 'Проект контрагента'}
-              <span className="ml-1 text-red-400">*</span>
-            </label>
-
-            <div className="flex items-center gap-2">
-              <div ref={projectDropdownRef} className="relative flex-1">
-                <SelectSearch
-                  value={projectSearch}
-                  loading={loadingProjects}
-                  placeholder="Название или код проекта"
-                  onChange={(value) => {
-                    setProjectSearch(value);
-                    if (selectedProject) setSelectedProject(null);
-                    setShowProjectDropdown(true);
-                  }}
-                  onFocus={() => {
-                    setShowProjectDropdown(true);
-                    if (!projects.length) {
-                      if (ticketViewType === 'company') {
-                        loadProjects(DIO_COMPANY_ID);
-                      } else if (selectedCounterparty) {
-                        loadProjects(selectedCounterparty.id);
-                      } else {
-                        loadProjectsForAll();
-                      }
-                    }
-                  }}
-                />
-
-                {showProjectDropdown && (
-                  <Dropdown>
-                    {loadingProjects ? (
-                      <DropdownEmpty>Загружаем проекты...</DropdownEmpty>
-                    ) : filteredProjects.length === 0 ? (
-                      <DropdownEmpty>Проекты не найдены</DropdownEmpty>
-                    ) : (
-                      filteredProjects.map((project) => (
-                        <button
-                          key={project.id}
-                          type="button"
-                          onClick={() => selectProject(project)}
-                          className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
                         >
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center">
-                            <FolderOpen className="h-5 w-5 text-amber-400" />
-                          </div>
+                          <Building2
+                            className={`h-6 w-6 shrink-0 ${selectionType === 'counterparty'
+                              ? 'text-blue-400'
+                              : 'text-[var(--text-primary)]/45'
+                              }`}
+                          />
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-base font-medium text-[var(--text-primary)]">
-                              {project.name}
+                            <div className="text-base font-semibold text-[var(--text-primary)]">
+                              Прочая заявка
                             </div>
                             <div className="text-sm text-[var(--text-primary)]/45">
-                              {project.key}
+                              {ticketViewType === 'company'
+                                ? 'Привязать к компании Дио-Консалт'
+                                : 'Привязать к контрагенту'}
                             </div>
                           </div>
-                          {selectedProject?.id === project.id && (
-                            <Check className="h-5 w-5 text-emerald-400" />
+                          {selectionType === 'counterparty' && (
+                            <CheckCircle2 className="h-5 w-5 shrink-0 text-blue-400" />
                           )}
                         </button>
-                      ))
-                    )}
-                  </Dropdown>
-                )}
-              </div>
+                      </div>
 
-              {selectedProject && (
-                <button
-                  type="button"
-                  onClick={() => navigate(`/projects/${selectedProject.id}`)}
-                  title="Перейти к проекту"
-                  className="flex h-[52px] w-[52px] shrink-0 items-center justify-center
+                      {/* Проект — если выбрали «по проекту» */}
+                      {selectionType === 'project' && (
+                        <div className="mt-5">
+                          <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
+                            {ticketViewType === 'company' ? 'Проект компании' : 'Проект контрагента'}
+                            <span className="ml-1 text-red-400">*</span>
+                          </label>
+
+                          <div className="flex items-center gap-2">
+                            <div ref={projectDropdownRef} className="relative flex-1">
+                              <SelectSearch
+                                value={projectSearch}
+                                loading={loadingProjects}
+                                placeholder="Название или код проекта"
+                                onChange={(value) => {
+                                  setProjectSearch(value);
+                                  if (selectedProject) setSelectedProject(null);
+                                  setShowProjectDropdown(true);
+                                }}
+                                onFocus={() => {
+                                  setShowProjectDropdown(true);
+                                  if (!projects.length) {
+                                    if (ticketViewType === 'company') {
+                                      loadProjects(DIO_COMPANY_ID);
+                                    } else if (selectedCounterparty) {
+                                      loadProjects(selectedCounterparty.id);
+                                    } else {
+                                      loadProjectsForAll();
+                                    }
+                                  }
+                                }}
+                              />
+
+                              {showProjectDropdown && (
+                                <Dropdown>
+                                  {loadingProjects ? (
+                                    <DropdownEmpty>Загружаем проекты...</DropdownEmpty>
+                                  ) : filteredProjects.length === 0 ? (
+                                    <DropdownEmpty>Проекты не найдены</DropdownEmpty>
+                                  ) : (
+                                    filteredProjects.map((project) => (
+                                      <button
+                                        key={project.id}
+                                        type="button"
+                                        onClick={() => selectProject(project)}
+                                        className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
+                                      >
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                                          <FolderOpen className="h-5 w-5 text-amber-400" />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                          <div className="truncate text-base font-medium text-[var(--text-primary)]">
+                                            {project.name}
+                                          </div>
+                                          <div className="text-sm text-[var(--text-primary)]/45">
+                                            {project.key}
+                                          </div>
+                                        </div>
+                                        {selectedProject?.id === project.id && (
+                                          <Check className="h-5 w-5 text-emerald-400" />
+                                        )}
+                                      </button>
+                                    ))
+                                  )}
+                                </Dropdown>
+                              )}
+                            </div>
+
+                            {selectedProject && (
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/projects/${selectedProject.id}`)}
+                                title="Перейти к проекту"
+                                className="flex h-[52px] w-[52px] shrink-0 items-center justify-center
                              rounded-xl border border-[var(--border-color)]
                              bg-[var(--hover-1)] text-[var(--text-primary)]/60
                              transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--accent)]"
-                >
-                  <ArrowRight className="h-5 w-5" />
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Если «Прочая» и вид = контрагент — показываем выбранного контрагента */}
-        {selectionType === 'counterparty' &&
-          ticketViewType === 'counterparty' &&
-          selectedCounterparty && (
-            <div className="mt-5 rounded-xl border border-blue-500/25 bg-blue-500/[0.06] px-5 py-4">
-              <div className="flex items-center gap-3">
-                <Building2 className="h-5 w-5 text-blue-400" />
-                <div>
-                  <p className="text-base font-medium text-[var(--text-primary)]">
-                    {cpName(selectedCounterparty)}
-                  </p>
-                  <p className="text-sm text-[var(--text-primary)]/50">
-                    Заявка будет привязана к этому контрагенту
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-      </section>
-    )}
-
-    {/* ═══ Инициатор — всегда, если canSelectReporter ═══ */}
-    {canSelectReporter && ticketViewType !== null && (
-      <section>
-        <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
-          Инициатор <span className="ml-1 text-red-400">*</span>
-        </label>
-
-        <div ref={reporterDropdownRef} className="relative">
-          <SelectSearch
-            value={
-              selectedReporter
-                ? reporterSearch
-                : reporterSearch ||
-                  actualReporter?.full_name ||
-                  actualReporter?.username ||
-                  actualReporter?.email ||
-                  ''
-            }
-            loading={loadingUsers}
-            placeholder="Выберите инициатора"
-            onChange={(value) => {
-              setReporterSearch(value);
-              if (selectedReporter) setSelectedReporter(null);
-              setShowReporterDropdown(true);
-            }}
-            onFocus={() => {
-              if (!selectedReporter) setReporterSearch('');
-              setShowReporterDropdown(true);
-            }}
-          />
-
-          {showReporterDropdown && (
-            <Dropdown>
-              {currentUserAsReporter && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedReporter(null);
-                    setReporterSearch(
-                      currentUserAsReporter.full_name ||
-                        currentUserAsReporter.username ||
-                        currentUserAsReporter.email,
-                    );
-                    setShowReporterDropdown(false);
-                  }}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center">
-                    <User className="h-5 w-5 text-emerald-400" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-base font-medium text-[var(--text-primary)]">
-                      {uName(currentUserAsReporter)}
-                    </div>
-                    <div className="truncate text-sm text-[var(--text-primary)]/45">
-                      {currentUserAsReporter.email}
-                    </div>
-                  </div>
-                  {!selectedReporter && (
-                    <Check className="h-5 w-5 text-emerald-400" />
-                  )}
-                </button>
-              )}
-
-              {loadingUsers ? (
-                <DropdownEmpty>Загружаем пользователей...</DropdownEmpty>
-              ) : filteredUsers.length === 0 ? (
-                reporterSearch ? (
-                  <DropdownEmpty>Пользователи не найдены</DropdownEmpty>
-                ) : null
-              ) : (
-                filteredUsers.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedReporter(item);
-                      setReporterSearch(uName(item));
-                      setShowReporterDropdown(false);
-                    }}
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
-                  >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center">
-                      <User className="h-5 w-5 text-[var(--text-primary)]/45" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-base font-medium text-[var(--text-primary)]">
-                        {uName(item)}
-                      </div>
-                      <div className="truncate text-sm text-[var(--text-primary)]/45">
-                        {item.email}
-                      </div>
-                    </div>
-                    {selectedReporter?.id === item.id && (
-                      <Check className="h-5 w-5 text-emerald-400" />
-                    )}
-                  </button>
-                ))
-              )}
-            </Dropdown>
-          )}
-        </div>
-      </section>
-    )}
-  </>
+                              >
+                                <ArrowRight className="h-5 w-5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
 )}
+                                {/* Этап — если выбран проект */}
+                      {selectionType === 'project' && selectedProject && (
+                        <div className="mt-5">
+                          <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
+                            Этап проекта
+                            <span className="ml-2 text-sm font-normal text-[var(--text-primary)]/45">
+                              (необязательно)
+                            </span>
+                          </label>
+
+                          <div ref={stageDropdownRef} className="relative">
+                            <button
+                              type="button"
+                              onClick={() => setShowStageDropdown((v) => !v)}
+                              className="
+                  flex h-[52px] w-full items-center justify-between gap-3
+                  rounded-xl border border-[var(--border-color)]
+                  bg-[var(--hover-1)] px-4
+                  text-left transition-colors
+                  hover:border-[var(--accent)]/40
+                "
+                            >
+                              <div className="flex min-w-0 items-center gap-3">
+                                <Milestone className="h-5 w-5 shrink-0 text-[var(--text-primary)]/45" />
+                                <span className="truncate text-base text-[var(--text-primary)]">
+                                  {selectedStage
+                                    ? `${selectedStage.execution_order}. ${selectedStage.name}`
+                                    : loadingStages
+                                      ? 'Загружаем этапы...'
+                                      : projectStages.length === 0
+                                        ? 'В проекте нет этапов'
+                                        : 'Выберите этап'}
+                                </span>
+                              </div>
+
+                              <ChevronDown
+                                className={`h-5 w-5 shrink-0 text-[var(--text-primary)]/45 transition-transform ${showStageDropdown ? 'rotate-180' : ''
+                                  }`}
+                              />
+                            </button>
+
+                            {showStageDropdown && projectStages.length > 0 && (
+                              <Dropdown>
+                                {/* Сбросить выбор */}
+                                {selectedStage && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedStage(null);
+                                      setShowStageDropdown(false);
+                                    }}
+                                    className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
+                                  >
+                                    <X className="h-4 w-4 text-[var(--text-primary)]/45" />
+                                    <span className="text-base text-[var(--text-primary)]/60">
+                                      Без этапа
+                                    </span>
+                                  </button>
+                                )}
+
+                                {projectStages.map((stage) => (
+                                  <button
+                                    key={stage.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedStage(stage);
+                                      setShowStageDropdown(false);
+                                    }}
+                                    className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
+                                  >
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                                      <Milestone className="h-5 w-5 text-amber-400" />
+                                    </div>
+
+                                    <div className="min-w-0 flex-1">
+                                      <div className="truncate text-base font-medium text-[var(--text-primary)]">
+                                        {stage.name}
+                                      </div>
+                                      <div className="text-sm text-[var(--text-primary)]/45">
+                                        Этап {stage.execution_order} · {stage.status}
+                                      </div>
+                                    </div>
+
+                                    {selectedStage?.id === stage.id && (
+                                      <Check className="h-5 w-5 text-emerald-400" />
+                                    )}
+                                  </button>
+                                ))}
+                              </Dropdown>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+
+                      {/* Если «Прочая» и вид = контрагент — показываем выбранного контрагента */}
+                      {selectionType === 'counterparty' &&
+                        ticketViewType === 'counterparty' &&
+                        selectedCounterparty && (
+                          <div className="mt-5 rounded-xl border border-blue-500/25 bg-blue-500/[0.06] px-5 py-4">
+                            <div className="flex items-center gap-3">
+                              <Building2 className="h-5 w-5 text-blue-400" />
+                              <div>
+                                <p className="text-base font-medium text-[var(--text-primary)]">
+                                  {cpName(selectedCounterparty)}
+                                </p>
+                                <p className="text-sm text-[var(--text-primary)]/50">
+                                  Заявка будет привязана к этому контрагенту
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                    </section>
+                  )}
+
+                  {/* ═══ Инициатор — всегда, если canSelectReporter ═══ */}
+                  {canSelectReporter && ticketViewType !== null && (
+                    <section>
+                      <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
+                        Инициатор <span className="ml-1 text-red-400">*</span>
+                      </label>
+
+                      <div ref={reporterDropdownRef} className="relative">
+                        <SelectSearch
+                          value={
+                            selectedReporter
+                              ? reporterSearch
+                              : reporterSearch ||
+                              actualReporter?.full_name ||
+                              actualReporter?.username ||
+                              actualReporter?.email ||
+                              ''
+                          }
+                          loading={loadingUsers}
+                          placeholder="Выберите инициатора"
+                          onChange={(value) => {
+                            setReporterSearch(value);
+                            if (selectedReporter) setSelectedReporter(null);
+                            setShowReporterDropdown(true);
+                          }}
+                          onFocus={() => {
+                            if (!selectedReporter) setReporterSearch('');
+                            setShowReporterDropdown(true);
+                          }}
+                        />
+
+                        {showReporterDropdown && (
+                          <Dropdown>
+                            {currentUserAsReporter && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedReporter(null);
+                                  setReporterSearch(
+                                    currentUserAsReporter.full_name ||
+                                    currentUserAsReporter.username ||
+                                    currentUserAsReporter.email,
+                                  );
+                                  setShowReporterDropdown(false);
+                                }}
+                                className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
+                              >
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                                  <User className="h-5 w-5 text-emerald-400" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-base font-medium text-[var(--text-primary)]">
+                                    {uName(currentUserAsReporter)}
+                                  </div>
+                                  <div className="truncate text-sm text-[var(--text-primary)]/45">
+                                    {currentUserAsReporter.email}
+                                  </div>
+                                </div>
+                                {!selectedReporter && (
+                                  <Check className="h-5 w-5 text-emerald-400" />
+                                )}
+                              </button>
+                            )}
+
+                            {loadingUsers ? (
+                              <DropdownEmpty>Загружаем пользователей...</DropdownEmpty>
+                            ) : filteredUsers.length === 0 ? (
+                              reporterSearch ? (
+                                <DropdownEmpty>Пользователи не найдены</DropdownEmpty>
+                              ) : null
+                            ) : (
+                              filteredUsers.map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedReporter(item);
+                                    setReporterSearch(uName(item));
+                                    setShowReporterDropdown(false);
+                                  }}
+                                  className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
+                                >
+                                  <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                                    <User className="h-5 w-5 text-[var(--text-primary)]/45" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="truncate text-base font-medium text-[var(--text-primary)]">
+                                      {uName(item)}
+                                    </div>
+                                    <div className="truncate text-sm text-[var(--text-primary)]/45">
+                                      {item.email}
+                                    </div>
+                                  </div>
+                                  {selectedReporter?.id === item.id && (
+                                    <Check className="h-5 w-5 text-emerald-400" />
+                                  )}
+                                </button>
+                              ))
+                            )}
+                          </Dropdown>
+                        )}
+                      </div>
+                    </section>
+                  )}
+                </>
+              )}
 
               {/* Customer */}
 
@@ -2465,12 +2616,11 @@ useEffect(() => {
                     placeholder="Кратко опишите проблему или задачу"
                     className={`
                       input-field w-full py-3.5 text-lg
-                      ${
-                        validationErrors.includes(
-                          'Укажите тему заявки',
-                        )
-                          ? 'border-red-500'
-                          : ''
+                      ${validationErrors.includes(
+                      'Укажите тему заявки',
+                    )
+                        ? 'border-red-500'
+                        : ''
                       }
                     `}
                   />
@@ -2566,10 +2716,9 @@ useEffect(() => {
                     items-center justify-center
                     rounded-2xl border-2 border-dashed
                     px-6 py-6 outline-none transition
-                    ${
-                      isDraggingFiles
-                        ? 'border-amber-400 bg-amber-500/10'
-                        : 'border-[var(--border-color)] bg-[var(--hover-1)]/35 hover:border-amber-500/40 hover:bg-amber-500/[0.04]'
+                    ${isDraggingFiles
+                      ? 'border-amber-400 bg-amber-500/10'
+                      : 'border-[var(--border-color)] bg-[var(--hover-1)]/35 hover:border-amber-500/40 hover:bg-amber-500/[0.04]'
                     }
                   `}
                 >
@@ -2579,20 +2728,18 @@ useEffect(() => {
                         flex h-14 w-14 shrink-0
                         items-center justify-center rounded-xl
                         transition
-                        ${
-                          isDraggingFiles
-                            ? 'bg-amber-500/20'
-                            : 'bg-[var(--hover-2)] group-hover:bg-amber-500/10'
+                        ${isDraggingFiles
+                          ? 'bg-amber-500/20'
+                          : 'bg-[var(--hover-2)] group-hover:bg-amber-500/10'
                         }
                       `}
                     >
                       <Upload
                         className={`
                           h-7 w-7 transition
-                          ${
-                            isDraggingFiles
-                              ? 'text-amber-400'
-                              : 'text-[var(--text-primary)]/50 group-hover:text-amber-400'
+                          ${isDraggingFiles
+                            ? 'text-amber-400'
+                            : 'text-[var(--text-primary)]/50 group-hover:text-amber-400'
                           }
                         `}
                       />
@@ -2602,10 +2749,9 @@ useEffect(() => {
                       <p
                         className={`
                           text-base font-semibold
-                          ${
-                            isDraggingFiles
-                              ? 'text-amber-300'
-                              : 'text-[var(--text-primary)]'
+                          ${isDraggingFiles
+                            ? 'text-amber-300'
+                            : 'text-[var(--text-primary)]'
                           }
                         `}
                       >
@@ -2773,10 +2919,9 @@ useEffect(() => {
                             flex min-h-[76px] items-center gap-3
                             rounded-xl border px-4 py-3
                             text-left transition
-                            ${
-                              selected
-                                ? 'border-[var(--accent)]/50 bg-[var(--accent)]/10'
-                                : 'border-[var(--border-color)] bg-[var(--hover-1)]/40 hover:bg-[var(--hover-1)]'
+                            ${selected
+                              ? 'border-[var(--accent)]/50 bg-[var(--accent)]/10'
+                              : 'border-[var(--border-color)] bg-[var(--hover-1)]/40 hover:bg-[var(--hover-1)]'
                             }
                           `}
                         >
@@ -2827,10 +2972,9 @@ useEffect(() => {
                             items-center gap-3
                             rounded-xl border px-4 py-4
                             text-left transition
-                            ${
-                              selected
-                                ? item.selected
-                                : 'border-[var(--border-color)] bg-[var(--hover-1)]/40 hover:bg-[var(--hover-1)]'
+                            ${selected
+                              ? item.selected
+                              : 'border-[var(--border-color)] bg-[var(--hover-1)]/40 hover:bg-[var(--hover-1)]'
                             }
                           `}
                         >
@@ -2891,12 +3035,10 @@ useEffect(() => {
                               transition hover:brightness-110
                             "
                             style={{
-                              backgroundColor: `${
-                                tag.color || '#94a3b8'
-                              }18`,
-                              borderColor: `${
-                                tag.color || '#94a3b8'
-                              }55`,
+                              backgroundColor: `${tag.color || '#94a3b8'
+                                }18`,
+                              borderColor: `${tag.color || '#94a3b8'
+                                }55`,
                               color: tag.color || '#cbd5e1',
                             }}
                           >
@@ -3095,18 +3237,30 @@ useEffect(() => {
                       </p>
 
                       {selectedProject ? (
-                        <div className="flex items-center gap-3">
-                          <FolderOpen className="h-5 w-5 text-amber-400" />
+                        <div>
+                          <div className="flex items-center gap-3">
+                            <FolderOpen className="h-5 w-5 text-amber-400" />
 
-                          <div>
-                            <p className="text-base font-medium text-[var(--text-primary)]">
-                              {selectedProject.name}
-                            </p>
+                            <div>
+                              <p className="text-base font-medium text-[var(--text-primary)]">
+                                {selectedProject.name}
+                              </p>
 
-                            <p className="text-sm text-[var(--text-primary)]/45">
-                              {selectedProject.key}
-                            </p>
+                              <p className="text-sm text-[var(--text-primary)]/45">
+                                {selectedProject.key}
+                              </p>
+                            </div>
                           </div>
+
+                          {selectedStage && (
+                            <div className="mt-3 flex items-center gap-3 pl-8">
+                              <Milestone className="h-4 w-4 text-amber-400" />
+
+                              <p className="text-sm text-[var(--text-primary)]/70">
+                                Этап: {selectedStage.execution_order}. {selectedStage.name}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       ) : selectedCounterparty ? (
                         <div className="flex items-center gap-3">
@@ -3289,9 +3443,8 @@ useEffect(() => {
                             key={tag.name}
                             className="rounded-lg px-3 py-1.5 text-sm font-medium"
                             style={{
-                              backgroundColor: `${
-                                tag.color || '#94a3b8'
-                              }20`,
+                              backgroundColor: `${tag.color || '#94a3b8'
+                                }20`,
                               color: tag.color || '#cbd5e1',
                             }}
                           >
@@ -3419,59 +3572,59 @@ useEffect(() => {
         </footer>
       </main>
       {showExitConfirm && (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-    <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-      onClick={() => setShowExitConfirm(false)}
-    />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowExitConfirm(false)}
+          />
 
-    <div className="relative w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-2xl overflow-hidden">
-      <div className="p-6 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10">
-          <AlertTriangle className="h-6 w-6 text-amber-500" />
-        </div>
+          <div className="relative w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-2xl overflow-hidden">
+            <div className="p-6 text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10">
+                <AlertTriangle className="h-6 w-6 text-amber-500" />
+              </div>
 
-        <h3 className="mb-2 text-lg font-bold text-[var(--text-primary)]">
-          Сохранить черновик?
-        </h3>
+              <h3 className="mb-2 text-lg font-bold text-[var(--text-primary)]">
+                Сохранить черновик?
+              </h3>
 
-        <p className="text-sm text-[var(--text-primary)]/50">
-          У вас есть незаконченная заявка. Сохранить её на будущее?
-        </p>
-      </div>
+              <p className="text-sm text-[var(--text-primary)]/50">
+                У вас есть незаконченная заявка. Сохранить её на будущее?
+              </p>
+            </div>
 
-      <div className="flex border-t border-[var(--border-color)]">
-        <button
-          type="button"
-          onClick={() => {
-            clearDraft(draftKey);
-            setShowExitConfirm(false);
-            navigate('/tickets');
-          }}
-          className="flex-1 py-3.5 text-sm font-medium text-[var(--text-primary)]/60
+            <div className="flex border-t border-[var(--border-color)]">
+              <button
+                type="button"
+                onClick={() => {
+                  clearDraft(draftKey);
+                  setShowExitConfirm(false);
+                  navigate('/tickets');
+                }}
+                className="flex-1 py-3.5 text-sm font-medium text-[var(--text-primary)]/60
                      hover:bg-[var(--hover-1)] transition-colors"
-        >
-          Не сохранять
-        </button>
+              >
+                Не сохранять
+              </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            // Черновик уже сохраняется автоматически (autosave), просто выходим
-            setShowExitConfirm(false);
-            navigate('/tickets');
-          }}
-          className="flex flex-1 items-center justify-center gap-2
+              <button
+                type="button"
+                onClick={() => {
+                  // Черновик уже сохраняется автоматически (autosave), просто выходим
+                  setShowExitConfirm(false);
+                  navigate('/tickets');
+                }}
+                className="flex flex-1 items-center justify-center gap-2
                      border-l border-[var(--border-color)]
                      py-3.5 text-sm font-semibold
                      text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors"
-        >
-          Сохранить
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
