@@ -1,18 +1,22 @@
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.domain.exceptions import AlreadyExistsError, NotFoundError
 
-from .domain.entities import Counterparty
+from .domain.entities import Counterparty, CounterpartyProduct
 from .domain.repo import CounterpartyRepository
 from .domain.vo import ContactPerson, Inn, Kpp, Okpo, Phone
-from .mappers import map_counterparty_to_response
+from .mappers import map_counterparty_product_to_response, map_counterparty_to_response
 from .schemas import (
     BranchAdd,
     ContactPersonIn,
     CounterpartyCreate,
     CounterpartyEdit,
+    CounterpartyProductCreate,
+    CounterpartyProductResponse,
+    CounterpartyProductUpdate,
     CounterpartyResponse,
 )
 
@@ -152,7 +156,9 @@ class CounterpartyService:
 
         return map_counterparty_to_response(counterparty)
 
-    async def link_product(self, counterparty_id: UUID, product_id: UUID) -> None:
+    async def link_product(
+            self, counterparty_id: UUID, data: CounterpartyProductCreate
+    ) -> CounterpartyProductResponse:
         """
         Привязка программного продукта к контрагенту
         (программны продукт из общего справочника)
@@ -163,22 +169,78 @@ class CounterpartyService:
         if counterparty is None:
             raise NotFoundError(f"Counterparty with ID {counterparty_id} not found")
 
-        # 2. Привязка продукта
-        await self.repository.link_product(counterparty.id, product_id)
-        await self.session.commit()
+        existing_link = await self.repository.get_product_link_by_serial(data.serial_number)
+        if existing_link is not None:
+            raise AlreadyExistsError(
+                f"Product with serial number {data.serial_number} is already linked"
+            )
 
-    async def unlink_product(self, counterparty_id: UUID, product_id: UUID) -> None:
+        product = await self.repository.get_product(data.product_id)
+        if product is None:
+            raise NotFoundError(f"Product with ID {data.product_id} not found")
+
+        link = CounterpartyProduct(
+            counterparty_id=counterparty.id,
+            product_id=data.product_id,
+            serial_number=data.serial_number,
+            product=product,
+        )
+        await self.repository.link_product(link)
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise AlreadyExistsError(
+                f"Product with serial number {data.serial_number} is already linked"
+            ) from exc
+
+        return map_counterparty_product_to_response(link)
+
+    async def update_product_link(
+            self,
+            counterparty_id: UUID,
+            link_id: UUID,
+            data: CounterpartyProductUpdate,
+    ) -> CounterpartyProductResponse:
+        link = await self.repository.read_product_link(counterparty_id, link_id)
+        if link is None:
+            raise NotFoundError(
+                f"Product link with ID {link_id} not found for counterparty {counterparty_id}"
+            )
+
+        existing_link = await self.repository.get_product_link_by_serial(data.serial_number)
+        if existing_link is not None and existing_link.id != link.id:
+            raise AlreadyExistsError(
+                f"Product with serial number {data.serial_number} is already linked"
+            )
+
+        link.change_serial_number(data.serial_number)
+        await self.repository.update_product_link(link)
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise AlreadyExistsError(
+                f"Product with serial number {data.serial_number} is already linked"
+            ) from exc
+
+        return map_counterparty_product_to_response(link)
+
+    async def unlink_product(self, counterparty_id: UUID, link_id: UUID) -> None:
         """
         Отвязка программного продукта от контрагента
         """
-        
+
         # 1. Получение и проверка на существование контрагента
         counterparty = await self.repository.read(counterparty_id)
         if counterparty is None:
             raise NotFoundError(f"Counterparty with ID {counterparty_id} not found")
-        
-        # 2. Отвязка продукта
-        await self.repository.unlink_product(counterparty.id, product_id)
+
+        deleted = await self.repository.unlink_product(counterparty.id, link_id)
+        if not deleted:
+            raise NotFoundError(
+                f"Product link with ID {link_id} not found for counterparty {counterparty_id}"
+            )
         await self.session.commit()
 
     async def delete_contact_person(

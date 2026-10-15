@@ -2,17 +2,15 @@ from typing import Annotated, Any
 
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Path, Query, status
+from fastapi import APIRouter, Depends, Path, Query, status
 from pydantic import EmailStr
 
-from src.shared.domain.exceptions import NotFoundError
 from src.iam.dependencies import get_current_user, require_role
 from src.iam.domain.vo import UserRole
 from src.iam.mappers import map_user_to_response
 from src.iam.schemas import UserResponse
-from src.products.mappers import map_product_to_response
-from src.products.schemas import ProductResponse
 from src.shared.dependencies import PaginationDep
+from src.shared.domain.exceptions import NotFoundError
 from src.shared.schemas import Page
 
 from .dependencies import (
@@ -21,11 +19,15 @@ from .dependencies import (
     get_counterparty_or_404,
     paginate_counterparties,
 )
+from .mappers import map_counterparty_product_to_response
 from .schemas import (
     BranchAdd,
     ContactPersonIn,
     CounterpartyCreate,
     CounterpartyEdit,
+    CounterpartyProductCreate,
+    CounterpartyProductResponse,
+    CounterpartyProductUpdate,
     CounterpartyResponse,
 )
 
@@ -142,7 +144,7 @@ async def add_contact_person(
 async def delete_contact_person(
         counterparty_id: UUID,
         phone: Annotated[str, Query(..., description="Номер телефона")],
-        
+
         service: CounterpartyServiceDep,
         email: EmailStr | None = Query(None, description="Email адрес"),
 
@@ -168,24 +170,22 @@ async def get_counterparty_customers(
 @router.post(
     path="/{counterparty_id}/products",
     status_code=status.HTTP_201_CREATED,
+    response_model=CounterpartyProductResponse,
     dependencies=[Depends(require_role(REQUIRED_ROLES))],
     summary="Привязка программного продукта к контрагенту"
 )
 async def link_counterparty_product(
         counterparty_id: UUID,
-        product_id: Annotated[
-            UUID, Body(..., embed=True, description="ID продукта из справочника")
-        ],
+        data: CounterpartyProductCreate,
         service: CounterpartyServiceDep,
-) -> dict[str, str]:
-    await service.link_product(counterparty_id, product_id)
-    return {"message": "Software product linked successfully"}
+) -> CounterpartyProductResponse:
+    return await service.link_product(counterparty_id, data)
 
 
 @router.get(
     path="/{counterparty_id}/products",
     status_code=status.HTTP_200_OK,
-    response_model=Page[ProductResponse],
+    response_model=Page[CounterpartyProductResponse],
     dependencies=[Depends(get_current_user)],
     summary="Получение программных продуктов контрагента"
 )
@@ -193,20 +193,36 @@ async def get_counterparty_products(
         counterparty_id: UUID,
         pagination: PaginationDep,
         repository: CounterpartyRepoDep
-) -> Page[ProductResponse]:
+) -> Page[CounterpartyProductResponse]:
     page = await repository.get_products(counterparty_id, pagination)
-    return page.to_response(map_product_to_response)
+    return page.to_response(map_counterparty_product_to_response)
+
+
+@router.patch(
+    path="/{counterparty_id}/products/{link_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=CounterpartyProductResponse,
+    dependencies=[Depends(require_role(REQUIRED_ROLES))],
+    summary="Изменение серийного номера продукта контрагента",
+)
+async def update_counterparty_product(
+        counterparty_id: UUID,
+        link_id: UUID,
+        data: CounterpartyProductUpdate,
+        service: CounterpartyServiceDep,
+) -> CounterpartyProductResponse:
+    return await service.update_product_link(counterparty_id, link_id, data)
 
 
 @router.delete(
-    path="/{counterparty_id}/products/{product_id}",
+    path="/{counterparty_id}/products/{link_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_role(REQUIRED_ROLES))],
     summary="Отвязка программного продукта от контрагента"
 )
 async def unlink_counterparty_product(
         counterparty_id: UUID,
-        product_id: UUID,
+        link_id: UUID,
         service: CounterpartyServiceDep,
 ) -> None:
-    await service.unlink_product(counterparty_id, product_id)   
+    await service.unlink_product(counterparty_id, link_id)
