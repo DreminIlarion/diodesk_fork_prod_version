@@ -1,5 +1,6 @@
 from typing import Protocol, override
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -25,6 +26,19 @@ class UserRepository(Repository[User]):
     ) -> Page[User]: ...
 
     async def get_by_email(self, email: Email) -> User | None: ...
+
+    async def search(
+            self,
+            query: str | None = None,
+            *,
+            roles: Collection[UserRole] | None = None,
+            active_only: bool = True,
+            limit: int = 20,
+    ) -> list[User]:
+        """
+        Поиск пользователей по ФИО, email или логину (подстрока, без учёта регистра).
+        Если указаны роли - пользователь должен иметь хотя бы одну из них.
+        """
 
 
 class TokenStore(Protocol):
