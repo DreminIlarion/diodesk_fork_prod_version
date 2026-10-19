@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import TEXT, Computed, DateTime, Enum, Index, String, literal, select
+from sqlalchemy import TEXT, Computed, DateTime, Index, String, literal, select
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
@@ -9,7 +9,7 @@ from src.comments.infra.models import CommentOrm
 from src.core.database import Base
 from src.media.infra.models import AttachmentOrm
 from src.shared.domain.vo import Priority
-from src.shared.infra.sqlalchemy_types import DslUUID, TagListJSONB
+from src.shared.infra.sqlalchemy_types import DslEnum, DslUUID, TagListJSONB
 
 from ..domain.vo import TicketStatus, TicketType
 
@@ -32,9 +32,9 @@ class TicketOrm(Base):
     number: Mapped[str] = mapped_column(String(25), unique=True)
     title: Mapped[str]
     description: Mapped[str] = mapped_column(TEXT)
-    ticket_type: Mapped[TicketType] = mapped_column(Enum(TicketType))
-    status: Mapped[TicketStatus] = mapped_column(Enum(TicketStatus))
-    priority: Mapped[Priority] = mapped_column(Enum(Priority))
+    ticket_type: Mapped[TicketType] = mapped_column(DslEnum(TicketType))
+    status: Mapped[TicketStatus] = mapped_column(DslEnum(TicketStatus))
+    priority: Mapped[Priority] = mapped_column(DslEnum(Priority))
 
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

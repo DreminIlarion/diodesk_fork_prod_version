@@ -101,9 +101,17 @@ async def test_ticket_repository_executes_nested_ddf_filter_on_postgres(session)
             Group(
                 op="$or",
                 filters=(
-                    Condition(field="status", op="$eq", value=TicketStatus.OPEN.value),
-                    Condition(field="status", op="$eq", value=TicketStatus.NEW.value),
+                    Condition(
+                        field="status",
+                        op="$in",
+                        value=[TicketStatus.OPEN.value, TicketStatus.NEW.value],
+                    ),
                 ),
+            ),
+            Condition(
+                field="ticketType",
+                op="$eq",
+                value=TicketType.INCIDENT.value,
             ),
             Negation(
                 filter=Condition(
@@ -195,7 +203,12 @@ async def test_task_repository_executes_iso_date_filter_on_postgres(session) -> 
             filters=(
                 Condition(field="projectId", op="$eq", value=str(project_id)),
                 Condition(field="dueDate", op="$lt", value="2026-10-14"),
-                Condition(field="status", op="$eq", value=TaskStatus.TODO.value),
+                Condition(
+                    field="status",
+                    op="$nin",
+                    value=[TaskStatus.DONE.value, TaskStatus.CANCELLED.value],
+                ),
+                Condition(field="priority", op="$eq", value=Priority.HIGH.value),
             ),
         ),
     )

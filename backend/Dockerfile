@@ -3,7 +3,9 @@
 # ────────────────────────────────────────────────
 # Стадия 1 — сборка зависимостей (builder)
 # ────────────────────────────────────────────────
-FROM python:3.13-slim AS builder
+ARG PYTHON_VERSION=3.14
+
+FROM python:${PYTHON_VERSION}-slim AS builder
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -12,6 +14,10 @@ ENV PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy
 
 WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install --yes --no-install-recommends git && \
+    rm -rf /var/lib/apt/lists/*
 
 # Копируем только lock-файлы / requirements (самое важное!)
 COPY pyproject.toml uv.lock requirements.txt* ./
@@ -26,7 +32,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 # ────────────────────────────────────────────────
 # Стадия 2 — финальный образ (runtime)
 # ────────────────────────────────────────────────
-FROM python:3.13-slim
+FROM python:${PYTHON_VERSION}-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1

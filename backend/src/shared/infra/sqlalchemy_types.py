@@ -1,10 +1,44 @@
-from typing import Any, override
+from typing import Any, TypeVar, override
 
 from datetime import date, datetime
+from enum import Enum as PythonEnum
 from uuid import UUID
 
 from sqlalchemy import Date, DateTime, TypeDecorator, Uuid, not_, or_
+from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.dialects.postgresql import JSONB
+
+EnumT = TypeVar("EnumT", bound=PythonEnum)
+
+
+class DslEnum(TypeDecorator[EnumT]):
+    """Enum column accepting member values coming from the JSON-based DDF DSL."""
+
+    impl = SqlEnum
+    cache_ok = True
+
+    def __init__(self, enum_type: type[EnumT], **kwargs: Any) -> None:
+        self.enum_type = enum_type
+        super().__init__(enum_type, **kwargs)
+
+    @override
+    def process_bind_param(
+        self,
+        value: EnumT | str | None,
+        _dialect: Any,
+    ) -> EnumT | None:
+        if value is None or isinstance(value, self.enum_type):
+            return value
+
+        try:
+            return self.enum_type(value)
+        except ValueError:
+            try:
+                return self.enum_type[str(value)]
+            except KeyError as error:
+                raise ValueError(
+                    f"Unknown {self.enum_type.__name__} value: {value!r}"
+                ) from error
 
 
 class DslUUID(TypeDecorator[UUID]):
