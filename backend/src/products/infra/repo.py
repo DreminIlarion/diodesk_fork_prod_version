@@ -1,7 +1,10 @@
 from typing import override
 
-from sqlalchemy import String, cast, desc, func, select, text
+from uuid import UUID
 
+from sqlalchemy import String, cast, desc, exists, func, or_, select, text
+
+from ...crm.infra.models import CounterpartyOrm, CounterpartyProductOrm
 from ...shared.infra.repos import ModelMapper, SqlAlchemyRepository
 from ...shared.schemas import Page, Pagination
 from ..domain.entities import SoftwareProduct
@@ -58,6 +61,8 @@ class SqlProductRepository(SqlAlchemyRepository[SoftwareProduct, SoftwareProduct
             category: ProductCategory | None = None,
             status: ProductStatus | None = None,
             search: str | None = None,
+            counterparty_id: UUID | None = None,
+            without_counterparty: bool = False,
     ) -> Page[SoftwareProduct]:
         # 1. Базовый запрос на получение всех данных
         stmt = select(self.model).where(self.model.deleted_at.is_(None))
@@ -67,6 +72,26 @@ class SqlProductRepository(SqlAlchemyRepository[SoftwareProduct, SoftwareProduct
             stmt = stmt.where(self.model.category == category)
         if status is not None:
             stmt = stmt.where(self.model.status == status)
+        if without_counterparty:
+            stmt = stmt.where(
+                ~exists().where(
+                    CounterpartyProductOrm.product_id == self.model.id,
+                )
+            )
+        elif counterparty_id is not None:
+            counterparty_ids = select(CounterpartyOrm.id).where(
+                or_(
+                    CounterpartyOrm.id == counterparty_id,
+                    CounterpartyOrm.parent_id == counterparty_id,
+                )
+            )
+
+            stmt = stmt.where(
+                exists().where(
+                    CounterpartyProductOrm.product_id == self.model.id,
+                    CounterpartyProductOrm.counterparty_id.in_(counterparty_ids),
+                )
+            )
         if search is not None:
             search_term = cast(search, String)
             trigram_condition = text(
