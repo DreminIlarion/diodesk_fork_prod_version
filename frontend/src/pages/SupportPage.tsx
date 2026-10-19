@@ -507,7 +507,7 @@ export default function SupportPage() {
   // ===========================================================================
 
   return (
-    <div className="mx-auto max-w-5xl px-4 pb-14 sm:px-6">
+    <div className="mx-auto px-4 pb-14 sm:px-6">
 
       {/* Back */}
 
@@ -553,7 +553,7 @@ export default function SupportPage() {
 
         </div>
 
-        <p className="max-w-3xl text-base leading-7 text-[var(--text-primary)]/65">
+        <p className=" text-base leading-7 text-[var(--text-primary)]/65">
           Возникли вопросы при работе с DIO Desk?
           Столкнулись с ошибкой или хотите предложить улучшение?
           Опишите ситуацию, и мы поможем разобраться.
