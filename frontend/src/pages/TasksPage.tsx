@@ -2132,7 +2132,7 @@ const loadUsers = useCallback(async (q: string, p: number) => {
     return result;
   };
 
-  useEffect(() => {
+    useEffect(() => {
     if (mode !== 'create' || context.type !== 'ticket' || !context.ticket_id) return;
 
     let cancelled = false;
@@ -2158,32 +2158,26 @@ const loadUsers = useCallback(async (q: string, p: number) => {
 
         if (ticket.created_by) {
           try {
-            const u = await usersApi.getById(ticket.created_by); // важно: чтобы этот метод был добавлен
+            const u = await usersApi.getById(ticket.created_by);
             if (!cancelled) setBaseTicketCreator(u);
           } catch { }
         }
 
-
         // ── ЭТАП ЗАЯВКИ ──
-const stageId = (ticket as any).stage_id as string | undefined;
-if (stageId && ticket.project_id) {
-  try {
-    const proj = await projectsApi.getById(ticket.project_id);
-    if (cancelled) return;
-    const stage = (proj.stages ?? []).find((s) => s.id === stageId);
-    if (stage) {
-      setTicketStageName(stage.name);
-      setTicketStageOrder(stage.execution_order);
-    }
-  } catch { /* тихо игнорим — этап просто не покажется */ }
-}
-
+        const stageId = (ticket as any).stage_id as string | undefined;
+        if (stageId && ticket.project_id) {
+          try {
+            const proj = await projectsApi.getById(ticket.project_id);
+            if (cancelled) return;
+            const stage = (proj.stages ?? []).find((s) => s.id === stageId);
+            if (stage) {
+              setTicketStageName(stage.name);
+              setTicketStageOrder(stage.execution_order);
+            }
+          } catch { /* тихо игнорим */ }
+        }
       } catch { }
-    }
-    
-  
-  
-  )();
+    })();
 
     return () => {
       cancelled = true;
