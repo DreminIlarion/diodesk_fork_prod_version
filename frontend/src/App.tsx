@@ -32,6 +32,8 @@ const MyCompanyPage = lazy(() => import('./pages/MyCompanyPage'));
 const InvitationsPage = lazy(() => import('./pages/InvitationsPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const SupportPage = lazy(() => import('./pages/SupportPage'));
+
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
 const NewProjectPage = lazy(() => import('./pages/NewProjectPage'));
 const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage'));
@@ -100,6 +102,7 @@ export default function App() {
               <Route path="/products/new" element={<LazyRoute><ProtectedRoute><CreateProductPage /></ProtectedRoute></LazyRoute>} />
               <Route path="/notifications" element={<LazyRoute><NotificationsPage /></LazyRoute>} />
               <Route path="/profile" element={<LazyRoute><ProfilePage /></LazyRoute>} />
+              <Route path="/support" element={<LazyRoute><SupportPage /></LazyRoute>}/>
 
 
               <Route path="/feedbacks" element={<LazyRoute><FeedbacksPage /></LazyRoute>} />

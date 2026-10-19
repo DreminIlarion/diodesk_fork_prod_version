@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Moon,
   Sun,
+  CircleHelp,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -424,6 +425,28 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   >
                     <Settings className="w-5 h-5" />
                     Настройки
+                  </Link>
+
+                                    {/* Поддержка DIO Desk */}
+                  <Link
+                    to="/support"
+                    onClick={() => setShowDropdown(false)}
+                    className="
+                      flex
+                      items-center
+                      gap-3
+                      px-4
+                      py-3
+                      text-[var(--text-secondary)]
+                      hover:text-[var(--text-primary)]
+                      hover:bg-[var(--hover-1)]
+                      rounded-xl
+                      transition-colors
+                      text-base
+                    "
+                  >
+                    <CircleHelp className="w-5 h-5" />
+                    Поддержка
                   </Link>
 
                 </div>
