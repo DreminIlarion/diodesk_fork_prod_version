@@ -2698,46 +2698,228 @@ useEffect(() => {
                 </div>
               )}
 
+                         {/* Заявка, на основании которой создаётся задача */}
               {lockTicket && (
-  <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 flex items-center gap-3">
-    <Ticket className="w-5 h-5 text-blue-400 shrink-0" />
-    <div className="min-w-0 flex-1">
-      <p className="text-sm font-medium text-[var(--text-primary)]">
-        Создание на основании заявки
-      </p>
+                <div
+                  className="
+                    overflow-hidden rounded-xl
+                    border border-[var(--border-color)]
+                    bg-[var(--hover-1)]/40
+                  "
+                >
+                  {/* Заголовок карточки */}
+                  <div className="flex items-center gap-3 px-4 py-3.5">
+                    <div
+                      className="
+                        flex h-9 w-9 shrink-0 items-center justify-center
+                        rounded-lg
+                        border border-[var(--border-color)]
+                        bg-[var(--hover-2)]
+                      "
+                    >
+                      <Ticket
+                        className="h-[18px] w-[18px] text-[var(--text-primary)]/60"
+                        strokeWidth={1.8}
+                      />
+                    </div>
 
-      {baseTicket ? (
-        <>
-          <p className="text-xs text-blue-400 mt-0.5">
-            {baseTicket.number} — {baseTicket.title}
-          </p>
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className="
+                          text-[13px] font-medium
+                          text-[var(--text-primary)]/55
+                        "
+                      >
+                        Основание задачи
+                      </p>
 
-          {!!requesterLabel && (
-            <p className="text-xs text-[var(--text-primary)]/55 truncate">
-              от: {requesterLabel}
-            </p>
-          )}
+                      <p
+                        className="
+                          mt-0.5 text-sm font-semibold
+                          text-[var(--text-primary)]
+                        "
+                      >
+                        Заявка
+                      </p>
+                    </div>
 
-          {/* ── ЭТАП ЗАЯВКИ (только показ, без сохранения) ── */}
-          {ticketStageName && (
-            <div className="mt-2 inline-flex items-center gap-2 px-2.5 py-1 rounded-lg
-                            bg-amber-500/10 border border-amber-500/25
-                            text-amber-400">
-              <Milestone className="w-3.5 h-3.5 shrink-0" />
-              <span className="text-[11px] font-medium truncate">
-                Этап {ticketStageOrder != null ? String(ticketStageOrder).padStart(2, '0') : '—'} · {ticketStageName}
-              </span>
-            </div>
-          )}
-        </>
-      ) : (
-        <p className="text-xs text-blue-400 truncate mt-0.5">
-          {ticketLabel || 'Заявка будет привязана автоматически'}
-        </p>
-      )}
-    </div>
-  </div>
-)}
+                    <div
+                      className="
+                        flex shrink-0 items-center
+                        rounded-md
+                        border border-[var(--border-color)]
+                        bg-[var(--hover-2)]
+                        px-2 py-1
+                      "
+                    >
+                      <span
+                        className="
+                          text-[11px] font-medium
+                          text-[var(--text-primary)]/50
+                        "
+                      >
+                        ИСТОЧНИК
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Информация о заявке */}
+                  <div
+                    className="
+                      border-t border-[var(--border-color)]
+                      px-4 py-4
+                    "
+                  >
+                    {baseTicket ? (
+                      <div className="space-y-3">
+
+                        {/* Номер заявки */}
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="
+                              inline-flex items-center
+                              rounded-md
+                              border border-[var(--border-color)]
+                              bg-[var(--hover-2)]
+                              px-2.5 py-1
+                              text-xs font-medium
+                              tracking-wide
+                              text-[var(--text-primary)]/65
+                            "
+                          >
+                            {baseTicket.number}
+                          </span>
+                        </div>
+
+                        {/* Название заявки */}
+                        <p
+                          className="
+                            break-words
+                            text-[15px] font-medium
+                            leading-relaxed
+                            text-[var(--text-primary)]
+                          "
+                        >
+                          {baseTicket.title}
+                        </p>
+
+                        {/* Автор заявки */}
+                        {!!requesterLabel && (
+                          <div className="flex items-center gap-2.5">
+                            <User
+                              className="
+                                h-4 w-4 shrink-0
+                                text-[var(--text-primary)]/40
+                              "
+                              strokeWidth={1.8}
+                            />
+
+                            <span
+                              className="
+                                text-[13px]
+                                text-[var(--text-primary)]/50
+                              "
+                            >
+                              Автор
+                            </span>
+
+                            <span
+                              className="
+                                min-w-0 truncate
+                                text-[13px] font-medium
+                                text-[var(--text-primary)]/80
+                              "
+                            >
+                              {requesterLabel}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Этап проекта */}
+                        {ticketStageName && (
+                          <div
+                            className="
+                              mt-4 flex items-start gap-3
+                              border-t border-[var(--border-color)]
+                              pt-3.5
+                            "
+                          >
+                            <div
+                              className="
+                                flex h-8 w-8 shrink-0
+                                items-center justify-center
+                                rounded-lg
+                                bg-[var(--hover-2)]
+                              "
+                            >
+                              <Milestone
+                                className="
+                                  h-4 w-4
+                                  text-[var(--text-primary)]/55
+                                "
+                                strokeWidth={1.8}
+                              />
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <p
+                                className="
+                                  text-xs
+                                  text-[var(--text-primary)]/45
+                                "
+                              >
+                                Этап проекта
+                              </p>
+
+                              <p
+                                className="
+                                  mt-1 break-words
+                                  text-sm font-medium
+                                  leading-5
+                                  text-[var(--text-primary)]/85
+                                "
+                              >
+                                {ticketStageOrder != null && (
+                                  <span
+                                    className="
+                                      mr-2
+                                      text-[var(--text-primary)]/45
+                                    "
+                                  >
+                                    {String(ticketStageOrder).padStart(2, '0')}
+                                  </span>
+                                )}
+
+                                {ticketStageName}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2.5">
+                        <Ticket
+                          className="
+                            h-4 w-4 shrink-0
+                            text-[var(--text-primary)]/40
+                          "
+                        />
+
+                        <p
+                          className="
+                            min-w-0 truncate
+                            text-sm
+                            text-[var(--text-primary)]/65
+                          "
+                        >
+                          {ticketLabel ||
+                            'Заявка будет привязана автоматически'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Приоритет */}
               <div>
