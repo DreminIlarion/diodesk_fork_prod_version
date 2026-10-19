@@ -2704,7 +2704,7 @@ useEffect(() => {
 
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-[var(--text-primary)]">
-                      Создание задачи на основании заявки
+                      Создание на основании заявки
                     </p>
 
                     {baseTicket ? (
