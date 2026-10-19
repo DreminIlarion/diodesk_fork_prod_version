@@ -2132,57 +2132,94 @@ const loadUsers = useCallback(async (q: string, p: number) => {
     return result;
   };
 
-    useEffect(() => {
-    if (mode !== 'create' || context.type !== 'ticket' || !context.ticket_id) return;
+    // 1. Загрузка заявки
+useEffect(() => {
+  if (mode !== 'create' || context.type !== 'ticket' || !context.ticket_id) return;
 
-    let cancelled = false;
+  let cancelled = false;
 
-    (async () => {
-      try {
-        setBaseTicket(null);
-        setBaseTicketCreator(null);
+  (async () => {
+    try {
+      setBaseTicket(null);
+      setBaseTicketCreator(null);
+      setTicketStageName('');
+      setTicketStageOrder(null);
 
-        const ticket = await ticketsApi.getById(context.ticket_id);
-        if (cancelled) return;
+      const ticket = await ticketsApi.getById(context.ticket_id);
+      if (cancelled) return;
 
-        setBaseTicket(ticket);
+      setBaseTicket(ticket);
 
-        if (ticket.project_id) {
-          setProjectId(ticket.project_id);
-          firstProjectChange.current = true;
-        }
+      if (ticket.project_id) {
+        setProjectId(ticket.project_id);
+        firstProjectChange.current = true;
+      }
 
-        if (ticket.priority) {
-          setPri(ticket.priority as TaskPriority);
-        }
+      if (ticket.priority) {
+        setPri(ticket.priority as TaskPriority);
+      }
 
-        if (ticket.created_by) {
-          try {
-            const u = await usersApi.getById(ticket.created_by);
-            if (!cancelled) setBaseTicketCreator(u);
-          } catch { }
-        }
+      if (ticket.created_by) {
+        try {
+          const u = await usersApi.getById(ticket.created_by);
+          if (!cancelled) setBaseTicketCreator(u);
+        } catch { }
+      }
+    } catch { }
+  })();
 
-        // ── ЭТАП ЗАЯВКИ ──
-        const stageId = (ticket as any).stage_id as string | undefined;
-        if (stageId && ticket.project_id) {
-          try {
-            const proj = await projectsApi.getById(ticket.project_id);
-            if (cancelled) return;
-            const stage = (proj.stages ?? []).find((s) => s.id === stageId);
-            if (stage) {
-              setTicketStageName(stage.name);
-              setTicketStageOrder(stage.execution_order);
-            }
-          } catch { /* тихо игнорим */ }
-        }
-      } catch { }
-    })();
+  return () => {
+    cancelled = true;
+  };
+}, [mode, context.type, context.ticket_id]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [mode, context.type, context.ticket_id]);
+// 2. Загрузка этапа по данным заявки
+useEffect(() => {
+  let cancelled = false;
+
+  const stageId = (baseTicket as any)?.stage_id as string | undefined;
+  const projectId = (baseTicket as any)?.project_id as string | undefined;
+
+  if (!stageId || !projectId) {
+    setTicketStageName('');
+    setTicketStageOrder(null);
+    return;
+  }
+
+  (async () => {
+    try {
+      const proj = await projectsApi.getById(projectId);
+      if (cancelled) return;
+
+      const stage = (proj.stages ?? []).find((s) => s.id === stageId);
+      if (stage) {
+        setTicketStageName(stage.name);
+        setTicketStageOrder(stage.execution_order);
+      } else {
+        setTicketStageName('');
+        setTicketStageOrder(null);
+      }
+    } catch (e) {
+      console.error('[STAGE] load failed:', e);
+      if (!cancelled) {
+        setTicketStageName('');
+        setTicketStageOrder(null);
+      }
+    }
+  })();
+
+  return () => {
+    cancelled = true;
+  };
+}, [baseTicket]);
+
+useEffect(() => {
+  console.log('[STAGE] baseTicket changed:', {
+    id: baseTicket?.id,
+    stage_id: (baseTicket as any)?.stage_id,
+    project_id: (baseTicket as any)?.project_id,
+  });
+}, [baseTicket]);
 
   const submit = async () => {
     if (!title.trim()) return;
