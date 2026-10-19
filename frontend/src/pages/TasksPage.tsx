@@ -33,6 +33,7 @@ import {
 } from '../components/helpers/TicketEditor';
 
 import { TicketDescriptionContent } from '../components/helpers/TicketDescriptionContent';
+import { object } from 'zod';
 
 /* ───────────────── types ───────────────── */
 
@@ -2380,12 +2381,16 @@ useEffect(() => {
           payload.due_date = dueDate || null;
         }
 
-        if (
-          assigneeId !==
-          (task.assignee_id ?? '')
-        ) {
-          payload.assignee_id =
-            assigneeId || null;
+        const assigneeChanged =
+          assigneeId !== (task.assignee_id ?? '');
+
+        if (assigneeChanged && !assigneeId) {
+          toast({
+            title: 'Выберите исполнителя',
+            description: 'Снятие исполнителя этим действием не поддерживается.',
+            variant: 'destructive',
+          });
+          return;
         }
 
         if (
@@ -2409,6 +2414,12 @@ useEffect(() => {
             task.id,
             payload as TaskUpdateInput,
           );
+        }
+
+        if (assigneeChanged) {
+          await tasksApi.assign(task.id, {
+            assignee_id: assigneeId,
+          });
         }
 
         /*

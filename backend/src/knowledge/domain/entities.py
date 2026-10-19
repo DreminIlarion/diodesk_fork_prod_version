@@ -1,108 +1,184 @@
+from typing import Self
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
-from ...media.domain.entities import Attachment
-from ...shared.domain.entities import Entity
-from ...shared.utils.text import get_latin_slug
-from ...shared.utils.time import current_datetime
-from ..utils import estimate_reading_time
-from .vo import ArticleStatus, ArticleVisibility
+from src.shared.domain.entities import AggregateRoot
+from src.shared.domain.exceptions import InvalidStateError
+from src.shared.utils.time import current_datetime
+
+from .events import (
+    ArticleArchived,
+    ArticleCreated,
+    ArticleEdited,
+    ArticlePublished,
+)
+from .types import ArticleMetadata
+from .vo import (
+    ArticleSource,
+    ArticleStatus,
+    ArticleVisibility,
+)
 
 
 @dataclass(kw_only=True)
-class Category(Entity):
+class Article(AggregateRoot):
     """
-    Категория статьи базы знаний (папка для хранения статей)
+    Статья базы знаний
     """
-
-    name: str
-    slug: str
-    description: str | None = None
-    parent_category_id: UUID | None = None
-
-    def __post_init__(self) -> None:
-        # Наименование и описание не может быть пустым
-        if not self.name.strip() or \
-                (self.description is not None and not self.description.strip()):
-            raise ValueError("Category name or description cannot be empty")
-
-    @classmethod
-    def create(
-            cls,
-            name: str,
-            description: str | None = None,
-            parent_category_id: UUID | None = None,
-    ) -> "Category":
-        """Создание категории базы знаний"""
-
-        slug = get_latin_slug(name)
-        return cls(
-            name=name,
-            slug=slug,
-            description=description,
-            parent_category_id=parent_category_id,
-        )
-
-    def archive(self) -> None:
-        """Архивирование категории"""
-
-        if self.is_deleted:
-            return
-
-        self.deleted_at = current_datetime()
-
-
-@dataclass(kw_only=True)
-class Article(Entity):
-    """
-    Версия статьи - для аудита и отката
-    """
-
-    # Единый ID для разных версий
-    article_id: UUID
 
     # Контент
     title: str
     content: str
-    tags: list[str] = field(default_factory=list)
 
-    # Ссылки на другие сущности
-    category_id: UUID | None = None
-    product_id: UUID | None = None
-
-    # Номер версии
-    version: int = 1
+    # Источник знания
+    source: ArticleSource
+    external_id: str | None = None
 
     # Авторство и публикация
     author_id: UUID
-    reviewer_id: UUID | None = None
+    published_by: UUID | None = None
     published_at: datetime | None = None
 
-    # Статус и видимость
-    status: ArticleStatus
-    visibility: ArticleVisibility
+    # Статус, видимость и версия
+    status: ArticleStatus = ArticleStatus.DRAFT
+    visibility: ArticleVisibility = ArticleVisibility.INTERNAL
+    version: int = 1
 
-    attachments: list[Attachment] = field(default_factory=list)
+    # Классификация
+    tags: list[str] = field(default_factory=list)
 
-    def __post_init__(self) -> None:
-        # Заголовок и описание не могут быть пустыми
-        if not self.title.strip() or not self.content.strip():
-            raise ValueError("Article title or content cannot be empty")
+    # Связи с существующими сущностями
+    product_id: UUID | None = None
+    project_id: UUID | None = None
+    counterparty_id: UUID | None = None
 
-    @property
-    def reading_time_minutes(self) -> int:
-        """Время прочтения статьи в минутах"""
-
-        return estimate_reading_time(self.content)
+    # Дополнительные данные источника
+    metadata: ArticleMetadata = field(default_factory=dict)
 
     @classmethod
     def create(
-            cls,
-            title: str,
-            content: str,
-            created_by: UUID,
-            visibility: ArticleVisibility = ArticleVisibility.INTERNAL,
-            tags: list[str] | None = None,
-    ) -> "Article":
-        ...
+        cls,
+        *,
+        title: str,
+        content: str,
+        source: ArticleSource,
+        author_id: UUID,
+        visibility: ArticleVisibility = ArticleVisibility.INTERNAL,
+        external_id: str | None = None,
+        tags: list[str] | None = None,
+        product_id: UUID | None = None,
+        project_id: UUID | None = None,
+        counterparty_id: UUID | None = None,
+        metadata: ArticleMetadata | None = None,
+    ) -> Self:
+        """Создание статьи базы знаний."""
+
+        article = cls(
+            title=title,
+            content=content,
+            source=source,
+            author_id=author_id,
+            visibility=visibility,
+            external_id=external_id,
+            tags=tags or [],
+            product_id=product_id,
+            project_id=project_id,
+            counterparty_id=counterparty_id,
+            metadata=metadata or {},
+        )
+        article.register_event(
+            ArticleCreated(
+                article_id=article.id,
+                author_id=author_id,
+                title=title,
+            )
+        )
+        return article
+
+    def revise(
+        self,
+        *,
+        title: str,
+        content: str,
+        edited_by: UUID,
+        tags: list[str] | None = None,
+    ) -> None:
+        """Создание новой редакции статьи."""
+
+        # Архивные статьи изменять нельзя
+        if self.status == ArticleStatus.ARCHIVED:
+            raise InvalidStateError(
+                "Archived article cannot be edited"
+            )
+
+        # Обновление содержимого
+        self.title = title
+        self.content = content
+        self.author_id = edited_by
+
+        if tags is not None:
+            self.tags = tags
+
+        # Номер редакции увеличивается, ID статьи остаётся прежним
+        self.version += 1
+        self.updated_at = current_datetime()
+
+        self.register_event(
+            ArticleEdited(
+                article_id=self.id,
+                title=self.title,
+                edited_by=edited_by,
+            )
+        )
+
+    def publish(self, published_by: UUID) -> None:
+        """Публикация статьи базы знаний."""
+
+        # Архивную статью публиковать нельзя
+        if self.status == ArticleStatus.ARCHIVED:
+            raise InvalidStateError(
+                "Archived article cannot be published"
+            )
+
+        # Повторная публикация не изменяет состояние
+        if self.status == ArticleStatus.PUBLISHED:
+            return
+
+        now = current_datetime()
+
+        self.status = ArticleStatus.PUBLISHED
+        self.published_by = published_by
+        self.published_at = now
+        self.updated_at = now
+
+        self.register_event(
+            ArticlePublished(
+                article_id=self.id,
+                title=self.title,
+                visibility=self.visibility,
+                published_by=published_by,
+            )
+        )
+
+    def archive(self, archived_by: UUID) -> None:
+        """Архивирование статьи базы знаний."""
+
+        # Повторное архивирование не изменяет состояние
+        # и не создаёт повторное событие.
+        if self.status == ArticleStatus.ARCHIVED:
+            return
+
+        now = current_datetime()
+
+        self.status = ArticleStatus.ARCHIVED
+        self.deleted_at = now
+        self.updated_at = now
+
+        self.register_event(
+            ArticleArchived(
+                article_id=self.id,
+                archived_by=archived_by,
+            )
+        )
