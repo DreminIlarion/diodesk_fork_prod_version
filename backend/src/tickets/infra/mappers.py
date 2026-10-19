@@ -55,7 +55,6 @@ class TicketMapper(ModelMapper[Ticket, TicketOrm]):
             updated_at=model.updated_at,
             deleted_at=model.deleted_at,
             project_id=model.project_id,
-            # stage_id=model.stage_id,
             counterparty_id=model.counterparty_id,
             product_id=model.product_id,
             created_by=model.created_by,
@@ -87,7 +86,6 @@ class TicketMapper(ModelMapper[Ticket, TicketOrm]):
             updated_at=model.updated_at,
             deleted_at=model.deleted_at,
             project_id=model.project_id,
-            # stage_id=model.stage_id,
             counterparty_id=model.counterparty_id,
             product_id=model.product_id,
             created_by=model.created_by,
@@ -107,7 +105,12 @@ class TicketMapper(ModelMapper[Ticket, TicketOrm]):
             closed_at=model.closed_at,
             tags=[Tag(name=tag["name"], color=tag["color"]) for tag in model.tags],
             attachments=[],
-            has_attachments=bool(model.has_attachments),
+            has_attachments=bool(
+                model.__dict__.get(
+                    "has_attachments",
+                    model.__dict__.get("attachments"),
+                )
+            ),
 
         )
 
@@ -119,7 +122,6 @@ class TicketMapper(ModelMapper[Ticket, TicketOrm]):
             updated_at=entity.updated_at,
             deleted_at=entity.deleted_at,
             project_id=entity.project_id,
-            # stage_id=entity.stage_id,
             counterparty_id=entity.counterparty_id,
             product_id=entity.product_id,
             created_by=entity.created_by,
@@ -142,6 +144,14 @@ class TicketMapper(ModelMapper[Ticket, TicketOrm]):
                 AttachmentMapper.from_entity(attachment) for attachment in entity.attachments
             ],
         )
+
+    def from_model(self, model: TicketOrm) -> Ticket:
+        """Map list-query rows without loading attachment relationships."""
+
+        return self.to_light(model)
+
+    def to_model(self, entity: Ticket) -> TicketOrm:
+        return self.from_entity(entity)
 
 
 class ReactionMapper(ModelMapper[Reaction, ReactionOrm]):

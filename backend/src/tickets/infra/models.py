@@ -1,40 +1,33 @@
-from typing import TYPE_CHECKING
-
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import TEXT, Computed, DateTime, Enum, ForeignKey, Index, String, exists, select, literal
-from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
-from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
+from sqlalchemy import TEXT, Computed, DateTime, Enum, Index, String, literal, select
+from sqlalchemy.dialects.postgresql import TSVECTOR
+from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
-
-
-from src.comments.infra.models import CommentOrm  # Добавить импорт
+from src.comments.infra.models import CommentOrm
 from src.core.database import Base
-from src.shared.domain.vo import Priority
-
-from ..domain.vo import TicketStatus, TicketType  # Убрать CommentType, ReactionType
-
 from src.media.infra.models import AttachmentOrm
+from src.shared.domain.vo import Priority
+from src.shared.infra.sqlalchemy_types import DslUUID, TagListJSONB
+
+from ..domain.vo import TicketStatus, TicketType
+
 
 class TicketOrm(Base):
     __tablename__ = "tickets"
 
-    project_id: Mapped[UUID | None] = mapped_column(nullable=True)
-    # stage_id: Mapped[UUID | None] = mapped_column(
-    #     ForeignKey("project_stages.id", ondelete="SET NULL"),
-    #     nullable=True,
-    # )
-    counterparty_id: Mapped[UUID | None] = mapped_column(nullable=True)
-    product_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    project_id: Mapped[UUID | None] = mapped_column(DslUUID(), nullable=True)
+    counterparty_id: Mapped[UUID | None] = mapped_column(DslUUID(), nullable=True)
+    product_id: Mapped[UUID | None] = mapped_column(DslUUID(), nullable=True)
 
-    created_by: Mapped[UUID]
-    approved_by: Mapped[UUID | None] = mapped_column(nullable=True)
-    resolved_by: Mapped[UUID | None] = mapped_column(nullable=True)
-    closed_by: Mapped[UUID | None] = mapped_column(nullable=True)
+    created_by: Mapped[UUID] = mapped_column(DslUUID())
+    approved_by: Mapped[UUID | None] = mapped_column(DslUUID(), nullable=True)
+    resolved_by: Mapped[UUID | None] = mapped_column(DslUUID(), nullable=True)
+    closed_by: Mapped[UUID | None] = mapped_column(DslUUID(), nullable=True)
 
-    reporter_id: Mapped[UUID]
-    assignee_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    reporter_id: Mapped[UUID] = mapped_column(DslUUID())
+    assignee_id: Mapped[UUID | None] = mapped_column(DslUUID(), nullable=True)
 
     number: Mapped[str] = mapped_column(String(25), unique=True)
     title: Mapped[str]
@@ -47,18 +40,16 @@ class TicketOrm(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    tags: Mapped[list[dict[str, str]]] = mapped_column(JSONB)
+    tags: Mapped[list[dict[str, str]]] = mapped_column(TagListJSONB)
 
-    comments: Mapped[list["CommentOrm"]] = relationship(back_populates="ticket")
-    attachments: Mapped[list["AttachmentOrm"]] = relationship(
+    comments: Mapped[list[CommentOrm]] = relationship(back_populates="ticket")
+    attachments: Mapped[list[AttachmentOrm]] = relationship(
         primaryjoin=(
             "and_(AttachmentOrm.owner_type=='ticket', "
             "foreign(AttachmentOrm.owner_id)==TicketOrm.id)"
         ),
         viewonly=True,
     )
-
-   
 
     search_vector: Mapped[str] = mapped_column(
         TSVECTOR,
@@ -70,8 +61,8 @@ class TicketOrm(Base):
     )
     __table_args__ = (
         Index("ix_tickets_search_vector", "search_vector", postgresql_using="gin"),
-        # Index("ix_tickets_stage_id", "stage_id"),
     )
+
 
 TicketOrm.has_attachments = column_property(
     select(1)

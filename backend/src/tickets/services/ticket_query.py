@@ -1,13 +1,12 @@
 from uuid import UUID
 
-from ddf.application.dsl import Condition, Expression
+from ddf.application.dsl import Condition, Expression, Group
 
 from src.iam.domain.authz import Subject
 from src.iam.domain.entities import User
 from src.iam.domain.exceptions import PermissionDeniedError
 from src.iam.mappers import map_user_to_reference
 from src.shared.domain.repos import get_or_raise_404
-from src.shared.dsl import and_expressions
 from src.shared.schemas import Page, Pagination
 
 from ..consts import PARTICIPANT_FIELDS
@@ -70,13 +69,15 @@ class TicketQueryService:
             if counterparty_id is None:
                 raise PermissionDeniedError("Customer must be associated with a counterparty")
 
-            query = and_expressions(
-                query,
-                Condition(
-                    field="counterpartyId",
-                    op="$eq",
-                    value=counterparty_id,
-                ),
+            counterparty_filter = Condition(
+                field="counterpartyId",
+                op="$eq",
+                value=counterparty_id,
+            )
+            query = (
+                counterparty_filter
+                if query is None
+                else Group(op="$and", filters=(query, counterparty_filter))
             )
 
         page = await self.ticket_repo.paginate(

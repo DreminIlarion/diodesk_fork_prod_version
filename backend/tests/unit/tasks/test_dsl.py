@@ -3,6 +3,8 @@ from uuid import uuid4
 
 import pytest
 from ddf.application.dsl import Condition, Group
+from ddf.infra.database.sqlalchemy import SqlAlchemyRepository as DdfSqlAlchemyRepository
+from ddf.infra.database.sqlalchemy.filters import compile_filter
 from pydantic import TypeAdapter
 
 from src.shared.domain.vo import Priority
@@ -12,10 +14,8 @@ from src.tasks.dsl import (
     legacy_kanban_filters_to_expression,
     unpack_kanban_request,
 )
-from src.tasks.infra.repos import (  # noqa: PLC2701
-    TASK_FILTER_WHITELIST,
-    _compile_task_expression,
-)
+from src.tasks.infra.models import TaskOrm
+from src.tasks.infra.repos import TASK_FILTER_WHITELIST, SqlTaskRepository
 from src.tasks.schemas import (
     InternalKanbanContext,
     KanbanRequest,
@@ -23,6 +23,10 @@ from src.tasks.schemas import (
     MyTasksKanbanContext,
     ProjectKanbanContext,
 )
+
+
+def test_task_repository_uses_ddf_sqlalchemy_repository() -> None:
+    assert issubclass(SqlTaskRepository, DdfSqlAlchemyRepository)
 
 
 def test_kanban_request_accepts_legacy_context_body() -> None:
@@ -152,16 +156,22 @@ def test_sensitive_and_internal_fields_are_not_available_in_dsl(field: str) -> N
     assert field not in TASK_FILTER_WHITELIST
 
     with pytest.raises(ValueError, match="Unknown filter field"):
-        _compile_task_expression(
+        compile_filter(
+            TaskOrm,
             Condition(field=field, op="$eq", value="secret"),
+            SqlTaskRepository.filter_whitelist,
+            SqlTaskRepository.search,
         )
 
 
 def test_camel_case_field_is_compiled_for_task_model() -> None:
     project_id = uuid4()
 
-    compiled = _compile_task_expression(
+    compiled = compile_filter(
+        TaskOrm,
         Condition(field="projectId", op="$eq", value=project_id),
+        SqlTaskRepository.filter_whitelist,
+        SqlTaskRepository.search,
     )
 
     assert "tasks.project_id" in str(compiled)
@@ -169,10 +179,14 @@ def test_camel_case_field_is_compiled_for_task_model() -> None:
 
 def test_tags_keep_match_any_semantics() -> None:
     compiled = str(
-        _compile_task_expression(
+        compile_filter(
+            TaskOrm,
             Condition(field="tags", op="$in", value=["backend", "urgent"]),
+            SqlTaskRepository.filter_whitelist,
+            SqlTaskRepository.search,
         ),
     )
 
     assert " OR " in compiled
-    assert compiled.count("@>") == 2
+    expected_tag_conditions = 2
+    assert compiled.count("@>") == expected_tag_conditions

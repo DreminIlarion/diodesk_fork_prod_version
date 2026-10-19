@@ -3,7 +3,7 @@ from typing import Annotated
 from datetime import datetime
 from uuid import UUID
 
-from ddf.application.dsl import Expression
+from ddf.application.dsl import Expression, Group
 from fastapi import Body, Depends, Query
 
 from src.activity_logs.dependencies import ActivityLogRecorderDep
@@ -21,7 +21,6 @@ from src.shared.dependencies import (
     EventPublisherDep,
     SessionDep,
 )
-from src.shared.dsl import and_expressions
 
 from ..shared.domain.repos import get_or_raise_404
 from .data_loaders import ReferenceLoader
@@ -186,7 +185,13 @@ def get_ticket_search_expression(
         created_before=created_before,
     )
 
-    return and_expressions(request, date_expression)
+    if request is None:
+        return date_expression
+
+    if date_expression is None:
+        return request
+
+    return Group(op="$and", filters=(request, date_expression))
 
 
 TicketSearchExpressionDep = Annotated[

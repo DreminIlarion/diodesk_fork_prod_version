@@ -1,19 +1,24 @@
 from typing import Annotated
 
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
 from ddf.application.dsl import Condition, Expression, Group, Search
+from ddf.infra.database.sqlalchemy import SqlAlchemyRepository as DdfSqlAlchemyRepository
+from ddf.infra.database.sqlalchemy.filters import compile_filter
 from fastapi import Depends, FastAPI, status
 from fastapi.testclient import TestClient
 from pydantic import TypeAdapter
 
 from src.shared.domain.vo import Priority
+from src.shared.schemas import Pagination
 from src.tickets.dependencies import get_ticket_search_expression
 from src.tickets.domain.vo import TicketStatus, TicketType
 from src.tickets.dsl import legacy_ticket_search_to_expression
-from src.tickets.infra.repos import _compile_ticket_expression  # noqa: PLC2701
+from src.tickets.infra.models import TicketOrm
+from src.tickets.infra.repos import SqlTicketRepository
 from src.tickets.schemas import LegacyTicketSearch, TicketSearchRequest
 
 app = FastAPI()
@@ -27,6 +32,32 @@ def search_tickets(
 
 
 client = TestClient(app)
+
+
+def test_ticket_repository_uses_ddf_sqlalchemy_repository() -> None:
+    assert issubclass(SqlTicketRepository, DdfSqlAlchemyRepository)
+
+
+async def test_ticket_repository_passes_query_to_ddf_find() -> None:
+    session = AsyncMock()
+    session.scalar.return_value = 0
+    scalars = Mock()
+    scalars.all.return_value = []
+    session.scalars.return_value = scalars
+    repository = SqlTicketRepository(session)
+
+    page = await repository.paginate(
+        Pagination(page=1, size=10),
+        query=Condition(
+            field="status",
+            op="$eq",
+            value=TicketStatus.OPEN.value,
+        ),
+    )
+
+    assert page.items == []
+    count_statement = session.scalar.await_args.args[0]
+    assert "tickets.status" in str(count_statement)
 
 
 def test_http_endpoint_accepts_legacy_body() -> None:
@@ -122,13 +153,25 @@ def test_sensitive_and_internal_fields_are_not_available_in_dsl(field: str) -> N
     expression = Condition(field=field, op="$eq", value="secret")
 
     with pytest.raises(ValueError, match="Unknown filter field"):
-        _compile_ticket_expression(expression)
+        compile_filter(
+            TicketOrm,
+            expression,
+            SqlTicketRepository.filter_whitelist,
+            SqlTicketRepository.search,
+        )
 
 
 def test_tags_keep_legacy_match_any_semantics() -> None:
     expression = Condition(field="tags", op="$in", value=["hardware", "urgent"])
 
-    compiled = str(_compile_ticket_expression(expression))
+    compiled = str(
+        compile_filter(
+            TicketOrm,
+            expression,
+            SqlTicketRepository.filter_whitelist,
+            SqlTicketRepository.search,
+        )
+    )
 
     assert " OR " in compiled
     expected_tag_conditions = 2

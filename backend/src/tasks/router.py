@@ -1,10 +1,10 @@
 from uuid import UUID
 
+from ddf.application.dsl import Group
 from fastapi import APIRouter, Depends, status
 
 from src.iam.dependencies import CurrentSubjectDep, get_current_subject
 from src.shared.dependencies import PaginationDep
-from src.shared.dsl import and_expressions
 
 from .dependencies import (
     KanbanQueryDep,
@@ -154,10 +154,15 @@ async def get_kanban_board(
     service: TaskBoardServiceDep,
 ) -> KanbanBoard:
     context, body_query = unpack_kanban_request(request)
+    query = body_query
+    if query is None:
+        query = legacy_query
+    elif legacy_query is not None:
+        query = Group(op="$and", filters=(query, legacy_query))
 
     return await service.get_kanban_board(
         pagination=pagination,
         context=context,
-        query=and_expressions(body_query, legacy_query),
+        query=query,
         current_subject=current_subject,
     )

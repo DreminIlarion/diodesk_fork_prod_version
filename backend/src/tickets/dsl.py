@@ -1,8 +1,6 @@
 from datetime import datetime
 
-from ddf.application.dsl import Condition, Expression, Search
-
-from src.shared.dsl import and_expressions
+from ddf.application.dsl import Condition, Expression, Group, Search
 
 from .schemas import LegacyTicketSearch
 
@@ -108,4 +106,10 @@ def legacy_ticket_search_to_expression(  # noqa: C901
             )
         )
 
-    return and_expressions(*expressions)
+    if not expressions:
+        return None
+
+    if len(expressions) == 1:
+        return expressions[0]
+
+    return Group(op="$and", filters=tuple(expressions))

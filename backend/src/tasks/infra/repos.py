@@ -1,18 +1,17 @@
-from typing import Any, ClassVar
+from typing import ClassVar
 
-from collections.abc import Callable
-from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from ddf.application.dsl import Condition, Expression, Group, Negation
+from ddf.application.dsl import Expression
+from ddf.infra.database.sqlalchemy import SqlAlchemyRepository as DdfSqlAlchemyRepository
 from ddf.infra.database.sqlalchemy.filters import compile_filter
-from sqlalchemy import ColumnElement, and_, func, not_, or_, select
+from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.media.infra.repo import AttachmentMapper
-from src.shared.domain.vo import Priority, Tag
-from src.shared.infra.repos import ModelMapper, SqlAlchemyRepository
+from src.shared.domain.vo import Tag
+from src.shared.infra.repos import ModelMapper
 from src.shared.schemas import Page, Pagination
 
 from ..domain.entities import Task
@@ -44,89 +43,6 @@ TASK_FILTER_WHITELIST = (
 )
 
 
-def _to_uuid(value: Any) -> UUID:
-    return value if isinstance(value, UUID) else UUID(str(value))
-
-
-def _to_date(value: Any) -> date:
-    if isinstance(value, datetime):
-        return value.date()
-
-    if isinstance(value, date):
-        return value
-
-    return date.fromisoformat(str(value))
-
-
-def _to_datetime(value: Any) -> datetime:
-    if isinstance(value, datetime):
-        return value
-
-    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-
-
-_FIELD_VALUE_CONVERTERS: dict[str, Callable[[Any], Any]] = {
-    "id": _to_uuid,
-    "status": TaskStatus,
-    "priority": Priority,
-    "assigneeId": _to_uuid,
-    "reviewerId": _to_uuid,
-    "projectId": _to_uuid,
-    "ticketId": _to_uuid,
-    "createdBy": _to_uuid,
-    "dueDate": _to_date,
-    "createdAt": _to_datetime,
-    "updatedAt": _to_datetime,
-    "startedAt": _to_datetime,
-    "completedAt": _to_datetime,
-}
-
-
-def _normalize_task_condition(condition: Condition) -> Condition:
-    """Приводит значения DSL к типам ORM-модели."""
-
-    converter = _FIELD_VALUE_CONVERTERS.get(condition.field)
-    if converter is None or condition.value is None:
-        return condition
-
-    if condition.op in {"$in", "$nin"}:
-        if not isinstance(condition.value, list):
-            return condition
-
-        value = [converter(item) for item in condition.value]
-    else:
-        value = converter(condition.value)
-
-    return condition.model_copy(update={"value": value})
-
-
-def _compile_tags_condition(
-    condition: Condition,
-) -> ColumnElement[bool]:
-    """Компилирует фильтрацию JSONB-тегов с семантикой «любой из»."""
-
-    if condition.op not in {"$in", "$nin"}:
-        raise ValueError("Tags support only '$in' and '$nin' operators.")
-
-    if not isinstance(condition.value, list) or not condition.value:
-        raise ValueError("Tags filter expects a non-empty list.")
-
-    if not all(isinstance(tag, str) for tag in condition.value):
-        raise ValueError("Every tag must be a string.")
-
-    matches_any_tag = or_(
-        *(
-            TaskOrm.tags.contains([{"name": tag}])
-            for tag in condition.value
-        )
-    )
-
-    if condition.op == "$nin":
-        return not_(matches_any_tag)
-
-    return matches_any_tag
-
-
 def _compile_task_search(query: str) -> ColumnElement[bool]:
     """Компилирует текстовый поиск по номеру, заголовку и описанию."""
 
@@ -136,47 +52,6 @@ def _compile_task_search(query: str) -> ColumnElement[bool]:
         TaskOrm.number.ilike(pattern),
         TaskOrm.title.ilike(pattern),
         TaskOrm.description.ilike(pattern),
-    )
-
-
-def _compile_task_expression(
-    expression: Expression,
-) -> ColumnElement[bool]:
-    """Компилирует DDF DSL в SQLAlchemy-условие."""
-
-    if isinstance(expression, Condition):
-        if expression.field == "tags":
-            return _compile_tags_condition(expression)
-
-        return compile_filter(
-            TaskOrm,
-            _normalize_task_condition(expression),
-            TASK_FILTER_WHITELIST,
-            _compile_task_search,
-        )
-
-    if isinstance(expression, Group):
-        filters = tuple(
-            _compile_task_expression(child)
-            for child in expression.filters
-        )
-
-        if not filters:
-            raise ValueError("Filter group cannot be empty.")
-
-        if expression.op == "$and":
-            return and_(*filters)
-
-        return or_(*filters)
-
-    if isinstance(expression, Negation):
-        return not_(_compile_task_expression(expression.filter_))
-
-    return compile_filter(
-        TaskOrm,
-        expression,
-        TASK_FILTER_WHITELIST,
-        _compile_task_search,
     )
 
 
@@ -240,7 +115,16 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
             working_since=entity.working_since,
             created_by=entity.created_by,
             tags=[{"name": tag.name, "color": tag.color} for tag in entity.tags],
+            attachments=[
+                AttachmentMapper.from_entity(attachment) for attachment in entity.attachments
+            ],
         )
+
+    def from_model(self, model: TaskOrm) -> Task:
+        return self.to_entity(model)
+
+    def to_model(self, entity: Task) -> TaskOrm:
+        return self.from_entity(entity)
 
     @staticmethod
     def to_view(model: TaskOrm) -> TaskView:
@@ -257,7 +141,9 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
             reviewer_id=model.reviewer_id,
             due_date=model.due_date,
             story_points=None if model.story_points is None else Decimal(model.story_points),
-            estimated_hours=None if model.estimated_hours is None else Decimal(model.estimated_hours),
+            estimated_hours=(
+                None if model.estimated_hours is None else Decimal(model.estimated_hours)
+            ),
             actual_hours=None if model.actual_hours is None else Decimal(model.actual_hours),
             started_at=model.started_at,        # ← Добавиl
             completed_at=model.completed_at,    # ← Добавил
@@ -269,16 +155,17 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
         )
 
 
-class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
+class SqlTaskRepository(DdfSqlAlchemyRepository[Task, TaskOrm]):
     model = TaskOrm
-    model_mapper = TaskMapper
+    data_mapper = TaskMapper()
+    search = staticmethod(_compile_task_search)
     filter_whitelist: ClassVar[tuple[str, ...]] = TASK_FILTER_WHITELIST
 
     async def get_by_number(self, number: TaskNumber) -> Task | None:
         stmt = select(self.model).where(self.model.number == number.value)
-        result = await self.session.execute(stmt)
+        result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
-        return None if model is None else self.model_mapper.to_entity(model)
+        return None if model is None else self.data_mapper.from_model(model)
 
     async def get_next_sequence(
             self, ticket_id: UUID | None = None, project_id: UUID | None = None
@@ -290,11 +177,14 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
         elif project_id is not None:
             count_stmt = count_stmt.where(TaskOrm.project_id == project_id)
         else:
-            count_stmt = count_stmt.where(TaskOrm.ticket_id.is_(None), TaskOrm.project_id.is_(None))
-        
-        real_count = await self.session.scalar(count_stmt)
+            count_stmt = count_stmt.where(
+                TaskOrm.ticket_id.is_(None),
+                TaskOrm.project_id.is_(None),
+            )
+
+        real_count = await self._session.scalar(count_stmt)
         next_num = (real_count or 0) + 1
-        
+
         # Атомарная вставка/обновление
         stmt = (
             pg_insert(TaskSequence)
@@ -305,8 +195,8 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
             )
             .returning(TaskSequence.last_number)
         )
-        
-        result = await self.session.execute(stmt)
+
+        result = await self._session.execute(stmt)
         return result.scalar_one()
 
     async def get_grouped_by_status(
@@ -319,7 +209,14 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
         conditions = [self.model.deleted_at.is_(None)]
 
         if query is not None:
-            conditions.append(_compile_task_expression(query))
+            conditions.append(
+                compile_filter(
+                    self.model,
+                    query,
+                    self.filter_whitelist,
+                    self.search,
+                )
+            )
 
         # Пагинация задач для каждого статуса
         grouped: dict[TaskStatus, Page[TaskView]] = {}
@@ -330,7 +227,7 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
 
             # Подсчёт общего количества задач в статусе
             count_stmt = select(func.count()).select_from(stmt.subquery())
-            total_items = await self.session.scalar(count_stmt)
+            total_items = await self._session.scalar(count_stmt)
 
             # Запрос для пагинации
             stmt = (
@@ -339,11 +236,11 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
                 .offset(pagination.offset)
                 .limit(pagination.size)
             )
-            results = await self.session.execute(stmt)
+            results = await self._session.execute(stmt)
             models = results.scalars().all()
 
             grouped[status] = Page.create(
-                items=[self.model_mapper.to_view(model) for model in models],
+                items=[TaskMapper.to_view(model) for model in models],
                 total_items=total_items,
                 page=pagination.page,
                 size=pagination.size,
