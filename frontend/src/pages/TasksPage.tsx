@@ -9,7 +9,7 @@ import {
   ArrowUpRight, ChevronDown, Flag, AlertCircle, CheckCircle2, Ban, RotateCcw,
   RefreshCw, Archive, FolderOpen, Ticket, Zap, Star, User, Layers, UserCheck,
   GitPullRequest, ThumbsUp, ThumbsDown, Pencil, List, LayoutGrid, Clock3,
-  FileText, File as FileIcon, Download, BarChart3, Trash2, Paperclip, ArrowRight, Mail,ArrowDown 
+  FileText, File as FileIcon, Download, BarChart3, Trash2, Paperclip, ArrowRight, Mail,ArrowDown ,Milestone
 } from 'lucide-react';
 import { tasksApi, projectsApi, ticketsApi, usersApi } from '../api/client';
 import { attachmentsApi } from '../api/attachments';
@@ -1856,6 +1856,12 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
   const [baseTicket, setBaseTicket] = useState<any | null>(null);
   const [baseTicketCreator, setBaseTicketCreator] = useState<SimpleUser | null>(null);
 
+
+
+// ── ЭТАП ЗАЯВКИ (только для показа) ──
+const [ticketStageName, setTicketStageName] = useState<string>('');
+const [ticketStageOrder, setTicketStageOrder] = useState<number | null>(null);
+
   const requesterLabel =
     baseTicketCreator?.full_name ||
     baseTicketCreator?.username ||
@@ -2156,8 +2162,28 @@ const loadUsers = useCallback(async (q: string, p: number) => {
             if (!cancelled) setBaseTicketCreator(u);
           } catch { }
         }
+
+
+        // ── ЭТАП ЗАЯВКИ ──
+const stageId = (ticket as any).stage_id as string | undefined;
+if (stageId && ticket.project_id) {
+  try {
+    const proj = await projectsApi.getById(ticket.project_id);
+    if (cancelled) return;
+    const stage = (proj.stages ?? []).find((s) => s.id === stageId);
+    if (stage) {
+      setTicketStageName(stage.name);
+      setTicketStageOrder(stage.execution_order);
+    }
+  } catch { /* тихо игнорим — этап просто не покажется */ }
+}
+
       } catch { }
-    })();
+    }
+    
+  
+  
+  )();
 
     return () => {
       cancelled = true;
@@ -2642,33 +2668,45 @@ const loadUsers = useCallback(async (q: string, p: number) => {
               )}
 
               {lockTicket && (
-                <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 flex items-center gap-3">
-                  <Ticket className="w-5 h-5 text-blue-400 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-primary)]">
-                      Создание на основании заявки
-                    </p>
+  <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 flex items-center gap-3">
+    <Ticket className="w-5 h-5 text-blue-400 shrink-0" />
+    <div className="min-w-0 flex-1">
+      <p className="text-sm font-medium text-[var(--text-primary)]">
+        Создание на основании заявки
+      </p>
 
-                    {baseTicket ? (
-                      <>
-                        <p className="text-xs text-blue-400  mt-0.5">
-                          {baseTicket.number} — {baseTicket.title}
-                        </p>
+      {baseTicket ? (
+        <>
+          <p className="text-xs text-blue-400 mt-0.5">
+            {baseTicket.number} — {baseTicket.title}
+          </p>
 
-                        {!!requesterLabel && (
-                          <p className="text-xs text-[var(--text-primary)]/55 truncate">
-                            от: {requesterLabel}
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-xs text-blue-400 truncate mt-0.5">
-                        {ticketLabel || 'Заявка будет привязана автоматически'}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
+          {!!requesterLabel && (
+            <p className="text-xs text-[var(--text-primary)]/55 truncate">
+              от: {requesterLabel}
+            </p>
+          )}
+
+          {/* ── ЭТАП ЗАЯВКИ (только показ, без сохранения) ── */}
+          {ticketStageName && (
+            <div className="mt-2 inline-flex items-center gap-2 px-2.5 py-1 rounded-lg
+                            bg-amber-500/10 border border-amber-500/25
+                            text-amber-400">
+              <Milestone className="w-3.5 h-3.5 shrink-0" />
+              <span className="text-[11px] font-medium truncate">
+                Этап {ticketStageOrder != null ? String(ticketStageOrder).padStart(2, '0') : '—'} · {ticketStageName}
+              </span>
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="text-xs text-blue-400 truncate mt-0.5">
+          {ticketLabel || 'Заявка будет привязана автоматически'}
+        </p>
+      )}
+    </div>
+  </div>
+)}
 
               {/* Приоритет */}
               <div>
