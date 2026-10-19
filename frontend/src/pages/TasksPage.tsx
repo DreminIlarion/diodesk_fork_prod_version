@@ -2699,8 +2699,8 @@ useEffect(() => {
               )}
 
                          {lockTicket && (
-                <div className="flex items-start gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-3.5">
-                  <Ticket className="mt-0.5 h-5 w-5 shrink-0 text-[var(--accent)]" />
+                <div className="flex items-start gap-3 rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3.5">
+                  <Ticket className="mt-0.5 h-5 w-5 shrink-0 text-blue-400" />
 
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-[var(--text-primary)]">
@@ -2710,7 +2710,7 @@ useEffect(() => {
                     {baseTicket ? (
                       <>
                         <p className="mt-1.5 break-words text-sm font-medium text-[var(--text-primary)]/85">
-                          <span className="text-[var(--accent)]">
+                          <span className="text-[var(--text-primary)]/70">
                             {baseTicket.number}
                           </span>
                           {' — '}
