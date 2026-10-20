@@ -1,46 +1,45 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import TEXT, Computed, DateTime, Index, String, literal, select
-from sqlalchemy.dialects.postgresql import TSVECTOR
+from ddf.infra.database.sqlalchemy import Base, EntityMixin
+from sqlalchemy import TEXT, Computed, DateTime, Enum, Index, String, literal, select
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
 from src.comments.infra.models import CommentOrm
-from src.core.database import Base
 from src.media.infra.models import AttachmentOrm
 from src.shared.domain.vo import Priority
-from src.shared.infra.sqlalchemy_types import DslEnum, DslUUID, TagListJSONB
 
 from ..domain.vo import TicketStatus, TicketType
 
 
-class TicketOrm(Base):
+class TicketOrm(EntityMixin, Base):
     __tablename__ = "tickets"
 
-    project_id: Mapped[UUID | None] = mapped_column(DslUUID(), nullable=True)
-    counterparty_id: Mapped[UUID | None] = mapped_column(DslUUID(), nullable=True)
-    product_id: Mapped[UUID | None] = mapped_column(DslUUID(), nullable=True)
+    project_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    counterparty_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    product_id: Mapped[UUID | None] = mapped_column(nullable=True)
 
-    created_by: Mapped[UUID] = mapped_column(DslUUID())
-    approved_by: Mapped[UUID | None] = mapped_column(DslUUID(), nullable=True)
-    resolved_by: Mapped[UUID | None] = mapped_column(DslUUID(), nullable=True)
-    closed_by: Mapped[UUID | None] = mapped_column(DslUUID(), nullable=True)
+    created_by: Mapped[UUID]
+    approved_by: Mapped[UUID | None] = mapped_column(nullable=True)
+    resolved_by: Mapped[UUID | None] = mapped_column(nullable=True)
+    closed_by: Mapped[UUID | None] = mapped_column(nullable=True)
 
-    reporter_id: Mapped[UUID] = mapped_column(DslUUID())
-    assignee_id: Mapped[UUID | None] = mapped_column(DslUUID(), nullable=True)
+    reporter_id: Mapped[UUID]
+    assignee_id: Mapped[UUID | None] = mapped_column(nullable=True)
 
     number: Mapped[str] = mapped_column(String(25), unique=True)
     title: Mapped[str]
     description: Mapped[str] = mapped_column(TEXT)
-    ticket_type: Mapped[TicketType] = mapped_column(DslEnum(TicketType))
-    status: Mapped[TicketStatus] = mapped_column(DslEnum(TicketStatus))
-    priority: Mapped[Priority] = mapped_column(DslEnum(Priority))
+    ticket_type: Mapped[TicketType] = mapped_column(Enum(TicketType))
+    status: Mapped[TicketStatus] = mapped_column(Enum(TicketStatus))
+    priority: Mapped[Priority] = mapped_column(Enum(Priority))
 
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    tags: Mapped[list[dict[str, str]]] = mapped_column(TagListJSONB)
+    tags: Mapped[list[dict[str, str]]] = mapped_column(JSONB)
 
     comments: Mapped[list[CommentOrm]] = relationship(back_populates="ticket")
     attachments: Mapped[list[AttachmentOrm]] = relationship(

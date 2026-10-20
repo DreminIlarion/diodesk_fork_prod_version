@@ -2,15 +2,15 @@ from typing import Any
 
 from uuid import UUID
 
+from ddf.infra.database.sqlalchemy import Base, EntityMixin
 from sqlalchemy import TEXT, Computed, Enum, Index, text
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ...core.database import Base
 from ..domain.vo import ProductCategory, ProductStatus
 
 
-class SoftwareProductOrm(Base):
+class SoftwareProductOrm(EntityMixin, Base):
     __tablename__ = "software_products"
 
     name: Mapped[str]

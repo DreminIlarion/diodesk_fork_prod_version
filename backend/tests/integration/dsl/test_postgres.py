@@ -138,49 +138,6 @@ async def test_ticket_repository_executes_nested_ddf_filter_on_postgres(session)
     assert [ticket.id for ticket in page.items] == [matching.id]
 
 
-async def test_ticket_repository_executes_tag_in_and_nin_on_postgres(session) -> None:
-    project_id = uuid4()
-    tagged = _ticket(
-        project_id=project_id,
-        title="Tagged ticket",
-        tags=["hardware", "urgent"],
-    )
-    untagged = _ticket(
-        project_id=project_id,
-        title="Other ticket",
-        tags=["finance"],
-    )
-    session.add_all((tagged, untagged))
-    await session.flush()
-
-    repository = SqlTicketRepository(session)
-    project_filter = Condition(field="projectId", op="$eq", value=str(project_id))
-
-    included = await repository.find(
-        OffsetPagination(page=1, size=10),
-        query=Group(
-            op="$and",
-            filters=(
-                project_filter,
-                Condition(field="tags", op="$in", value=["hardware", "missing"]),
-            ),
-        ),
-    )
-    excluded = await repository.find(
-        OffsetPagination(page=1, size=10),
-        query=Group(
-            op="$and",
-            filters=(
-                project_filter,
-                Condition(field="tags", op="$nin", value=["hardware"]),
-            ),
-        ),
-    )
-
-    assert {ticket.id for ticket in included.items} == {tagged.id}
-    assert {ticket.id for ticket in excluded.items} == {untagged.id}
-
-
 async def test_task_repository_executes_iso_date_filter_on_postgres(session) -> None:
     project_id = uuid4()
     overdue = _task(

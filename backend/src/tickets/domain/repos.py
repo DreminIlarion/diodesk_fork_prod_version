@@ -3,7 +3,7 @@ from typing import override
 from dataclasses import dataclass
 from uuid import UUID
 
-from ddf.application.dsl import Expression
+from ddf.application.dtos import QueryDTO
 
 from src.shared.domain.repos import Repository
 from src.shared.schemas import Page, Pagination
@@ -17,7 +17,7 @@ class TicketRepository(Repository[Ticket]):
     async def paginate(
         self,
         pagination: Pagination,
-        query: Expression | None = None,
+        query: QueryDTO | None = None,
     ) -> Page[Ticket]: ...
 
     async def get_total(

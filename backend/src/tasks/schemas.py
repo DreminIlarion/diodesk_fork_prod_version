@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from ddf.application.dsl import Expression
+from ddf.application.dtos import QueryDTO
 from fastapi import Body
 from pydantic import BaseModel, Field, NonNegativeFloat, NonNegativeInt
 
@@ -234,7 +234,7 @@ class KanbanSearchRequest(BaseModel):
         ...,
         description="Контекст просмотра канбан-доски",
     )
-    query: Expression | None = Field(
+    query: QueryDTO | None = Field(
         None,
         description="DDF DSL фильтр задач",
     )

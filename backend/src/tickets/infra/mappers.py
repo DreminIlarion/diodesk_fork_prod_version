@@ -105,12 +105,7 @@ class TicketMapper(ModelMapper[Ticket, TicketOrm]):
             closed_at=model.closed_at,
             tags=[Tag(name=tag["name"], color=tag["color"]) for tag in model.tags],
             attachments=[],
-            has_attachments=bool(
-                model.__dict__.get(
-                    "has_attachments",
-                    model.__dict__.get("attachments"),
-                )
-            ),
+            has_attachments=bool(model.has_attachments),
 
         )
 

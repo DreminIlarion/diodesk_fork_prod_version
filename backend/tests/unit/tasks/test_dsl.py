@@ -150,7 +150,7 @@ def test_internal_context_preserves_legacy_unfiltered_behavior() -> None:
 
 @pytest.mark.parametrize(
     "field",
-    ["password", "passwordHash", "workingSince", "deletedAt"],
+    ["password", "passwordHash", "workingSince", "deletedAt", "tags"],
 )
 def test_sensitive_and_internal_fields_are_not_available_in_dsl(field: str) -> None:
     assert field not in TASK_FILTER_WHITELIST
@@ -175,18 +175,3 @@ def test_camel_case_field_is_compiled_for_task_model() -> None:
     )
 
     assert "tasks.project_id" in str(compiled)
-
-
-def test_tags_keep_match_any_semantics() -> None:
-    compiled = str(
-        compile_filter(
-            TaskOrm,
-            Condition(field="tags", op="$in", value=["backend", "urgent"]),
-            SqlTaskRepository.filter_whitelist,
-            SqlTaskRepository.search,
-        ),
-    )
-
-    assert " OR " in compiled
-    expected_tag_conditions = 2
-    assert compiled.count("@>") == expected_tag_conditions

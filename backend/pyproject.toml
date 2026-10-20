@@ -39,7 +39,7 @@ dependencies = [
     "taskiq>=0.12.4",
     "testcontainers[minio,postgres]>=4.14.2",
     "unidecode>=1.4.0",
-    "py-ddd-framework[sqlalchemy] @ git+https://github.com/Andr171p/py-ddd-framework.git@fix/critical-bugs",
+    "py-ddd-framework[sqlalchemy] @ git+https://github.com/Andr171p/py-ddd-framework.git@main",
 ]
 
 [tool.ruff]

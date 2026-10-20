@@ -3,7 +3,7 @@ from typing import override
 import math
 from uuid import UUID
 
-from ddf.application.dsl import Expression
+from ddf.application.dtos import QueryDTO
 
 from src.crm.domain.entities import Counterparty
 from src.crm.domain.vo import Inn
@@ -190,7 +190,7 @@ class InMemoryTicketRepository(InMemoryRepository[Ticket]):
     async def paginate(
         self,
         pagination: Pagination,
-        query: Expression | None = None,
+        query: QueryDTO | None = None,
     ) -> Page[Ticket]:
         tickets = [ticket for ticket in self.data.values() if not ticket.is_deleted]
 

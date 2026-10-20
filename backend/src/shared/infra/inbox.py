@@ -3,13 +3,13 @@ from typing import Any
 from datetime import datetime
 from enum import StrEnum
 
+from ddf.infra.database.sqlalchemy import Base, EntityMixin
 from sqlalchemy import TEXT, DateTime, Enum, UniqueConstraint, select, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ...core.database import Base
 from ..utils.time import current_datetime
 
 
@@ -19,7 +19,7 @@ class MessageStatus(StrEnum):
     FAILED = "failed"
 
 
-class InboxMessage(Base):
+class InboxMessage(EntityMixin, Base):
     __tablename__ = "inbox_messages"
 
     message_id: Mapped[str]

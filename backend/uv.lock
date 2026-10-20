@@ -331,7 +331,7 @@ requires-dist = [
     { name = "passlib", specifier = ">=1.7.4" },
     { name = "pgvector", specifier = ">=0.4.2" },
     { name = "prometheus-fastapi-instrumentator", specifier = ">=7.1.0" },
-    { name = "py-ddd-framework", extras = ["sqlalchemy"], git = "https://github.com/Andr171p/py-ddd-framework.git?rev=fix%2Fcritical-bugs" },
+    { name = "py-ddd-framework", extras = ["sqlalchemy"], git = "https://github.com/Andr171p/py-ddd-framework.git?rev=main" },
     { name = "pyjwt", specifier = ">=2.12.1" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-asyncio", specifier = ">=1.3.0" },
@@ -1769,7 +1769,7 @@ wheels = [
 [[package]]
 name = "py-ddd-framework"
 version = "0.1.0"
-source = { git = "https://github.com/Andr171p/py-ddd-framework.git?rev=fix%2Fcritical-bugs#1a1dca331dc1ebb8fa67257bc7a7ea5de74113b2" }
+source = { git = "https://github.com/Andr171p/py-ddd-framework.git?rev=main#29dac3c7afd5f82d1bfc3b9b5dbe3c79a9b1084a" }
 dependencies = [
     { name = "fastapi", extra = ["all"] },
     { name = "msgpack" },

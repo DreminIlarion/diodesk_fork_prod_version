@@ -148,7 +148,7 @@ def test_dates_are_combined_with_dsl_request() -> None:
     )
 
 
-@pytest.mark.parametrize("field", ["password", "passwordHash", "searchVector"])
+@pytest.mark.parametrize("field", ["password", "passwordHash", "searchVector", "tags"])
 def test_sensitive_and_internal_fields_are_not_available_in_dsl(field: str) -> None:
     expression = Condition(field=field, op="$eq", value="secret")
 
@@ -159,20 +159,3 @@ def test_sensitive_and_internal_fields_are_not_available_in_dsl(field: str) -> N
             SqlTicketRepository.filter_whitelist,
             SqlTicketRepository.search,
         )
-
-
-def test_tags_keep_legacy_match_any_semantics() -> None:
-    expression = Condition(field="tags", op="$in", value=["hardware", "urgent"])
-
-    compiled = str(
-        compile_filter(
-            TicketOrm,
-            expression,
-            SqlTicketRepository.filter_whitelist,
-            SqlTicketRepository.search,
-        )
-    )
-
-    assert " OR " in compiled
-    expected_tag_conditions = 2
-    assert compiled.count("@>") == expected_tag_conditions

@@ -2,15 +2,15 @@ from typing import Any, Optional
 
 from uuid import UUID
 
+from ddf.infra.database.sqlalchemy import Base, EntityMixin
 from sqlalchemy import Enum, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ...core.database import Base
 from ..domain.vo import CounterpartyType
 
 
-class CounterpartyOrm(Base):
+class CounterpartyOrm(EntityMixin, Base):
     __tablename__ = "counterparties"
 
     counterparty_type: Mapped[CounterpartyType] = mapped_column(Enum(CounterpartyType))
@@ -60,7 +60,7 @@ class CounterpartyOrm(Base):
     )
 
 
-class CounterpartyProductOrm(Base):
+class CounterpartyProductOrm(EntityMixin, Base):
     __tablename__ = "counterparty_products"
 
     counterparty_id: Mapped[UUID] = mapped_column(ForeignKey("counterparties.id"), unique=False)

@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import StrEnum, auto
 from uuid import UUID
 
-from ddf.application.dsl import Expression
+from ddf.application.dtos import QueryDTO
 from pydantic import BaseModel, ConfigDict, Field, NonNegativeFloat, NonNegativeInt
 
 from src.crm.schemas import CounterpartyReference
@@ -46,7 +46,7 @@ class LegacyTicketSearch(BaseModel):
     actors: LegacyTicketActors | None = None
 
 
-type TicketSearchRequest = Expression | LegacyTicketSearch
+type TicketSearchRequest = QueryDTO | LegacyTicketSearch
 
 
 class CommentResponse(BaseModel):

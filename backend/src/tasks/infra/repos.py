@@ -3,8 +3,8 @@ from typing import ClassVar
 from decimal import Decimal
 from uuid import UUID
 
-from ddf.application.dsl import Expression
-from ddf.infra.database.sqlalchemy import SqlAlchemyRepository as DdfSqlAlchemyRepository
+from ddf.application.dtos import QueryDTO
+from ddf.infra.database.sqlalchemy import SqlAlchemyRepository
 from ddf.infra.database.sqlalchemy.filters import compile_filter
 from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -39,7 +39,6 @@ TASK_FILTER_WHITELIST = (
     "completedAt",
     "estimatedHours",
     "actualHours",
-    "tags",
 )
 
 
@@ -155,10 +154,9 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
         )
 
 
-class SqlTaskRepository(DdfSqlAlchemyRepository[Task, TaskOrm]):
+class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
     model = TaskOrm
     data_mapper = TaskMapper()
-    search = staticmethod(_compile_task_search)
     filter_whitelist: ClassVar[tuple[str, ...]] = TASK_FILTER_WHITELIST
 
     async def get_by_number(self, number: TaskNumber) -> Task | None:
@@ -203,7 +201,7 @@ class SqlTaskRepository(DdfSqlAlchemyRepository[Task, TaskOrm]):
             self,
             pagination: Pagination,
             *,
-            query: Expression | None = None,
+            query: QueryDTO | None = None,
     ) -> dict[TaskStatus, Page[TaskView]]:
         # Общие условия фильтрации (исключаем удалённые задачи)
         conditions = [self.model.deleted_at.is_(None)]
@@ -214,7 +212,7 @@ class SqlTaskRepository(DdfSqlAlchemyRepository[Task, TaskOrm]):
                     self.model,
                     query,
                     self.filter_whitelist,
-                    self.search,
+                    _compile_task_search,
                 )
             )
 

@@ -3,8 +3,8 @@ from typing import ClassVar, override
 from collections import defaultdict
 from uuid import UUID
 
-from ddf.application.dsl import Condition, Expression
-from ddf.application.dtos import OffsetPagination, Sort
+from ddf.application.dsl import Condition
+from ddf.application.dtos import OffsetPagination, QueryDTO, Sort
 from ddf.application.dtos.pagination import OffsetMeta
 from ddf.infra.database.sqlalchemy import SqlAlchemyRepository as DdfSqlAlchemyRepository
 from sqlalchemy import ColumnElement, and_, func, or_, select
@@ -25,7 +25,6 @@ TICKET_FILTER_WHITELIST = (
     "status",
     "priority",
     "ticketType",
-    "tags",
     "counterpartyId",
     "projectId",
     "assigneeId",
@@ -63,7 +62,7 @@ class SqlTicketRepository(DdfSqlAlchemyRepository[Ticket, TicketOrm]):
     async def paginate(
         self,
         pagination: Pagination,
-        query: Expression | None = None,
+        query: QueryDTO | None = None,
     ) -> Page[Ticket]:
         page = await self.find(
             OffsetPagination(page=pagination.page, size=pagination.size),

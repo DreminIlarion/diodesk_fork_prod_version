@@ -2,10 +2,9 @@ import abc
 from collections.abc import Callable
 from uuid import UUID
 
+from ddf.infra.database.sqlalchemy import Base
 from sqlalchemy import Select, delete, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.core.database import Base
 
 from ..domain.dtos import TimeRangeFilters
 from ..domain.entities import Entity

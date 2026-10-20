@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from ddf.application.dsl import Expression
+from ddf.application.dtos import QueryDTO
 
 from src.shared.domain.repos import Repository
 from src.shared.domain.vo import Priority, Tag
@@ -28,14 +28,13 @@ class TaskView:
 
     status: TaskStatus
     priority: Priority
-    description: str | None = None  
-
+    description: str | None = None
 
     assignee_id: UUID | None = None
     reviewer_id: UUID | None = None
     due_date: datetime | None = None
     story_points: Decimal | None = None
-    estimated_hours: Decimal | None = None 
+    estimated_hours: Decimal | None = None
     actual_hours: Decimal | None = None
 
     started_at: datetime | None = None  # ← Добавил
@@ -69,7 +68,7 @@ class TaskRepository(Repository[Task]):
             self,
             pagination: Pagination,
             *,
-            query: Expression | None = None,
+            query: QueryDTO | None = None,
     ) -> dict[TaskStatus, Page[TaskView]]:
         """
         Группировка задач по статусам.
