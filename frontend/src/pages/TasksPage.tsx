@@ -9,7 +9,7 @@ import {
   ArrowUpRight, ChevronDown, Flag, AlertCircle, CheckCircle2, Ban, RotateCcw,
   RefreshCw, Archive, FolderOpen, Ticket, Zap, Star, User, Layers, UserCheck,
   GitPullRequest, ThumbsUp, ThumbsDown, Pencil, List, LayoutGrid, Clock3,
-  FileText, File as FileIcon, Download, BarChart3, Trash2, Paperclip, ArrowRight, Mail,ArrowDown 
+  FileText, File as FileIcon, Download, BarChart3, Trash2, Paperclip, ArrowRight, Mail,ArrowDown ,Milestone
 } from 'lucide-react';
 import { tasksApi, projectsApi, ticketsApi, usersApi } from '../api/client';
 import { attachmentsApi } from '../api/attachments';
@@ -1856,6 +1856,12 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
   const [baseTicket, setBaseTicket] = useState<any | null>(null);
   const [baseTicketCreator, setBaseTicketCreator] = useState<SimpleUser | null>(null);
 
+
+
+// ── ЭТАП ЗАЯВКИ (только для показа) ──
+const [ticketStageName, setTicketStageName] = useState<string>('');
+const [ticketStageOrder, setTicketStageOrder] = useState<number | null>(null);
+
   const requesterLabel =
     baseTicketCreator?.full_name ||
     baseTicketCreator?.username ||
@@ -2126,43 +2132,94 @@ const loadUsers = useCallback(async (q: string, p: number) => {
     return result;
   };
 
-  useEffect(() => {
-    if (mode !== 'create' || context.type !== 'ticket' || !context.ticket_id) return;
+    // 1. Загрузка заявки
+useEffect(() => {
+  if (mode !== 'create' || context.type !== 'ticket' || !context.ticket_id) return;
 
-    let cancelled = false;
+  let cancelled = false;
 
-    (async () => {
-      try {
-        setBaseTicket(null);
-        setBaseTicketCreator(null);
+  (async () => {
+    try {
+      setBaseTicket(null);
+      setBaseTicketCreator(null);
+      setTicketStageName('');
+      setTicketStageOrder(null);
 
-        const ticket = await ticketsApi.getById(context.ticket_id);
-        if (cancelled) return;
+      const ticket = await ticketsApi.getById(context.ticket_id);
+      if (cancelled) return;
 
-        setBaseTicket(ticket);
+      setBaseTicket(ticket);
 
-        if (ticket.project_id) {
-          setProjectId(ticket.project_id);
-          firstProjectChange.current = true;
-        }
+      if (ticket.project_id) {
+        setProjectId(ticket.project_id);
+        firstProjectChange.current = true;
+      }
 
-        if (ticket.priority) {
-          setPri(ticket.priority as TaskPriority);
-        }
+      if (ticket.priority) {
+        setPri(ticket.priority as TaskPriority);
+      }
 
-        if (ticket.created_by) {
-          try {
-            const u = await usersApi.getById(ticket.created_by); // важно: чтобы этот метод был добавлен
-            if (!cancelled) setBaseTicketCreator(u);
-          } catch { }
-        }
-      } catch { }
-    })();
+      if (ticket.created_by) {
+        try {
+          const u = await usersApi.getById(ticket.created_by);
+          if (!cancelled) setBaseTicketCreator(u);
+        } catch { }
+      }
+    } catch { }
+  })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [mode, context.type, context.ticket_id]);
+  return () => {
+    cancelled = true;
+  };
+}, [mode, context.type, context.ticket_id]);
+
+// 2. Загрузка этапа по данным заявки
+useEffect(() => {
+  let cancelled = false;
+
+  const stageId = (baseTicket as any)?.stage_id as string | undefined;
+  const projectId = (baseTicket as any)?.project_id as string | undefined;
+
+  if (!stageId || !projectId) {
+    setTicketStageName('');
+    setTicketStageOrder(null);
+    return;
+  }
+
+  (async () => {
+    try {
+      const proj = await projectsApi.getById(projectId);
+      if (cancelled) return;
+
+      const stage = (proj.stages ?? []).find((s) => s.id === stageId);
+      if (stage) {
+        setTicketStageName(stage.name);
+        setTicketStageOrder(stage.execution_order);
+      } else {
+        setTicketStageName('');
+        setTicketStageOrder(null);
+      }
+    } catch (e) {
+      console.error('[STAGE] load failed:', e);
+      if (!cancelled) {
+        setTicketStageName('');
+        setTicketStageOrder(null);
+      }
+    }
+  })();
+
+  return () => {
+    cancelled = true;
+  };
+}, [baseTicket]);
+
+useEffect(() => {
+  console.log('[STAGE] baseTicket changed:', {
+    id: baseTicket?.id,
+    stage_id: (baseTicket as any)?.stage_id,
+    project_id: (baseTicket as any)?.project_id,
+  });
+}, [baseTicket]);
 
   const submit = async () => {
     if (!title.trim()) return;
@@ -2641,28 +2698,45 @@ const loadUsers = useCallback(async (q: string, p: number) => {
                 </div>
               )}
 
-              {lockTicket && (
-                <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 flex items-center gap-3">
-                  <Ticket className="w-5 h-5 text-blue-400 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                         {lockTicket && (
+                <div className="flex items-start gap-3 rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3.5">
+                  <Ticket className="mt-0.5 h-5 w-5 shrink-0 text-blue-400" />
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">
                       Создание на основании заявки
                     </p>
 
                     {baseTicket ? (
                       <>
-                        <p className="text-xs text-blue-400  mt-0.5">
-                          {baseTicket.number} — {baseTicket.title}
+                        <p className="mt-1.5 break-words text-sm font-medium text-[var(--text-primary)]/85">
+                          <span className="text-[var(--text-primary)]/70">
+                            {baseTicket.number}
+                          </span>
+                          {' — '}
+                          {baseTicket.title}
                         </p>
 
                         {!!requesterLabel && (
-                          <p className="text-xs text-[var(--text-primary)]/55 truncate">
+                          <p className="mt-1 text-sm text-[var(--text-primary)]/55">
                             от: {requesterLabel}
                           </p>
                         )}
+
+                        {ticketStageName && (
+                          <div className="mt-2.5 inline-flex max-w-full items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--hover-2)] px-2.5 py-1.5">
+                            <Milestone className="h-4 w-4 shrink-0 text-[var(--text-primary)]/55" />
+
+                            <span className="break-words text-sm font-medium text-[var(--text-primary)]/75">
+                              Этап {ticketStageOrder != null
+                                ? String(ticketStageOrder).padStart(2, '0')
+                                : '—'} · {ticketStageName}
+                            </span>
+                          </div>
+                        )}
                       </>
                     ) : (
-                      <p className="text-xs text-blue-400 truncate mt-0.5">
+                      <p className="mt-1 text-sm text-[var(--text-primary)]/60">
                         {ticketLabel || 'Заявка будет привязана автоматически'}
                       </p>
                     )}

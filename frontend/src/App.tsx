@@ -32,6 +32,8 @@ const MyCompanyPage = lazy(() => import('./pages/MyCompanyPage'));
 const InvitationsPage = lazy(() => import('./pages/InvitationsPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const SupportPage = lazy(() => import('./pages/SupportPage'));
+
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
 const NewProjectPage = lazy(() => import('./pages/NewProjectPage'));
 const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage'));
@@ -46,6 +48,10 @@ const WorkflowPage = lazy(() => import('./pages/WorkflowPage'));
 const GlobalPage = lazy(() => import('./pages/GlobalPage'));
 
 
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
+const TermsPage = lazy(() => import('./pages/TermsPage'));
+
+
 export default function App() {
   return (
     <NotificationsProvider>
@@ -54,6 +60,24 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LazyRoute><LoginPage /></LazyRoute>} />
             <Route path="/auth/invite/accept" element={<LazyRoute><RegisterPage /></LazyRoute>} />
+
+            <Route
+              path="/privacy"
+              element={
+                <LazyRoute>
+                  <PrivacyPolicyPage />
+                </LazyRoute>
+              }
+            />
+
+            <Route
+              path="/terms"
+              element={
+                <LazyRoute>
+                  <TermsPage />
+                </LazyRoute>
+              }
+            />
 
 
             <Route
@@ -74,6 +98,8 @@ export default function App() {
               <Route path="/workflows" element={<LazyRoute><ProtectedRoute><WorkflowPage /></ProtectedRoute></LazyRoute>} />
 
               <Route path="/global" element={<LazyRoute><GlobalPage /></LazyRoute>} />
+
+
 
 
               <Route path="/tasks" element={<LazyRoute><ProtectedRoute><TasksPage /></ProtectedRoute></LazyRoute>} />
@@ -100,6 +126,7 @@ export default function App() {
               <Route path="/products/new" element={<LazyRoute><ProtectedRoute><CreateProductPage /></ProtectedRoute></LazyRoute>} />
               <Route path="/notifications" element={<LazyRoute><NotificationsPage /></LazyRoute>} />
               <Route path="/profile" element={<LazyRoute><ProfilePage /></LazyRoute>} />
+              <Route path="/support" element={<LazyRoute><SupportPage /></LazyRoute>} />
 
 
               <Route path="/feedbacks" element={<LazyRoute><FeedbacksPage /></LazyRoute>} />

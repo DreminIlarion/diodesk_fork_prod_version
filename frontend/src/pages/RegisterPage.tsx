@@ -1,9 +1,10 @@
 // pages/RegisterPage.tsx
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, Loader2, CheckCircle, Shield, AlertCircle, Pencil, Sparkles } from 'lucide-react';
 import { authApi } from '../api/client';
 import { useToast } from '../components/ui/use-toast';
+
 
 /* ─────────────── транслитерация ─────────────── */
 
@@ -504,6 +505,31 @@ export default function RegisterPage() {
                 )}
               </div>
             </div>
+
+
+            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3">
+  <p className="text-sm leading-6 text-[var(--color-text-secondary)]">
+    Нажимая «Зарегистрироваться», вы принимаете условия{' '}
+    <Link
+      to="/terms"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="font-medium text-blue-500 hover:underline"
+    >
+      Пользовательского соглашения
+    </Link>
+    {' '}и подтверждаете ознакомление с{' '}
+    <Link
+      to="/privacy"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="font-medium text-blue-500 hover:underline"
+    >
+      Политикой обработки персональных данных
+    </Link>
+    .
+  </p>
+</div>
 
             {/* Submit */}
             <button
