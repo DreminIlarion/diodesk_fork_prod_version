@@ -395,7 +395,17 @@ class InMemoryReactionRepository(InMemoryRepository[Reaction]):
 
 
 class InMemoryProductRepository(InMemoryRepository[SoftwareProduct]):
-    ...
+    async def get_by_registration_number(
+            self, registration_number: str
+    ) -> SoftwareProduct | None:
+        return next(
+            (
+                product
+                for product in self.data.values()
+                if product.registration_number == registration_number
+            ),
+            None,
+        )
 
 
 class InMemoryTaskRepository(InMemoryRepository[Task]):

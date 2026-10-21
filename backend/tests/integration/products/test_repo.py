@@ -1,5 +1,6 @@
 import pytest
 from scripts.regsetup import description
+from sqlalchemy.exc import IntegrityError
 
 from src.products.domain.vo import ProductCategory, ProductStatus
 from src.products.infra.models import SoftwareProductOrm
@@ -110,3 +111,45 @@ class TestPaginate:
         assert all(
             search_query in item.description.lower() for item in page.items
         )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_registration_number_can_be_null_for_legacy_products(session, product_repo):
+    legacy = SoftwareProductOrm(
+        name="Legacy product",
+        vendor="Vendor",
+        registration_number=None,
+        category=ProductCategory.OTHER,
+        status=ProductStatus.ACTIVE,
+        attributes={},
+    )
+    session.add(legacy)
+    await session.commit()
+
+    product = await product_repo.read(legacy.id)
+
+    assert product is not None
+    assert product.registration_number is None
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_registration_number_is_globally_unique(session):
+    products = [
+        SoftwareProductOrm(
+            name=f"Product {index}",
+            vendor="Vendor",
+            registration_number="REG-DUPLICATE",
+            category=ProductCategory.OTHER,
+            status=ProductStatus.ACTIVE,
+            attributes={},
+        )
+        for index in range(2)
+    ]
+    session.add_all(products)
+
+    with pytest.raises(IntegrityError):
+        await session.commit()
+
+    await session.rollback()

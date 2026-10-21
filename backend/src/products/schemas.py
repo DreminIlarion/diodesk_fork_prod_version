@@ -1,11 +1,13 @@
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
 
 from .domain.vo import ProductCategory, ProductStatus
+
+NonEmptyIdentifier = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class ProductBase(BaseModel):
@@ -14,6 +16,9 @@ class ProductBase(BaseModel):
     name: str = Field(..., description="Полное наименование", examples=["1С УНФ"])
     vendor: str = Field(..., description="Вендор ПО", examples=["1С"])
     category: ProductCategory = Field(..., description="Категория программного продукта")
+    registration_number: str | None = Field(
+        None, description="Регистрационный номер продукта в 1С УФФ"
+    )
     description: str | None = Field(None, description="Описание")
     version: str | None = Field(None, description="Версия", examples=["3.0.1"])
     status: ProductStatus = Field(..., description="Статус в справочнике")
@@ -36,6 +41,18 @@ class ProductResponse(ProductBase):
 
 class ProductCreate(ProductBase):
     """API схема для создания программного продукта"""
+
+    registration_number: NonEmptyIdentifier = Field(
+        ..., description="Регистрационный номер продукта в 1С УФФ"
+    )
+
+
+class ProductUpdate(BaseModel):
+    """API схема для обновления регистрационного номера продукта."""
+
+    registration_number: NonEmptyIdentifier = Field(
+        ..., description="Новый регистрационный номер продукта"
+    )
 
 
 class ProductFilters(BaseModel):
