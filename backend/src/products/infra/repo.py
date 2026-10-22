@@ -19,6 +19,7 @@ class SoftwareProductMapper(ModelMapper[SoftwareProduct, SoftwareProductOrm]):
             deleted_at=model.deleted_at,
             name=model.name,
             vendor=model.vendor,
+            registration_number=model.registration_number,
             version=model.version,
             description=model.description,
             category=model.category,
@@ -37,6 +38,7 @@ class SoftwareProductMapper(ModelMapper[SoftwareProduct, SoftwareProductOrm]):
             deleted_at=entity.deleted_at,
             name=entity.name,
             vendor=entity.vendor,
+            registration_number=entity.registration_number,
             version=entity.version,
             description=entity.description,
             category=entity.category,
@@ -50,6 +52,14 @@ class SoftwareProductMapper(ModelMapper[SoftwareProduct, SoftwareProductOrm]):
 class SqlProductRepository(SqlAlchemyRepository[SoftwareProduct, SoftwareProductOrm]):
     model = SoftwareProductOrm
     model_mapper = SoftwareProductMapper
+
+    async def get_by_registration_number(
+            self, registration_number: str
+    ) -> SoftwareProduct | None:
+        stmt = select(self.model).where(self.model.registration_number == registration_number)
+        result = await self.session.execute(stmt)
+        model = result.scalar_one_or_none()
+        return None if model is None else self.model_mapper.to_entity(model)
 
     @override
     async def paginate(

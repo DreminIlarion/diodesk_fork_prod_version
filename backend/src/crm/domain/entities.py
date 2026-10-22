@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import EmailStr
 
+from src.products.domain.entities import SoftwareProduct
 from src.shared.domain.entities import Entity
 from src.shared.domain.exceptions import InvariantViolationError
 from src.shared.utils.time import current_datetime
@@ -13,6 +14,32 @@ from .vo import ContactPerson, CounterpartyType, Inn, Kpp, Okpo, Phone
 
 INDIVIDUAL_INN_LENGTH = 12
 LEGAL_INN_LENGTH = 10
+
+
+@dataclass(kw_only=True)
+class CounterpartyProduct(Entity):
+    """A serialized product instance assigned to a counterparty."""
+
+    counterparty_id: UUID
+    product_id: UUID
+    serial_number: str | None = None
+    product: SoftwareProduct | None = None
+
+    def __post_init__(self) -> None:
+        if self.serial_number is not None:
+            self.serial_number = self.serial_number.strip()
+            if not self.serial_number:
+                raise ValueError("Product serial number cannot be empty")
+
+    def change_serial_number(self, serial_number: str) -> None:
+        serial_number = serial_number.strip()
+        if not serial_number:
+            raise ValueError("Product serial number cannot be empty")
+        if serial_number == self.serial_number:
+            return
+
+        self.serial_number = serial_number
+        self.updated_at = current_datetime()
 
 
 @dataclass(kw_only=True)
@@ -79,7 +106,7 @@ class Counterparty(Entity):
             # Пропускаем проверку, если оба поля пустые
             if not contact_person.phone and not contact_person.email:
                 continue
-            
+
             contact_data = (contact_person.phone, contact_person.email)
             if contact_data in seen_contact_data:
                 raise InvariantViolationError(
@@ -191,13 +218,13 @@ class Counterparty(Entity):
             # Пропускаем проверку, если оба поля пустые
             if not phone and not email:
                 continue
-            
+
             # Проверяем совпадение по телефону
             if phone and contact_person.phone == Phone(phone):
                 raise ValueError(
                     f"Contact person with phone - '{phone}' already exists"
                 )
-            
+
             # Проверяем совпадение по email
             if email and contact_person.email == email:
                 raise ValueError(
@@ -212,7 +239,7 @@ class Counterparty(Entity):
                 phone=phone,
                 email=email,
                 position=position,        # ← добавил
-                extension=extension, 
+                extension=extension,
                 messengers=messengers,
             )
         )

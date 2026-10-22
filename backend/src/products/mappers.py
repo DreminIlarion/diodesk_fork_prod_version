@@ -9,6 +9,7 @@ def map_product_to_response(product: SoftwareProduct) -> ProductResponse:
         updated_at=product.updated_at,
         name=product.name,
         vendor=product.vendor,
+        registration_number=product.registration_number,
         version=product.version,
         description=product.description,
         display_name=product.display_name,

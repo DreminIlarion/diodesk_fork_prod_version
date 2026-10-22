@@ -8,6 +8,10 @@ from .vo import ProductCategory, ProductStatus
 
 class ProductRepository(Repository[SoftwareProduct]):
 
+    async def get_by_registration_number(
+            self, registration_number: str
+    ) -> SoftwareProduct | None: ...
+
     @override
     async def paginate(
             self,

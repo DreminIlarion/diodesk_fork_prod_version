@@ -2,11 +2,12 @@ from typing import Any, Optional
 
 from uuid import UUID
 
-from sqlalchemy import Enum, ForeignKey, Index
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ...core.database import Base
+from ...products.infra.models import SoftwareProductOrm
 from ..domain.vo import CounterpartyType
 
 
@@ -65,5 +66,17 @@ class CounterpartyProductOrm(Base):
 
     counterparty_id: Mapped[UUID] = mapped_column(ForeignKey("counterparties.id"), unique=False)
     product_id: Mapped[UUID] = mapped_column(ForeignKey("software_products.id"), unique=False)
+    serial_number: Mapped[str | None] = mapped_column(nullable=True)
 
     counterparty: Mapped["CounterpartyOrm"] = relationship(back_populates="products")
+    product: Mapped["SoftwareProductOrm"] = relationship()
+
+    __table_args__ = (
+        CheckConstraint(
+            "serial_number IS NULL OR btrim(serial_number) <> ''",
+            name="ck_counterparty_products_serial_number_not_blank",
+        ),
+        UniqueConstraint("serial_number", name="uq_counterparty_products_serial_number"),
+        Index("ix_counterparty_products_counterparty_id", "counterparty_id"),
+        Index("ix_counterparty_products_product_id", "product_id"),
+    )

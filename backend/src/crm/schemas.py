@@ -1,9 +1,36 @@
+from typing import Annotated
+
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, StringConstraints
+
+from src.products.schemas import ProductResponse
 
 from .domain.vo import CounterpartyType
+
+NonEmptySerialNumber = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1)
+]
+
+
+class CounterpartyProductCreate(BaseModel):
+    product_id: UUID = Field(..., description="ID продукта из справочника")
+    serial_number: NonEmptySerialNumber = Field(..., description="Серийный номер продукта")
+
+
+class CounterpartyProductUpdate(BaseModel):
+    serial_number: NonEmptySerialNumber = Field(..., description="Новый серийный номер продукта")
+
+
+class CounterpartyProductResponse(BaseModel):
+    id: UUID = Field(..., description="ID экземпляра продукта у контрагента")
+    counterparty_id: UUID
+    product_id: UUID
+    serial_number: str | None
+    created_at: datetime
+    updated_at: datetime
+    product: ProductResponse
 
 
 class ContactPersonIn(BaseModel):
@@ -11,9 +38,11 @@ class ContactPersonIn(BaseModel):
 
     first_name: str = Field(..., description="Имя")
     last_name: str | None = Field(None, description="Фамилия")
-    
+
     middle_name: str | None = Field(None, description="Отчество")
-    phone: str | None = Field(None, description="Номер телефона", examples=["88005553535", "+78005553535"])
+    phone: str | None = Field(
+        None, description="Номер телефона", examples=["88005553535", "+78005553535"]
+    )
     email: EmailStr | None = Field(None, description="Адрес электронной почты")
     position: str | None = Field(None, description="Должность", examples=["Главный бухгалтер"])
     extension: str | None = Field(None, description="Добавочный номер", examples=["1234"])
@@ -28,7 +57,9 @@ class ContactPersonOut(BaseModel):
     """Созданное контактное лицо"""
 
     full_name: str = Field(..., description="ФИО лица", examples=["Иванов Иван Иванович"])
-    phone: str | None = Field(None, description="Номер телефона", examples=["88005553535", "+78005553535"])
+    phone: str | None = Field(
+        None, description="Номер телефона", examples=["88005553535", "+78005553535"]
+    )
     email: EmailStr | None = Field(None, description="Адрес электронной почты")
     position: str | None = Field(None, description="Должность", examples=["Главный бухгалтер"])
     extension: str | None = Field(None, description="Добавочный номер", examples=["1234"])

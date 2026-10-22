@@ -1,12 +1,15 @@
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 
 from src.iam.domain.exceptions import PermissionDeniedError
 from src.iam.domain.vo import UserRole
+from src.products.domain.entities import SoftwareProduct
 from src.products.domain.vo import ProductCategory, ProductStatus
-from src.products.schemas import ProductCreate
+from src.products.schemas import ProductCreate, ProductUpdate
 from src.products.services import ProductService
+from src.shared.domain.exceptions import AlreadyExistsError, NotFoundError
 
 
 @pytest.fixture
@@ -24,6 +27,7 @@ class TestCreate:
         return ProductCreate(
             name="1C УНФ",
             vendor="1C",
+            registration_number="REG-UNF-001",
             version="3.0.5",
             category=ProductCategory.ERP,
             status=ProductStatus.ACTIVE,
@@ -36,6 +40,7 @@ class TestCreate:
             ProductCreate(
                 name="1C ERP",
                 vendor="1C",
+                registration_number="REG-ERP-001",
                 version="3.0.1",
                 category=ProductCategory.ERP,
                 status=ProductStatus.BETA,
@@ -44,6 +49,7 @@ class TestCreate:
             ProductCreate(
                 name="Web-сайт",
                 vendor="ДИО-Консалт",
+                registration_number="REG-WEB-001",
                 category=ProductCategory.WEB,
                 status=ProductStatus.ACTIVE,
                 attributes={"environment": "local", "framework": "Wagtail"}
@@ -80,6 +86,7 @@ class TestCreate:
 
         assert response.name == valid_create_data.name
         assert response.vendor == valid_create_data.vendor
+        assert response.registration_number == valid_create_data.registration_number
         assert response.version == valid_create_data.version
         assert response.description == valid_create_data.description
         assert response.category == valid_create_data.category
@@ -141,3 +148,61 @@ class TestCreate:
                     created_by=uuid4(),
                     created_by_role=UserRole.SUPPORT_MANAGER,
                 )
+
+    @pytest.mark.parametrize("registration_number", [None, "", "   "])
+    def test_registration_number_is_required(self, registration_number):
+        payload = {
+            "name": "1C ERP",
+            "vendor": "1C",
+            "registration_number": registration_number,
+            "category": ProductCategory.ERP,
+            "status": ProductStatus.ACTIVE,
+            "attributes": {"license_type": "cloud"},
+        }
+
+        with pytest.raises(ValidationError):
+            ProductCreate(**payload)
+
+    @pytest.mark.asyncio
+    async def test_duplicate_registration_number_fails(
+            self, product_service, valid_create_data
+    ):
+        await product_service.create(
+            valid_create_data, uuid4(), UserRole.SUPPORT_MANAGER
+        )
+
+        with pytest.raises(AlreadyExistsError):
+            await product_service.create(
+                valid_create_data, uuid4(), UserRole.SUPPORT_MANAGER
+            )
+
+
+class TestUpdate:
+    @pytest.mark.asyncio
+    async def test_sets_registration_number_on_legacy_product(
+            self, product_service, fake_product_repo
+    ):
+        product = SoftwareProduct(
+            name="Legacy",
+            vendor="Vendor",
+            category=ProductCategory.OTHER,
+            status=ProductStatus.ACTIVE,
+        )
+        await fake_product_repo.create(product)
+        updated_by = uuid4()
+
+        response = await product_service.update(
+            product.id,
+            ProductUpdate(registration_number="  LEGACY-001  "),
+            updated_by,
+        )
+
+        assert response.registration_number == "LEGACY-001"
+        assert response.updated_by == updated_by
+
+    @pytest.mark.asyncio
+    async def test_missing_product_fails(self, product_service):
+        with pytest.raises(NotFoundError):
+            await product_service.update(
+                uuid4(), ProductUpdate(registration_number="REG-001"), uuid4()
+            )
