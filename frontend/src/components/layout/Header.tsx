@@ -18,6 +18,15 @@ const DIOS_WIDTH_KEY = 'dios-panel-width';
 const MIN_W = 360;
 const MAX_W_RATIO = 0.9;
 
+function getStoredWidth(): number {
+  try {
+    const n = Number(localStorage.getItem(DIOS_WIDTH_KEY));
+    return Number.isFinite(n) && n >= MIN_W ? n : 560;
+  } catch {
+    return 560;
+  }
+}
+
 export default function Header({ onMenuClick }: HeaderProps) {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
@@ -32,18 +41,15 @@ export default function Header({ onMenuClick }: HeaderProps) {
   });
   const [diosExpanded, setDiosExpanded] = useState(false);
 
-  // ширину храним в ref, чтобы не ререндерить на каждом mousemove
+  // isResizing нужен только чтобы показать overlay поверх iframe,
+  // сама ширина живёт в ref и не триггерит рендеры на mousemove.
+  const [isResizing, setIsResizing] = useState(false);
+
   const panelRef = useRef<HTMLDivElement>(null);
-  const initialWidth = (() => {
-    try {
-      const n = Number(localStorage.getItem(DIOS_WIDTH_KEY));
-      return Number.isFinite(n) && n >= MIN_W ? n : 560;
-    } catch { return 560; }
-  })();
-  const widthRef = useRef(initialWidth);
+  const widthRef = useRef<number>(getStoredWidth());
   const resizingRef = useRef(false);
 
-  // применить ширину при монтировании / открытии
+  // применить сохранённую ширину при открытии / выходе из полноэкранного режима
   useEffect(() => {
     if (panelRef.current && !diosExpanded) {
       panelRef.current.style.width = `${widthRef.current}px`;
@@ -66,7 +72,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
     return () => document.removeEventListener('keydown', onKey);
   }, [showDios, diosExpanded]);
 
-  // ── Resize (без React state — только DOM) ─────────────────────
+  // ── Resize (DOM-манипуляции, без лишних ререндеров ширины) ─────
   useEffect(() => {
     if (!showDios || diosExpanded) return;
 
@@ -79,25 +85,33 @@ export default function Header({ onMenuClick }: HeaderProps) {
       e.preventDefault();
     };
 
-    const onUp = () => {
+    const stop = () => {
       if (!resizingRef.current) return;
       resizingRef.current = false;
+      setIsResizing(false);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       try { localStorage.setItem(DIOS_WIDTH_KEY, String(widthRef.current)); } catch {}
     };
 
     window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    window.addEventListener('mouseup', stop);
+    // На случай если курсор ушёл из окна (например, через iframe/другой монитор)
+    window.addEventListener('mouseleave', stop);
+    window.addEventListener('blur', stop);
+
     return () => {
       window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('mouseup', stop);
+      window.removeEventListener('mouseleave', stop);
+      window.removeEventListener('blur', stop);
     };
   }, [showDios, diosExpanded]);
 
   const startResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     resizingRef.current = true;
+    setIsResizing(true);
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   }, []);
@@ -238,13 +252,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
         </div>
       </header>
 
-      {/* ── DIOS AI PANEL ────────────────────────────────────────
-          Оборачиваем в pointer-events-none, чтобы клики по сайту
-          проходили мимо; сама панель — pointer-events-auto.
-          fixed только когда expanded (тогда нужен оверлей). */}
+      {/* ── DIOS AI PANEL ──────────────────────────────────────── */}
       {showDios && (
         <>
-          {/* Expanded overlay — только в режиме «развернуть» */}
           {diosExpanded && (
             <div
               className="fixed inset-0 z-[55] bg-black/60 backdrop-blur-sm"
@@ -256,23 +266,20 @@ export default function Header({ onMenuClick }: HeaderProps) {
             className={`fixed top-0 right-0 bottom-0 z-[56] flex pointer-events-none ${
               diosExpanded ? 'w-full lg:w-[85vw]' : ''
             }`}
-            style={diosExpanded ? undefined : { width: `calc(${widthRef.current}px + 6px)` }}
           >
-            {/* Resize handle — широкая зона захвата, поверх */}
             {!diosExpanded && (
               <div
                 onMouseDown={startResize}
                 title="Потяните, чтобы изменить ширину"
                 className="hidden lg:flex w-1.5 cursor-col-resize bg-[var(--border-color)] hover:bg-[var(--accent)]/60 transition-colors pointer-events-auto relative"
               >
-                {/* расширенная невидимая зона захвата */}
                 <div className="absolute -left-1.5 -right-1.5 top-0 bottom-0" />
               </div>
             )}
 
             <div
               ref={panelRef}
-              className={`flex flex-col h-full bg-[var(--bg-card)] border-l border-[var(--border-color)] shadow-2xl pointer-events-auto ${
+              className={`relative flex flex-col h-full bg-[var(--bg-card)] border-l border-[var(--border-color)] shadow-2xl pointer-events-auto ${
                 diosExpanded ? 'w-full' : ''
               }`}
               style={diosExpanded ? undefined : { width: `${widthRef.current}px` }}
@@ -321,12 +328,20 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 </div>
               </div>
 
-              <iframe
-                src={DIOS_URL}
-                title="DIOS AI"
-                className="flex-1 w-full border-0 bg-white"
-                allow="clipboard-read; clipboard-write"
-              />
+              <div className="relative flex-1 min-h-0">
+                <iframe
+                  src={DIOS_URL}
+                  title="DIOS AI"
+                  className="w-full h-full border-0 bg-white"
+                  allow="clipboard-read; clipboard-write"
+                />
+                {/* Overlay поверх iframe во время ресайза —
+                    без него iframe перехватывает mousemove/mouseup
+                    и драг "зависает", из-за чего потом размер скачет. */}
+                {isResizing && (
+                  <div className="absolute inset-0 z-10 cursor-col-resize" />
+                )}
+              </div>
             </div>
           </div>
         </>
