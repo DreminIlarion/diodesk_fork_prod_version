@@ -15,6 +15,9 @@ const DIOS_URL = 'http://10.1.50.109:18080/';
 const DIOS_STORAGE_KEY = 'dios-panel-open';
 const DIOS_WIDTH_KEY = 'dios-panel-width';
 
+const MIN_W = 360;
+const MAX_W_RATIO = 0.9;
+
 export default function Header({ onMenuClick }: HeaderProps) {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
@@ -28,22 +31,30 @@ export default function Header({ onMenuClick }: HeaderProps) {
     try { return localStorage.getItem(DIOS_STORAGE_KEY) === '1'; } catch { return false; }
   });
   const [diosExpanded, setDiosExpanded] = useState(false);
-  const [diosWidth, setDiosWidth] = useState<number>(() => {
+
+  // ширину храним в ref, чтобы не ререндерить на каждом mousemove
+  const panelRef = useRef<HTMLDivElement>(null);
+  const initialWidth = (() => {
     try {
       const n = Number(localStorage.getItem(DIOS_WIDTH_KEY));
-      return Number.isFinite(n) && n >= 320 ? n : 560;
+      return Number.isFinite(n) && n >= MIN_W ? n : 560;
     } catch { return 560; }
-  });
+  })();
+  const widthRef = useRef(initialWidth);
   const resizingRef = useRef(false);
+
+  // применить ширину при монтировании / открытии
+  useEffect(() => {
+    if (panelRef.current && !diosExpanded) {
+      panelRef.current.style.width = `${widthRef.current}px`;
+    }
+  }, [showDios, diosExpanded]);
 
   useEffect(() => {
     try { localStorage.setItem(DIOS_STORAGE_KEY, showDios ? '1' : '0'); } catch {}
   }, [showDios]);
 
-  useEffect(() => {
-    try { localStorage.setItem(DIOS_WIDTH_KEY, String(diosWidth)); } catch {}
-  }, [diosWidth]);
-
+  // Esc
   useEffect(() => {
     if (!showDios) return;
     const onKey = (e: KeyboardEvent) => {
@@ -55,18 +66,27 @@ export default function Header({ onMenuClick }: HeaderProps) {
     return () => document.removeEventListener('keydown', onKey);
   }, [showDios, diosExpanded]);
 
+  // ── Resize (без React state — только DOM) ─────────────────────
   useEffect(() => {
     if (!showDios || diosExpanded) return;
+
     const onMove = (e: MouseEvent) => {
-      if (!resizingRef.current) return;
-      const next = window.innerWidth - e.clientX;
-      setDiosWidth(Math.min(Math.max(next, 360), Math.floor(window.innerWidth * 0.9)));
+      if (!resizingRef.current || !panelRef.current) return;
+      const maxW = Math.floor(window.innerWidth * MAX_W_RATIO);
+      const next = Math.min(Math.max(window.innerWidth - e.clientX, MIN_W), maxW);
+      widthRef.current = next;
+      panelRef.current.style.width = `${next}px`;
+      e.preventDefault();
     };
+
     const onUp = () => {
+      if (!resizingRef.current) return;
       resizingRef.current = false;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      try { localStorage.setItem(DIOS_WIDTH_KEY, String(widthRef.current)); } catch {}
     };
+
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
     return () => {
@@ -75,7 +95,8 @@ export default function Header({ onMenuClick }: HeaderProps) {
     };
   }, [showDios, diosExpanded]);
 
-  const startResize = useCallback(() => {
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
     resizingRef.current = true;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
@@ -108,8 +129,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
     <>
       <header className="sticky py-3 top-0 z-30 bg-[var(--bg-sidebar)] backdrop-blur-xl border-b border-[var(--border-color)]">
         <div className="flex items-center justify-between px-6">
-
-          {/* MOBILE LOGO */}
           <div className="flex items-center gap-4 lg:hidden">
             <img
               src="http://80.93.62.177:8000/media/images/Logo_bez_fona_bez_teksta.width-80.height-80.png"
@@ -120,10 +139,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
           </div>
           <div className="hidden lg:block" />
 
-          {/* RIGHT SIDE */}
           <div className="flex items-center gap-2 md:gap-4">
-
-            {/* DIOS AI — toggle panel */}
             <button
               type="button"
               onClick={() => setShowDios((v) => !v)}
@@ -154,7 +170,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
               />
             </button>
 
-            {/* THEME */}
             <button
               onClick={toggleTheme}
               className="p-2 rounded-xl hover:bg-[var(--hover-1)] transition-colors"
@@ -167,18 +182,13 @@ export default function Header({ onMenuClick }: HeaderProps) {
               )}
             </button>
 
-            {/* USER */}
             <div ref={dropdownRef} className="relative">
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
                 className="flex items-center gap-2 md:gap-3 p-2 rounded-xl hover:bg-[var(--hover-1)] transition-colors"
               >
                 {user?.avatar_url ? (
-                  <img
-                    src={user.avatar_url}
-                    alt=""
-                    className="w-10 h-10 rounded-full object-cover ring-2 ring-[var(--accent)]/20"
-                  />
+                  <img src={user.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover ring-2 ring-[var(--accent)]/20" />
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-dark)] flex items-center justify-center">
                     <User className="w-5 h-5 text-white" />
@@ -201,36 +211,19 @@ export default function Header({ onMenuClick }: HeaderProps) {
                     </p>
                     <p className="text-sm text-[var(--text-muted)]">{user?.email}</p>
                   </div>
-
                   <div className="py-2">
-                    <Link
-                      to="/profile"
-                      onClick={() => setShowDropdown(false)}
-                      className="flex items-center gap-3 px-4 py-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-1)] rounded-xl transition-colors text-base"
-                    >
+                    <Link to="/profile" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-1)] rounded-xl transition-colors text-base">
                       <User className="w-5 h-5" /> Профиль
                     </Link>
-                    <Link
-                      to="/notifications"
-                      onClick={() => setShowDropdown(false)}
-                      className="flex items-center gap-3 px-4 py-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-1)] rounded-xl transition-colors text-base"
-                    >
+                    <Link to="/notifications" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-1)] rounded-xl transition-colors text-base">
                       <Settings className="w-5 h-5" /> Настройки
                     </Link>
-                    <Link
-                      to="/support"
-                      onClick={() => setShowDropdown(false)}
-                      className="flex items-center gap-3 px-4 py-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-1)] rounded-xl transition-colors text-base"
-                    >
+                    <Link to="/support" onClick={() => setShowDropdown(false)} className="flex items-center gap-3 px-4 py-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-1)] rounded-xl transition-colors text-base">
                       <CircleHelp className="w-5 h-5" /> Поддержка
                     </Link>
                   </div>
-
                   <div className="pt-2 border-t border-[var(--border-color)]">
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-[var(--error)] hover:text-[var(--error)]/80 hover:bg-[var(--error)]/10 rounded-xl transition-colors text-base"
-                    >
+                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-[var(--error)] hover:text-[var(--error)]/80 hover:bg-[var(--error)]/10 rounded-xl transition-colors text-base">
                       <LogOut className="w-5 h-5" /> Выйти
                     </button>
                   </div>
@@ -238,100 +231,105 @@ export default function Header({ onMenuClick }: HeaderProps) {
               )}
             </div>
 
-            {/* MOBILE MENU */}
-            <button
-              onClick={onMenuClick}
-              className="lg:hidden p-2 rounded-xl hover:bg-[var(--hover-1)] transition-colors"
-            >
+            <button onClick={onMenuClick} className="lg:hidden p-2 rounded-xl hover:bg-[var(--hover-1)] transition-colors">
               <Menu className="w-6 h-6 text-[var(--text-primary)]" />
             </button>
           </div>
         </div>
       </header>
 
-      {/* DIOS AI SIDE PANEL */}
+      {/* ── DIOS AI PANEL ────────────────────────────────────────
+          Оборачиваем в pointer-events-none, чтобы клики по сайту
+          проходили мимо; сама панель — pointer-events-auto.
+          fixed только когда expanded (тогда нужен оверлей). */}
       {showDios && (
-        <div className="fixed inset-0 z-[60] flex">
-          <div
-            className={`flex-1 transition-opacity duration-200 ${
-              diosExpanded ? 'bg-black/60 backdrop-blur-sm' : 'bg-transparent'
-            }`}
-            onClick={() => {
-              if (diosExpanded) setDiosExpanded(false);
-              else if (window.innerWidth < 1024) setShowDios(false);
-            }}
-          />
-
-          {!diosExpanded && (
+        <>
+          {/* Expanded overlay — только в режиме «развернуть» */}
+          {diosExpanded && (
             <div
-              onMouseDown={startResize}
-              title="Потяните, чтобы изменить ширину"
-              className="hidden lg:block w-1.5 cursor-col-resize bg-[var(--border-color)] hover:bg-[var(--accent)]/50 transition-colors"
+              className="fixed inset-0 z-[55] bg-black/60 backdrop-blur-sm"
+              onClick={() => setDiosExpanded(false)}
             />
           )}
 
           <div
-            className={`flex flex-col bg-[var(--bg-card)] border-l border-[var(--border-color)] shadow-2xl transition-[width] duration-200 ease-out ${
-              diosExpanded ? 'w-full lg:w-[85vw]' : 'w-full lg:w-auto'
+            className={`fixed top-0 right-0 bottom-0 z-[56] flex pointer-events-none ${
+              diosExpanded ? 'w-full lg:w-[85vw]' : ''
             }`}
-            style={
-              !diosExpanded && window.innerWidth >= 1024
-                ? { width: `${diosWidth}px` }
-                : undefined
-            }
+            style={diosExpanded ? undefined : { width: `calc(${widthRef.current}px + 6px)` }}
           >
-            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-sidebar)] shrink-0">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <img
-                  src="https://storage.yandexcloud.net/b.fotovssylku.ru/2026/10/05/GLYNTEVYI-LOGOTIP-d_i-S-AI-SKEMAMI.png"
-                  alt=""
-                  className="w-7 h-7 object-contain shrink-0"
-                />
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
-                    DIOS <span className="text-[var(--accent)]">AI</span>
-                  </p>
-                  <p className="text-[11px] text-[var(--text-muted)] truncate">ИИ-агент</p>
+            {/* Resize handle — широкая зона захвата, поверх */}
+            {!diosExpanded && (
+              <div
+                onMouseDown={startResize}
+                title="Потяните, чтобы изменить ширину"
+                className="hidden lg:flex w-1.5 cursor-col-resize bg-[var(--border-color)] hover:bg-[var(--accent)]/60 transition-colors pointer-events-auto relative"
+              >
+                {/* расширенная невидимая зона захвата */}
+                <div className="absolute -left-1.5 -right-1.5 top-0 bottom-0" />
+              </div>
+            )}
+
+            <div
+              ref={panelRef}
+              className={`flex flex-col h-full bg-[var(--bg-card)] border-l border-[var(--border-color)] shadow-2xl pointer-events-auto ${
+                diosExpanded ? 'w-full' : ''
+              }`}
+              style={diosExpanded ? undefined : { width: `${widthRef.current}px` }}
+            >
+              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-sidebar)] shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <img
+                    src="https://storage.yandexcloud.net/b.fotovssylku.ru/2026/10/05/GLYNTEVYI-LOGOTIP-d_i-S-AI-SKEMAMI.png"
+                    alt=""
+                    className="w-7 h-7 object-contain shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
+                      DIOS <span className="text-[var(--accent)]">AI</span>
+                    </p>
+                    <p className="text-[11px] text-[var(--text-muted)] truncate">ИИ-агент</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <a
+                    href={DIOS_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Открыть в новой вкладке"
+                    className="p-2 rounded-lg text-[var(--text-muted)] hover:bg-[var(--hover-1)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setDiosExpanded((v) => !v)}
+                    title={diosExpanded ? 'Свернуть' : 'Развернуть'}
+                    className="hidden lg:inline-flex p-2 rounded-lg text-[var(--text-muted)] hover:bg-[var(--hover-1)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    {diosExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDios(false)}
+                    title="Закрыть"
+                    className="p-2 rounded-lg text-[var(--text-muted)] hover:bg-[var(--hover-1)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1 shrink-0">
-                <a
-                  href={DIOS_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Открыть в новой вкладке"
-                  className="p-2 rounded-lg text-[var(--text-muted)] hover:bg-[var(--hover-1)] hover:text-[var(--text-primary)] transition-colors"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setDiosExpanded((v) => !v)}
-                  title={diosExpanded ? 'Свернуть' : 'Развернуть'}
-                  className="hidden lg:inline-flex p-2 rounded-lg text-[var(--text-muted)] hover:bg-[var(--hover-1)] hover:text-[var(--text-primary)] transition-colors"
-                >
-                  {diosExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowDios(false)}
-                  title="Закрыть"
-                  className="p-2 rounded-lg text-[var(--text-muted)] hover:bg-[var(--hover-1)] hover:text-[var(--text-primary)] transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+              <iframe
+                src={DIOS_URL}
+                title="DIOS AI"
+                className="flex-1 w-full border-0 bg-white"
+                allow="clipboard-read; clipboard-write"
+              />
             </div>
-
-            <iframe
-              src={DIOS_URL}
-              title="DIOS AI"
-              className="flex-1 w-full border-0 bg-white"
-              allow="clipboard-read; clipboard-write"
-            />
           </div>
-        </div>
+        </>
       )}
     </>
   );
