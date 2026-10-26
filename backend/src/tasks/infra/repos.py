@@ -26,6 +26,7 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
             deleted_at=model.deleted_at,
             ticket_id=model.ticket_id,
             project_id=model.project_id,
+            stage_id=model.stage_id,
             number=TaskNumber(model.number),
             title=model.title,
             description=model.description,
@@ -58,6 +59,7 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
             deleted_at=entity.deleted_at,
             ticket_id=entity.ticket_id,
             project_id=entity.project_id,
+            stage_id=entity.stage_id,
             number=entity.number.value,
             title=entity.title,
             description=entity.description,
@@ -99,6 +101,7 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
             completed_at=model.completed_at,    # ← Добавил
             working_since=model.working_since,  # ← Добавил
             project_id=model.project_id,
+            stage_id=model.stage_id,
             ticket_id=model.ticket_id,
             attachments=[AttachmentMapper.to_entity(a) for a in model.attachments],
             tags={Tag(name=tag["name"], color=tag["color"]) for tag in model.tags},
@@ -156,6 +159,7 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
             # Дополнительные фильтры
             priorities: list[Priority] | None = None,
             overdue_only: bool = False,
+            stage_ids: set[UUID] | None = None,
     ) -> dict[TaskStatus, Page[TaskView]]:
         # Общие условия фильтрации (исключаем удалённые задачи)
         conditions = [self.model.deleted_at.is_(None)]
@@ -190,6 +194,9 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
 
         if priorities is not None:
             conditions.append(self.model.priority.in_(priorities))
+
+        if stage_ids:
+            conditions.append(self.model.stage_id.in_(stage_ids))
 
         if overdue_only:
             today = current_datetime().date()

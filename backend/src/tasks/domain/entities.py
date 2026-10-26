@@ -44,6 +44,7 @@ class Task(AggregateRoot):
 
     ticket_id: UUID | None = None
     project_id: UUID | None = None
+    stage_id: UUID | None = None
 
     number: TaskNumber
     title: str
@@ -102,6 +103,7 @@ class Task(AggregateRoot):
             priority: Priority = Priority.MEDIUM,
             ticket_id: UUID | None = None,
             project_id: UUID | None = None,
+            stage_id: UUID | None = None,
             due_date: date | None = None,
             estimated_hours: Decimal | None = None,
             story_points: int | None = None, #добавил
@@ -117,6 +119,7 @@ class Task(AggregateRoot):
             id=task_id,
             ticket_id=ticket_id,
             project_id=project_id,
+            stage_id=stage_id,
             number=number,
             title=title,
             description=description,

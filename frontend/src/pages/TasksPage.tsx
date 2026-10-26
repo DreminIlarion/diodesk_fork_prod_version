@@ -9,7 +9,7 @@ import {
   ArrowUpRight, ChevronDown, Flag, AlertCircle, CheckCircle2, Ban, RotateCcw,
   RefreshCw, Archive, FolderOpen, Ticket, Zap, Star, User, Layers, UserCheck,
   GitPullRequest, ThumbsUp, ThumbsDown, Pencil, List, LayoutGrid, Clock3,
-  FileText, File as FileIcon, Download, BarChart3, Trash2, Paperclip, ArrowRight, Mail,ArrowDown ,Milestone
+  FileText, File as FileIcon, Download, BarChart3, Trash2, Paperclip, ArrowRight, Mail, ArrowDown, Milestone
 } from 'lucide-react';
 import { tasksApi, projectsApi, ticketsApi, usersApi } from '../api/client';
 import { attachmentsApi } from '../api/attachments';
@@ -125,16 +125,16 @@ const ST_LABEL: Record<TaskStatus, string> = {
 
 
 const TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
-  backlog:      ['todo', 'in_progress', 'cancelled'],
-  todo:         ['backlog', 'in_progress', 'paused', 'blocked', 'to_review', 'to_fix', 'to_test', 'done', 'cancelled'],
-  in_progress:  ['backlog', 'todo', 'paused', 'blocked', 'to_review', 'to_fix', 'to_test', 'done', 'cancelled'],
-  paused:       ['backlog', 'todo', 'in_progress', 'blocked', 'cancelled'],
-  blocked:      ['backlog', 'todo', 'in_progress', 'paused', 'cancelled'],
-  to_review:    ['backlog', 'todo', 'in_progress', 'paused', 'to_fix', 'to_test', 'done', 'cancelled'],
-  to_fix:       ['backlog', 'todo', 'in_progress', 'to_review', 'to_test', 'done', 'cancelled'],
-  to_test:      ['backlog', 'todo', 'in_progress', 'to_review', 'to_fix', 'done', 'cancelled'],
-  done:         ['backlog', 'todo', 'in_progress', 'paused', 'to_review', 'to_fix', 'to_test', 'cancelled'],
-  cancelled:    ['backlog', 'todo', 'in_progress', 'paused', 'to_review', 'to_fix', 'to_test','done']
+  backlog: ['todo', 'in_progress', 'cancelled'],
+  todo: ['backlog', 'in_progress', 'paused', 'blocked', 'to_review', 'to_fix', 'to_test', 'done', 'cancelled'],
+  in_progress: ['backlog', 'todo', 'paused', 'blocked', 'to_review', 'to_fix', 'to_test', 'done', 'cancelled'],
+  paused: ['backlog', 'todo', 'in_progress', 'blocked', 'cancelled'],
+  blocked: ['backlog', 'todo', 'in_progress', 'paused', 'cancelled'],
+  to_review: ['backlog', 'todo', 'in_progress', 'paused', 'to_fix', 'to_test', 'done', 'cancelled'],
+  to_fix: ['backlog', 'todo', 'in_progress', 'to_review', 'to_test', 'done', 'cancelled'],
+  to_test: ['backlog', 'todo', 'in_progress', 'to_review', 'to_fix', 'done', 'cancelled'],
+  done: ['backlog', 'todo', 'in_progress', 'paused', 'to_review', 'to_fix', 'to_test', 'cancelled'],
+  cancelled: ['backlog', 'todo', 'in_progress', 'paused', 'to_review', 'to_fix', 'to_test', 'done']
 };
 
 const ASSIGN_OK: Set<TaskStatus> = new Set([
@@ -851,32 +851,31 @@ function AsyncDD({ value, onChange, loadFn, placeholder, icon: LI, disabled, wid
           {ld && <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-[var(--text-primary)]/30" /></div>}
           {!ld && opts.length === 0 && <div className="px-3 py-4 text-center text-sm text-[var(--text-primary)]/40">{q ? 'Не найдено' : 'Нет данных'}</div>}
           {!ld && opts.map((o) => (
-  <div key={o.value} role="button" tabIndex={0} onClick={() => { onChange(o.value); setSelLbl(o.label); setOpen(false); }}
-    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm cursor-pointer ${
-      o.value === value
-        ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
-        : o.isMe
-          ? 'bg-emerald-500/[0.06] hover:bg-emerald-500/[0.12] text-[var(--text-primary)]'
-          : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'
-    }`}>
-    {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
-    {o.icon && <span className="shrink-0">{o.icon}</span>}
-    <div className="flex-1 min-w-0">
-      <div className="flex items-center gap-1.5">
-        <span className="block leading-snug" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {o.label}
-        </span>
-        {o.isMe && (
-          <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
-            Вы
-          </span>
-        )}
-      </div>
-      {o.sublabel && <span className="block text-xs text-[var(--text-primary)]/40 truncate mt-0.5">{o.sublabel}</span>}
-    </div>
-    {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
-  </div>
-))}
+            <div key={o.value} role="button" tabIndex={0} onClick={() => { onChange(o.value); setSelLbl(o.label); setOpen(false); }}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm cursor-pointer ${o.value === value
+                ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
+                : o.isMe
+                  ? 'bg-emerald-500/[0.06] hover:bg-emerald-500/[0.12] text-[var(--text-primary)]'
+                  : 'hover:bg-[var(--hover-2)] text-[var(--text-primary)]'
+                }`}>
+              {o.dotColor && <span className={`w-2 h-2 rounded-full shrink-0 ${o.dotColor}`} />}
+              {o.icon && <span className="shrink-0">{o.icon}</span>}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="block leading-snug" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {o.label}
+                  </span>
+                  {o.isMe && (
+                    <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
+                      Вы
+                    </span>
+                  )}
+                </div>
+                {o.sublabel && <span className="block text-xs text-[var(--text-primary)]/40 truncate mt-0.5">{o.sublabel}</span>}
+              </div>
+              {o.value === value && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
+            </div>
+          ))}
           {!ld && more && (
             <div role="button" tabIndex={0} onClick={() => !ldMore && doLoad(q, pg + 1, true)}
               className="flex items-center justify-center gap-1.5 py-2 text-sm text-[var(--text-primary)]/50 hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] rounded-lg cursor-pointer transition-colors">
@@ -1148,6 +1147,10 @@ export const TCard = memo(function TCard({
 
           {t.project_id && (
             <FolderOpen className="w-4.5 h-4.5 text-[var(--text-primary)]/30" />
+          )}
+
+          {t.stage_id && (
+            <Milestone className="w-4.5 h-4.5 text-amber-400/60" />
           )}
 
           {t.due_date && (
@@ -1858,9 +1861,14 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
 
 
 
-// ── ЭТАП ЗАЯВКИ (только для показа) ──
-const [ticketStageName, setTicketStageName] = useState<string>('');
-const [ticketStageOrder, setTicketStageOrder] = useState<number | null>(null);
+  // ── ЭТАП ЗАЯВКИ (только для показа) ──
+  const [ticketStageName, setTicketStageName] = useState<string>('');
+  const [ticketStageOrder, setTicketStageOrder] = useState<number | null>(null);
+
+  // ── ЭТАП ЗАДАЧИ (селект) ──
+  const [stageId, setStageId] = useState<string>(task?.stage_id ?? '');
+  const [projectStages, setProjectStages] = useState<any[]>([]);
+  const [loadingStages, setLoadingStages] = useState(false);
 
   const requesterLabel =
     baseTicketCreator?.full_name ||
@@ -1929,6 +1937,24 @@ const [ticketStageOrder, setTicketStageOrder] = useState<number | null>(null);
   useEffect(() => {
     if (firstProjectChange.current) { firstProjectChange.current = false; return; }
     setTicketId('');
+    setStageId('');
+  }, [projectId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!projectId) { setProjectStages([]); return; }
+    setLoadingStages(true);
+    projectsApi.getById(projectId)
+      .then(proj => {
+        if (cancelled) return;
+        const sorted = [...(proj.stages ?? [])].sort(
+          (a: any, b: any) => a.execution_order - b.execution_order,
+        );
+        setProjectStages(sorted);
+      })
+      .catch(() => { if (!cancelled) setProjectStages([]); })
+      .finally(() => { if (!cancelled) setLoadingStages(false); });
+    return () => { cancelled = true; };
   }, [projectId]);
 
   useEffect(() => {
@@ -2053,35 +2079,35 @@ const [ticketStageOrder, setTicketStageOrder] = useState<number | null>(null);
   }, []);
 
   const { user } = useAuthStore();
-const currentUserId = user?.id;
+  const currentUserId = user?.id;
 
-const loadUsers = useCallback(async (q: string, p: number) => {
-  let items: any[] = [];
-  try { items = (await usersApi.getAllUsers(p, 20)).items; } catch { items = []; }
+  const loadUsers = useCallback(async (q: string, p: number) => {
+    let items: any[] = [];
+    try { items = (await usersApi.getAllUsers(p, 20)).items; } catch { items = []; }
 
-  const f = q
-    ? items.filter((u) => (u.full_name || '').toLowerCase().includes(q.toLowerCase()) || u.email.toLowerCase().includes(q.toLowerCase()))
-    : items;
+    const f = q
+      ? items.filter((u) => (u.full_name || '').toLowerCase().includes(q.toLowerCase()) || u.email.toLowerCase().includes(q.toLowerCase()))
+      : items;
 
-  // Сортировка: сначала я, потом остальные по алфавиту
-  const sorted = [...f].sort((a, b) => {
-    if (a.id === currentUserId) return -1;
-    if (b.id === currentUserId) return 1;
-    const nameA = a.full_name || a.username || '';
-    const nameB = b.full_name || b.username || '';
-    return nameA.localeCompare(nameB, 'ru');
-  });
+    // Сортировка: сначала я, потом остальные по алфавиту
+    const sorted = [...f].sort((a, b) => {
+      if (a.id === currentUserId) return -1;
+      if (b.id === currentUserId) return 1;
+      const nameA = a.full_name || a.username || '';
+      const nameB = b.full_name || b.username || '';
+      return nameA.localeCompare(nameB, 'ru');
+    });
 
-  return {
-    items: sorted.map((u) => ({
-      value: u.id,
-      label: u.full_name || u.username || u.email,
-      sublabel: u.email,
-      isMe: u.id === currentUserId,   // ← для бейджа "Вы"
-    })),
-    hasNext: items.length === 20,
-  };
-}, [currentUserId]);
+    return {
+      items: sorted.map((u) => ({
+        value: u.id,
+        label: u.full_name || u.username || u.email,
+        sublabel: u.email,
+        isMe: u.id === currentUserId,   // ← для бейджа "Вы"
+      })),
+      hasNext: items.length === 20,
+    };
+  }, [currentUserId]);
 
   const loadTickets = useCallback(async (q: string, p: number) => {
     const r = await ticketsApi.getAll(p, 20, {
@@ -2132,94 +2158,99 @@ const loadUsers = useCallback(async (q: string, p: number) => {
     return result;
   };
 
-    // 1. Загрузка заявки
-useEffect(() => {
-  if (mode !== 'create' || context.type !== 'ticket' || !context.ticket_id) return;
+  // 1. Загрузка заявки
+  useEffect(() => {
+    if (mode !== 'create' || context.type !== 'ticket' || !context.ticket_id) return;
 
-  let cancelled = false;
+    let cancelled = false;
 
-  (async () => {
-    try {
-      setBaseTicket(null);
-      setBaseTicketCreator(null);
+    (async () => {
+      try {
+        setBaseTicket(null);
+        setBaseTicketCreator(null);
+        setTicketStageName('');
+        setTicketStageOrder(null);
+
+        const ticket = await ticketsApi.getById(context.ticket_id);
+        if (cancelled) return;
+
+        setBaseTicket(ticket);
+
+        if (ticket.project_id) {
+          setProjectId(ticket.project_id);
+          firstProjectChange.current = true;
+        }
+
+        if (ticket.priority) {
+          setPri(ticket.priority as TaskPriority);
+        }
+
+        // Автоподтягивание stage_id из заявки
+        if ((ticket as any).stage_id) {
+          setStageId((ticket as any).stage_id);
+        }
+
+        if (ticket.created_by) {
+          try {
+            const u = await usersApi.getById(ticket.created_by);
+            if (!cancelled) setBaseTicketCreator(u);
+          } catch { }
+        }
+      } catch { }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, context.type, context.ticket_id]);
+
+  // 2. Загрузка этапа по данным заявки
+  useEffect(() => {
+    let cancelled = false;
+
+    const stageId = (baseTicket as any)?.stage_id as string | undefined;
+    const projectId = (baseTicket as any)?.project_id as string | undefined;
+
+    if (!stageId || !projectId) {
       setTicketStageName('');
       setTicketStageOrder(null);
-
-      const ticket = await ticketsApi.getById(context.ticket_id);
-      if (cancelled) return;
-
-      setBaseTicket(ticket);
-
-      if (ticket.project_id) {
-        setProjectId(ticket.project_id);
-        firstProjectChange.current = true;
-      }
-
-      if (ticket.priority) {
-        setPri(ticket.priority as TaskPriority);
-      }
-
-      if (ticket.created_by) {
-        try {
-          const u = await usersApi.getById(ticket.created_by);
-          if (!cancelled) setBaseTicketCreator(u);
-        } catch { }
-      }
-    } catch { }
-  })();
-
-  return () => {
-    cancelled = true;
-  };
-}, [mode, context.type, context.ticket_id]);
-
-// 2. Загрузка этапа по данным заявки
-useEffect(() => {
-  let cancelled = false;
-
-  const stageId = (baseTicket as any)?.stage_id as string | undefined;
-  const projectId = (baseTicket as any)?.project_id as string | undefined;
-
-  if (!stageId || !projectId) {
-    setTicketStageName('');
-    setTicketStageOrder(null);
-    return;
-  }
-
-  (async () => {
-    try {
-      const proj = await projectsApi.getById(projectId);
-      if (cancelled) return;
-
-      const stage = (proj.stages ?? []).find((s) => s.id === stageId);
-      if (stage) {
-        setTicketStageName(stage.name);
-        setTicketStageOrder(stage.execution_order);
-      } else {
-        setTicketStageName('');
-        setTicketStageOrder(null);
-      }
-    } catch (e) {
-      console.error('[STAGE] load failed:', e);
-      if (!cancelled) {
-        setTicketStageName('');
-        setTicketStageOrder(null);
-      }
+      return;
     }
-  })();
 
-  return () => {
-    cancelled = true;
-  };
-}, [baseTicket]);
+    (async () => {
+      try {
+        const proj = await projectsApi.getById(projectId);
+        if (cancelled) return;
 
-useEffect(() => {
-  console.log('[STAGE] baseTicket changed:', {
-    id: baseTicket?.id,
-    stage_id: (baseTicket as any)?.stage_id,
-    project_id: (baseTicket as any)?.project_id,
-  });
-}, [baseTicket]);
+        const stage = (proj.stages ?? []).find((s) => s.id === stageId);
+        if (stage) {
+          setTicketStageName(stage.name);
+          setTicketStageOrder(stage.execution_order);
+        } else {
+          setTicketStageName('');
+          setTicketStageOrder(null);
+        }
+      } catch (e) {
+        console.error('[STAGE] load failed:', e);
+        if (!cancelled) {
+          setTicketStageName('');
+          setTicketStageOrder(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [baseTicket]);
+
+  useEffect(() => {
+    console.log('[STAGE] baseTicket changed:', {
+      id: baseTicket?.id,
+      stage_id: (baseTicket as any)?.stage_id,
+      project_id: (baseTicket as any)?.project_id,
+    });
+  }, [baseTicket]);
 
   const submit = async () => {
     if (!title.trim()) return;
@@ -2255,6 +2286,7 @@ useEffect(() => {
 
         if (projectId) payload.project_id = projectId;
         if (ticketId) payload.ticket_id = ticketId;
+        if (stageId) payload.stage_id = stageId;
         if (sp) payload.story_points = Number(sp);
 
         if (estimatedHours) {
@@ -2388,12 +2420,20 @@ useEffect(() => {
             assigneeId || null;
         }
 
-        if (
+                if (
           projectId !==
           (task.project_id ?? '')
         ) {
           payload.project_id =
             projectId || null;
+        }
+
+        if (
+          stageId !==
+          (task.stage_id ?? '')
+        ) {
+          payload.stage_id =
+            stageId || null;
         }
 
         if (
@@ -2663,6 +2703,52 @@ useEffect(() => {
                 </div>
               </div>
 
+                            {/* Этап проекта — показываем только если выбран проект */}
+              {projectId && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-primary)]/70 mb-1.5">
+                    Этап проекта
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <SelectDD
+                        value={stageId}
+                        onChange={setStageId}
+                        options={projectStages.map((s: any) => ({
+                          value: s.id,
+                          label: `${s.execution_order}. ${s.name}`,
+                          sublabel: s.status,
+                        }))}
+                        placeholder={
+                          loadingStages
+                            ? 'Загрузка...'
+                            : projectStages.length === 0
+                              ? 'В проекте нет этапов'
+                              : 'Не выбран'
+                        }
+                        icon={Milestone}
+                        searchable
+                        disabled={loadingStages || projectStages.length === 0}
+                      />
+                    </div>
+
+                    {stageId && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/projects/${projectId}/stages`)}
+                        title="Перейти к этапам проекта"
+                        className="flex h-[42px] w-[42px] shrink-0 items-center justify-center
+                                   rounded-xl border border-[var(--border-color)]
+                                   bg-[var(--hover-1)] text-[var(--text-primary)]/60
+                                   transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--accent)]"
+                      >
+                        <ArrowRight size={18} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Заявка */}
               {!lockTicket && (
                 <div>
@@ -2698,7 +2784,7 @@ useEffect(() => {
                 </div>
               )}
 
-                         {lockTicket && (
+              {lockTicket && (
                 <div className="flex items-start gap-3 rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3.5">
                   <Ticket className="mt-0.5 h-5 w-5 shrink-0 text-blue-400" />
 
@@ -3033,6 +3119,24 @@ function DetailModal({
       document.body.style.overflow = '';
     };
   }, [onClose, showArchive]);
+
+
+  const [stageName, setStageName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!t.stage_id || !t.project_id) { setStageName(null); return; }
+    let cancelled = false;
+    projectsApi.getById(t.project_id)
+      .then(proj => {
+        if (cancelled) return;
+        const stage = (proj.stages ?? []).find(s => s.id === t.stage_id);
+        setStageName(stage?.name ?? null);
+      })
+      .catch(() => { if (!cancelled) setStageName(null); });
+    return () => { cancelled = true; };
+  }, [t.stage_id, t.project_id]);
+
+
 
   const act = async (
     lbl: string,
@@ -3389,6 +3493,22 @@ function DetailModal({
                       p={t.priority}
                     />
                   </div>
+
+                  {/* Stage */}
+                  {t.stage_id && (
+                    <div className="flex items-center justify-between gap-4 px-4 py-3">
+                      <span className="text-sm text-[var(--text-primary)]/45">
+                        Этап
+                      </span>
+
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md
+                 bg-amber-500/10 border border-amber-500/20 text-amber-400
+                 text-xs font-medium max-w-[200px]">
+                        <Milestone className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{stageName ?? 'Привязана'}</span>
+                      </span>
+                    </div>
+                  )}
 
                   {/* Complexity */}
                   <div className="flex items-center justify-between gap-4 px-4 py-3">
@@ -4028,9 +4148,12 @@ export default function TasksPage() {
     return staff ? 'internal' : 'my';
   });
 
-  const [selP, setSelP] = useState(up ?? '');
+    const [selP, setSelP] = useState(up ?? '');
   const [selA, setSelA] = useState(ua ?? '');
   const [selT, setSelT] = useState(ut ?? '');
+  const [selStage, setSelStage] = useState<string>('');
+  const [projectStages, setProjectStages] = useState<any[]>([]);
+  const [loadingStages, setLoadingStages] = useState(false);
   const [selTLabel, setSelTLabel] = useState('');
   const ticketLabelsRef = useRef<Record<string, string>>({});
   const ticketNumbersRef = useRef<Record<string, string>>({});
@@ -4138,11 +4261,30 @@ export default function TasksPage() {
     if (shouldCreate && ut) setCreate('backlog');
   }, [shouldCreate, ut]);
 
-  useEffect(() => {
+    useEffect(() => {
     if (up) setMode('project');
     else if (ua) setMode('assignee');
     else if (ut) setMode('ticket');
   }, [up, ua, ut]);
+
+  // Загрузка этапов при выборе проекта
+  useEffect(() => {
+    let cancelled = false;
+    if (!selP) { setProjectStages([]); setSelStage(''); return; }
+    setLoadingStages(true);
+    projectsApi.getById(selP)
+      .then(proj => {
+        if (cancelled) return;
+        const sorted = [...(proj.stages ?? [])].sort(
+          (a: any, b: any) => a.execution_order - b.execution_order,
+        );
+        setProjectStages(sorted);
+        setSelStage(prev => sorted.some((s: any) => s.id === prev) ? prev : '');
+      })
+      .catch(() => { if (!cancelled) setProjectStages([]); })
+      .finally(() => { if (!cancelled) setLoadingStages(false); });
+    return () => { cancelled = true; };
+  }, [selP]);
 
   const ctx = useCallback((): TaskKanbanContext => {
     if (mode === 'project' && selP) return { type: 'project', project_id: selP };
@@ -4291,10 +4433,11 @@ export default function TasksPage() {
       }
       silent ? setRefreshing(true) : setLoading(true);
       try {
-        const d: any = await tasksApi.getKanban(ctx(), {
+                const d: any = await tasksApi.getKanban(ctx(), {
           size: 20,
           priorities: fpR.current.length ? fpR.current : undefined,
           overdue_only: foR.current || undefined,
+          stage_ids: selStage ? [selStage] : undefined,
         });
         const mapped: TaskViewColumn[] = COL_ORDER.map((s) =>
           d.columns.find((c: TaskViewColumn) => c.status === s),
@@ -4308,7 +4451,7 @@ export default function TasksPage() {
         setRefreshing(false);
       }
     },
-    [ctx, toast, mode, selP, selT, selA],
+        [ctx, toast, mode, selP, selT, selA, selStage],
   );
 
   useEffect(() => {
@@ -4329,11 +4472,12 @@ export default function TasksPage() {
       if (!c?.tasks.has_next) return;
       setMoreCol(st);
       try {
-        const d: any = await tasksApi.getKanban(ctx(), {
+                const d: any = await tasksApi.getKanban(ctx(), {
           page: c.tasks.page + 1,
           size: c.tasks.size,
           priorities: fpR.current.length ? fpR.current : undefined,
           overdue_only: foR.current || undefined,
+          stage_ids: selStage ? [selStage] : undefined,
         });
         const nc = d.columns.find((x: TaskViewColumn) => x.status === st);
         if (nc) {
@@ -4351,7 +4495,7 @@ export default function TasksPage() {
         setMoreCol(null);
       }
     },
-    [cols, ctx, toast],
+        [cols, ctx, toast, selStage],
   );
 
   const moveTo = useCallback(
@@ -4851,12 +4995,12 @@ export default function TasksPage() {
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
           <ActionButton
-  onClick={() => setCreate('backlog')}
-  className="px-4 py-2 text-sm font-medium"
->
-  <Plus className="w-4 h-4" />
-  Новая задача
-</ActionButton>
+            onClick={() => setCreate('backlog')}
+            className="px-4 py-2 text-sm font-medium"
+          >
+            <Plus className="w-4 h-4" />
+            Новая задача
+          </ActionButton>
         </div>
       </div>
 
@@ -4881,8 +5025,8 @@ export default function TasksPage() {
             })}
           </div>
 
-          {mode === 'project' && (
-            <div className="flex items-center gap-2">
+                    {mode === 'project' && (
+            <div className="flex items-center gap-2 flex-wrap">
               <div className="w-72">
                 <AsyncDD
                   value={selP}
@@ -4894,14 +5038,38 @@ export default function TasksPage() {
               </div>
 
               {selP && (
+                <div className="w-64">
+                  <SelectDD
+                    value={selStage}
+                    onChange={setSelStage}
+                    options={projectStages.map((s: any) => ({
+                      value: s.id,
+                      label: `${s.execution_order}. ${s.name}`,
+                      sublabel: s.status,
+                    }))}
+                    placeholder={
+                      loadingStages
+                        ? 'Загрузка...'
+                        : projectStages.length === 0
+                          ? 'В проекте нет этапов'
+                          : 'Все этапы'
+                    }
+                    icon={Milestone}
+                    searchable
+                    disabled={loadingStages || projectStages.length === 0}
+                  />
+                </div>
+              )}
+
+              {selP && (
                 <button
                   type="button"
                   onClick={() => navigate(`/projects/${selP}`)}
                   title="Перейти к проекту"
                   className="flex h-[42px] w-[42px] shrink-0 items-center justify-center
-                   rounded-xl border border-[var(--border-color)]
-                   bg-[var(--hover-2)] text-[var(--text-primary)]/60
-                   transition-colors hover:bg-[var(--hover-3)] hover:text-[var(--accent)]"
+                             rounded-xl border border-[var(--border-color)]
+                             bg-[var(--hover-2)] text-[var(--text-primary)]/60
+                             transition-colors hover:bg-[var(--hover-3)] hover:text-[var(--accent)]"
                 >
                   <ArrowRight className="w-4 h-4" />
                 </button>

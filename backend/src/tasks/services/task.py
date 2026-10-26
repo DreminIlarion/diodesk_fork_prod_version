@@ -93,6 +93,7 @@ class TaskService:
 
         project_id = self._resolve_project_id(data, ticket)
 
+        project = None
         project_key = None
 
         if project_id is not None:
@@ -101,6 +102,22 @@ class TaskService:
                 raise NotFoundError(f"Project with ID {project_id} not found")
 
             project_key = project.key
+
+        # Автоподтягивание stage_id из тикета
+        stage_id = data.stage_id
+        if stage_id is None and ticket is not None:
+            stage_id = getattr(ticket, "stage_id", None)
+
+        # Валидация stage_id
+        if stage_id is not None:
+            if project_id is None:
+                raise InvalidStateError("Stage cannot be specified without project")
+            if project is None:
+                raise NotFoundError(f"Project with ID {project_id} not found")
+            if project.find_stage(stage_id) is None:
+                raise NotFoundError(
+                    f"Stage with ID {stage_id} does not exist in project {project_id}"
+                )
 
         ticket_id = None if ticket is None else ticket.id
         sequence = await self.task_repo.get_next_sequence(
@@ -123,8 +140,9 @@ class TaskService:
             priority=priority,
             due_date=data.due_date,
             estimated_hours=data.estimated_hours,
-            story_points=data.story_points,  # ← добавить
+            story_points=data.story_points,
             project_id=project_id,
+            stage_id=stage_id,
             ticket_id=data.ticket_id,
             created_by=current_subject.id,
             tags=[Tag(name=tag.name, color=tag.color) for tag in data.tags]

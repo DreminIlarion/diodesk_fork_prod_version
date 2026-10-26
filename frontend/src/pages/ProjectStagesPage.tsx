@@ -24,7 +24,7 @@ import {
 
 import { ActionButton } from '../components/ui/ActionButton';
 import exportTimelineToExcel from '../components/utils/exportTimelineToExcel';
-import { projectsApi, usersApi } from '../api/client';
+import { projectsApi, usersApi, tasksApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 
 import type { Project, ProjectStageResponse, StageResponsible } from '../types';
@@ -1091,8 +1091,8 @@ function RoadmapView({
                   type="button"
                   onClick={() => onOpen(stage)}
                   className={`absolute rounded-xl border bg-[var(--bg-card)] p-3.5 text-left transition-colors hover:bg-[var(--hover-2)] ${overdue
-                      ? 'border-[var(--accent)]/30'
-                      : 'border-[var(--border-color)]'
+                    ? 'border-[var(--accent)]/30'
+                    : 'border-[var(--border-color)]'
                     }`}
                   style={{
                     top: NODE_D + 12,
@@ -1137,7 +1137,7 @@ function RoadmapView({
                     </div>
                   )}
 
-                  
+
                 </button>
               </motion.div>
             );
@@ -1734,7 +1734,7 @@ function BoardView({ stages, users, onOpen, onMove }: {
               }}
               onDrop={e => { e.preventDefault(); void handleDrop(column); }}
               className={`min-h-[380px] rounded-2xl border flex flex-col overflow-hidden transition-colors ${isOver && canDrop ? 'border-[var(--accent)] bg-[var(--accent-soft)]' :
-                  'border-[var(--border-color)] bg-[var(--hover-1)]'
+                'border-[var(--border-color)] bg-[var(--hover-1)]'
                 }`}
             >
               {/* COLUMN HEADER */}
@@ -2414,10 +2414,12 @@ function StageDetail({
   currentUserId,
   totalStages,
   busy,
+  projectId,
   onBack,
   onEdit,
   onDelete,
   onAction,
+
   onSetAssignees,
 }: {
   stage: ProjectStageResponse;
@@ -2425,6 +2427,7 @@ function StageDetail({
   currentUserId?: string;
   totalStages: number;
   busy: boolean;
+  projectId: string;
   onBack: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -2434,6 +2437,9 @@ function StageDetail({
   const [assigneesOpen, setAssigneesOpen] = useState(false);
   const [savingAssignees, setSavingAssignees] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const [stageTasks, setStageTasks] = useState<any[]>([]);
+  const [loadingStageTasks, setLoadingStageTasks] = useState(false);
 
   const responsible = stage.responsible_id ? users[stage.responsible_id] : null;
   const assigneeIds = stage.assignee_ids ?? [];
@@ -2457,6 +2463,26 @@ function StageDetail({
 
   const late = isOverPlan(stage);
   const lateDays = overrunDays(stage);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingStageTasks(true);
+    tasksApi.getKanban(
+      { type: 'project', project_id: projectId } as any,
+      { size: 100, stage_ids: [stage.id] },
+    )
+      .then((res: any) => {
+        if (cancelled) return;
+        const all: any[] = [];
+        (res.columns ?? []).forEach((col: any) => {
+          (col.tasks?.items ?? []).forEach((task: any) => all.push(task));
+        });
+        setStageTasks(all);
+      })
+      .catch(() => { if (!cancelled) setStageTasks([]); })
+      .finally(() => { if (!cancelled) setLoadingStageTasks(false); });
+    return () => { cancelled = true; };
+  }, [stage.id, projectId]);
 
   const saveAssignees = async (ids: string[]) => {
     setSavingAssignees(true);
@@ -2668,6 +2694,48 @@ function StageDetail({
                     </div>
                     <p className="flex-1 pt-1 text-sm leading-6 text-[var(--text-secondary)]">{criterion}</p>
                   </div>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+
+          {/* TASKS */}
+          <SectionCard
+            title="Задачи на этапе"
+            description={`${stageTasks.length} задач`}
+            icon={CheckCircle2}
+          >
+            {loadingStageTasks ? (
+              <div className="p-6 flex items-center gap-3 text-sm text-[var(--text-muted)]">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Загружаем задачи...
+              </div>
+            ) : !stageTasks.length ? (
+              <EmptyState
+                icon={CheckCircle2}
+                title="Задач нет"
+                description="К этому этапу пока не привязано ни одной задачи."
+              />
+            ) : (
+              <div className="divide-y divide-[var(--border-color)]">
+                {stageTasks.map((t: any) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => window.open(`/tasks?ticket_id=${t.ticket_id ?? ''}`, '_blank')}
+                    className="group w-full flex items-center gap-3 px-6 py-4 text-left hover:bg-[var(--hover-2)] transition-colors"
+                  >
+                    <span className="font-mono text-xs text-[var(--text-muted)] shrink-0">
+                      #{t.number}
+                    </span>
+                    <span className="flex-1 text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">
+                      {t.title}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-[var(--hover-2)] text-[11px] text-[var(--text-muted)] shrink-0">
+                      {t.status}
+                    </span>
+                    <ChevronRight className="w-4 h-4 shrink-0 text-[var(--text-disabled)] group-hover:text-[var(--accent)]" />
+                  </button>
                 ))}
               </div>
             )}
@@ -3229,6 +3297,7 @@ export default function ProjectStagesPage() {
                 currentUserId={user?.id}
                 totalStages={stages.length}
                 busy={busy}
+                projectId={projectId}
                 onBack={goList}
                 onEdit={() => setEditing(true)}
                 onDelete={() => setDeletingStage(selectedStage)}
