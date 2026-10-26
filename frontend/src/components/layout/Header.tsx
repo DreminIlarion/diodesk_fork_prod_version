@@ -95,76 +95,44 @@ export default function Header({ onMenuClick }: HeaderProps) {
           {/* =======================================================
               DIOS AI
           ======================================================= */}
-          <Link
-            to="/dios-ai"
+          <a
+            href="http://10.1.50.109:18080/"
             className="
-              group
-              flex items-center
-              gap-2.5
-              px-3
-              py-2
-              rounded-xl
+    group
+    flex items-center
+    gap-2.5
+    px-3
+    py-2
+    rounded-xl
 
-              border
-              border-[var(--border-color)]
+    border
+    border-[var(--border-color)]
 
-              bg-[var(--bg-card)]
+    bg-[var(--bg-card)]
 
-              hover:bg-[var(--hover-1)]
-              hover:border-[var(--accent)]/40
+    hover:bg-[var(--hover-1)]
+    hover:border-[var(--accent)]/40
 
-              transition-all
-              duration-200
-            "
+    transition-all
+    duration-200
+  "
             title="Открыть DIOS AI"
           >
             {/* Фирменный знак ДИО */}
-            <div
-              className="
-                relative
-                flex-shrink-0
-                w-8
-                h-8
-                flex
-                items-center
-                justify-center
-              "
-            >
+            <div className="relative flex-shrink-0 w-8 h-8 flex items-center justify-center">
               <img
                 src="https://storage.yandexcloud.net/b.fotovssylku.ru/2026/10/05/GLYNTEVYI-LOGOTIP-d_i-S-AI-SKEMAMI.png"
                 alt=""
-                className="
-                  w-8
-                  h-8
-                  object-contain
-                  transition-transform
-                  duration-200
-                  group-hover:scale-105
-                "
+                className="w-8 h-8 object-contain transition-transform duration-200 group-hover:scale-105"
               />
-
-              
             </div>
 
             {/* Text */}
             <div className="hidden sm:flex flex-col leading-tight">
-              <span
-                className="
-                  text-sm
-                  font-semibold
-                  text-[var(--text-primary)]
-                "
-              >
-                DIOS <span className="text-[var(--accent)]">AI </span> 
+              <span className="text-sm font-semibold text-[var(--text-primary)]">
+                DIOS <span className="text-[var(--accent)]">AI </span>
               </span>
-
-              <span
-                className="
-                  text-[11px]
-                  text-[var(--text-muted)]
-                  mt-0.5
-                "
-              >
+              <span className="text-[11px] text-[var(--text-muted)] mt-0.5">
                 ИИ-агент
               </span>
             </div>
@@ -172,21 +140,18 @@ export default function Header({ onMenuClick }: HeaderProps) {
             {/* Arrow */}
             <ChevronRight
               className="
-                hidden sm:block
-                w-4
-                h-4
-                ml-0.5
-
-                text-[var(--text-muted)]
-
-                transition-transform
-                duration-200
-
-                group-hover:translate-x-0.5
-                group-hover:text-[var(--text-primary)]
-              "
+      hidden sm:block
+      w-4
+      h-4
+      ml-0.5
+      text-[var(--text-muted)]
+      transition-transform
+      duration-200
+      group-hover:translate-x-0.5
+      group-hover:text-[var(--text-primary)]
+    "
             />
-          </Link>
+          </a>
 
           {/* =======================================================
               THEME SWITCHER
@@ -427,7 +392,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                     Настройки
                   </Link>
 
-                                    {/* Поддержка DIO Desk */}
+                  {/* Поддержка DIO Desk */}
                   <Link
                     to="/support"
                     onClick={() => setShowDropdown(false)}
