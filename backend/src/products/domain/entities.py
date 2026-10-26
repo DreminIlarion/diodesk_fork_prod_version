@@ -20,6 +20,7 @@ class SoftwareProduct(Entity):
     name: str
     vendor: str
     category: ProductCategory
+    registration_number: str | None = None
     description: str | None = None
     version: str | None = None
     status: ProductStatus = field(default=ProductStatus.ACTIVE)
@@ -41,6 +42,23 @@ class SoftwareProduct(Entity):
         # 2. Нормализация данных
         self.name = self.name.strip()
         self.vendor = self.vendor.strip()
+        if self.registration_number is not None:
+            self.registration_number = self.registration_number.strip()
+            if not self.registration_number:
+                raise ValueError("Product registration number cannot be empty")
+
+    def change_registration_number(
+            self, registration_number: str, changed_by: UUID | None = None
+    ) -> None:
+        registration_number = registration_number.strip()
+        if not registration_number:
+            raise ValueError("Product registration number cannot be empty")
+        if registration_number == self.registration_number:
+            return
+
+        self.registration_number = registration_number
+        self.updated_at = current_datetime()
+        self.updated_by = changed_by
 
     def change_status(self, new_status: ProductStatus, changed_by: UUID | None = None) -> None:
         """Обновление статуса"""

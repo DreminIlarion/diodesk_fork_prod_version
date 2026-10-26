@@ -1,5 +1,24 @@
-from .domain.entities import Counterparty
-from .schemas import ContactPersonOut, CounterpartyResponse
+from src.products.mappers import map_product_to_response
+
+from .domain.entities import Counterparty, CounterpartyProduct
+from .schemas import ContactPersonOut, CounterpartyProductResponse, CounterpartyResponse
+
+
+def map_counterparty_product_to_response(
+        link: CounterpartyProduct
+) -> CounterpartyProductResponse:
+    if link.product is None:
+        raise ValueError("Product link must include product data")
+
+    return CounterpartyProductResponse(
+        id=link.id,
+        counterparty_id=link.counterparty_id,
+        product_id=link.product_id,
+        serial_number=link.serial_number,
+        created_at=link.created_at,
+        updated_at=link.updated_at,
+        product=map_product_to_response(link.product),
+    )
 
 
 def map_counterparty_to_response(counterparty: Counterparty) -> CounterpartyResponse:
