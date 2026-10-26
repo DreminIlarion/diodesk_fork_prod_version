@@ -6,7 +6,7 @@ import {
   ArrowLeft, FolderOpen, Building2, Users, Calendar,
   User, Mail, Phone, Loader2, Archive, Plus, Ticket,
   Crown, Hash, UserPlus, ChevronRight, Search, X,
-  Check, Settings, AlertTriangle, Milestone, Pencil,
+  Check, Settings, AlertTriangle, Milestone, Pencil,Layers
 } from 'lucide-react';
 
 import {
@@ -905,6 +905,15 @@ export default function ProjectDetailPage() {
 
           <ChevronRight className="ml-1 h-4 w-4 text-[var(--text-disabled)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--accent)]" />
         </Link>
+
+        <Link
+  to={`/tasks?project_id=${project.id}`}
+  className="group flex items-center gap-2 whitespace-nowrap rounded-t-xl px-5 py-3 text-sm font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)]"
+>
+  <Layers className="h-4 w-4" />  
+  Задачи
+  <ChevronRight className="ml-1 h-4 w-4 text-[var(--text-disabled)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--accent)]" />
+</Link>
       </div>
 
       {/* CONTENT */}
