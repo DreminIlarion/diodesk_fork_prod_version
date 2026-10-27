@@ -37,6 +37,26 @@ async def create_project_stage(
     )
 
 
+
+@router.patch(
+    path="/{project_id}/stages/order",
+    status_code=status.HTTP_200_OK,
+    response_model=ProjectResponse,
+    summary="Изменить порядок проведения этапов",
+)
+async def reorder_project_stages(
+        project_id: UUID,
+        new_order: NewProjectStagesOrder,
+        current_subject: CurrentSubjectDep,
+        service: ProjectServiceDep,
+) -> ProjectResponse:
+    return await service.reorder_stages(
+        project_id=project_id,
+        new_order=new_order,
+        current_subject=current_subject,
+    )
+
+
 @router.patch(
     path="/{project_id}/stages/{stage_id}",
     status_code=status.HTTP_200_OK,
@@ -58,23 +78,6 @@ async def update_project_stage(
     )
 
 
-@router.patch(
-    path="/{project_id}/stages/order",
-    status_code=status.HTTP_200_OK,
-    response_model=ProjectResponse,
-    summary="Изменить порядок проведения этапов",
-)
-async def reorder_project_stages(
-        project_id: UUID,
-        new_order: NewProjectStagesOrder,
-        current_subject: CurrentSubjectDep,
-        service: ProjectServiceDep,
-) -> ProjectResponse:
-    return await service.reorder_stages(
-        project_id=project_id,
-        new_order=new_order,
-        current_subject=current_subject,
-    )
 
 
 @router.delete(

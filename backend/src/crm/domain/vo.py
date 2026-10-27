@@ -7,6 +7,7 @@ from enum import StrEnum
 from pydantic import EmailStr
 
 from ...iam.domain.vo import FullName
+from src.shared.domain.entities import Entity
 from ...shared.domain.vo import ValueObject
 
 
@@ -187,8 +188,8 @@ class Phone:
         return f"Phone({self.value!r})"
 
 
-@dataclass(frozen=True, slots=True)
-class ContactPerson(ValueObject):
+@dataclass(kw_only=True)
+class ContactPerson(Entity):
     """
     Контактное лицо контрагента (физическое лицо)
     """

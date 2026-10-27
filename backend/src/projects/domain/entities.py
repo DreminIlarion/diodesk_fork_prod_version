@@ -19,6 +19,7 @@ from .events import (
 )
 from .vo import MemberRole, ProjectKey, ProjectStageStatus, ProjectStatus
 
+_UNSET = object()
 
 @dataclass(kw_only=True)
 class ProjectMember(Entity):
@@ -151,7 +152,7 @@ class ProjectStage(Entity):
             *,
             name: str | None = None,
             description: str | None = None,
-            responsible_id: UUID | None = None,
+            responsible_id: UUID | None | object = _UNSET,
             completion_criteria: list[str] | None = None,
             planned_start: date | None = None,
             planned_end: date | None = None,
@@ -171,8 +172,8 @@ class ProjectStage(Entity):
             self.description = description.strip()
             changed = True
 
-        if responsible_id is not None and responsible_id != self.responsible_id:
-            self.responsible_id = responsible_id
+        if responsible_id is not _UNSET and responsible_id != self.responsible_id:
+            self.responsible_id = responsible_id  # type: ignore[assignment]
             changed = True
 
         if completion_criteria is not None and completion_criteria != self.completion_criteria:

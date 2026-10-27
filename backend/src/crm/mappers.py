@@ -46,6 +46,7 @@ def map_counterparty_to_response(counterparty: Counterparty) -> CounterpartyResp
         is_active=counterparty.is_active,
         contact_persons=[
             ContactPersonOut(
+                id=contact_person.id,
                 full_name=str(contact_person.full_name) if contact_person.full_name else None,
                 phone=str(contact_person.phone) if contact_person.phone else None,
                 email=str(contact_person.email) if contact_person.email else None,

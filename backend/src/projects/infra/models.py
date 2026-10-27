@@ -51,6 +51,8 @@ class ProjectStageOrm(Base):
     assignees: Mapped[list["ProjectStageAssigneeOrm"]] = relationship(
         lazy="selectin",
         foreign_keys="ProjectStageAssigneeOrm.stage_id",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     __table_args__ = (

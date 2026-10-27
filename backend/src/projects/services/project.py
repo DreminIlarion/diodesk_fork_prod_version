@@ -379,14 +379,18 @@ class ProjectService:
         if stage is None:
             raise NotFoundError(f"Project stage with ID {stage_id} does not exists in project")
 
-        stage.edit(
+        edit_kwargs = dict(
             name=data.name,
             description=data.description,
-            responsible_id=data.responsible_id,
             completion_criteria=data.completion_criteria,
             planned_start=data.planned_start,
             planned_end=data.planned_end,
         )
+
+        if "responsible_id" in data.model_fields_set:
+            edit_kwargs["responsible_id"] = data.responsible_id
+
+        stage.edit(**edit_kwargs)
         await self.project_repo.update(project)
         await self.uow.commit()
 
