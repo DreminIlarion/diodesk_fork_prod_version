@@ -2408,14 +2408,61 @@ function StageFormView({
    STAGE DETAIL
    ═══════════════════════════════════════════════════════════════ */
 
+
 const ST_LABEL: Record<TaskStatus, string> = {
-  backlog: 'В резерве', todo: 'Готово к выполнению', in_progress: 'В работе',
-  paused: 'На паузе', blocked: 'Приостановлено', to_review: 'На проверке',
-  to_fix: 'На доработку', to_test: 'На тестировании', done: 'Выполнено',
+  backlog: 'В резерве',
+  todo: 'Готово к выполнению',
+  in_progress: 'В работе',
+  paused: 'На паузе',
+  blocked: 'Приостановлено',
+  to_review: 'На проверке',
+  to_fix: 'На доработку',
+  to_test: 'На тестировании',
+  done: 'Выполнено',
   cancelled: 'Отменено',
 };
 
-type StageAction = 'start' | 'pause' | 'resume' | 'complete' | 'skip';
+const StageActionButton: React.FC<{
+  primary?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  Icon: React.ElementType;
+  label: string;
+}> = ({ primary, disabled, onClick, Icon, label }) => {
+  if (primary) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className="btn-primary w-full justify-center gap-2 text-sm"
+      >
+        {disabled ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <Icon className="w-4 h-4" />
+        )}
+        <span>{label}</span>
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="btn-secondary w-full justify-center gap-2 text-sm"
+    >
+      {disabled ? (
+        <Loader2 className="w-4 h-4 animate-spin" />
+      ) : (
+        <Icon className="w-4 h-4" />
+      )}
+      <span>{label}</span>
+    </button>
+  );
+};
 
 function StageDetail({
   stage,
@@ -2439,36 +2486,48 @@ function StageDetail({
   onBack: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onAction: (action: StageAction) => Promise<void>;
+  onAction: (action: 'start' | 'pause' | 'resume' | 'complete' | 'skip') => Promise<void>;
   onSetAssignees: (ids: string[]) => Promise<void>;
 }) {
   const [assigneesOpen, setAssigneesOpen] = useState(false);
   const [savingAssignees, setSavingAssignees] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
   const [stageTasks, setStageTasks] = useState<any[]>([]);
   const [loadingStageTasks, setLoadingStageTasks] = useState(false);
 
   const responsible = stage.responsible_id ? users[stage.responsible_id] : null;
   const assigneeIds = stage.assignee_ids ?? [];
+
   const effective = effectiveStatus(stage);
-  const statusConfig = STATUS[effective];
+  const config = STATUS[effective];
+
+  const canStart = stage.status === 'planned';
+  const canPause = stage.status === 'active';
+  const canResume = stage.status === 'on_hold';
+  const canComplete = stage.status === 'active';
+  const canSkip = stage.status === 'planned' || stage.status === 'on_hold';
 
   const plannedStart = parseDate(stage.planned_start);
   const plannedEnd = parseDate(stage.planned_end);
-  const actualStart = parseDate(stage.started_at);
-  const actualFinish = actualEnd(stage);
+  const started = parseDate(stage.started_at);
+  const finished = actualEnd(stage);
+
   const plannedDays = plannedStart && plannedEnd ? daysBetween(plannedStart, plannedEnd) + 1 : null;
-  const actualDays = actualStart && actualFinish ? Math.max(1, daysBetween(actualStart, actualFinish) + 1) : null;
+  const actualDays = started && finished ? Math.max(1, daysBetween(started, finished) + 1) : null;
+
   const late = isOverPlan(stage);
   const lateDays = overrunDays(stage);
 
   useEffect(() => {
     let cancelled = false;
     setLoadingStageTasks(true);
-    tasksApi.getKanban(
-      { type: 'project', project_id: projectId } as any,
-      { size: 100, stage_ids: [stage.id] },
-    )
+
+    tasksApi
+      .getKanban(
+        { type: 'project', project_id: projectId } as any,
+        { size: 100, stage_ids: [stage.id] },
+      )
       .then((res: any) => {
         if (cancelled) return;
         const all: any[] = [];
@@ -2477,84 +2536,112 @@ function StageDetail({
         });
         setStageTasks(all);
       })
-      .catch(() => { if (!cancelled) setStageTasks([]); })
-      .finally(() => { if (!cancelled) setLoadingStageTasks(false); });
-    return () => { cancelled = true; };
+      .catch(() => {
+        if (!cancelled) setStageTasks([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingStageTasks(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [stage.id, projectId]);
 
   const saveAssignees = async (ids: string[]) => {
     setSavingAssignees(true);
-    try { await onSetAssignees(ids); }
-    finally { setSavingAssignees(false); }
+    try {
+      await onSetAssignees(ids);
+    } finally {
+      setSavingAssignees(false);
+    }
   };
 
-  // Какие действия доступны при текущем статусе — порядок = порядок показа
-  const actions: { action: StageAction; label: string; icon: React.ElementType; primary: boolean }[] = [];
-  if (stage.status === 'planned') actions.push({ action: 'start', label: 'Начать этап', icon: PlayCircle, primary: true });
-  if (stage.status === 'on_hold') actions.push({ action: 'resume', label: 'Возобновить', icon: PlayCircle, primary: true });
-  if (stage.status === 'active') {
-    actions.push({ action: 'complete', label: 'Завершить этап', icon: CheckCircle2, primary: true });
-    actions.push({ action: 'pause', label: 'Приостановить', icon: PauseCircle, primary: false });
-  }
-  if (stage.status === 'planned' || stage.status === 'on_hold') {
-    actions.push({ action: 'skip', label: 'Пропустить', icon: SkipForward, primary: false });
-  }
-  const primaryAction = actions.find(a => a.primary);
-  const secondaryActions = actions.filter(a => !a.primary);
+  const headerStatusBadges = (
+    <div className="flex flex-wrap items-center gap-2">
+      <StageNumber order={stage.execution_order} />
+      <StatusBadge status={stage.status} />
+      {effective === 'overdue' && <StatusBadge status="overdue" />}
+    </div>
+  );
 
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-
-      {/* ═══ НАЗАД ═══ */}
-      <button onClick={onBack}
-        className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-        <ArrowLeft className="w-4 h-4" /> Все этапы
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-6"
+    >
+      {/* 1. Навигация назад */}
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span>Все этапы</span>
       </button>
 
-      {/* ═══════════════════════════════════════════════════════════
-          ГЛАВНЫЙ БЛОК (HERO)
-          Это первое, что видит пользователь: кто этот этап, какой у
-          него статус, и что с ним нужно сделать прямо сейчас.
-          Поэтому статус + главная кнопка действия — ЗДЕСЬ, а не в
-          сайдбаре, куда надо было бы долистывать.
-      ═══════════════════════════════════════════════════════════ */}
-      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] overflow-hidden">
+      {/* 2. Шапка этапа */}
+      <div className="glass-card p-5 sm:p-6 lg:p-7 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          {/* Левая часть: название, порядковый номер, статус */}
+          <div className="min-w-0 flex-1 space-y-3">
+            {headerStatusBadges}
 
-        {/* --- верх: номер/статус-бейджи слева, тихие кнопки справа --- */}
-        <div className="flex items-start justify-between gap-4 p-6 sm:p-8 pb-5">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-3">
-              <StageNumber order={stage.execution_order} />
-              <StatusBadge status={stage.status} />
-              {effective === 'overdue' && <StatusBadge status="overdue" />}
-            </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] break-words">
               {stage.name}
             </h1>
-            <p className="mt-2 text-sm text-[var(--text-muted)]">
+
+            <p className="text-sm sm:text-base text-[var(--text-secondary)]">
               Этап {stage.execution_order} из {totalStages}
             </p>
           </div>
 
-          {/* ghost-кнопки — намеренно неброские, чтобы не спорить с главным действием ниже */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button onClick={onEdit} disabled={busy} title="Редактировать"
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] disabled:opacity-50 transition-colors">
-              <Pencil className="w-4.5 h-4.5" />
+          {/* Правая часть: действия с этапом (редактирование, меню) */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onEdit}
+              disabled={busy}
+              className="btn-secondary gap-2 text-sm px-3 py-2.5"
+            >
+              <Pencil className="w-4 h-4" />
+              <span>Редактировать</span>
             </button>
+
             <div className="relative">
-              <button onClick={() => setMenuOpen(v => !v)} disabled={busy} title="Ещё"
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] disabled:opacity-50 transition-colors">
-                <MoreHorizontal className="w-4.5 h-4.5" />
+              <button
+                type="button"
+                onClick={() => setMenuOpen(v => !v)}
+                disabled={busy}
+                title="Дополнительные действия"
+                className="btn-secondary w-11 h-11 p-0 justify-center"
+              >
+                <MoreHorizontal className="w-5 h-5" />
               </button>
+
               {menuOpen && (
                 <>
-                  <button className="fixed inset-0 z-20 cursor-default" onClick={() => setMenuOpen(false)} />
-                  <div className="absolute right-0 top-full mt-2 z-30 w-52 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-1.5"
-                    style={{ boxShadow: 'var(--shadow-lg)' }}>
-                    <button onClick={() => { setMenuOpen(false); onDelete(); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-[var(--accent)] hover:bg-[var(--accent-soft)] text-left">
-                      <Trash2 className="w-4 h-4" /> Удалить этап
+                  {/* клик вне меню */}
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-20 cursor-default"
+                    onClick={() => setMenuOpen(false)}
+                  />
+                  <div
+                    className="absolute right-0 top-full mt-2 z-30 w-56 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1.5"
+                    style={{ boxShadow: 'var(--shadow-lg)' }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onDelete();
+                      }}
+                      className="flex w-full items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-[var(--accent)] hover:bg-[var(--accent-soft)] text-left transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Удалить этап</span>
                     </button>
                   </div>
                 </>
@@ -2562,234 +2649,441 @@ function StageDetail({
             </div>
           </div>
         </div>
-
-        {/* --- низ: цветная полоса статуса + действие(я). Единственное
-             место на странице, где используется цвет статуса —
-             чтобы он не "размазывался" по всей странице и бросался
-             в глаза именно там, где нужно принять решение. --- */}
-        {(primaryAction || secondaryActions.length > 0) && (
-          <div className={`flex flex-wrap items-center justify-between gap-4 px-6 sm:px-8 py-5 border-t ${statusConfig.border} ${statusConfig.bg}`}>
-            <div className="flex items-center gap-3">
-              <statusConfig.icon className={`w-5 h-5 ${statusConfig.text}`} />
-              <span className={`text-sm font-semibold ${statusConfig.text}`}>{statusConfig.label}</span>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              {secondaryActions.map(a => (
-                <button key={a.action} onClick={() => void onAction(a.action)} disabled={busy}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--hover-3)] disabled:opacity-50 transition-colors">
-                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <a.icon className="w-4 h-4" />}
-                  {a.label}
-                </button>
-              ))}
-              {primaryAction && (
-                <ActionButton onClick={() => void onAction(primaryAction.action)} disabled={busy}
-                  className="px-5 py-2.5 text-sm font-semibold">
-                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <primaryAction.icon className="w-4 h-4" />}
-                  {primaryAction.label}
-                </ActionButton>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* ═══ ОСНОВНАЯ СЕТКА: контент слева, компактный сайдбар справа ═══ */}
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
-
-        {/* ─────────────── ЛЕВАЯ КОЛОНКА: контент этапа ─────────────── */}
+      {/* 3. Основная сетка: слева контент, справа сайдбар */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)] gap-6 items-start">
+        {/* LEFT / MAIN */}
         <div className="space-y-6">
-
-          {stage.description && (
-            <SectionCard title="Описание этапа" icon={FileText}>
-              <div className="p-6">
-                <p className="text-sm sm:text-base leading-8 text-[var(--text-secondary)] whitespace-pre-wrap">
+          {/* 3.1 Описание этапа */}
+          <SectionCard title="Описание этапа" icon={FileText}>
+            <div className="p-5 sm:p-6">
+              {stage.description ? (
+                <p className="text-base leading-7 text-[var(--text-secondary)] whitespace-pre-wrap">
                   {stage.description}
                 </p>
-              </div>
-            </SectionCard>
-          )}
+              ) : (
+                <p className="text-sm text-[var(--text-muted)]">
+                  Описание не заполнено
+                </p>
+              )}
+            </div>
+          </SectionCard>
 
-          {/* --- СРОКИ: раньше это были 2 коробки по 3 поля + баннер +
-               2 отдельных прогресс-бара. Теперь — 2 компактные строки
-               (план/факт) + один прогресс-бар, вся суть на одном экране
-               без скролла внутри карточки. --- */}
-          <SectionCard title="Сроки выполнения" icon={CalendarDays}>
-            <div className="p-6 space-y-4">
-              <TimelineRow
-                dotClass="bg-blue-500"
-                label="План"
-                start={formatDate(stage.planned_start)}
-                end={formatDate(stage.planned_end)}
-                days={plannedDays}
-              />
-              <TimelineRow
-                dotClass={late ? 'bg-[var(--accent)]' : 'bg-emerald-500'}
-                label="Факт"
-                start={formatDate(stage.started_at)}
-                end={stage.completed_at ? formatDate(stage.completed_at) : stage.started_at ? 'Выполняется' : '—'}
-                days={actualDays}
-              />
+          {/* 3.2 Сроки выполнения */}
+          <SectionCard
+            title="Сроки выполнения"
+            description="Плановые и фактические показатели по этапу"
+            icon={CalendarDays}
+          >
+            <div className="p-5 sm:p-6 space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* План */}
+                <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                      План
+                    </h3>
+                  </div>
 
-              {plannedDays != null && actualDays != null && plannedDays > 0 && (
-                <div className="pt-1">
-                  <div className="h-2 rounded-full bg-[var(--hover-3)] overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${late ? 'bg-[var(--accent)]' : 'bg-emerald-500'}`}
-                      style={{ width: `${Math.min(100, (actualDays / plannedDays) * 100)}%` }}
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Начало</p>
+                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                        {formatDate(stage.planned_start)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Окончание</p>
+                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                        {formatDate(stage.planned_end)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Длительность</p>
+                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                        {plannedDays != null ? `${plannedDays} дн.` : '—'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Факт */}
+                <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full ${
+                        late ? 'bg-[var(--accent)]' : 'bg-emerald-500'
+                      }`}
                     />
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                      Факт
+                    </h3>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Начало</p>
+                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                        {formatDate(stage.started_at)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Окончание</p>
+                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                        {stage.completed_at
+                          ? formatDate(stage.completed_at)
+                          : stage.started_at
+                          ? 'Выполняется'
+                          : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Длительность</p>
+                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                        {actualDays != null ? `${actualDays} дн.` : '—'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Предупреждение о просрочке */}
+              {late && (
+                <div className="flex items-start gap-3 rounded-xl border border-[var(--accent)]/25 bg-[var(--accent-soft)] p-4">
+                  <AlertTriangle className="w-5 h-5 text-[var(--accent)] shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--accent)]">
+                      Превышение планового срока
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                      Фактическое выполнение превышает план на {lateDays} дн.
+                    </p>
                   </div>
                 </div>
               )}
 
-              {late && (
-                <div className="flex items-center gap-2 text-xs text-[var(--accent)] font-medium">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  Превышение плана на {lateDays} дн.
+              {/* Визуальное сравнение длительности */}
+              {plannedDays != null && actualDays != null && plannedDays > 0 && (
+                <div className="space-y-4 pt-4 border-t border-[var(--border-color)]">
+                  <div>
+                    <div className="flex justify-between mb-1 text-xs text-[var(--text-muted)]">
+                      <span>Плановая длительность</span>
+                      <span>{plannedDays} дн.</span>
+                    </div>
+                    <div className="h-2.5 rounded-full bg-[var(--hover-3)] overflow-hidden">
+                      <div className="h-full w-full rounded-full bg-blue-500/70" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between mb-1 text-xs text-[var(--text-muted)]">
+                      <span>Фактическая длительность</span>
+                      <span>{actualDays} дн.</span>
+                    </div>
+                    <div className="h-2.5 rounded-full bg-[var(--hover-3)] overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          late ? 'bg-[var(--accent)]' : 'bg-emerald-500'
+                        }`}
+                        style={{
+                          width: `${Math.min(100, (actualDays / plannedDays) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
           </SectionCard>
 
-          <SectionCard title="Критерии приёмки" icon={ListChecks}>
+          {/* 3.3 Критерии приёмки */}
+          <SectionCard
+            title="Критерии приёмки"
+            description="Условия, при которых этап считается завершённым"
+            icon={ListChecks}
+          >
             {!stage.completion_criteria.length ? (
-              <div className="p-6 text-sm text-[var(--text-muted)]">Критерии не указаны</div>
+              <div className="p-5 sm:p-6 text-sm text-[var(--text-muted)]">
+                Критерии не указаны
+              </div>
             ) : (
               <div className="divide-y divide-[var(--border-color)]">
                 {stage.completion_criteria.map((criterion, index) => (
-                  <div key={index} className="flex items-start gap-3 px-6 py-3.5">
-                    <Target className="w-4 h-4 mt-0.5 text-[var(--accent)] shrink-0" />
-                    <p className="flex-1 text-sm leading-6 text-[var(--text-secondary)]">{criterion}</p>
+                  <div key={index} className="flex items-start gap-3 px-5 sm:px-6 py-4">
+                    <div className="w-8 h-8 rounded-lg bg-[var(--hover-2)] flex items-center justify-center shrink-0">
+                      <Target className="w-4 h-4 text-[var(--accent)]" />
+                    </div>
+                    <p className="flex-1 pt-0.5 text-sm leading-6 text-[var(--text-secondary)]">
+                      {criterion}
+                    </p>
                   </div>
                 ))}
               </div>
             )}
           </SectionCard>
 
-          <SectionCard title="Задачи на этапе" description={`${stageTasks.length} задач`} icon={CheckCircle2}>
+          {/* 3.4 Задачи на этапе */}
+          <SectionCard
+            title="Задачи на этапе"
+            description={
+              loadingStageTasks
+                ? 'Загружаем список задач...'
+                : `${stageTasks.length} задач`
+            }
+            icon={CheckCircle2}
+          >
             {loadingStageTasks ? (
-              <div className="p-6 flex items-center gap-3 text-sm text-[var(--text-muted)]">
-                <Loader2 className="w-4 h-4 animate-spin" /> Загружаем задачи...
+              <div className="p-5 sm:p-6 flex items-center gap-3 text-sm text-[var(--text-muted)]">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Загружаем задачи...</span>
               </div>
             ) : !stageTasks.length ? (
-              <EmptyState icon={CheckCircle2} title="Задач нет"
-                description="К этому этапу пока не привязано ни одной задачи." />
+              <EmptyState
+                icon={CheckCircle2}
+                title="Задач нет"
+                description="К этому этапу пока не привязано ни одной задачи."
+              />
             ) : (
               <div className="divide-y divide-[var(--border-color)]">
-                {stageTasks.map((t: any) => (
-                  <button key={t.id} type="button"
-                    onClick={() => window.open(`/tasks?ticket_id=${t.ticket_id ?? ''}`, '_blank')}
-                    className="group w-full flex items-center gap-3 px-6 py-3.5 text-left hover:bg-[var(--hover-2)] transition-colors">
-                    <span className="font-mono text-xs text-[var(--text-muted)] shrink-0">#{t.number}</span>
-                    <span className="flex-1 text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">
-                      {t.title}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-md bg-[var(--hover-2)] text-[11px] text-[var(--text-muted)] shrink-0">
-                      {ST_LABEL[t.status as TaskStatus] ?? t.status}
-                    </span>
-                    <ChevronRight className="w-4 h-4 shrink-0 text-[var(--text-disabled)] group-hover:text-[var(--accent)]" />
-                  </button>
-                ))}
+                {stageTasks.map((t: any) => {
+                  const statusKey = t.status as TaskStatus;
+                  const statusLabel = ST_LABEL[statusKey] ?? t.status ?? '—';
+
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() =>
+                        window.open(
+                          `/tasks?ticket_id=${t.ticket_id ?? ''}`,
+                          '_blank',
+                        )
+                      }
+                      className="group w-full flex items-center gap-3 px-5 sm:px-6 py-3.5 text-left hover:bg-[var(--hover-2)] transition-colors"
+                    >
+                      <span className="font-mono text-xs text-[var(--text-muted)] shrink-0">
+                        #{t.number}
+                      </span>
+
+                      <span className="flex-1 text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">
+                        {t.title}
+                      </span>
+
+                      <span className="px-2.5 py-1 rounded-full bg-[var(--hover-2)] text-[11px] text-[var(--text-secondary)] shrink-0">
+                        {statusLabel}
+                      </span>
+
+                      <ChevronRight className="w-4 h-4 shrink-0 text-[var(--text-disabled)] group-hover:text-[var(--accent)]" />
+                    </button>
+                  );
+                })}
               </div>
             )}
           </SectionCard>
         </div>
 
-        {/* ─────────── ПРАВАЯ КОЛОНКА: люди + служебная инфа ───────────
-             Было 4 карточки одного веса (управление / ответственный /
-             исполнители / инфо). Управление ушло в шапку, ответственный
-             и исполнители — это один смысловой блок "кто на этом этапе",
-             объединяю их. Служебная инфа — внизу, мельче, без лишнего
-             визуального веса, т.к. это не то, на что смотрят часто. ─── */}
+        {/* RIGHT / SIDEBAR */}
         <aside className="space-y-5 xl:sticky xl:top-5">
-
+          {/* 4.1 Управление этапом (статус + действия) */}
           <SectionCard
-            title="Люди"
-            icon={Users}
-            action={
-              <button onClick={() => setAssigneesOpen(true)}
-                className="p-2 rounded-lg bg-[var(--hover-2)] text-[var(--text-secondary)] hover:text-[var(--accent)]"
-                title="Управление исполнителями">
-                <UserPlus className="w-4 h-4" />
-              </button>
-            }
+            title="Управление этапом"
+            description="Состояние этапа и доступные действия"
+            icon={Flag}
           >
-            <div className="divide-y divide-[var(--border-color)]">
-
-              {/* Ответственный */}
-              <div className="p-5">
-                <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-disabled)]">
-                  Ответственный
-                </p>
-                {responsible ? (
-                  <div className="flex items-center gap-3">
-                    <Avatar name={responsible.full_name} size="md" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{responsible.full_name}</p>
-                      {responsible.email && (
-                        <p className="text-xs text-[var(--text-muted)] truncate">{responsible.email}</p>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-[var(--text-muted)]">Не назначен</p>
-                )}
+            <div className="p-5 space-y-4">
+              {/* Текущий статус */}
+              <div
+                className={`flex items-center gap-3 rounded-xl border ${config.border} ${config.bg} p-3.5`}
+              >
+                <div
+                  className={`w-10 h-10 rounded-xl bg-[var(--bg-card)] flex items-center justify-center ${config.text}`}
+                >
+                  <config.icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs text-[var(--text-muted)]">Текущий статус</p>
+                  <p className={`mt-1 text-sm font-semibold ${config.text}`}>
+                    {config.label}
+                  </p>
+                </div>
               </div>
 
-              {/* Исполнители */}
-              <div className="p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-disabled)]">
-                    Исполнители
-                  </p>
-                  <span className="text-[11px] text-[var(--text-muted)]">{assigneeIds.length}</span>
-                </div>
+              {/* Действия */}
+              <div className="space-y-2">
+                {canStart && (
+                  <StageActionButton
+                    primary
+                    disabled={busy}
+                    onClick={() => void onAction('start')}
+                    Icon={PlayCircle}
+                    label="Начать этап"
+                  />
+                )}
 
-                {!assigneeIds.length ? (
-                  <button onClick={() => setAssigneesOpen(true)}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-[var(--border-color)] text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] transition-colors">
-                    <UserPlus className="w-4 h-4" /> Назначить
-                  </button>
-                ) : (
-                  <div className="space-y-3">
-                    {assigneeIds.map(id => {
-                      const employee = users[id];
-                      return (
-                        <div key={id} className="flex items-center gap-2.5">
-                          <Avatar name={employee?.full_name} size="sm" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-[var(--text-primary)] truncate">
-                              {employee?.full_name ?? 'Пользователь'}
-                            </p>
-                          </div>
-                          {id === currentUserId && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--hover-2)] text-[var(--text-muted)]">Вы</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                {canResume && (
+                  <StageActionButton
+                    primary
+                    disabled={busy}
+                    onClick={() => void onAction('resume')}
+                    Icon={PlayCircle}
+                    label="Возобновить"
+                  />
+                )}
+
+                {canComplete && (
+                  <StageActionButton
+                    primary
+                    disabled={busy}
+                    onClick={() => void onAction('complete')}
+                    Icon={CheckCircle2}
+                    label="Завершить этап"
+                  />
+                )}
+
+                {canPause && (
+                  <StageActionButton
+                    disabled={busy}
+                    onClick={() => void onAction('pause')}
+                    Icon={PauseCircle}
+                    label="Поставить на паузу"
+                  />
+                )}
+
+                {canSkip && (
+                  <StageActionButton
+                    disabled={busy}
+                    onClick={() => void onAction('skip')}
+                    Icon={SkipForward}
+                    label="Пропустить этап"
+                  />
+                )}
+
+                {!canStart && !canPause && !canResume && !canComplete && !canSkip && (
+                  <p className="py-2.5 text-center text-sm text-[var(--text-muted)]">
+                    Сейчас нет доступных действий
+                  </p>
                 )}
               </div>
             </div>
           </SectionCard>
 
-          {/* Служебная инфа — минимум визуального веса, т.к. читают редко */}
-          <div className="rounded-2xl border border-[var(--border-color)] p-5 text-xs text-[var(--text-muted)] space-y-2.5">
-            <div className="flex items-center gap-1.5 text-[var(--text-disabled)] mb-1">
-              <Info className="w-3.5 h-3.5" />
-              <span className="font-semibold uppercase tracking-wide text-[10px]">Информация</span>
+          {/* 4.2 Ответственный */}
+          <SectionCard title="Ответственный" icon={User}>
+            <div className="p-5">
+              {responsible ? (
+                <div className="flex items-center gap-3">
+                  <Avatar name={responsible.full_name} size="lg" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">
+                      {responsible.full_name}
+                    </p>
+                    {responsible.email && (
+                      <p className="mt-1 text-xs text-[var(--text-muted)] truncate">
+                        {responsible.email}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-[var(--text-muted)]">Не назначен</p>
+              )}
             </div>
-            <div className="flex justify-between"><span>Создан</span><span>{formatDateTime(stage.created_at)}</span></div>
-            <div className="flex justify-between"><span>Обновлён</span><span>{formatDateTime(stage.updated_at)}</span></div>
-            <div className="pt-2 border-t border-[var(--border-color)]">
-              <span className="block mb-1">ID этапа</span>
-              <span className="font-mono break-all">{stage.id}</span>
+          </SectionCard>
+
+          {/* 4.3 Исполнители */}
+          <SectionCard
+            title="Исполнители"
+            description={`${assigneeIds.length} назначено`}
+            icon={Users}
+            action={
+              <button
+                type="button"
+                onClick={() => setAssigneesOpen(true)}
+                className="p-2 rounded-lg bg-[var(--hover-2)] text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors"
+                title="Управление исполнителями"
+              >
+                <UserPlus className="w-4 h-4" />
+              </button>
+            }
+          >
+            <div className="p-5 space-y-3">
+              {!assigneeIds.length ? (
+                <div className="py-5 text-center">
+                  <Users className="w-8 h-8 mx-auto text-[var(--text-disabled)]" />
+                  <p className="mt-3 text-sm text-[var(--text-muted)]">
+                    Исполнители не назначены
+                  </p>
+                </div>
+              ) : (
+                assigneeIds.map(id => {
+                  const employee = users[id];
+                  return (
+                    <div key={id} className="flex items-center gap-3">
+                      <Avatar name={employee?.full_name} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                          {employee?.full_name ?? 'Пользователь'}
+                        </p>
+                        {employee?.email && (
+                          <p className="text-xs text-[var(--text-muted)] truncate">
+                            {employee.email}
+                          </p>
+                        )}
+                      </div>
+                      {id === currentUserId && (
+                        <span className="text-[11px] px-2 py-1 rounded-md bg-[var(--hover-2)] text-[var(--text-muted)]">
+                          Вы
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+
+              <button
+                type="button"
+                onClick={() => setAssigneesOpen(true)}
+                className="w-full flex items-center justify-center gap-2 mt-2.5 px-4 py-3 rounded-xl border border-dashed border-[var(--border-color)] text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                <UserPlus className="w-4 h-4" />
+                {assigneeIds.length ? 'Изменить исполнителей' : 'Назначить исполнителей'}
+              </button>
             </div>
-          </div>
+          </SectionCard>
+
+          {/* 4.4 Служебная информация */}
+          <SectionCard title="Информация" icon={Info}>
+            <div className="p-5 space-y-4 text-xs">
+              {[
+                { label: 'Порядок этапа', value: `${stage.execution_order} из ${totalStages}` },
+                { label: 'Создан', value: formatDateTime(stage.created_at) },
+                { label: 'Обновлён', value: formatDateTime(stage.updated_at) },
+              ].map(item => (
+                <div
+                  key={item.label}
+                  className="flex items-start justify-between gap-3"
+                >
+                  <span className="text-[var(--text-muted)]">{item.label}</span>
+                  <span className="text-[var(--text-secondary)] text-right">
+                    {item.value}
+                  </span>
+                </div>
+              ))}
+
+              <div className="pt-3 border-t border-[var(--border-color)]">
+                <p className="text-[var(--text-muted)]">ID этапа</p>
+                <p className="mt-1 font-mono break-all text-[var(--text-secondary)]">
+                  {stage.id}
+                </p>
+              </div>
+            </div>
+          </SectionCard>
         </aside>
       </div>
 
+      {/* 5. Модалка выбора исполнителей */}
       <AssigneesModal
         open={assigneesOpen}
         users={users}
@@ -2800,27 +3094,6 @@ function StageDetail({
         onClose={() => setAssigneesOpen(false)}
       />
     </motion.div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Маленький локальный helper только для этого файла — одна строка
-// "план/факт" в блоке сроков (см. комментарий выше по дизайну)
-// ─────────────────────────────────────────────────────────────────
-function TimelineRow({
-  dotClass, label, start, end, days,
-}: { dotClass: string; label: string; start: string; end: string; days: number | null }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
-      <span className="w-10 text-xs font-medium text-[var(--text-muted)] shrink-0">{label}</span>
-      <span className="text-sm text-[var(--text-primary)]">{start}</span>
-      <span className="text-[var(--text-disabled)]">→</span>
-      <span className="text-sm text-[var(--text-primary)]">{end}</span>
-      {days != null && (
-        <span className="ml-auto text-xs text-[var(--text-muted)] shrink-0">{days} дн.</span>
-      )}
-    </div>
   );
 }
 
