@@ -109,6 +109,15 @@ const PRI_LABEL: Record<TaskPriority, string> = {
   low: 'Низкий', medium: 'Средний', high: 'Высокий', critical: 'Критический',
 };
 
+const STAGE_STATUS_LABEL: Record<string, string> = {
+  planned: 'Запланирован',
+  active: 'В работе',
+  completed: 'Завершён',
+  on_hold: 'На паузе',
+  skipped: 'Пропущен',
+  overdue: 'Просрочен',
+};
+
 const PRI_LIST: { value: TaskPriority; label: string }[] = [
   { value: 'low', label: 'Низкий' },
   { value: 'medium', label: 'Средний' },
@@ -2717,7 +2726,7 @@ function TaskEditorModal({ mode, task, initSt, context, ticketLabel, onClose, on
                         options={projectStages.map((s: any) => ({
                           value: s.id,
                           label: `${s.execution_order}. ${s.name}`,
-                          sublabel: s.status,
+                          sublabel: STAGE_STATUS_LABEL[s.status] ?? s.status,
                         }))}
                         placeholder={
                           loadingStages
@@ -5045,7 +5054,7 @@ export default function TasksPage() {
                     options={projectStages.map((s: any) => ({
                       value: s.id,
                       label: `${s.execution_order}. ${s.name}`,
-                      sublabel: s.status,
+                      sublabel: STAGE_STATUS_LABEL[s.status] ?? s.status,
                     }))}
                     placeholder={
                       loadingStages
