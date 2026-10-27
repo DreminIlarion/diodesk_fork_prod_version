@@ -16,10 +16,10 @@ export default function Layout() {
     <div className="min-h-screen bg-[var(--bg-primary)]">
       <div className="flex">
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-        
-        <div className="flex-1 flex flex-col min-h-screen min-w-0">
+
+        <div className="flex-1 flex flex-col min-h-screen min-w-0 app-content-shift">
           <Header onMenuClick={() => setSidebarOpen(true)} />
-          
+
           <main id="main-content" className="flex-1 p-3 md:p-3 lg:p-3 bg-[var(--bg-primary)] min-w-0">
             <Outlet />
           </main>
