@@ -2713,9 +2713,8 @@ function StageDetail({
                 <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 sm:p-5 space-y-4">
                   <div className="flex items-center gap-2">
                     <span
-                      className={`w-2.5 h-2.5 rounded-full ${
-                        late ? 'bg-[var(--accent)]' : 'bg-emerald-500'
-                      }`}
+                      className={`w-2.5 h-2.5 rounded-full ${late ? 'bg-[var(--accent)]' : 'bg-emerald-500'
+                        }`}
                     />
                     <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                       Факт
@@ -2735,8 +2734,8 @@ function StageDetail({
                         {stage.completed_at
                           ? formatDate(stage.completed_at)
                           : stage.started_at
-                          ? 'Выполняется'
-                          : '—'}
+                            ? 'Выполняется'
+                            : '—'}
                       </p>
                     </div>
                     <div>
@@ -2784,9 +2783,8 @@ function StageDetail({
                     </div>
                     <div className="h-2.5 rounded-full bg-[var(--hover-3)] overflow-hidden">
                       <div
-                        className={`h-full rounded-full ${
-                          late ? 'bg-[var(--accent)]' : 'bg-emerald-500'
-                        }`}
+                        className={`h-full rounded-full ${late ? 'bg-[var(--accent)]' : 'bg-emerald-500'
+                          }`}
                         style={{
                           width: `${Math.min(100, (actualDays / plannedDays) * 100)}%`,
                         }}
@@ -3277,7 +3275,11 @@ export default function ProjectStagesPage() {
         const position = Math.max(0, Math.min(payload.order - 1, reordered.length));
         reordered.splice(position, 0, stage);
 
-        await projectsApi.reorderStages(projectId, reordered.map(s => s.id));
+        // Бэк ждёт list[list[UUID]]: каждая группа = параллельные этапы.
+        // Для последовательного порядка — по одному этапу в группе.
+        const groups = reordered.map(s => [s.id]);
+
+        await projectsApi.reorderStages(projectId, groups);
       }
 
       await loadProject();
