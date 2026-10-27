@@ -601,7 +601,7 @@ export const projectsApi = {
   // Изменить порядок (возвращает проект)
   reorderStages: async (projectId: string, order: string[]): Promise<Project> => {
     const response = await api.patch<Project>(`/api/v1/projects/${projectId}/stages/order`, {
-      new_order: order,
+      new_order: [order],
     });
     return response.data;
   },
