@@ -1,6 +1,6 @@
 from typing import override
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import Select, and_, delete, func, or_, select
 from sqlalchemy.orm import joinedload
@@ -39,6 +39,7 @@ class CounterpartyMapper(ModelMapper[Counterparty, CounterpartyOrm]):
             avatar_url=model.avatar_url,
             contact_persons=[
                 ContactPerson(
+                    id=UUID(contact_person["id"]) if contact_person.get("id") else uuid4(),
                     full_name=FullName(contact_person["full_name"]),
                     phone=Phone(contact_person["phone"]) if contact_person["phone"] else None,
                     email=contact_person["email"],
@@ -70,6 +71,7 @@ class CounterpartyMapper(ModelMapper[Counterparty, CounterpartyOrm]):
             avatar_url=entity.avatar_url,
             contact_persons=[
                 {
+                    "id": str(contact_person.id),
                     "full_name": contact_person.full_name.value,
                     "phone": contact_person.phone.value if contact_person.phone else None,
                     "email": contact_person.email,
