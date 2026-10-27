@@ -188,7 +188,7 @@ class Phone:
         return f"Phone({self.value!r})"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContactPerson(Entity):
     """
     Контактное лицо контрагента (физическое лицо)
