@@ -63,7 +63,11 @@ class TaskBoardService:
             }
             
 
-        kwargs.update({"priorities": filters.priorities, "overdue_only": filters.overdue_only})
+        kwargs.update({
+            "priorities": filters.priorities,
+            "overdue_only": filters.overdue_only,
+            "stage_ids": filters.stage_ids,
+        })
 
         # 3. Формирование канбан доски
         groups = await self.task_repo.get_grouped_by_status(pagination, **kwargs)

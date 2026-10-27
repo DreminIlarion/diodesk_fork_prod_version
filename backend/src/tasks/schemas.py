@@ -36,6 +36,10 @@ ReviewDecision = Annotated[
 class TaskBase(BaseModel):
     ticket_id: UUID | None = Field(None, description="Тикет на основе которого создана задача")
     project_id: UUID | None = Field(None, description="Проект в рамках которого создана задача")
+    stage_id: UUID | None = Field(
+        None,
+        description="Этап проекта, к которому относится задача (требует project_id)",
+    )
     title: str = Field(..., description="Тема задачи")
     description: str | None = Field(None, description="Постановка задачи")
     priority: Priority = Field(..., description="Приоритет задачи")
@@ -161,6 +165,7 @@ class TaskViewResponse(BaseModel):
     ticket_id: UUID | None = Field(None, description="Тикет на основе которого создана задача")
     attachments: list[AttachmentResponse] = Field(default_factory=list, description="Вложения")
     project_id: UUID | None = Field(None, description="Проект в рамках которого создана задача")
+    stage_id: UUID | None = Field(None, description="Этап проекта")
     tag: list[Tag] = Field(default_factory=list, description="Теги для маркировки и поиска")
 
     source_ticket: TicketPreview | None = Field(
@@ -247,3 +252,4 @@ class KanbanFilters:
 
     priorities: list[Priority] | None = None
     overdue_only: bool = False
+    stage_ids: set[UUID] | None = None

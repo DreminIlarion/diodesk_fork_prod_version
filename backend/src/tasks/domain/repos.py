@@ -40,6 +40,8 @@ class TaskView:
     completed_at: datetime | None = None  # ← Добавил
     working_since: datetime | None = None  # ← Добавил (таймер)
 
+    stage_id: UUID | None = None
+
     project_id: UUID | None = None
     ticket_id: UUID | None = None
     attachments: list = field(default_factory=list)  # ← ДОБАВИ

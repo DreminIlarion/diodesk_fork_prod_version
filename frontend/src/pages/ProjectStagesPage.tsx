@@ -24,7 +24,7 @@ import {
 
 import { ActionButton } from '../components/ui/ActionButton';
 import exportTimelineToExcel from '../components/utils/exportTimelineToExcel';
-import { projectsApi, usersApi } from '../api/client';
+import { projectsApi, usersApi, tasksApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 
 import type { Project, ProjectStageResponse, StageResponsible } from '../types';
@@ -1091,8 +1091,8 @@ function RoadmapView({
                   type="button"
                   onClick={() => onOpen(stage)}
                   className={`absolute rounded-xl border bg-[var(--bg-card)] p-3.5 text-left transition-colors hover:bg-[var(--hover-2)] ${overdue
-                      ? 'border-[var(--accent)]/30'
-                      : 'border-[var(--border-color)]'
+                    ? 'border-[var(--accent)]/30'
+                    : 'border-[var(--border-color)]'
                     }`}
                   style={{
                     top: NODE_D + 12,
@@ -1137,7 +1137,7 @@ function RoadmapView({
                     </div>
                   )}
 
-                  
+
                 </button>
               </motion.div>
             );
@@ -1734,7 +1734,7 @@ function BoardView({ stages, users, onOpen, onMove }: {
               }}
               onDrop={e => { e.preventDefault(); void handleDrop(column); }}
               className={`min-h-[380px] rounded-2xl border flex flex-col overflow-hidden transition-colors ${isOver && canDrop ? 'border-[var(--accent)] bg-[var(--accent-soft)]' :
-                  'border-[var(--border-color)] bg-[var(--hover-1)]'
+                'border-[var(--border-color)] bg-[var(--hover-1)]'
                 }`}
             >
               {/* COLUMN HEADER */}
@@ -2408,12 +2408,22 @@ function StageFormView({
    STAGE DETAIL
    ═══════════════════════════════════════════════════════════════ */
 
+const ST_LABEL: Record<TaskStatus, string> = {
+  backlog: 'В резерве', todo: 'Готово к выполнению', in_progress: 'В работе',
+  paused: 'На паузе', blocked: 'Приостановлено', to_review: 'На проверке',
+  to_fix: 'На доработку', to_test: 'На тестировании', done: 'Выполнено',
+  cancelled: 'Отменено',
+};
+
+type StageAction = 'start' | 'pause' | 'resume' | 'complete' | 'skip';
+
 function StageDetail({
   stage,
   users,
   currentUserId,
   totalStages,
   busy,
+  projectId,
   onBack,
   onEdit,
   onDelete,
@@ -2425,38 +2435,52 @@ function StageDetail({
   currentUserId?: string;
   totalStages: number;
   busy: boolean;
+  projectId: string;
   onBack: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onAction: (action: 'start' | 'pause' | 'resume' | 'complete' | 'skip') => Promise<void>;
+  onAction: (action: StageAction) => Promise<void>;
   onSetAssignees: (ids: string[]) => Promise<void>;
 }) {
   const [assigneesOpen, setAssigneesOpen] = useState(false);
   const [savingAssignees, setSavingAssignees] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [stageTasks, setStageTasks] = useState<any[]>([]);
+  const [loadingStageTasks, setLoadingStageTasks] = useState(false);
 
   const responsible = stage.responsible_id ? users[stage.responsible_id] : null;
   const assigneeIds = stage.assignee_ids ?? [];
-
   const effective = effectiveStatus(stage);
-  const config = STATUS[effective];
-
-  const canStart = stage.status === 'planned';
-  const canPause = stage.status === 'active';
-  const canResume = stage.status === 'on_hold';
-  const canComplete = stage.status === 'active';
-  const canSkip = stage.status === 'planned' || stage.status === 'on_hold';
+  const statusConfig = STATUS[effective];
 
   const plannedStart = parseDate(stage.planned_start);
   const plannedEnd = parseDate(stage.planned_end);
-  const started = parseDate(stage.started_at);
-  const finished = actualEnd(stage);
-
+  const actualStart = parseDate(stage.started_at);
+  const actualFinish = actualEnd(stage);
   const plannedDays = plannedStart && plannedEnd ? daysBetween(plannedStart, plannedEnd) + 1 : null;
-  const actualDays = started && finished ? Math.max(1, daysBetween(started, finished) + 1) : null;
-
+  const actualDays = actualStart && actualFinish ? Math.max(1, daysBetween(actualStart, actualFinish) + 1) : null;
   const late = isOverPlan(stage);
   const lateDays = overrunDays(stage);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingStageTasks(true);
+    tasksApi.getKanban(
+      { type: 'project', project_id: projectId } as any,
+      { size: 100, stage_ids: [stage.id] },
+    )
+      .then((res: any) => {
+        if (cancelled) return;
+        const all: any[] = [];
+        (res.columns ?? []).forEach((col: any) => {
+          (col.tasks?.items ?? []).forEach((task: any) => all.push(task));
+        });
+        setStageTasks(all);
+      })
+      .catch(() => { if (!cancelled) setStageTasks([]); })
+      .finally(() => { if (!cancelled) setLoadingStageTasks(false); });
+    return () => { cancelled = true; };
+  }, [stage.id, projectId]);
 
   const saveAssignees = async (ids: string[]) => {
     setSavingAssignees(true);
@@ -2464,69 +2488,65 @@ function StageDetail({
     finally { setSavingAssignees(false); }
   };
 
-  const actionButton = (
-    action: 'start' | 'pause' | 'resume' | 'complete' | 'skip',
-    label: string,
-    Icon: React.ElementType,
-    primary = false,
-  ) => (
-    primary ? (
-      <ActionButton onClick={() => void onAction(action)} disabled={busy}
-        className="w-full px-5 py-3 text-sm font-semibold">
-        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon className="w-4 h-4" />}
-        {label}
-      </ActionButton>
-    ) : (
-      <button onClick={() => void onAction(action)} disabled={busy}
-        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--hover-3)] disabled:opacity-50 transition-colors">
-        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon className="w-4 h-4" />}
-        {label}
-      </button>
-    )
-  );
+  // Какие действия доступны при текущем статусе — порядок = порядок показа
+  const actions: { action: StageAction; label: string; icon: React.ElementType; primary: boolean }[] = [];
+  if (stage.status === 'planned') actions.push({ action: 'start', label: 'Начать этап', icon: PlayCircle, primary: true });
+  if (stage.status === 'on_hold') actions.push({ action: 'resume', label: 'Возобновить', icon: PlayCircle, primary: true });
+  if (stage.status === 'active') {
+    actions.push({ action: 'complete', label: 'Завершить этап', icon: CheckCircle2, primary: true });
+    actions.push({ action: 'pause', label: 'Приостановить', icon: PauseCircle, primary: false });
+  }
+  if (stage.status === 'planned' || stage.status === 'on_hold') {
+    actions.push({ action: 'skip', label: 'Пропустить', icon: SkipForward, primary: false });
+  }
+  const primaryAction = actions.find(a => a.primary);
+  const secondaryActions = actions.filter(a => !a.primary);
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
 
-      {/* BACK */}
+      {/* ═══ НАЗАД ═══ */}
       <button onClick={onBack}
         className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]">
         <ArrowLeft className="w-4 h-4" /> Все этапы
       </button>
 
-      {/* HEADER */}
-      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] p-6 sm:p-8">
-        <div className="flex flex-wrap items-start justify-between gap-5">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap mb-4">
+      {/* ═══════════════════════════════════════════════════════════
+          ГЛАВНЫЙ БЛОК (HERO)
+          Это первое, что видит пользователь: кто этот этап, какой у
+          него статус, и что с ним нужно сделать прямо сейчас.
+          Поэтому статус + главная кнопка действия — ЗДЕСЬ, а не в
+          сайдбаре, куда надо было бы долистывать.
+      ═══════════════════════════════════════════════════════════ */}
+      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] overflow-hidden">
+
+        {/* --- верх: номер/статус-бейджи слева, тихие кнопки справа --- */}
+        <div className="flex items-start justify-between gap-4 p-6 sm:p-8 pb-5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-3">
               <StageNumber order={stage.execution_order} />
               <StatusBadge status={stage.status} />
               {effective === 'overdue' && <StatusBadge status="overdue" />}
             </div>
-
             <h1 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] break-words">
               {stage.name}
             </h1>
-
-            <p className="mt-3 text-sm text-[var(--text-muted)]">
+            <p className="mt-2 text-sm text-[var(--text-muted)]">
               Этап {stage.execution_order} из {totalStages}
             </p>
           </div>
 
-          {/* HEADER ACTIONS */}
-          <div className="flex items-center gap-2">
-            <button onClick={onEdit} disabled={busy}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--hover-3)] disabled:opacity-50">
-              <Pencil className="w-4 h-4" /> Редактировать
+          {/* ghost-кнопки — намеренно неброские, чтобы не спорить с главным действием ниже */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button onClick={onEdit} disabled={busy} title="Редактировать"
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] disabled:opacity-50 transition-colors">
+              <Pencil className="w-4.5 h-4.5" />
             </button>
-
             <div className="relative">
-              <button onClick={() => setMenuOpen(v => !v)} disabled={busy}
-                title="Дополнительные действия"
-                className="w-11 h-11 rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--hover-3)]">
-                <MoreHorizontal className="w-5 h-5" />
+              <button onClick={() => setMenuOpen(v => !v)} disabled={busy} title="Ещё"
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] disabled:opacity-50 transition-colors">
+                <MoreHorizontal className="w-4.5 h-4.5" />
               </button>
-
               {menuOpen && (
                 <>
                   <button className="fixed inset-0 z-20 cursor-default" onClick={() => setMenuOpen(false)} />
@@ -2542,193 +2562,149 @@ function StageDetail({
             </div>
           </div>
         </div>
+
+        {/* --- низ: цветная полоса статуса + действие(я). Единственное
+             место на странице, где используется цвет статуса —
+             чтобы он не "размазывался" по всей странице и бросался
+             в глаза именно там, где нужно принять решение. --- */}
+        {(primaryAction || secondaryActions.length > 0) && (
+          <div className={`flex flex-wrap items-center justify-between gap-4 px-6 sm:px-8 py-5 border-t ${statusConfig.border} ${statusConfig.bg}`}>
+            <div className="flex items-center gap-3">
+              <statusConfig.icon className={`w-5 h-5 ${statusConfig.text}`} />
+              <span className={`text-sm font-semibold ${statusConfig.text}`}>{statusConfig.label}</span>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {secondaryActions.map(a => (
+                <button key={a.action} onClick={() => void onAction(a.action)} disabled={busy}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--hover-3)] disabled:opacity-50 transition-colors">
+                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <a.icon className="w-4 h-4" />}
+                  {a.label}
+                </button>
+              ))}
+              {primaryAction && (
+                <ActionButton onClick={() => void onAction(primaryAction.action)} disabled={busy}
+                  className="px-5 py-2.5 text-sm font-semibold">
+                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <primaryAction.icon className="w-4 h-4" />}
+                  {primaryAction.label}
+                </ActionButton>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
+      {/* ═══ ОСНОВНАЯ СЕТКА: контент слева, компактный сайдбар справа ═══ */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
 
-        {/* MAIN */}
+        {/* ─────────────── ЛЕВАЯ КОЛОНКА: контент этапа ─────────────── */}
         <div className="space-y-6">
 
-          {/* DESCRIPTION */}
-          <SectionCard title="Описание этапа" icon={FileText}>
-            <div className="p-6">
-              {stage.description ? (
+          {stage.description && (
+            <SectionCard title="Описание этапа" icon={FileText}>
+              <div className="p-6">
                 <p className="text-sm sm:text-base leading-8 text-[var(--text-secondary)] whitespace-pre-wrap">
                   {stage.description}
                 </p>
-              ) : (
-                <p className="text-sm text-[var(--text-muted)]">Описание не заполнено</p>
-              )}
-            </div>
-          </SectionCard>
-
-          {/* DATES */}
-          <SectionCard title="Сроки выполнения" description="Плановые и фактические показатели" icon={CalendarDays}>
-            <div className="p-6 space-y-5">
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
-                  <div className="flex items-center gap-2 mb-5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">План</h3>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)]">Начало</p>
-                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">{formatDate(stage.planned_start)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)]">Окончание</p>
-                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">{formatDate(stage.planned_end)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)]">Длительность</p>
-                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
-                        {plannedDays != null ? `${plannedDays} дн.` : '—'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
-                  <div className="flex items-center gap-2 mb-5">
-                    <span className={`w-2.5 h-2.5 rounded-full ${late ? 'bg-[var(--accent)]' : 'bg-emerald-500'}`} />
-                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">Факт</h3>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)]">Начало</p>
-                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">{formatDate(stage.started_at)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)]">Окончание</p>
-                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
-                        {stage.completed_at ? formatDate(stage.completed_at) : stage.started_at ? 'Выполняется' : '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)]">Длительность</p>
-                      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
-                        {actualDays != null ? `${actualDays} дн.` : '—'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
               </div>
+            </SectionCard>
+          )}
 
-              {late && (
-                <div className="flex items-start gap-3 rounded-xl border border-[var(--accent)]/20 bg-[var(--accent-soft)] p-4">
-                  <AlertTriangle className="w-5 h-5 text-[var(--accent)] shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold text-[var(--accent)]">Превышение планового срока</p>
-                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                      Фактическое выполнение превышает план на {lateDays} дн.
-                    </p>
-                  </div>
-                </div>
-              )}
+          {/* --- СРОКИ: раньше это были 2 коробки по 3 поля + баннер +
+               2 отдельных прогресс-бара. Теперь — 2 компактные строки
+               (план/факт) + один прогресс-бар, вся суть на одном экране
+               без скролла внутри карточки. --- */}
+          <SectionCard title="Сроки выполнения" icon={CalendarDays}>
+            <div className="p-6 space-y-4">
+              <TimelineRow
+                dotClass="bg-blue-500"
+                label="План"
+                start={formatDate(stage.planned_start)}
+                end={formatDate(stage.planned_end)}
+                days={plannedDays}
+              />
+              <TimelineRow
+                dotClass={late ? 'bg-[var(--accent)]' : 'bg-emerald-500'}
+                label="Факт"
+                start={formatDate(stage.started_at)}
+                end={stage.completed_at ? formatDate(stage.completed_at) : stage.started_at ? 'Выполняется' : '—'}
+                days={actualDays}
+              />
 
               {plannedDays != null && actualDays != null && plannedDays > 0 && (
-                <div className="space-y-4 pt-4 border-t border-[var(--border-color)]">
-                  <div>
-                    <div className="flex justify-between mb-2 text-xs text-[var(--text-muted)]">
-                      <span>Плановая длительность</span>
-                      <span>{plannedDays} дн.</span>
-                    </div>
-                    <div className="h-2.5 rounded-full bg-[var(--hover-3)]">
-                      <div className="h-full w-full rounded-full bg-blue-500/70" />
-                    </div>
+                <div className="pt-1">
+                  <div className="h-2 rounded-full bg-[var(--hover-3)] overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${late ? 'bg-[var(--accent)]' : 'bg-emerald-500'}`}
+                      style={{ width: `${Math.min(100, (actualDays / plannedDays) * 100)}%` }}
+                    />
                   </div>
+                </div>
+              )}
 
-                  <div>
-                    <div className="flex justify-between mb-2 text-xs text-[var(--text-muted)]">
-                      <span>Фактическая длительность</span>
-                      <span>{actualDays} дн.</span>
-                    </div>
-                    <div className="h-2.5 rounded-full bg-[var(--hover-3)] overflow-hidden">
-                      <div className={`h-full rounded-full ${late ? 'bg-[var(--accent)]' : 'bg-emerald-500'}`}
-                        style={{ width: `${Math.min(100, actualDays / plannedDays * 100)}%` }} />
-                    </div>
-                  </div>
+              {late && (
+                <div className="flex items-center gap-2 text-xs text-[var(--accent)] font-medium">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  Превышение плана на {lateDays} дн.
                 </div>
               )}
             </div>
           </SectionCard>
 
-          {/* CRITERIA */}
-          <SectionCard title="Критерии приёмки" description="Условия завершения этапа" icon={ListChecks}>
+          <SectionCard title="Критерии приёмки" icon={ListChecks}>
             {!stage.completion_criteria.length ? (
               <div className="p-6 text-sm text-[var(--text-muted)]">Критерии не указаны</div>
             ) : (
               <div className="divide-y divide-[var(--border-color)]">
                 {stage.completion_criteria.map((criterion, index) => (
-                  <div key={index} className="flex items-start gap-3 px-6 py-4">
-                    <div className="w-8 h-8 rounded-lg bg-[var(--hover-2)] flex items-center justify-center shrink-0">
-                      <Target className="w-4 h-4 text-[var(--accent)]" />
-                    </div>
-                    <p className="flex-1 pt-1 text-sm leading-6 text-[var(--text-secondary)]">{criterion}</p>
+                  <div key={index} className="flex items-start gap-3 px-6 py-3.5">
+                    <Target className="w-4 h-4 mt-0.5 text-[var(--accent)] shrink-0" />
+                    <p className="flex-1 text-sm leading-6 text-[var(--text-secondary)]">{criterion}</p>
                   </div>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard title="Задачи на этапе" description={`${stageTasks.length} задач`} icon={CheckCircle2}>
+            {loadingStageTasks ? (
+              <div className="p-6 flex items-center gap-3 text-sm text-[var(--text-muted)]">
+                <Loader2 className="w-4 h-4 animate-spin" /> Загружаем задачи...
+              </div>
+            ) : !stageTasks.length ? (
+              <EmptyState icon={CheckCircle2} title="Задач нет"
+                description="К этому этапу пока не привязано ни одной задачи." />
+            ) : (
+              <div className="divide-y divide-[var(--border-color)]">
+                {stageTasks.map((t: any) => (
+                  <button key={t.id} type="button"
+                    onClick={() => window.open(`/tasks?ticket_id=${t.ticket_id ?? ''}`, '_blank')}
+                    className="group w-full flex items-center gap-3 px-6 py-3.5 text-left hover:bg-[var(--hover-2)] transition-colors">
+                    <span className="font-mono text-xs text-[var(--text-muted)] shrink-0">#{t.number}</span>
+                    <span className="flex-1 text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">
+                      {t.title}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-[var(--hover-2)] text-[11px] text-[var(--text-muted)] shrink-0">
+                      {ST_LABEL[t.status as TaskStatus] ?? t.status}
+                    </span>
+                    <ChevronRight className="w-4 h-4 shrink-0 text-[var(--text-disabled)] group-hover:text-[var(--accent)]" />
+                  </button>
                 ))}
               </div>
             )}
           </SectionCard>
         </div>
 
-        {/* SIDEBAR */}
+        {/* ─────────── ПРАВАЯ КОЛОНКА: люди + служебная инфа ───────────
+             Было 4 карточки одного веса (управление / ответственный /
+             исполнители / инфо). Управление ушло в шапку, ответственный
+             и исполнители — это один смысловой блок "кто на этом этапе",
+             объединяю их. Служебная инфа — внизу, мельче, без лишнего
+             визуального веса, т.к. это не то, на что смотрят часто. ─── */}
         <aside className="space-y-5 xl:sticky xl:top-5">
 
-          {/* STATUS ACTIONS */}
-          <SectionCard title="Управление этапом" description="Текущее состояние и действия" icon={Flag}>
-            <div className="p-5 space-y-4">
-              <div className={`flex items-center gap-3 rounded-xl border ${config.border} ${config.bg} p-4`}>
-                <div className={`w-10 h-10 rounded-xl bg-[var(--bg-card)] flex items-center justify-center ${config.text}`}>
-                  <config.icon className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs text-[var(--text-muted)]">Текущий статус</p>
-                  <p className={`mt-1 text-sm font-semibold ${config.text}`}>{config.label}</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {canStart && actionButton('start', 'Начать этап', PlayCircle, true)}
-                {canResume && actionButton('resume', 'Возобновить', PlayCircle, true)}
-                {canComplete && actionButton('complete', 'Завершить этап', CheckCircle2, true)}
-                {canPause && actionButton('pause', 'Приостановить', PauseCircle)}
-                {canSkip && actionButton('skip', 'Пропустить этап', SkipForward)}
-
-                {!canStart && !canPause && !canResume && !canComplete && !canSkip && (
-                  <p className="py-3 text-center text-sm text-[var(--text-muted)]">
-                    Доступных действий нет
-                  </p>
-                )}
-              </div>
-            </div>
-          </SectionCard>
-
-          {/* RESPONSIBLE */}
-          <SectionCard title="Ответственный" icon={User}>
-            <div className="p-5">
-              {responsible ? (
-                <div className="flex items-center gap-3">
-                  <Avatar name={responsible.full_name} size="lg" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">{responsible.full_name}</p>
-                    {responsible.email && (
-                      <p className="mt-1 text-xs text-[var(--text-muted)] truncate">{responsible.email}</p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-[var(--text-muted)]">Не назначен</p>
-              )}
-            </div>
-          </SectionCard>
-
-          {/* ASSIGNEES */}
           <SectionCard
-            title="Исполнители"
-            description={`${assigneeIds.length} назначено`}
+            title="Люди"
             icon={Users}
             action={
               <button onClick={() => setAssigneesOpen(true)}
@@ -2738,59 +2714,79 @@ function StageDetail({
               </button>
             }
           >
-            <div className="p-5 space-y-3">
-              {!assigneeIds.length ? (
-                <div className="py-5 text-center">
-                  <Users className="w-8 h-8 mx-auto text-[var(--text-disabled)]" />
-                  <p className="mt-3 text-sm text-[var(--text-muted)]">Исполнители не назначены</p>
-                </div>
-              ) : (
-                assigneeIds.map(id => {
-                  const employee = users[id];
-                  return (
-                    <div key={id} className="flex items-center gap-3">
-                      <Avatar name={employee?.full_name} size="sm" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-[var(--text-primary)] truncate">
-                          {employee?.full_name ?? 'Пользователь'}
-                        </p>
-                        {employee?.email && <p className="text-xs text-[var(--text-muted)] truncate">{employee.email}</p>}
-                      </div>
-                      {id === currentUserId && (
-                        <span className="text-[11px] px-2 py-1 rounded-md bg-[var(--hover-2)] text-[var(--text-muted)]">Вы</span>
+            <div className="divide-y divide-[var(--border-color)]">
+
+              {/* Ответственный */}
+              <div className="p-5">
+                <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-disabled)]">
+                  Ответственный
+                </p>
+                {responsible ? (
+                  <div className="flex items-center gap-3">
+                    <Avatar name={responsible.full_name} size="md" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{responsible.full_name}</p>
+                      {responsible.email && (
+                        <p className="text-xs text-[var(--text-muted)] truncate">{responsible.email}</p>
                       )}
                     </div>
-                  );
-                })
-              )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-[var(--text-muted)]">Не назначен</p>
+                )}
+              </div>
 
-              <button onClick={() => setAssigneesOpen(true)}
-                className="w-full flex items-center justify-center gap-2 mt-3 px-4 py-3 rounded-xl border border-dashed border-[var(--border-color)] text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] transition-colors">
-                <UserPlus className="w-4 h-4" />
-                {assigneeIds.length ? 'Изменить исполнителей' : 'Назначить исполнителей'}
-              </button>
-            </div>
-          </SectionCard>
-
-          {/* SERVICE INFO */}
-          <SectionCard title="Информация" icon={Info}>
-            <div className="p-5 space-y-4">
-              {[
-                { label: 'Порядок', value: `${stage.execution_order} из ${totalStages}` },
-                { label: 'Создан', value: formatDateTime(stage.created_at) },
-                { label: 'Обновлён', value: formatDateTime(stage.updated_at) },
-              ].map(item => (
-                <div key={item.label} className="flex items-start justify-between gap-3">
-                  <span className="text-xs text-[var(--text-muted)]">{item.label}</span>
-                  <span className="text-xs text-[var(--text-secondary)] text-right">{item.value}</span>
+              {/* Исполнители */}
+              <div className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-disabled)]">
+                    Исполнители
+                  </p>
+                  <span className="text-[11px] text-[var(--text-muted)]">{assigneeIds.length}</span>
                 </div>
-              ))}
-              <div className="pt-3 border-t border-[var(--border-color)]">
-                <p className="text-xs text-[var(--text-muted)]">ID этапа</p>
-                <p className="mt-1 text-xs font-mono break-all text-[var(--text-secondary)]">{stage.id}</p>
+
+                {!assigneeIds.length ? (
+                  <button onClick={() => setAssigneesOpen(true)}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-[var(--border-color)] text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] transition-colors">
+                    <UserPlus className="w-4 h-4" /> Назначить
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    {assigneeIds.map(id => {
+                      const employee = users[id];
+                      return (
+                        <div key={id} className="flex items-center gap-2.5">
+                          <Avatar name={employee?.full_name} size="sm" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                              {employee?.full_name ?? 'Пользователь'}
+                            </p>
+                          </div>
+                          {id === currentUserId && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--hover-2)] text-[var(--text-muted)]">Вы</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </SectionCard>
+
+          {/* Служебная инфа — минимум визуального веса, т.к. читают редко */}
+          <div className="rounded-2xl border border-[var(--border-color)] p-5 text-xs text-[var(--text-muted)] space-y-2.5">
+            <div className="flex items-center gap-1.5 text-[var(--text-disabled)] mb-1">
+              <Info className="w-3.5 h-3.5" />
+              <span className="font-semibold uppercase tracking-wide text-[10px]">Информация</span>
+            </div>
+            <div className="flex justify-between"><span>Создан</span><span>{formatDateTime(stage.created_at)}</span></div>
+            <div className="flex justify-between"><span>Обновлён</span><span>{formatDateTime(stage.updated_at)}</span></div>
+            <div className="pt-2 border-t border-[var(--border-color)]">
+              <span className="block mb-1">ID этапа</span>
+              <span className="font-mono break-all">{stage.id}</span>
+            </div>
+          </div>
         </aside>
       </div>
 
@@ -2804,6 +2800,27 @@ function StageDetail({
         onClose={() => setAssigneesOpen(false)}
       />
     </motion.div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Маленький локальный helper только для этого файла — одна строка
+// "план/факт" в блоке сроков (см. комментарий выше по дизайну)
+// ─────────────────────────────────────────────────────────────────
+function TimelineRow({
+  dotClass, label, start, end, days,
+}: { dotClass: string; label: string; start: string; end: string; days: number | null }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
+      <span className="w-10 text-xs font-medium text-[var(--text-muted)] shrink-0">{label}</span>
+      <span className="text-sm text-[var(--text-primary)]">{start}</span>
+      <span className="text-[var(--text-disabled)]">→</span>
+      <span className="text-sm text-[var(--text-primary)]">{end}</span>
+      {days != null && (
+        <span className="ml-auto text-xs text-[var(--text-muted)] shrink-0">{days} дн.</span>
+      )}
+    </div>
   );
 }
 
@@ -3229,6 +3246,7 @@ export default function ProjectStagesPage() {
                 currentUserId={user?.id}
                 totalStages={stages.length}
                 busy={busy}
+                projectId={projectId}
                 onBack={goList}
                 onEdit={() => setEditing(true)}
                 onDelete={() => setDeletingStage(selectedStage)}

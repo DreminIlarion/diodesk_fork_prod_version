@@ -81,8 +81,14 @@ def get_kanban_filters(
             list[Priority] | None, Query(..., description="По приоритету")
         ] = None,
         overdue_only: Annotated[bool, Query(..., description="Только просроченные")] = False,
+        stage_ids: Annotated[
+            list[UUID] | None, Query(..., description="По этапам проекта")
+        ] = None,
 ) -> KanbanFilters:
-    return KanbanFilters(priorities=priorities, overdue_only=overdue_only)
-
+    return KanbanFilters(
+        priorities=priorities,
+        overdue_only=overdue_only,
+        stage_ids=set(stage_ids) if stage_ids else None,
+    )
 
 KanbanFiltersDep = Annotated[KanbanFilters, Depends(get_kanban_filters)]

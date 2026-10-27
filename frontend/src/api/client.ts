@@ -1054,7 +1054,7 @@ export const productsApi = {
 // ==== Tasks API ====
 export const tasksApi = {
   // Получить Kanban-доску
-  getKanban: async (
+    getKanban: async (
     context: TaskKanbanContext,
     filters?: TaskKanbanFilters
   ): Promise<TaskKanbanResponse> => {
@@ -1065,6 +1065,10 @@ export const tasksApi = {
 
     if (filters?.priorities && filters.priorities.length > 0) {
       filters.priorities.forEach(p => searchParams.append('priorities', p));
+    }
+
+    if (filters?.stage_ids && filters.stage_ids.length > 0) {
+      filters.stage_ids.forEach(id => searchParams.append('stage_ids', id));
     }
 
     const response = await api.post<TaskKanbanResponse>(
