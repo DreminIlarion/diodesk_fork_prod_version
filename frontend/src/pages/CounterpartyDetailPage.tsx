@@ -2062,16 +2062,16 @@ function ProductsTab({
   const [selectedProduct, setSelectedProduct] =
     useState<any | null>(null);
 
-  const [linkEnv, setLinkEnv] = useState('production');
-  const [linkPrimary, setLinkPrimary] = useState(false);
+  const [serialNumber, setSerialNumber] = useState('');
   const [linking, setLinking] = useState(false);
-  const [linkError, setLinkError] =
-    useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
-  const [unlinkingProduct, setUnlinkingProduct] =
-    useState<any | null>(null);
-
+  const [unlinkingProduct, setUnlinkingProduct] = useState<any | null>(null);
   const [unlinking, setUnlinking] = useState(false);
+
+  const [editingSerialFor, setEditingSerialFor] = useState<string | null>(null);
+  const [serialDraft, setSerialDraft] = useState('');
+  const [savingSerial, setSavingSerial] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -2142,29 +2142,20 @@ function ProductsTab({
     )
     : allProducts;
 
-  const handleLink = async () => {
+    const handleLink = async () => {
     if (!selectedProduct) return;
-
     setLinking(true);
     setLinkError(null);
-
     try {
-      await counterpartiesApi.linkProduct(
-        counterpartyId,
-        {
-          product_id: selectedProduct.id,
-          environment: linkEnv,
-          is_primary: linkPrimary,
-        },
-      );
-
+      await counterpartiesApi.linkProduct(counterpartyId, {
+        product_id: selectedProduct.id,
+        serial_number: serialNumber.trim() || undefined,
+      });
       setSelectedProduct(null);
       setFilterQuery('');
-      setLinkEnv('production');
-      setLinkPrimary(false);
+      setSerialNumber('');
       setShowForm(false);
       setPage(1);
-
       load();
     } catch (err: any) {
       setLinkError(
@@ -2195,12 +2186,11 @@ function ProductsTab({
     }
   };
 
-  const closeForm = () => {
+    const closeForm = () => {
     setShowForm(false);
     setSelectedProduct(null);
     setFilterQuery('');
-    setLinkEnv('production');
-    setLinkPrimary(false);
+    setSerialNumber('');
     setLinkError(null);
   };
 
@@ -2396,76 +2386,35 @@ function ProductsTab({
             )}
           </div>
 
-          {selectedProduct && (
+                    {selectedProduct && (
             <>
               <div>
                 <label className="block text-base text-[var(--text-primary)]/60 mb-2">
-                  Среда
+                  Серийный номер
                 </label>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {ENVIRONMENTS.map(env => (
-                    <button
-                      key={env.value}
-                      onClick={() =>
-                        setLinkEnv(env.value)
-                      }
-                      className={`px-3 py-3 rounded-xl text-base font-medium transition-all ${linkEnv === env.value
-                        ? envBadgeClass(env.value)
-                        : 'border border-[var(--border-color)] bg-[var(--hover-1)] text-[var(--text-primary)]/40 hover:bg-[var(--hover-2)]'
-                        }`}
-                    >
-                      {env.label}
-                    </button>
-                  ))}
-                </div>
+                <input
+                  value={serialNumber}
+                  onChange={e => setSerialNumber(e.target.value)}
+                  placeholder="Например, SN-123456789"
+                  className="w-full px-4 py-3 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-xl text-base text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)] transition-all"
+                />
+                <p className="mt-2 text-sm text-[var(--text-primary)]/40">
+                  Необязательно. Можно указать позже.
+                </p>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-[var(--hover-1)] border border-[var(--border-color)] rounded-xl">
-                <div>
-                  <p className="text-base text-[var(--text-primary)]/80">
-                    Основной продукт
-                  </p>
-
-                  <p className="text-sm text-[var(--text-primary)]/40">
-                    Отмечает как основной
-                  </p>
-                </div>
-
-                <button
-                  onClick={() =>
-                    setLinkPrimary(!linkPrimary)
-                  }
-                  className={`relative w-11 h-6 rounded-full transition-colors ${linkPrimary
-                    ? 'bg-[var(--accent)]'
-                    : 'bg-[var(--hover-1)]'
-                    }`}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${linkPrimary
-                      ? 'translate-x-5'
-                      : ''
-                      }`}
-                  />
-                </button>
-              </div>
-
-              <button
-                onClick={handleLink}
-                disabled={linking}
-                className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[var(--accent)] text-white text-base font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
-              >
-                {linking ? (
-                  <Loader2
-                    size={18}
-                    className="animate-spin"
-                  />
-                ) : (
-                  <Link2 size={18} />
-                )}
-
-                Привязать продукт
-              </button>
+             <button
+  onClick={handleLink}
+  disabled={linking}
+  className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[var(--accent)] text-white text-base font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+>
+  {linking ? (
+    <Loader2 size={18} className="animate-spin" />
+  ) : (
+    <Link2 size={18} />
+  )}
+  Привязать продукт
+</button>
             </>
           )}
         </div>
@@ -2557,66 +2506,32 @@ function ProductsTab({
                     <Icon size={20} />
                   </div>
 
-                  <div className="flex-1 min-w-0">
+                                    <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
                       <span className="text-base font-semibold text-[var(--text-primary)] truncate">
-                        {product.display_name ||
-                          product.name}
+                        {product.display_name || product.name}
                       </span>
-
-                      {product.is_primary && (
-                        <span className="px-2 py-0.5 rounded-md bg-[var(--accent)]/20 border border-[var(--accent)]/15 text-xs text-[var(--accent)] font-medium flex-shrink-0">
-                          Основной
-                        </span>
-                      )}
                     </div>
-
                     <p className="text-sm text-[var(--text-primary)]/40">
                       {product.vendor}
                     </p>
                   </div>
 
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    {product.environment && (
-                      <span
-                        className={`px-2.5 py-1 rounded-lg text-sm font-medium hidden sm:block ${envBadgeClass(
-                          product.environment,
-                        )}`}
-                      >
-                        {envLabel(
-                          product.environment,
-                        )}
-                      </span>
-                    )}
-
                     <div className="flex items-center gap-2">
-                      <div
-                        className={`w-2.5 h-2.5 rounded-full ${statusDot(
-                          product.status,
-                        )}`}
-                      />
-
-                      <span
-                        className={`text-sm hidden sm:block ${sInfo?.color ||
-                          'text-[var(--text-primary)]/40'
-                          }`}
-                      >
+                      <div className={`w-2.5 h-2.5 rounded-full ${statusDot(product.status)}`} />
+                      <span className={`text-sm hidden sm:block ${sInfo?.color || 'text-[var(--text-primary)]/40'}`}>
                         {statusLabel(product.status)}
                       </span>
                     </div>
-
                     {isExpanded ? (
-                      <ChevronUp
-                        size={18}
-                        className="text-[var(--text-primary)]/40"
-                      />
-                    ) : (
-                      <ChevronDown
-                        size={18}
-                        className="text-[var(--text-primary)]/20"
-                      />
-                    )}
+  <ChevronUp size={18} className="text-[var(--text-primary)]/40" />
+) : (
+  <ChevronDown size={18} className="text-[var(--text-primary)]/20" />
+)}
                   </div>
+
+                 
                 </button>
 
                 {isExpanded && (
@@ -2652,6 +2567,72 @@ function ProductsTab({
                         </p>
                       </div>
                     )}
+
+
+                                        {/* Серийный номер */}
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-[var(--text-primary)]/40 mb-2 font-semibold">
+                        Серийный номер
+                      </p>
+
+                      {editingSerialFor === product.id ? (
+                        <div className="flex gap-2 flex-wrap">
+                          <input
+                            value={serialDraft}
+                            onChange={e => setSerialDraft(e.target.value)}
+                            placeholder="SN-..."
+                            className="flex-1 min-w-[200px] px-3 py-2 bg-[var(--hover-2)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]/30"
+                          />
+                          <button
+                            type="button"
+                            disabled={savingSerial}
+                            onClick={async () => {
+                              setSavingSerial(true);
+                              try {
+                                await counterpartiesApi.updateProductLink(
+                                  counterpartyId,
+                                  product.id,
+                                  { serial_number: serialDraft.trim() || null },
+                                );
+                                setEditingSerialFor(null);
+                                load();
+                              } catch (e) {
+                                console.error(e);
+                              } finally {
+                                setSavingSerial(false);
+                              }
+                            }}
+                            className="px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-50"
+                          >
+                            {savingSerial ? <Loader2 size={14} className="animate-spin" /> : 'Сохранить'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingSerialFor(null)}
+                            className="px-4 py-2 rounded-lg bg-[var(--hover-2)] text-[var(--text-primary)]/70 text-sm font-medium"
+                          >
+                            Отмена
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--hover-2)] text-base text-[var(--text-primary)]/80 border border-[var(--border-color)] font-mono">
+                            <Hash size={16} className="text-[var(--text-primary)]/40" />
+                            {product.serial_number || '—'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingSerialFor(product.id);
+                              setSerialDraft(product.serial_number ?? '');
+                            }}
+                            className="px-3 py-2 rounded-lg bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/60 text-sm font-medium"
+                          >
+                            {product.serial_number ? 'Изменить' : 'Указать'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
 
                     {attrs.length > 0 && (
                       <div>

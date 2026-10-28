@@ -380,9 +380,21 @@ export const counterpartiesApi = {
 
   linkProduct: async (
     counterpartyId: string,
-    data: { product_id: string; environment: string; is_primary: boolean }
+    data: { product_id: string; serial_number?: string }
   ) => {
     const res = await api.post(`/api/v1/counterparties/${counterpartyId}/products`, data);
+    return res.data;
+  },
+
+  updateProductLink: async (
+    counterpartyId: string,
+    linkId: string,
+    data: { serial_number?: string | null }
+  ) => {
+    const res = await api.patch(
+      `/api/v1/counterparties/${counterpartyId}/products/${linkId}`,
+      data
+    );
     return res.data;
   },
 };

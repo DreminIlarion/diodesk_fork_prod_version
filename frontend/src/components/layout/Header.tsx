@@ -17,6 +17,31 @@ const DIOS_WIDTH_KEY = 'dios-panel-width';
 
 const MIN_W = 360;
 const MAX_W_RATIO = 0.9;
+const HANDLE_W = 6; // ширина зоны-"ручки" для ресайза, добавляется к офсету
+
+const DIOS_RED = '#bb252d';
+
+/** Логотип DIOS AI — свёрстан по markup с их сайта (<span class="_logo_nsett_5">...) */
+function DiosLogo({
+  size = 22,
+  withWordmark = true,
+}: { size?: number; withWordmark?: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 shrink-0" aria-label="DIOS AI">
+      <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+        <path fill={DIOS_RED} d="M3 21V11.5A8.5 8.5 0 0 1 11.5 3H15v5.5h-3.5a3 3 0 0 0-3 3V21Z" />
+        <path fill="#9a9a96" d="M15.5 9H21v6a7 7 0 0 1-7 7H9v-5.5h5a1.5 1.5 0 0 0 1.5-1.5Z" />
+        <circle cx="19.5" cy="4.5" r="1.8" fill="#b5b5b0" />
+      </svg>
+      {withWordmark && (
+        <span className="flex items-baseline gap-0.5 font-bold leading-none tracking-tight">
+          <span className="text-[var(--text-primary)]">DIOS</span>
+          <span style={{ color: DIOS_RED }}>AI</span>
+        </span>
+      )}
+    </span>
+  );
+}
 
 function getStoredWidth(): number {
   try {
@@ -25,6 +50,12 @@ function getStoredWidth(): number {
   } catch {
     return 560;
   }
+}
+
+/** Пишет текущий отступ основного контента в CSS-переменную на <html>.
+ *  Layout ничего не знает про Header — просто читает var(--dios-panel-offset). */
+function setContentOffset(px: number) {
+  document.documentElement.style.setProperty('--dios-panel-offset', `${px}px`);
 }
 
 export default function Header({ onMenuClick }: HeaderProps) {
@@ -40,20 +71,28 @@ export default function Header({ onMenuClick }: HeaderProps) {
     try { return localStorage.getItem(DIOS_STORAGE_KEY) === '1'; } catch { return false; }
   });
   const [diosExpanded, setDiosExpanded] = useState(false);
-
-  // isResizing нужен только чтобы показать overlay поверх iframe,
-  // сама ширина живёт в ref и не триггерит рендеры на mousemove.
-  const [isResizing, setIsResizing] = useState(false);
+  const [isResizing, setIsResizing] = useState(false); // нужен только для overlay над iframe
 
   const panelRef = useRef<HTMLDivElement>(null);
   const widthRef = useRef<number>(getStoredWidth());
   const resizingRef = useRef(false);
 
-  // применить сохранённую ширину при открытии / выходе из полноэкранного режима
+  // ── применяем ширину панели + сдвиг контента при открытии/закрытии ──
   useEffect(() => {
-    if (panelRef.current && !diosExpanded) {
+    if (!showDios) {
+      setContentOffset(0);
+      return;
+    }
+    if (diosExpanded) {
+      // Развёрнутый режим — модальный оверлей с подложкой,
+      // контент под ним и так скрыт, сдвигать не нужно.
+      setContentOffset(0);
+      return;
+    }
+    if (panelRef.current) {
       panelRef.current.style.width = `${widthRef.current}px`;
     }
+    setContentOffset(widthRef.current + HANDLE_W);
   }, [showDios, diosExpanded]);
 
   useEffect(() => {
@@ -72,7 +111,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
     return () => document.removeEventListener('keydown', onKey);
   }, [showDios, diosExpanded]);
 
-  // ── Resize (DOM-манипуляции, без лишних ререндеров ширины) ─────
+  // ── Resize ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!showDios || diosExpanded) return;
 
@@ -82,6 +121,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
       const next = Math.min(Math.max(window.innerWidth - e.clientX, MIN_W), maxW);
       widthRef.current = next;
       panelRef.current.style.width = `${next}px`;
+      setContentOffset(next + HANDLE_W); // сайт "уступает место" синхронно с драгом
       e.preventDefault();
     };
 
@@ -89,6 +129,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
       if (!resizingRef.current) return;
       resizingRef.current = false;
       setIsResizing(false);
+      document.documentElement.classList.remove('dios-resizing');
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       try { localStorage.setItem(DIOS_WIDTH_KEY, String(widthRef.current)); } catch {}
@@ -96,7 +137,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', stop);
-    // На случай если курсор ушёл из окна (например, через iframe/другой монитор)
     window.addEventListener('mouseleave', stop);
     window.addEventListener('blur', stop);
 
@@ -112,6 +152,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
     e.preventDefault();
     resizingRef.current = true;
     setIsResizing(true);
+    document.documentElement.classList.add('dios-resizing');
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   }, []);
@@ -164,16 +205,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   : 'border-[var(--border-color)] bg-[var(--bg-card)] hover:bg-[var(--hover-1)] hover:border-[var(--accent)]/40'
               }`}
             >
-              <div className="relative flex-shrink-0 w-8 h-8 flex items-center justify-center">
-                <img
-                  src="https://storage.yandexcloud.net/b.fotovssylku.ru/2026/10/05/GLYNTEVYI-LOGOTIP-d_i-S-AI-SKEMAMI.png"
-                  alt=""
-                  className="w-8 h-8 object-contain transition-transform duration-200 group-hover:scale-105"
-                />
-              </div>
+              <DiosLogo size={22} withWordmark={false} />
               <div className="hidden sm:flex flex-col leading-tight">
-                <span className="text-sm font-semibold text-[var(--text-primary)]">
-                  DIOS <span className="text-[var(--accent)]">AI </span>
+                <span className="flex items-baseline gap-0.5 text-sm font-bold">
+                  <span className="text-[var(--text-primary)]">DIOS</span>
+                  <span style={{ color: DIOS_RED }}>AI</span>
                 </span>
                 <span className="text-[11px] text-[var(--text-muted)] mt-0.5">ИИ-агент</span>
               </div>
@@ -286,14 +322,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
             >
               <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-sidebar)] shrink-0">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <img
-                    src="https://storage.yandexcloud.net/b.fotovssylku.ru/2026/10/05/GLYNTEVYI-LOGOTIP-d_i-S-AI-SKEMAMI.png"
-                    alt=""
-                    className="w-7 h-7 object-contain shrink-0"
-                  />
+                  <DiosLogo size={24} withWordmark={false} />
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
-                      DIOS <span className="text-[var(--accent)]">AI</span>
+                    <p className="flex items-baseline gap-0.5 text-sm font-bold truncate">
+                      <span className="text-[var(--text-primary)]">DIOS</span>
+                      <span style={{ color: DIOS_RED }}>AI</span>
                     </p>
                     <p className="text-[11px] text-[var(--text-muted)] truncate">ИИ-агент</p>
                   </div>
@@ -335,9 +368,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   className="w-full h-full border-0 bg-white"
                   allow="clipboard-read; clipboard-write"
                 />
-                {/* Overlay поверх iframe во время ресайза —
-                    без него iframe перехватывает mousemove/mouseup
-                    и драг "зависает", из-за чего потом размер скачет. */}
+                {/* overlay нужен только во время драга ресайза —
+                    иначе iframe перехватывает mousemove/mouseup
+                    и ширина начинает "скакать" */}
                 {isResizing && (
                   <div className="absolute inset-0 z-10 cursor-col-resize" />
                 )}

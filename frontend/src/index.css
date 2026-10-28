@@ -1406,3 +1406,35 @@ a {
   justify-content: center;
   gap: 0.5rem;
 }
+
+
+
+
+/* ═══════════════════════════════════════════════════════════════
+   DIOS AI PANEL — СДВИГ ОСНОВНОГО КОНТЕНТА
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  --dios-panel-offset: 0px;
+}
+
+/* Класс вешается на обёртку с Header + <main>, не на Sidebar.
+   Значение --dios-panel-offset обновляет Header.tsx при открытии/
+   закрытии/ресайзе панели. */
+.app-content-shift {
+  margin-right: var(--dios-panel-offset, 0px);
+  transition: margin-right 200ms ease;
+}
+
+/* Во время драга ресайза transition выключаем — иначе ширина
+   «запаздывает» за курсором. */
+html.dios-resizing .app-content-shift {
+  transition: none;
+}
+
+/* На мобильных панель = фуллскрин-оверлей, сдвиг не нужен. */
+@media (max-width: 1023px) {
+  .app-content-shift {
+    margin-right: 0 !important;
+  }
+}
