@@ -77,6 +77,7 @@ class TicketMapper(ModelMapper[Ticket, TicketOrm]):
             attachments=[
                 AttachmentMapper.to_entity(attachment) for attachment in model.attachments
             ],
+            has_tasks=bool(model.has_tasks),
         )
 
     @staticmethod
@@ -108,7 +109,7 @@ class TicketMapper(ModelMapper[Ticket, TicketOrm]):
             tags=[Tag(name=tag["name"], color=tag["color"]) for tag in model.tags],
             attachments=[],
             has_attachments=bool(model.has_attachments),
-
+            has_tasks=bool(model.has_tasks),
         )
 
     @staticmethod

@@ -134,6 +134,10 @@ class TicketViewResponse(BaseModel):
         description="ID этапа проекта",
     )
     has_attachments: bool = Field(False, description="Есть ли прикреплённые файлы")
+    has_tasks: bool = Field(
+        False,
+        description="Есть ли хотя бы одна активная задача по заявке",
+    )
 
 
 class TicketResponse(TicketBase):
@@ -149,7 +153,10 @@ class TicketResponse(TicketBase):
     assignee_id: UUID | None = Field(None, description="Кому назначен тикет")
     closed_at: datetime | None = Field(None, description="Дата закрытия тикета")
     is_archived: bool = Field(..., description="Заархивирован ли тикет")
-
+    has_tasks: bool = Field(
+        False,
+        description="Есть ли хотя бы одна активная задача по заявке",
+    )
     attachments: list[AttachmentResponse] = Field(
         default_factory=list, description="Прикреплённые файлы"
     )
