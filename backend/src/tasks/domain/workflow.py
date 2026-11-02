@@ -102,6 +102,22 @@ class TaskWorkflow:
             f"Not allowed status transition from {old_status} to {new_status}."
         )
 
+    def is_allowed(self, old_status: TaskStatus, new_status: TaskStatus) -> bool:
+        try:
+            self.resolve(old_status, new_status)
+        except NotAllowedStatusTransitionError:
+            return False
+        return True
+
+    def next_statuses(self, status: TaskStatus) -> list[TaskStatus]:
+        """Статусы, в которые разрешён переход из указанного."""
+
+        return [
+            candidate
+            for candidate in TaskStatus
+            if candidate != status and self.is_allowed(status, candidate)
+        ]
+
 task_workflow = (
     TaskWorkflow()
     # ===================

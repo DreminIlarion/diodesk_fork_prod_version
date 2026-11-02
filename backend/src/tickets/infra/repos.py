@@ -1,6 +1,7 @@
 from typing import override
 
 from collections import defaultdict
+from collections.abc import Collection
 from uuid import UUID
 
 from sqlalchemy import Select, and_, func, or_, select
@@ -14,9 +15,11 @@ from src.shared.schemas import Page, Pagination
 from ..domain.dtos import ActorsFilters
 from ..domain.entities import Comment, Reaction, Ticket
 from ..domain.repos import ReactionStats, TicketFilters
-from ..domain.vo import ReactionType
+from ..domain.vo import ReactionType, TicketNumber, TicketStatus
 from .mappers import CommentMapper, ReactionMapper, TicketMapper
 from .models import TicketOrm
+
+ACTIVE_STATUSES = frozenset(status for status in TicketStatus if status.is_active)
 
 
 class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
@@ -34,6 +37,31 @@ class SqlTicketRepository(SqlAlchemyRepository[Ticket, TicketOrm]):
         model = result.scalar_one_or_none()
 
         return None if model is None else self.model_mapper.to_entity(model)
+
+    async def get_by_number(self, number: TicketNumber) -> Ticket | None:
+        stmt = (
+            select(self.model)
+            .where(self.model.number == number.value)
+            .options(selectinload(self.model.attachments))
+        )
+        model = (await self.session.execute(stmt)).scalar_one_or_none()
+
+        return None if model is None else self.model_mapper.to_entity(model)
+
+    async def count_active_by_assignee(self, user_ids: Collection[UUID]) -> dict[UUID, int]:
+        if not user_ids:
+            return {}
+
+        stmt = (
+            select(self.model.assignee_id, func.count())
+            .where(
+                self.model.deleted_at.is_(None),
+                self.model.status.in_(ACTIVE_STATUSES),
+                self.model.assignee_id.in_(user_ids),
+            )
+            .group_by(self.model.assignee_id)
+        )
+        return dict((await self.session.execute(stmt)).tuples().all())
 
     def _apply_actors_filters(
             self, stmt: Select[tuple[TicketOrm]], filters: ActorsFilters,

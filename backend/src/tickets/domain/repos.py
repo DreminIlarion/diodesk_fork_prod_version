@@ -1,5 +1,6 @@
 from typing import override
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -8,7 +9,7 @@ from src.shared.schemas import Page, Pagination
 
 from .dtos import TicketFilters
 from .entities import Comment, Reaction, Ticket
-from .vo import ReactionType
+from .vo import ReactionType, TicketNumber
 
 
 class TicketRepository(Repository[Ticket]):
@@ -29,6 +30,15 @@ class TicketRepository(Repository[Ticket]):
         """
 
     async def get_by_reporter(self, reporter_id: UUID, params: Pagination) -> Page[Ticket]: ...
+
+    async def get_by_number(self, number: TicketNumber) -> Ticket | None:
+        """Получение заявки по её уникальному номеру"""
+
+    async def count_active_by_assignee(self, user_ids: Collection[UUID]) -> dict[UUID, int]:
+        """
+        Количество активных (находящихся в работе) заявок у каждого исполнителя.
+        Исполнители без активных заявок в результат не попадают.
+        """
 
 
 class CommentRepository(Repository[Comment]):

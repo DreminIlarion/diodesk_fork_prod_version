@@ -49,6 +49,19 @@ class TicketStatus(StrEnum):
     REJECTED = auto()
     CANCELED = auto()
 
+    @property
+    def is_active(self) -> bool:
+        """Заявка находится в работе и учитывается в загрузке исполнителя."""
+
+        return self in {
+            TicketStatus.NEW,
+            TicketStatus.OPEN,
+            TicketStatus.IN_PROGRESS,
+            TicketStatus.WAITING,
+            TicketStatus.PAUSED,
+            TicketStatus.REOPENED,
+        }
+
 
 class TicketType(StrEnum):
     """Тип заявки/тикета"""
