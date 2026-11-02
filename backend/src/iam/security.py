@@ -3,6 +3,7 @@ from typing import Any
 import asyncio
 import logging
 import os
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from uuid import UUID, uuid4
@@ -13,7 +14,7 @@ from passlib.context import CryptContext
 from src.core.settings import settings
 from src.shared.utils.time import current_datetime
 
-from .domain.authz import SubjectType
+from .domain.authz import Subject, SubjectType
 from .domain.exceptions import UnauthorizedError
 from .domain.vo import Email, UserRole
 
@@ -33,7 +34,7 @@ pwd_context = CryptContext(
     argon2__parallelism=PARALLELISM,
     argon2__salt_size=SALT_SIZE,
     bcrypt__rounds=ROUNDS,
-    deprecated="auto"
+    deprecated="auto",
 )
 
 MAX_WORKERS = max(1, (os.cpu_count() or 2) // 2)
@@ -71,10 +72,10 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
 
 
 def create_access_token(
-        user_id: UUID,
-        email: Email,
-        user_roles: set[UserRole],
-        counterparty_id: UUID | None = None,
+    user_id: UUID,
+    email: Email,
+    user_roles: set[UserRole],
+    counterparty_id: UUID | None = None,
 ) -> str:
     now = current_datetime()
     expires_at = now + timedelta(minutes=settings.jwt.access_token_expires_in_minutes)
@@ -113,9 +114,23 @@ def validate_token(token: str) -> dict[str, Any]:
             token,
             key=settings.secret_key,
             algorithms=[settings.jwt.algorithm],
-            options={"verify_aud": False}
+            options={"verify_aud": False},
         )
     except jwt.ExpiredSignatureError:
         raise UnauthorizedError("Token signature expired!") from None
     except jwt.PyJWTError:
         raise UnauthorizedError("Invalid token!") from None
+
+
+def subject_from_claims(claims: Mapping[str, Any]) -> Subject:
+    """Restore the authorization subject from validated access-token claims."""
+
+    counterparty_id = claims.get("counterparty_id")
+    return Subject(
+        id=UUID(claims["sub"]),
+        type=SubjectType(claims.get("sub_type", SubjectType.USER)),
+        email=Email(claims["email"]) if "email" in claims else None,
+        roles=[UserRole(role) for role in claims.get("roles", [])],
+        counterparty_id=None if counterparty_id is None else UUID(counterparty_id),
+        scopes=list(claims.get("scopes", [])),
+    )
