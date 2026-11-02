@@ -1,7 +1,11 @@
+from typing import ClassVar
+
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import and_, func, or_, select
+from ddf.application.dtos import QueryDTO
+from ddf.infra.database.sqlalchemy.filters import compile_filter
+from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.media.infra.repo import AttachmentMapper
@@ -14,6 +18,40 @@ from ..domain.entities import Task
 from ..domain.repos import TaskView
 from ..domain.vo import StoryPoints, TaskNumber, TaskStatus
 from .models import TaskOrm, TaskSequence
+
+TASK_FILTER_WHITELIST = (
+    "id",
+    "number",
+    "title",
+    "description",
+    "status",
+    "priority",
+    "storyPoints",
+    "assigneeId",
+    "reviewerId",
+    "dueDate",
+    "projectId",
+    "ticketId",
+    "stageId",
+    "createdBy",
+    "createdAt",
+    "updatedAt",
+    "startedAt",
+    "completedAt",
+    "estimatedHours",
+    "actualHours",
+)
+
+
+def compile_task_search(query: str) -> ColumnElement[bool]:
+    """Текстовый поиск по номеру, названию и описанию задачи."""
+
+    pattern = f"%{query}%"
+    return or_(
+        TaskOrm.number.ilike(pattern),
+        TaskOrm.title.ilike(pattern),
+        TaskOrm.description.ilike(pattern),
+    )
 
 
 class TaskMapper(ModelMapper[Task, TaskOrm]):
@@ -95,7 +133,9 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
             reviewer_id=model.reviewer_id,
             due_date=model.due_date,
             story_points=None if model.story_points is None else Decimal(model.story_points),
-            estimated_hours=None if model.estimated_hours is None else Decimal(model.estimated_hours),
+            estimated_hours=(
+                None if model.estimated_hours is None else Decimal(model.estimated_hours)
+            ),
             actual_hours=None if model.actual_hours is None else Decimal(model.actual_hours),
             started_at=model.started_at,        # ← Добавиl
             completed_at=model.completed_at,    # ← Добавил
@@ -111,6 +151,7 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
 class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
     model = TaskOrm
     model_mapper = TaskMapper
+    filter_whitelist: ClassVar[tuple[str, ...]] = TASK_FILTER_WHITELIST
 
     async def get_by_number(self, number: TaskNumber) -> Task | None:
         stmt = select(self.model).where(self.model.number == number.value)
@@ -128,11 +169,14 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
         elif project_id is not None:
             count_stmt = count_stmt.where(TaskOrm.project_id == project_id)
         else:
-            count_stmt = count_stmt.where(TaskOrm.ticket_id.is_(None), TaskOrm.project_id.is_(None))
-        
+            count_stmt = count_stmt.where(
+                TaskOrm.ticket_id.is_(None),
+                TaskOrm.project_id.is_(None),
+            )
+
         real_count = await self.session.scalar(count_stmt)
         next_num = (real_count or 0) + 1
-        
+
         # Атомарная вставка/обновление
         stmt = (
             pg_insert(TaskSequence)
@@ -143,11 +187,43 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
             )
             .returning(TaskSequence.last_number)
         )
-        
+
         result = await self.session.execute(stmt)
         return result.scalar_one()
 
-    async def get_grouped_by_status(
+    async def search(
+            self,
+            pagination: Pagination,
+            *,
+            query: QueryDTO | None = None,
+    ) -> Page[TaskView]:
+        conditions = [self.model.deleted_at.is_(None)]
+
+        if query is not None:
+            conditions.append(
+                compile_filter(
+                    self.model,
+                    query,
+                    self.filter_whitelist,
+                    compile_task_search,
+                )
+            )
+
+        stmt = (
+            select(self.model)
+            .where(*conditions)
+            .order_by(
+                self.model.priority.desc(),
+                self.model.due_date.asc().nulls_last(),
+            )
+        )
+        return await self._paginate(
+            stmt,
+            pagination,
+            model_mapper=self.model_mapper.to_view,
+        )
+
+    async def get_grouped_by_status(  # noqa: C901
             self,
             pagination: Pagination,
             *,
@@ -190,7 +266,7 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
             )
 
         if user_conditions:
-            conditions.append(or_(*user_conditions))  
+            conditions.append(or_(*user_conditions))
 
         if priorities is not None:
             conditions.append(self.model.priority.in_(priorities))

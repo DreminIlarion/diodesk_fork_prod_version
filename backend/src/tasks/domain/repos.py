@@ -3,6 +3,8 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
+from ddf.application.dtos import QueryDTO
+
 from src.shared.domain.repos import Repository
 from src.shared.domain.vo import Priority, Tag
 from src.shared.schemas import Page, Pagination
@@ -26,14 +28,13 @@ class TaskView:
 
     status: TaskStatus
     priority: Priority
-    description: str | None = None  
-
+    description: str | None = None
 
     assignee_id: UUID | None = None
     reviewer_id: UUID | None = None
     due_date: datetime | None = None
     story_points: Decimal | None = None
-    estimated_hours: Decimal | None = None 
+    estimated_hours: Decimal | None = None
     actual_hours: Decimal | None = None
 
     started_at: datetime | None = None  # ← Добавил
@@ -63,6 +64,18 @@ class TaskRepository(Repository[Task]):
          - Получение количества задач привязанных к тикету (передан ticket_id)
          - Получение количества внутренних задач (ticket_id = None),
           только те задачи, которые не принадлежат тикету
+        """
+
+    async def search(
+            self,
+            pagination: Pagination,
+            *,
+            query: QueryDTO | None = None,
+    ) -> Page[TaskView]:
+        """
+        Универсальный поиск задач через DDF DSL.
+
+        Архивные задачи исключаются независимо от пользовательского фильтра.
         """
 
     async def get_grouped_by_status(
