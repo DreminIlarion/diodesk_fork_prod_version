@@ -1,8 +1,9 @@
 # syntax = docker/dockerfile:1.9-labs    # ← обязательно для --mount=type=cache,link
-ARG PYTHON_VERSION=3.14
 # ────────────────────────────────────────────────
 # Стадия 1 — сборка зависимостей (builder)
 # ────────────────────────────────────────────────
+ARG PYTHON_VERSION=3.14
+
 FROM python:${PYTHON_VERSION}-slim AS builder
 
 ENV PYTHONUNBUFFERED=1 \

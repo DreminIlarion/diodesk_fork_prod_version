@@ -82,18 +82,10 @@ class TaskRepository(Repository[Task]):
             self,
             pagination: Pagination,
             *,
-            project_id: UUID | None = None,
-            ticket_id: UUID | None = None,
-            assignee_id: UUID | None = None,
-            created_by: UUID | None = None,  # ← добавить
-            reviewer_id: UUID | None = None,
-            # Дополнительные фильтры
-            priorities: list[Priority] | None = None,
-            overdue_only: bool = False,
+            query: QueryDTO | None = None,
     ) -> dict[TaskStatus, Page[TaskView]]:
         """
         Группировка задач по статусам.
-        Учитывает переданное пространство имён, если project_id is None -
-        вернуться все строке где project_id равен None.
+        Применяет переданное DDF DSL-выражение.
         Возвращает облегченные модели представления задач.
         """
