@@ -1751,7 +1751,7 @@ export default function TicketDetailPage() {
       ) : (
         <div className="flex items-center gap-3 rounded-xl border border-dashed border-[var(--border-color)] px-4 py-3.5 text-sm text-[var(--text-primary)]/40">
           <User className="w-4 h-4 shrink-0" />
-          Исполнитель можно назначить после перевода заявки в статус «Открыт»
+          Исполнитель может быть назначен после перевода заявки в статус «Открыт»
         </div>
       )}
 

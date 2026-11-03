@@ -987,6 +987,7 @@ function ListView({ tasks, umap, onView }: {
               <th className="px-4 py-3 font-medium">Статус</th>
               <th className="px-4 py-3 font-medium">Приоритет</th>
               <th className="px-4 py-3 font-medium">Исполнитель</th>
+              <th className="px-4 py-3 font-medium">Ревьювер</th>
               <th className="px-4 py-3 font-medium">Срок</th>
               <th className="px-4 py-3 font-medium">Трудозатраты (План)</th>
               <th className="px-4 py-3 font-medium">Трудозатраты (Факт)</th>
@@ -1033,6 +1034,20 @@ function ListView({ tasks, umap, onView }: {
                       </div>
                     ) : <span className="text-[var(--text-primary)]/30">—</span>}
                   </td>
+
+                  <td className="px-4 py-3">
+  {t.reviewer_id ? (() => {
+    const r = umap.get(t.reviewer_id);
+    return r ? (
+      <div className="flex items-center gap-2">
+        <Ava name={r.full_name || r.username} url={r.avatar_url} sz="xs" />
+        <span className="text-[var(--text-primary)]/70 truncate max-w-[140px] text-sm">
+          {r.full_name || r.username}
+        </span>
+      </div>
+    ) : <span className="text-[var(--text-primary)]/30">—</span>;
+  })() : <span className="text-[var(--text-primary)]/30">—</span>}
+</td>
                   <td className="px-4 py-3">
                     {t.due_date ? (
                       <span className={`text-sm ${od ? 'text-red-400 font-medium' : 'text-[var(--text-primary)]/50'}`}>{fmtTaskDue(t)}</span>
@@ -1161,6 +1176,9 @@ export const TCard = memo(function TCard({
           {t.stage_id && (
             <Milestone className="w-4.5 h-4.5 text-amber-400/60" />
           )}
+          {t.reviewer_id && (
+  <Eye className="w-4.5 h-4.5 text-violet-400/70" />
+)}
 
           {t.due_date && (
             <span
@@ -3561,6 +3579,34 @@ function DetailModal({
                       </span>
                     )}
                   </div>
+
+                  {/* Reviewer */}
+{t.reviewer_id && (
+  <div className="px-4 py-3">
+    <div className="text-sm text-[var(--text-primary)]/45 mb-2">
+      Ревьювер
+    </div>
+    {(() => {
+      const reviewer = umap.get(t.reviewer_id!);
+      return reviewer ? (
+        <div className="flex items-center gap-2">
+          <Ava
+            name={reviewer.full_name || reviewer.username}
+            url={reviewer.avatar_url}
+            sz="xs"
+          />
+          <span className="text-sm font-medium text-[var(--text-primary)]/80 truncate">
+            {reviewer.full_name || reviewer.username}
+          </span>
+        </div>
+      ) : (
+        <span className="text-sm text-[var(--text-primary)]/30">
+          —
+        </span>
+      );
+    })()}
+  </div>
+)}
 
                   {/* Due date */}
                   <div className="flex items-start justify-between gap-4 px-4 py-3">
