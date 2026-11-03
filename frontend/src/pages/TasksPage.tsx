@@ -1335,7 +1335,7 @@ function DragPanel({
     >
       <div className="w-[310px] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-2xl overflow-hidden pointer-events-auto">
         <div className="px-4 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
-          <p className="text-[10px] uppercase tracking-widest text-[var(--text-primary)]/40 font-semibold mb-2">
+          <p className="text-[10px]  tracking-widest text-[var(--text-primary)]/40  mb-2">
             Вы переносите
           </p>
 
@@ -1346,7 +1346,7 @@ function DragPanel({
                 # <span className="text-xs font-mono font-bold text-[var(--text-primary)]" >{task.number} </span>
               </div>
 
-              <div className="text-sm font-bold text-[var(--text-primary)] leading-snug mt-1 line-clamp-3">
+              <div className="text-sm  text-[var(--text-primary)] leading-snug mt-1 line-clamp-3">
                 {task.title}
               </div>
 
