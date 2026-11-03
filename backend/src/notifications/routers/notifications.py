@@ -5,11 +5,9 @@ import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Query, Request, status
-from faststream.rabbit import RabbitQueue
-from faststream.rabbit.fastapi import RabbitRouter
+from faststream.rabbit import RabbitQueue, RabbitRouter
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
-from src.core.settings import settings
 from ...iam.dependencies import CurrentUserDep
 from ...shared.dependencies import PaginationDep, sse_manager
 from ...shared.schemas import Page, Pagination
@@ -23,7 +21,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/notifications", tags=["Уведомления"])
 
 # RabbitMQ брокер для subscriber'ов
-broker_router = RabbitRouter(settings.rabbit.url)
+broker_router = RabbitRouter()
 
 
 @router.get(
