@@ -75,6 +75,15 @@ def legacy_ticket_search_to_expression(  # noqa: C901
             )
         )
 
+    if search.stage_ids:
+        expressions.append(
+            Condition(
+                field="stageId",
+                op="$in",
+                value=search.stage_ids,
+            )
+        )
+
     if search.actors:
         actor_fields = (
             ("assigneeId", search.actors.assignee_id),

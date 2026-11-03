@@ -12,13 +12,12 @@ from src.tasks.domain.vo import TaskStatus
 from src.tasks.dsl import (
     apply_kanban_context,
     legacy_kanban_filters_to_expression,
-    unpack_kanban_request,
 )
 from src.tasks.infra.models import TaskOrm
 from src.tasks.infra.repos import TASK_FILTER_WHITELIST, SqlTaskRepository
 from src.tasks.schemas import (
     InternalKanbanContext,
-    KanbanRequest,
+    KanbanContextType,
     KanbanSearchRequest,
     MyTasksKanbanContext,
     ProjectKanbanContext,
@@ -29,20 +28,19 @@ def test_task_repository_uses_ddf_sqlalchemy_repository() -> None:
     assert issubclass(SqlTaskRepository, DdfSqlAlchemyRepository)
 
 
-def test_kanban_request_accepts_legacy_context_body() -> None:
+def test_v1_kanban_contract_accepts_legacy_context_body() -> None:
     project_id = uuid4()
 
-    request = TypeAdapter(KanbanRequest).validate_python({
+    request = TypeAdapter(KanbanContextType).validate_python({
         "type": "project",
         "project_id": project_id,
     })
 
     assert isinstance(request, ProjectKanbanContext)
     assert request.project_id == project_id
-    assert unpack_kanban_request(request) == (request, None)
 
 
-def test_kanban_request_accepts_dsl_body() -> None:
+def test_v2_kanban_contract_accepts_dsl_body() -> None:
     project_id = uuid4()
     body = {
         "context": {
@@ -56,13 +54,19 @@ def test_kanban_request_accepts_dsl_body() -> None:
         },
     }
 
-    request = TypeAdapter(KanbanRequest).validate_python(body)
-    context, query = unpack_kanban_request(request)
+    request = KanbanSearchRequest.model_validate(body)
 
     assert isinstance(request, KanbanSearchRequest)
-    assert isinstance(context, ProjectKanbanContext)
-    assert isinstance(query, Condition)
-    assert query.field == "status"
+    assert isinstance(request.context, ProjectKanbanContext)
+    assert isinstance(request.query, Condition)
+    assert request.query.field == "status"
+
+
+def test_v2_kanban_contract_allows_missing_query() -> None:
+    request = KanbanSearchRequest.model_validate({"context": {"type": "internal"}})
+
+    assert isinstance(request.context, InternalKanbanContext)
+    assert request.query is None
 
 
 def test_legacy_query_parameters_are_converted_to_dsl() -> None:

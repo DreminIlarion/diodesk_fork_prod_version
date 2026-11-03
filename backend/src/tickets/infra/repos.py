@@ -27,6 +27,7 @@ TICKET_FILTER_WHITELIST = (
     "ticketType",
     "counterpartyId",
     "projectId",
+    "stageId",
     "assigneeId",
     "reporterId",
     "createdBy",

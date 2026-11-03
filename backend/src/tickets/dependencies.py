@@ -3,7 +3,8 @@ from typing import Annotated
 from datetime import datetime
 from uuid import UUID
 
-from ddf.application.dsl import Expression, Group
+from ddf.application.dsl import Expression
+from ddf.application.dtos import QueryDTO
 from fastapi import Body, Depends, Query
 
 from src.activity_logs.dependencies import ActivityLogRecorderDep
@@ -33,7 +34,6 @@ from .mappers import map_ticket_to_response
 from .schemas import (
     LegacyTicketSearch,
     TicketResponse,
-    TicketSearchRequest,
 )
 from .services import CommentService, ReactionService, TicketQueryService, TicketService
 
@@ -158,9 +158,9 @@ async def get_ticket_or_404(ticket_id: UUID, ticket_repo: TicketRepoDep) -> Tick
     return map_ticket_to_response(ticket)
 
 
-def get_ticket_search_expression(
+def get_legacy_ticket_search_expression(
     request: Annotated[
-        TicketSearchRequest | None,
+        LegacyTicketSearch | None,
         Body(),
     ] = None,
     created_after: Annotated[
@@ -172,29 +172,29 @@ def get_ticket_search_expression(
         Query(description="Создан до"),
     ] = None,
 ) -> Expression | None:
-    if isinstance(request, LegacyTicketSearch):
-        return legacy_ticket_search_to_expression(
-            request,
-            created_after=created_after,
-            created_before=created_before,
-        )
-
-    date_expression = legacy_ticket_search_to_expression(
-        LegacyTicketSearch(),
+    return legacy_ticket_search_to_expression(
+        request or LegacyTicketSearch(),
         created_after=created_after,
         created_before=created_before,
     )
 
-    if request is None:
-        return date_expression
 
-    if date_expression is None:
-        return request
-
-    return Group(op="$and", filters=(request, date_expression))
-
-
-TicketSearchExpressionDep = Annotated[
+LegacyTicketSearchExpressionDep = Annotated[
     Expression | None,
-    Depends(get_ticket_search_expression),
+    Depends(get_legacy_ticket_search_expression),
+]
+
+
+def get_dsl_ticket_search_expression(
+    request: Annotated[
+        QueryDTO | None,
+        Body(),
+    ] = None,
+) -> Expression | None:
+    return request
+
+
+DslTicketSearchExpressionDep = Annotated[
+    Expression | None,
+    Depends(get_dsl_ticket_search_expression),
 ]

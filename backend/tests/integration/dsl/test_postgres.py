@@ -4,7 +4,8 @@ from uuid import UUID, uuid4
 import pytest
 from ddf.application.dsl import Condition, Group, Negation, Search
 from ddf.application.dtos import OffsetPagination, Sort
-from fastapi import FastAPI, status
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
 from httpx import ASGITransport, AsyncClient
 
 from src.iam.dependencies import get_current_subject
@@ -175,12 +176,23 @@ async def test_task_repository_executes_iso_date_filter_on_postgres(session) -> 
 
 
 async def test_unknown_dsl_field_returns_http_400_with_real_repository(session) -> None:
-    from main import value_exception_handler
-    from src.tickets.router import router as ticket_router
+    from src.tickets.router import v2_router as ticket_v2_router
 
     test_app = FastAPI()
-    test_app.include_router(ticket_router, prefix="/api/v1")
-    test_app.add_exception_handler(ValueError, value_exception_handler)
+    test_app.include_router(ticket_v2_router, prefix="/api/v2")
+
+    def handle_value_error(_request: Request, exc: ValueError) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={
+                "error": {
+                    "code": "VALIDATION_ERROR",
+                    "message": str(exc),
+                }
+            },
+        )
+
+    test_app.add_exception_handler(ValueError, handle_value_error)
 
     subject = Subject(
         id=uuid4(),
@@ -196,7 +208,7 @@ async def test_unknown_dsl_field_returns_http_400_with_real_repository(session) 
             base_url="http://test",
         ) as client:
             response = await client.post(
-                "/api/v1/tickets/search?page=1&size=10",
+                "/api/v2/tickets/search?page=1&size=10",
                 json={"field": "passwordHash", "op": "$eq", "value": "secret"},
             )
     finally:

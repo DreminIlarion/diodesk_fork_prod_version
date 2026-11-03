@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import UUID
 
 from ddf.infra.database.sqlalchemy import Base, EntityMixin
-from sqlalchemy import TEXT, Computed, DateTime, Enum, Index, String, literal, select
+from sqlalchemy import TEXT, Computed, DateTime, Enum, ForeignKey, Index, String, literal, select
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
@@ -17,6 +17,10 @@ class TicketOrm(EntityMixin, Base):
     __tablename__ = "tickets"
 
     project_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    stage_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("project_stages.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     counterparty_id: Mapped[UUID | None] = mapped_column(nullable=True)
     product_id: Mapped[UUID | None] = mapped_column(nullable=True)
 
@@ -60,15 +64,16 @@ class TicketOrm(EntityMixin, Base):
     )
     __table_args__ = (
         Index("ix_tickets_search_vector", "search_vector", postgresql_using="gin"),
+        Index("ix_tickets_stage_id", "stage_id"),
     )
 
 
 TicketOrm.has_attachments = column_property(
     select(1)
     .where(
-        (AttachmentOrm.owner_type == literal("ticket")) &
-        (AttachmentOrm.owner_id == TicketOrm.id) &
-        (AttachmentOrm.deleted_at.is_(None))
+        (AttachmentOrm.owner_type == literal("ticket"))
+        & (AttachmentOrm.owner_id == TicketOrm.id)
+        & (AttachmentOrm.deleted_at.is_(None))
     )
     .correlate(TicketOrm)
     .exists()

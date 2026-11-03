@@ -10,23 +10,33 @@ from ddf.infra.database.sqlalchemy import SqlAlchemyRepository as DdfSqlAlchemyR
 from ddf.infra.database.sqlalchemy.filters import compile_filter
 from fastapi import Depends, FastAPI, status
 from fastapi.testclient import TestClient
-from pydantic import TypeAdapter
+from pydantic import ValidationError
 
 from src.shared.domain.vo import Priority
 from src.shared.schemas import Pagination
-from src.tickets.dependencies import get_ticket_search_expression
+from src.tickets.dependencies import (
+    get_dsl_ticket_search_expression,
+    get_legacy_ticket_search_expression,
+)
 from src.tickets.domain.vo import TicketStatus, TicketType
 from src.tickets.dsl import legacy_ticket_search_to_expression
 from src.tickets.infra.models import TicketOrm
 from src.tickets.infra.repos import SqlTicketRepository
-from src.tickets.schemas import LegacyTicketSearch, TicketSearchRequest
+from src.tickets.schemas import LegacyTicketSearch
 
 app = FastAPI()
 
 
-@app.post("/tickets/search")
-def search_tickets(
-    query: Annotated[Expression | None, Depends(get_ticket_search_expression)],
+@app.post("/api/v1/tickets/search")
+def search_tickets_v1(
+    query: Annotated[Expression | None, Depends(get_legacy_ticket_search_expression)],
+):
+    return query
+
+
+@app.post("/api/v2/tickets/search")
+def search_tickets_v2(
+    query: Annotated[Expression | None, Depends(get_dsl_ticket_search_expression)],
 ):
     return query
 
@@ -62,7 +72,7 @@ async def test_ticket_repository_passes_query_to_ddf_find() -> None:
 
 def test_http_endpoint_accepts_legacy_body() -> None:
     response = client.post(
-        "/tickets/search",
+        "/api/v1/tickets/search",
         json={"statuses": [TicketStatus.OPEN.value]},
     )
 
@@ -74,17 +84,64 @@ def test_http_endpoint_accepts_legacy_body() -> None:
     }
 
 
-def test_http_endpoint_accepts_dsl_body() -> None:
+def test_v1_http_endpoint_accepts_legacy_stage_ids() -> None:
+    stage_id = uuid4()
+
+    response = client.post(
+        "/api/v1/tickets/search",
+        json={"stage_ids": [str(stage_id)]},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {
+        "field": "stageId",
+        "op": "$in",
+        "value": [str(stage_id)],
+    }
+
+
+def test_v1_http_endpoint_rejects_dsl_body() -> None:
+    response = client.post(
+        "/api/v1/tickets/search",
+        json={"field": "status", "op": "$eq", "value": TicketStatus.OPEN.value},
+    )
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+
+
+def test_v2_http_endpoint_accepts_dsl_body() -> None:
     body = {"field": "status", "op": "$eq", "value": TicketStatus.OPEN.value}
 
-    response = client.post("/tickets/search", json=body)
+    response = client.post("/api/v2/tickets/search", json=body)
 
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == body
 
 
-def test_ticket_search_request_accepts_legacy_body() -> None:
-    request = TypeAdapter(TicketSearchRequest).validate_python({
+def test_v2_http_endpoint_accepts_grouped_dsl_body() -> None:
+    body = {
+        "op": "$and",
+        "filters": [
+            {"field": "status", "op": "$eq", "value": TicketStatus.OPEN.value},
+            {"field": "priority", "op": "$eq", "value": Priority.HIGH.value},
+        ],
+    }
+
+    response = client.post("/api/v2/tickets/search", json=body)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == body
+
+
+def test_v2_http_endpoint_accepts_empty_body() -> None:
+    response = client.post("/api/v2/tickets/search")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() is None
+
+
+def test_legacy_ticket_search_accepts_only_single_priority() -> None:
+    request = LegacyTicketSearch.model_validate({
         "search_query": "printer",
         "statuses": [TicketStatus.OPEN],
         "priorities": Priority.HIGH,
@@ -95,26 +152,20 @@ def test_ticket_search_request_accepts_legacy_body() -> None:
     assert request.search_query == "printer"
     assert request.ticket_type == TicketType.INCIDENT
 
-
-def test_ticket_search_request_accepts_dsl_body() -> None:
-    request = TypeAdapter(TicketSearchRequest).validate_python({
-        "field": "status",
-        "op": "$eq",
-        "value": TicketStatus.OPEN.value,
-    })
-
-    assert isinstance(request, Condition)
-    assert request.field == "status"
+    with pytest.raises(ValidationError):
+        LegacyTicketSearch.model_validate({"priorities": [Priority.HIGH]})
 
 
 def test_legacy_ticket_search_is_converted_to_dsl() -> None:
     project_id = uuid4()
+    stage_id = uuid4()
     assignee_id = uuid4()
     request = LegacyTicketSearch.model_validate({
         "search_query": "printer",
         "project_ids": [project_id],
+        "stage_ids": [stage_id],
         "statuses": [TicketStatus.OPEN],
-        "priorities": [Priority.HIGH],
+        "priorities": Priority.HIGH,
         "type": TicketType.INCIDENT,
         "actors": {"assignee_id": assignee_id},
     })
@@ -125,17 +176,18 @@ def test_legacy_ticket_search_is_converted_to_dsl() -> None:
     assert any(isinstance(item, Search) for item in expression.filters)
     conditions = {item.field: item for item in expression.filters if isinstance(item, Condition)}
     assert conditions["projectId"].value == [project_id]
+    assert conditions["stageId"].value == [stage_id]
     assert conditions["status"].value == [TicketStatus.OPEN.value]
     assert conditions["priority"].value == [Priority.HIGH.value]
     assert conditions["ticketType"].value == TicketType.INCIDENT.value
     assert conditions["assigneeId"].value == assignee_id
 
 
-def test_dates_are_combined_with_dsl_request() -> None:
+def test_dates_are_combined_with_legacy_request() -> None:
     created_after = datetime(2026, 1, 1, tzinfo=UTC)
-    request = Condition(field="status", op="$eq", value=TicketStatus.OPEN.value)
+    request = LegacyTicketSearch(statuses=[TicketStatus.OPEN])
 
-    expression = get_ticket_search_expression(
+    expression = get_legacy_ticket_search_expression(
         request=request,
         created_after=created_after,
     )
@@ -143,7 +195,7 @@ def test_dates_are_combined_with_dsl_request() -> None:
     assert isinstance(expression, Group)
     assert expression.op == "$and"
     assert expression.filters == (
-        request,
+        Condition(field="status", op="$in", value=[TicketStatus.OPEN.value]),
         Condition(field="createdAt", op="$gte", value=created_after),
     )
 
@@ -159,3 +211,16 @@ def test_sensitive_and_internal_fields_are_not_available_in_dsl(field: str) -> N
             SqlTicketRepository.filter_whitelist,
             SqlTicketRepository.search,
         )
+
+
+def test_stage_id_is_available_in_dsl() -> None:
+    stage_id = uuid4()
+
+    compiled = compile_filter(
+        TicketOrm,
+        Condition(field="stageId", op="$eq", value=stage_id),
+        SqlTicketRepository.filter_whitelist,
+        SqlTicketRepository.search,
+    )
+
+    assert "tickets.stage_id" in str(compiled)

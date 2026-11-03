@@ -118,7 +118,9 @@ class TaskUpdate(BaseModel):
     estimated_hours: NonNegativeFloat | None = Field(
         None, description="Предварительное время выполнения"
     )
-    actual_hours: NonNegativeFloat | None = Field(None, description="Фактические трудозатраты (часы)")
+    actual_hours: NonNegativeFloat | None = Field(
+        None, description="Фактические трудозатраты (часы)"
+    )
     due_date: date | None = Field(None, description="Срок выполнения (deadline)")
 
 
@@ -135,7 +137,7 @@ class TaskViewResponse(BaseModel):
         ..., description="Уникальный номер задачи", examples=["PRJ-26-00000001-001", "TASK-001"]
     )
     title: str = Field(..., description="Тема задачи")
-    description: str | None = Field(None, description="Описание задачи") 
+    description: str | None = Field(None, description="Описание задачи")
     priority: Priority = Field(..., description="Приоритет задачи")
     story_points: int | None = Field(
         None,
@@ -143,7 +145,9 @@ class TaskViewResponse(BaseModel):
         le=21,
         description="Оценка сложности задачи, где 1 очень легко, а 21 максимально сложно",
     )
-    estimated_hours: Decimal | None = Field(None, description="Предварительные трудозатраты (часы)")  
+    estimated_hours: Decimal | None = Field(
+        None, description="Предварительные трудозатраты (часы)"
+    )
     actual_hours: Decimal | None = Field(None, description="Факт потраченных часов")
 
     started_at: datetime | None = Field(None, description="Дата начала выполнения")
@@ -238,9 +242,6 @@ class KanbanSearchRequest(BaseModel):
         None,
         description="DDF DSL фильтр задач",
     )
-
-
-type KanbanRequest = KanbanSearchRequest | KanbanContextType
 
 
 class KanbanColumn(BaseModel):
