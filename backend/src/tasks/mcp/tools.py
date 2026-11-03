@@ -14,8 +14,34 @@ from src.shared.schemas import Page, Pagination
 from ..domain.authz import TaskAuthZService
 from ..domain.repos import TaskRepository
 from .dependencies import get_task_repo
-from .presenters import to_task_brief
-from .schemas import TaskBrief
+from .presenters import to_task_brief, to_task_card
+from .references import TaskRef, find_task
+from .schemas import TaskBrief, TaskCard
+
+
+@tool(annotations=READ_ONLY, tags={"tasks"})
+async def get_task(
+    task: TaskRef,
+    subject: Subject = Depends(get_current_subject),
+    task_repo: TaskRepository = Depends(get_task_repo),
+) -> TaskCard:
+    """
+    Получить полную карточку задачи по UUID или номеру.
+
+    Используй перед изменением задачи, чтобы проверить её текущее состояние
+    и допустимые переходы статуса.
+    """
+
+    found = await find_task(task_repo, task)
+
+    permission = await TaskAuthZService().can_view_task(
+        subject,
+        project_id=found.project_id,
+    )
+    if not permission.allowed:
+        raise PermissionDeniedError(permission.reason)
+
+    return to_task_card(found)
 
 
 @tool(annotations=READ_ONLY, tags={"tasks"})
@@ -44,7 +70,7 @@ async def search_tasks(
     """
     Найти задачи с универсальной фильтрацией.
 
-    Используйи один DSL-запрос вместо отдельных инструментов для каждого
+    Используй один DSL-запрос вместо отдельных инструментов для каждого
     исполнителя, статуса, приоритета, проекта или срока.
     """
 
@@ -59,4 +85,4 @@ async def search_tasks(
     return tasks.to_response(to_task_brief)
 
 
-TOOLS = (search_tasks,)
+TOOLS = (get_task, search_tasks)

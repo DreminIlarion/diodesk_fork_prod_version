@@ -8,11 +8,13 @@ from ddf.application.dsl import Condition
 from src.iam.domain.authz import Subject, SubjectType
 from src.iam.domain.exceptions import PermissionDeniedError
 from src.iam.domain.vo import UserRole
+from src.shared.domain.exceptions import NotFoundError
 from src.shared.domain.vo import Priority, Tag
 from src.shared.schemas import Page, Pagination
+from src.tasks.domain.entities import Task
 from src.tasks.domain.repos import TaskView
 from src.tasks.domain.vo import TaskNumber, TaskStatus
-from src.tasks.mcp.tools import search_tasks
+from src.tasks.mcp.tools import get_task, search_tasks
 
 pytestmark = pytest.mark.unit
 
@@ -36,6 +38,21 @@ class FakeTaskRepository:
     ) -> Page[TaskView]:
         self.calls.append((pagination, query))
         return self.page
+
+
+class FakeTaskLookupRepository:
+    def __init__(self, task: Task | None) -> None:
+        self.task = task
+        self.read_calls = []
+        self.number_calls = []
+
+    async def read(self, task_id):
+        self.read_calls.append(task_id)
+        return self.task
+
+    async def get_by_number(self, number):
+        self.number_calls.append(number)
+        return self.task
 
 
 def make_subject(role: UserRole) -> Subject:
@@ -63,6 +80,27 @@ def make_task_view() -> TaskView:
         project_id=uuid4(),
         stage_id=uuid4(),
         tags={Tag(name="mcp"), Tag(name="backend")},
+    )
+
+
+def make_task(
+    *,
+    number: str,
+    status: TaskStatus = TaskStatus.BACKLOG,
+    project_id=None,
+    stage_id=None,
+    tags=None,
+) -> Task:
+    return Task(
+        id=uuid4(),
+        number=TaskNumber(number),
+        title="Тестовая задача",
+        status=status,
+        priority=Priority.MEDIUM,
+        created_by=uuid4(),
+        project_id=project_id,
+        stage_id=stage_id,
+        tags=tags or set(),
     )
 
 
@@ -135,3 +173,72 @@ async def test_search_tasks_denies_customer() -> None:
         )
 
     assert repository.calls == []
+
+
+async def test_get_task_finds_by_human_readable_number() -> None:
+    task = make_task(
+        number="TASK-001",
+        status=TaskStatus.TODO,
+        project_id=uuid4(),
+        stage_id=uuid4(),
+        tags={Tag(name="mcp")},
+    )
+    repository = FakeTaskLookupRepository(task)
+
+    result = await get_task(
+        task="task-001",
+        subject=make_subject(UserRole.DEVELOPER),
+        task_repo=repository,
+    )
+
+    assert repository.number_calls == [TaskNumber("TASK-001")]
+    assert repository.read_calls == []
+    assert result.id == task.id
+    assert result.number == "TASK-001"
+    assert result.status_label == "Готово к выполнению"
+    assert TaskStatus.IN_PROGRESS in result.next_statuses
+    assert result.project_id == task.project_id
+    assert result.stage_id == task.stage_id
+    assert result.tags == ["mcp"]
+    assert str(task.id) in result.url
+
+
+async def test_get_task_finds_by_uuid() -> None:
+    task = make_task(number="TASK-002")
+    repository = FakeTaskLookupRepository(task)
+
+    result = await get_task(
+        task=str(task.id),
+        subject=make_subject(UserRole.SUPPORT_AGENT),
+        task_repo=repository,
+    )
+
+    assert repository.read_calls == [task.id]
+    assert repository.number_calls == []
+    assert result.id == task.id
+
+
+async def test_get_task_returns_not_found_for_invalid_reference() -> None:
+    repository = FakeTaskLookupRepository(None)
+
+    with pytest.raises(NotFoundError, match="not found"):
+        await get_task(
+            task="not a task number",
+            subject=make_subject(UserRole.DEVELOPER),
+            task_repo=repository,
+        )
+
+    assert repository.read_calls == []
+    assert repository.number_calls == []
+
+
+async def test_get_task_denies_customer() -> None:
+    task = make_task(number="TASK-003")
+    repository = FakeTaskLookupRepository(task)
+
+    with pytest.raises(PermissionDeniedError, match="Require staff user"):
+        await get_task(
+            task="TASK-003",
+            subject=make_subject(UserRole.CUSTOMER),
+            task_repo=repository,
+        )
