@@ -1343,7 +1343,7 @@ function DragPanel({
 
             <div className="min-w-0">
               <div className="text-xs font-mono font-bold text-[var(--accent)]">
-                # <span className="text-xs font-mono font-bold text-[var(--text-primary)]" >{task.number} </span>
+                # <span className="text-xs font-mono  text-[var(--text-primary)]" >{task.number} </span>
               </div>
 
               <div className="text-sm  text-[var(--text-primary)] leading-snug mt-1 line-clamp-3">
@@ -4200,7 +4200,7 @@ export default function TasksPage() {
     if (up) return 'project';
     if (ua) return 'assignee';
     if (ut) return 'ticket';
-    return staff ? 'internal' : 'my';
+    return 'my';
   });
 
     const [selP, setSelP] = useState(up ?? '');
