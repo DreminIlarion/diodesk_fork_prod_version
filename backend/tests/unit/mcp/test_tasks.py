@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
@@ -14,7 +14,9 @@ from src.shared.schemas import Page, Pagination
 from src.tasks.domain.entities import Task
 from src.tasks.domain.repos import TaskView
 from src.tasks.domain.vo import TaskNumber, TaskStatus
-from src.tasks.mcp.tools import get_task, search_tasks
+from src.tasks.mcp.schemas import TaskDraft
+from src.tasks.mcp.tools import create_task, get_task, search_tasks
+from src.tasks.schemas import TaskCreate, TaskResponse
 
 pytestmark = pytest.mark.unit
 
@@ -53,6 +55,20 @@ class FakeTaskLookupRepository:
     async def get_by_number(self, number):
         self.number_calls.append(number)
         return self.task
+
+
+class FakeTaskService:
+    def __init__(self, response: TaskResponse) -> None:
+        self.response = response
+        self.calls: list[tuple[TaskCreate, Subject]] = []
+
+    async def create(
+        self,
+        data: TaskCreate,
+        subject: Subject,
+    ) -> TaskResponse:
+        self.calls.append((data, subject))
+        return self.response
 
 
 def make_subject(role: UserRole) -> Subject:
@@ -104,6 +120,28 @@ def make_task(
     )
 
 
+def make_task_response(*, created_by) -> TaskResponse:
+    now = datetime.now(UTC)
+    return TaskResponse(
+        id=uuid4(),
+        created_at=now,
+        updated_at=now,
+        is_archived=False,
+        number="TASK-004",
+        title="Создать MCP-инструмент",
+        description="Проверить создание задачи",
+        status=TaskStatus.TODO,
+        priority=Priority.HIGH,
+        story_points=STORY_POINTS,
+        estimated_hours=Decimal(str(ESTIMATED_HOURS)),
+        actual_hours=Decimal(0),
+        due_date=date(2026, 11, 10),
+        assignee_id=uuid4(),
+        created_by=created_by,
+        tags=[Tag(name="mcp")],
+    )
+
+
 async def test_search_tasks_passes_ddf_query_and_pagination() -> None:
     task = make_task_view()
     repository = FakeTaskRepository(
@@ -143,6 +181,46 @@ async def test_search_tasks_passes_ddf_query_and_pagination() -> None:
     assert found.estimated_hours == pytest.approx(ESTIMATED_HOURS)
     assert found.tags == ["backend", "mcp"]
     assert str(task.id) in found.url
+
+
+async def test_create_task_passes_draft_and_subject_to_service() -> None:
+    subject = make_subject(UserRole.DEVELOPER)
+    response = make_task_response(created_by=subject.id)
+    service = FakeTaskService(response)
+    draft = TaskDraft(
+        title=response.title,
+        description=response.description,
+        priority=response.priority,
+        story_points=STORY_POINTS,
+        estimated_hours=ESTIMATED_HOURS,
+        due_date=response.due_date,
+        assignee_id=response.assignee_id,
+        tags=["mcp"],
+        ready_for_work=True,
+    )
+
+    result = await create_task(
+        task=draft,
+        subject=subject,
+        service=service,
+    )
+
+    assert len(service.calls) == 1
+    data, passed_subject = service.calls[0]
+    assert passed_subject is subject
+    assert data.title == draft.title
+    assert data.priority == Priority.HIGH
+    assert data.story_points == STORY_POINTS
+    assert data.estimated_hours == Decimal(str(ESTIMATED_HOURS))
+    assert data.assignee_id == draft.assignee_id
+    assert data.tags == [Tag(name="mcp")]
+    assert data.mark_as_todo is True
+
+    assert result.id == response.id
+    assert result.number == response.number
+    assert result.status == TaskStatus.TODO
+    assert result.story_points == STORY_POINTS
+    assert str(response.id) in result.url
 
 
 async def test_search_tasks_allows_empty_filter() -> None:

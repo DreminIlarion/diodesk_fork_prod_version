@@ -7,16 +7,37 @@ from pydantic import Field
 
 from src.iam.domain.authz import Subject
 from src.iam.domain.exceptions import PermissionDeniedError
-from src.mcp.annotations import READ_ONLY
+from src.mcp.annotations import CREATE, READ_ONLY
 from src.mcp.dependencies import get_current_subject
 from src.shared.schemas import Page, Pagination
 
 from ..domain.authz import TaskAuthZService
 from ..domain.repos import TaskRepository
-from .dependencies import get_task_repo
+from ..services import TaskService
+from .dependencies import get_task_repo, get_task_service
 from .presenters import to_task_brief, to_task_card
 from .references import TaskRef, find_task
-from .schemas import TaskBrief, TaskCard
+from .schemas import TaskBrief, TaskCard, TaskDraft
+
+
+@tool(annotations=CREATE, tags={"tasks"})
+async def create_task(
+    task: TaskDraft,
+    subject: Subject = Depends(get_current_subject),
+    service: TaskService = Depends(get_task_service),
+) -> TaskCard:
+    """
+    Создать задачу.
+
+    Перед вызовом покажи пользователю название, описание, приоритет,
+    исполнителя и срок, затем получи подтверждение.
+    """
+
+    created = await service.create(
+        task.to_task_create(),
+        subject,
+    )
+    return to_task_card(created)
 
 
 @tool(annotations=READ_ONLY, tags={"tasks"})
@@ -85,4 +106,8 @@ async def search_tasks(
     return tasks.to_response(to_task_brief)
 
 
-TOOLS = (get_task, search_tasks)
+TOOLS = (
+    create_task,
+    get_task,
+    search_tasks,
+)
