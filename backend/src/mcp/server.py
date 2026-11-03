@@ -5,6 +5,7 @@ from src.core.redis import redis_client
 from src.iam.domain.repos import TokenStore
 from src.iam.infra.token_store import RedisTokenStore
 from src.iam.mcp.server import create_server as create_users_server
+from src.tasks.mcp.server import create_server as create_tasks_server
 
 from .auth import JwtTokenVerifier, require_staff
 from .middleware import DomainErrorMiddleware
@@ -45,6 +46,7 @@ def create_server(token_store: TokenStore | None = None) -> FastMCP:
         mask_error_details=True,
     )
     server.mount(create_users_server())
+    server.mount(create_tasks_server())
 
     return server
 
