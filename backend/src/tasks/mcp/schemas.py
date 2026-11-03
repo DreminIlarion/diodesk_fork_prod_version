@@ -3,12 +3,12 @@ from typing import Literal
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from src.shared.domain.vo import Priority, Tag
 
 from ..domain.vo import TaskStatus
-from ..schemas import TaskCreate
+from ..schemas import TaskCreate, TaskUpdate
 
 StoryPointsValue = Literal[1, 2, 3, 5, 8, 13, 21]
 
@@ -67,6 +67,65 @@ class TaskDraft(BaseModel):
             stage_id=self.stage_id,
             tags=[Tag(name=name) for name in self.tags],
             mark_as_todo=self.ready_for_work,
+        )
+
+
+class TaskChanges(BaseModel):
+    """Поля задачи, которые нужно изменить."""
+
+    title: str | None = Field(
+        None,
+        min_length=3,
+        max_length=255,
+        description="Новое название задачи",
+    )
+    description: str | None = Field(
+        None,
+        description="Новое описание задачи",
+    )
+    priority: Priority | None = Field(
+        None,
+        description="Новый приоритет",
+    )
+    story_points: StoryPointsValue | None = Field(
+        None,
+        description="Новая оценка сложности",
+    )
+    estimated_hours: float | None = Field(
+        None,
+        ge=0,
+        description="Новая оценка трудозатрат в часах",
+    )
+    due_date: date | None = Field(
+        None,
+        description="Новый срок выполнения",
+    )
+
+    @model_validator(mode="after")
+    def validate_changes(self) -> TaskChanges:
+        if all(
+            value is None
+            for value in (
+                self.title,
+                self.description,
+                self.priority,
+                self.story_points,
+                self.estimated_hours,
+                self.due_date,
+            )
+        ):
+            raise ValueError("At least one task field must be provided")
+
+        return self
+
+    def to_task_update(self) -> TaskUpdate:
+        return TaskUpdate(
+            title=self.title,
+            description=self.description,
+            priority=self.priority,
+            story_points=self.story_points,
+            estimated_hours=self.estimated_hours,
+            due_date=self.due_date,
         )
 
 

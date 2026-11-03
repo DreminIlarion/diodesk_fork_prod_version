@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import pytest
 from ddf.application.dsl import Condition
+from pydantic import ValidationError
 
 from src.iam.domain.authz import Subject, SubjectType
 from src.iam.domain.exceptions import PermissionDeniedError
@@ -14,9 +15,9 @@ from src.shared.schemas import Page, Pagination
 from src.tasks.domain.entities import Task
 from src.tasks.domain.repos import TaskView
 from src.tasks.domain.vo import TaskNumber, TaskStatus
-from src.tasks.mcp.schemas import TaskDraft
-from src.tasks.mcp.tools import create_task, get_task, search_tasks
-from src.tasks.schemas import TaskCreate, TaskResponse
+from src.tasks.mcp.schemas import TaskChanges, TaskDraft
+from src.tasks.mcp.tools import create_task, get_task, search_tasks, update_task
+from src.tasks.schemas import TaskCreate, TaskResponse, TaskUpdate
 
 pytestmark = pytest.mark.unit
 
@@ -25,6 +26,7 @@ PAGE_SIZE = 5
 TOTAL_ITEMS = 6
 STORY_POINTS = 5
 ESTIMATED_HOURS = 3.5
+UPDATED_ESTIMATED_HOURS = 8
 
 
 class FakeTaskRepository:
@@ -61,6 +63,7 @@ class FakeTaskService:
     def __init__(self, response: TaskResponse) -> None:
         self.response = response
         self.calls: list[tuple[TaskCreate, Subject]] = []
+        self.edit_calls: list[tuple[object, TaskUpdate, Subject]] = []
 
     async def create(
         self,
@@ -68,6 +71,15 @@ class FakeTaskService:
         subject: Subject,
     ) -> TaskResponse:
         self.calls.append((data, subject))
+        return self.response
+
+    async def edit(
+        self,
+        task_id,
+        data: TaskUpdate,
+        subject: Subject,
+    ) -> TaskResponse:
+        self.edit_calls.append((task_id, data, subject))
         return self.response
 
 
@@ -320,3 +332,47 @@ async def test_get_task_denies_customer() -> None:
             subject=make_subject(UserRole.CUSTOMER),
             task_repo=repository,
         )
+
+
+async def test_update_task_passes_changes_and_subject_to_service() -> None:
+    subject = make_subject(UserRole.DEVELOPER)
+    task = make_task(number="TASK-005")
+    repository = FakeTaskLookupRepository(task)
+    response = make_task_response(created_by=subject.id)
+    service = FakeTaskService(response)
+    changes = TaskChanges(
+        title="Обновлённая задача MCP",
+        priority=Priority.CRITICAL,
+        estimated_hours=UPDATED_ESTIMATED_HOURS,
+        due_date=date(2026, 11, 15),
+    )
+
+    result = await update_task(
+        task="task-005",
+        changes=changes,
+        subject=subject,
+        task_repo=repository,
+        service=service,
+    )
+
+    assert repository.number_calls == [TaskNumber("TASK-005")]
+    assert repository.read_calls == []
+    assert len(service.edit_calls) == 1
+
+    task_id, data, passed_subject = service.edit_calls[0]
+    assert task_id == task.id
+    assert passed_subject is subject
+    assert data.title == changes.title
+    assert data.priority == Priority.CRITICAL
+    assert data.estimated_hours == UPDATED_ESTIMATED_HOURS
+    assert data.due_date == changes.due_date
+    assert data.description is None
+    assert data.story_points is None
+
+    assert result.id == response.id
+    assert result.number == response.number
+
+
+def test_task_changes_requires_at_least_one_field() -> None:
+    with pytest.raises(ValidationError, match="At least one task field"):
+        TaskChanges()
