@@ -134,7 +134,7 @@ const ST_LABEL: Record<TaskStatus, string> = {
 
 
 const TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
-  backlog: ['todo', 'in_progress', 'cancelled'],
+  backlog: ['todo', 'cancelled'],
   todo: ['backlog', 'in_progress', 'paused', 'blocked', 'to_review', 'to_fix', 'to_test', 'done', 'cancelled'],
   in_progress: ['backlog', 'todo', 'paused', 'blocked', 'to_review', 'to_fix', 'to_test', 'done', 'cancelled'],
   paused: ['backlog', 'todo', 'in_progress', 'blocked', 'cancelled'],
