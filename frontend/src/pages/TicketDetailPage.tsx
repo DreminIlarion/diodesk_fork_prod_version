@@ -1724,29 +1724,36 @@ export default function TicketDetailPage() {
         )}
       </div>
 
-      {/* Исполнитель */}
-      <div>
-        <label className="block mb-2 text-sm font-medium text-[var(--text-primary)]/60">
-          Исполнитель
-        </label>
+            {/* Исполнитель */}
+      {['open', 'in_progress', 'waiting', 'resolved', 'closed', 'reopened'].includes(ticket.status || '') ? (
+        <div>
+          <label className="block mb-2 text-sm font-medium text-[var(--text-primary)]/60">
+            Исполнитель
+          </label>
 
-        <button
-          type="button"
-          disabled={!canAssign}
-          onClick={() => { loadSupportUsers(); setShowAssigneeModal(true); }}
-          className="w-full min-h-[50px] flex items-center justify-between gap-4 px-4 py-3 rounded-xl
-                     border border-[var(--border-color)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)]
-                     text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <span className="flex items-center gap-3 min-w-0">
-            <User className="w-5 h-5 text-[var(--text-primary)]/35 shrink-0" />
-            <span className={`text-base truncate ${ticket.assignee_id ? 'font-medium text-[var(--text-primary)]' : 'text-[var(--text-primary)]/35'}`}>
-              {ticket.assignee_id ? getAssigneeName() || 'Исполнитель' : 'Не назначен'}
+          <button
+            type="button"
+            disabled={!canAssign}
+            onClick={() => { loadSupportUsers(); setShowAssigneeModal(true); }}
+            className="w-full min-h-[50px] flex items-center justify-between gap-4 px-4 py-3 rounded-xl
+                       border border-[var(--border-color)] bg-[var(--hover-1)] hover:bg-[var(--hover-2)]
+                       text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <User className="w-5 h-5 text-[var(--text-primary)]/35 shrink-0" />
+              <span className={`text-base truncate ${ticket.assignee_id ? 'font-medium text-[var(--text-primary)]' : 'text-[var(--text-primary)]/35'}`}>
+                {ticket.assignee_id ? getAssigneeName() || 'Исполнитель' : 'Не назначен'}
+              </span>
             </span>
-          </span>
-          <ChevronDown className="w-5 h-5 shrink-0 text-[var(--text-primary)]/35" />
-        </button>
-      </div>
+            <ChevronDown className="w-5 h-5 shrink-0 text-[var(--text-primary)]/35" />
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 rounded-xl border border-dashed border-[var(--border-color)] px-4 py-3.5 text-sm text-[var(--text-primary)]/40">
+          <User className="w-4 h-4 shrink-0" />
+          Исполнитель может быть назначен после перевода заявки в статус «Открыт»
+        </div>
+      )}
 
       {/* Дополнительно */}
       <div className="pt-6 border-t border-[var(--border-color)]">
