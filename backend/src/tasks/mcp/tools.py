@@ -1,5 +1,7 @@
 from typing import Annotated
 
+from uuid import UUID
+
 from ddf.application.dtos import QueryDTO
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
@@ -62,6 +64,34 @@ async def update_task(
         subject,
     )
     return to_task_card(updated)
+
+
+@tool(annotations=UPDATE, tags={"tasks", "users"})
+async def assign_task(
+    task: TaskRef,
+    assignee_id: Annotated[
+        UUID,
+        Field(description="ID пользователя, назначаемого исполнителем"),
+    ],
+    subject: Subject = Depends(get_current_subject),
+    task_repo: TaskRepository = Depends(get_task_repo),
+    service: TaskService = Depends(get_task_service),
+) -> TaskCard:
+    """
+    Назначить исполнителя задачи.
+
+    Если пользователь указал имя или email, сначала найди его через search_users.
+    Перед назначением покажи пользователю задачу и выбранного исполнителя,
+    затем дождись подтверждения.
+    """
+
+    found = await find_task(task_repo, task)
+    assigned = await service.assign_to(
+        found.id,
+        assignee_id,
+        subject,
+    )
+    return to_task_card(assigned)
 
 
 @tool(annotations=READ_ONLY, tags={"tasks"})
@@ -131,6 +161,7 @@ async def search_tasks(
 
 
 TOOLS = (
+    assign_task,
     create_task,
     get_task,
     search_tasks,

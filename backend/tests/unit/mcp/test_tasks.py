@@ -16,7 +16,13 @@ from src.tasks.domain.entities import Task
 from src.tasks.domain.repos import TaskView
 from src.tasks.domain.vo import TaskNumber, TaskStatus
 from src.tasks.mcp.schemas import TaskChanges, TaskDraft
-from src.tasks.mcp.tools import create_task, get_task, search_tasks, update_task
+from src.tasks.mcp.tools import (
+    assign_task,
+    create_task,
+    get_task,
+    search_tasks,
+    update_task,
+)
 from src.tasks.schemas import TaskCreate, TaskResponse, TaskUpdate
 
 pytestmark = pytest.mark.unit
@@ -64,6 +70,7 @@ class FakeTaskService:
         self.response = response
         self.calls: list[tuple[TaskCreate, Subject]] = []
         self.edit_calls: list[tuple[object, TaskUpdate, Subject]] = []
+        self.assign_calls: list[tuple[object, object, Subject]] = []
 
     async def create(
         self,
@@ -80,6 +87,15 @@ class FakeTaskService:
         subject: Subject,
     ) -> TaskResponse:
         self.edit_calls.append((task_id, data, subject))
+        return self.response
+
+    async def assign_to(
+        self,
+        task_id,
+        assignee_id,
+        subject: Subject,
+    ) -> TaskResponse:
+        self.assign_calls.append((task_id, assignee_id, subject))
         return self.response
 
 
@@ -376,3 +392,26 @@ async def test_update_task_passes_changes_and_subject_to_service() -> None:
 def test_task_changes_requires_at_least_one_field() -> None:
     with pytest.raises(ValidationError, match="At least one task field"):
         TaskChanges()
+
+
+async def test_assign_task_passes_assignee_and_subject_to_service() -> None:
+    subject = make_subject(UserRole.DEVELOPER)
+    assignee_id = uuid4()
+    task = make_task(number="TASK-006")
+    repository = FakeTaskLookupRepository(task)
+    response = make_task_response(created_by=subject.id)
+    service = FakeTaskService(response)
+
+    result = await assign_task(
+        task="task-006",
+        assignee_id=assignee_id,
+        subject=subject,
+        task_repo=repository,
+        service=service,
+    )
+
+    assert repository.number_calls == [TaskNumber("TASK-006")]
+    assert repository.read_calls == []
+    assert service.assign_calls == [(task.id, assignee_id, subject)]
+    assert result.id == response.id
+    assert result.number == response.number
