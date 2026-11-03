@@ -15,6 +15,7 @@ from src.shared.schemas import Page, Pagination
 
 from ..domain.authz import TaskAuthZService
 from ..domain.repos import TaskRepository
+from ..domain.vo import TaskStatus
 from ..services import TaskService
 from .dependencies import get_task_repo, get_task_service
 from .presenters import to_task_brief, to_task_card
@@ -94,6 +95,40 @@ async def assign_task(
     return to_task_card(assigned)
 
 
+@tool(annotations=UPDATE, tags={"tasks"})
+async def change_task_status(
+    task: TaskRef,
+    status: Annotated[
+        TaskStatus,
+        Field(
+            description=(
+                "Новый статус задачи. Используй только статус из next_statuses "
+                "текущей карточки задачи. Статус to_review требует отдельного "
+                "процесса назначения ревьюера"
+            )
+        ),
+    ],
+    subject: Subject = Depends(get_current_subject),
+    task_repo: TaskRepository = Depends(get_task_repo),
+    service: TaskService = Depends(get_task_service),
+) -> TaskCard:
+    """
+    Изменить статус задачи.
+
+    Сначала получи задачу через get_task и проверь список next_statuses.
+    Перед изменением покажи пользователю текущий и новый статусы,
+    затем дождись подтверждения.
+    """
+
+    found = await find_task(task_repo, task)
+    changed = await service.change_status(
+        found.id,
+        status,
+        subject,
+    )
+    return to_task_card(changed)
+
+
 @tool(annotations=READ_ONLY, tags={"tasks"})
 async def get_task(
     task: TaskRef,
@@ -162,6 +197,7 @@ async def search_tasks(
 
 TOOLS = (
     assign_task,
+    change_task_status,
     create_task,
     get_task,
     search_tasks,

@@ -18,6 +18,7 @@ from src.tasks.domain.vo import TaskNumber, TaskStatus
 from src.tasks.mcp.schemas import TaskChanges, TaskDraft
 from src.tasks.mcp.tools import (
     assign_task,
+    change_task_status,
     create_task,
     get_task,
     search_tasks,
@@ -71,6 +72,7 @@ class FakeTaskService:
         self.calls: list[tuple[TaskCreate, Subject]] = []
         self.edit_calls: list[tuple[object, TaskUpdate, Subject]] = []
         self.assign_calls: list[tuple[object, object, Subject]] = []
+        self.status_calls: list[tuple[object, TaskStatus, Subject]] = []
 
     async def create(
         self,
@@ -96,6 +98,15 @@ class FakeTaskService:
         subject: Subject,
     ) -> TaskResponse:
         self.assign_calls.append((task_id, assignee_id, subject))
+        return self.response
+
+    async def change_status(
+        self,
+        task_id,
+        status: TaskStatus,
+        subject: Subject,
+    ) -> TaskResponse:
+        self.status_calls.append((task_id, status, subject))
         return self.response
 
 
@@ -413,5 +424,29 @@ async def test_assign_task_passes_assignee_and_subject_to_service() -> None:
     assert repository.number_calls == [TaskNumber("TASK-006")]
     assert repository.read_calls == []
     assert service.assign_calls == [(task.id, assignee_id, subject)]
+    assert result.id == response.id
+    assert result.number == response.number
+
+
+async def test_change_task_status_passes_status_and_subject_to_service() -> None:
+    subject = make_subject(UserRole.DEVELOPER)
+    task = make_task(number="TASK-007", status=TaskStatus.TODO)
+    repository = FakeTaskLookupRepository(task)
+    response = make_task_response(created_by=subject.id)
+    service = FakeTaskService(response)
+
+    result = await change_task_status(
+        task="task-007",
+        status=TaskStatus.IN_PROGRESS,
+        subject=subject,
+        task_repo=repository,
+        service=service,
+    )
+
+    assert repository.number_calls == [TaskNumber("TASK-007")]
+    assert repository.read_calls == []
+    assert service.status_calls == [
+        (task.id, TaskStatus.IN_PROGRESS, subject)
+    ]
     assert result.id == response.id
     assert result.number == response.number
