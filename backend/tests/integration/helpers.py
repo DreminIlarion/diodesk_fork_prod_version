@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
+from ddf.infra.database.sqlalchemy import Base, EntityMixin
 from sqlalchemy.orm import Mapped
 
-from src.core.database import Base
 from src.shared.domain.entities import Entity
 from src.shared.infra.repos import ModelMapper
 
@@ -12,7 +12,7 @@ class ExampleEntity(Entity):
     value: str
 
 
-class ExampleOrm(Base):
+class ExampleOrm(EntityMixin, Base):
     __tablename__ = "tests"
 
     value: Mapped[str]

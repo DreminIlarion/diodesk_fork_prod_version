@@ -2,15 +2,10 @@ from uuid import UUID
 
 import pytest
 
-from src.tickets.domain.services import TicketScopeService
-from src.tickets.loaders import TicketReferenceLoader
+from src.tickets.data_loaders import ReferenceLoader
 
 # ============================= Доменные сервисы =============================
 
-
-@pytest.fixture
-def ticket_scope_service(fake_membership_repo):
-    return TicketScopeService(project_membership_repo=fake_membership_repo)
 
 # ============================= In memory функции загрузчики =============================
 
@@ -41,13 +36,14 @@ def projects_fetcher(fake_project_repo):
 
     return fetch_projects
 
+
 # ============================= Data Loader с in memory реализацией =============================
 
 
 @pytest.fixture
 def ticket_data_loader(users_fetcher, counterparties_fetcher, projects_fetcher):
-    return TicketReferenceLoader(
-        users_fetcher=users_fetcher,
-        counterparties_fetcher=counterparties_fetcher,
-        projects_fetcher=projects_fetcher,
+    return ReferenceLoader(
+        users_loader=users_fetcher,
+        counterparties_loader=counterparties_fetcher,
+        projects_loader=projects_fetcher,
     )

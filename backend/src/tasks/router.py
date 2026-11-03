@@ -1,20 +1,22 @@
 from uuid import UUID
 
+from ddf.application.dsl import Group
 from fastapi import APIRouter, Depends, status
 
 from src.iam.dependencies import CurrentSubjectDep, get_current_subject
 from src.shared.dependencies import PaginationDep
 
 from .dependencies import (
-    KanbanFiltersDep,
+    KanbanQueryDep,
     TaskBoardServiceDep,
     TaskServiceDep,
     get_task_or_404,
 )
+from .dsl import unpack_kanban_request
 from .schemas import (
     AssigneeId,
     KanbanBoard,
-    KanbanContextType,
+    KanbanRequest,
     NewStatus,
     ReviewDecision,
     ReviewerId,
@@ -145,15 +147,22 @@ async def archive_task(
     summary="Получить канбан доску"
 )
 async def get_kanban_board(
-        context: KanbanContextType,
-        pagination: PaginationDep,
-        filters: KanbanFiltersDep,
-        current_subject: CurrentSubjectDep,
-        service: TaskBoardServiceDep,
+    request: KanbanRequest,
+    pagination: PaginationDep,
+    legacy_query: KanbanQueryDep,
+    current_subject: CurrentSubjectDep,
+    service: TaskBoardServiceDep,
 ) -> KanbanBoard:
+    context, body_query = unpack_kanban_request(request)
+    query = body_query
+    if query is None:
+        query = legacy_query
+    elif legacy_query is not None:
+        query = Group(op="$and", filters=(query, legacy_query))
+
     return await service.get_kanban_board(
         pagination=pagination,
         context=context,
-        filters=filters,
-        current_user=current_subject,
+        query=query,
+        current_subject=current_subject,
     )
