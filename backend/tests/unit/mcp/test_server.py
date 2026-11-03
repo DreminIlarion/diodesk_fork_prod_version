@@ -1,3 +1,4 @@
+import json
 from uuid import UUID, uuid4
 
 import pytest
@@ -21,6 +22,22 @@ INITIALIZE_REQUEST = {
     },
 }
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
+TOOLS_LIST_REQUEST = {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/list",
+    "params": {},
+}
+EXPECTED_TOOLS = {
+    "assign_task",
+    "change_task_status",
+    "create_task",
+    "get_current_user",
+    "get_task",
+    "search_tasks",
+    "search_users",
+    "update_task",
+}
 
 
 class FakeTokenStore:
@@ -51,3 +68,25 @@ def test_mcp_endpoint_accepts_staff_access_token():
         response = client.post("/", json=INITIALIZE_REQUEST, headers=headers)
 
     assert response.status_code == status.HTTP_200_OK
+
+
+def test_mcp_endpoint_lists_mounted_tools_for_staff_access_token():
+    app = create_server(FakeTokenStore()).http_app(path="/", stateless_http=True)
+    token = create_access_token(
+        uuid4(),
+        Email("agent@test.com"),
+        {UserRole.DEVELOPER},
+    )
+    headers = {**MCP_HEADERS, "Authorization": f"Bearer {token}"}
+
+    with TestClient(app) as client:
+        response = client.post("/", json=TOOLS_LIST_REQUEST, headers=headers)
+
+    assert response.status_code == status.HTTP_200_OK
+    event_data = next(
+        line.removeprefix("data: ")
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    )
+    tools = json.loads(event_data)["result"]["tools"]
+    assert {tool["name"] for tool in tools} == EXPECTED_TOOLS
