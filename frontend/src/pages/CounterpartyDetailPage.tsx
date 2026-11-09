@@ -2078,16 +2078,25 @@ function ProductsTab({
     setError(null);
 
     try {
-      const res =
-        await counterpartiesApi.getProducts(
-          counterpartyId,
-          page,
-          10,
-        );
+const res =
+  await counterpartiesApi.getProducts(
+    counterpartyId,
+    page,
+    10,
+  );
 
-      setProducts(res.items);
-      setTotalPages(res.total_pages);
-      setTotalItems(res.total_items);
+setProducts(
+  res.items.map((it: any) => ({
+    ...it.product,
+    id: it.id,
+    link_id: it.id,
+    product_id: it.product_id,
+    serial_number: it.serial_number,
+    counterparty_id: it.counterparty_id,
+  })),
+);
+setTotalPages(res.total_pages);
+setTotalItems(res.total_items);
     } catch {
       setError('Не удалось загрузить продукты');
     } finally {
