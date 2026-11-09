@@ -2905,6 +2905,15 @@ export default function CounterpartyDetailPage() {
       }
 
       try {
+  const r = await counterpartiesApi.getProducts(id!, 1, 1);
+  setProductsCount(
+    typeof r?.total_items === 'number' ? r.total_items : 0,
+  );
+} catch {
+  setProductsCount(0);
+}
+
+      try {
         const r =
           await counterpartiesApi.getBranches(id!);
 
