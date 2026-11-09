@@ -2038,11 +2038,12 @@ function BranchesTab({
 }
 
 // ─── Вкладка продуктов ────────────────────────────────────────────────────────
-
 function ProductsTab({
   counterpartyId,
+  onCountChange,
 }: {
   counterpartyId: string;
+  onCountChange?: (n: number) => void;
 }) {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -2097,6 +2098,7 @@ setProducts(
 );
 setTotalPages(res.total_pages);
 setTotalItems(res.total_items);
+onCountChange?.(res.total_items);
     } catch {
       setError('Не удалось загрузить продукты');
     } finally {
@@ -2808,6 +2810,8 @@ export default function CounterpartyDetailPage() {
   const [projectsCount, setProjectsCount] =
     useState(0);
 
+  const [productsCount, setProductsCount] = useState(0);  
+
   const [branches, setBranches] =
     useState<Counterparty[]>([]);
 
@@ -3005,6 +3009,7 @@ export default function CounterpartyDetailPage() {
         id: 'products',
         label: 'Продукты',
         icon: Layers,
+        count: productsCount,
       },
       {
         id: 'projects',
@@ -3314,10 +3319,11 @@ export default function CounterpartyDetailPage() {
           {/* Продукты */}
 
           {activeTab === 'products' && (
-            <ProductsTab
-              counterpartyId={id!}
-            />
-          )}
+  <ProductsTab
+    counterpartyId={id!}
+    onCountChange={setProductsCount}
+  />
+)}
 
           {/* Проекты */}
 
