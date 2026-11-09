@@ -1,167 +1,394 @@
-import React, { useCallback, useEffect, useState, useRef, useLayoutEffect, useMemo } from 'react';
+// pages/ProductsPage.tsx
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
-  Loader2, Plus, RefreshCcw, Search, Package,
-  ChevronLeft, ChevronRight, Globe, Server, Smartphone,
-  Monitor, Cpu, Code, HelpCircle, X, Building2, Tag,
-  ChevronDown, Check, Filter,
+  Loader2,
+  Plus,
+  RefreshCcw,
+  Search,
+  Package,
+  ChevronLeft,
+  ChevronRight,
+  Globe,
+  Server,
+  Smartphone,
+  Monitor,
+  Cpu,
+  Code,
+  HelpCircle,
+  X,
+  Building2,
+  Tag,
+  ChevronDown,
+  Check,
+  Filter,
 } from 'lucide-react';
-import { productsApi } from '../api/client';
 import { useNavigate } from 'react-router-dom';
+import { productsApi } from '../api/client';
 import { ActionButton } from '../components/ui/ActionButton';
 
-// ─── Constants ────
+/* ──────────────────────────────────────────────────────────────
+   Справочники
+────────────────────────────────────────────────────────────── */
 
 const CATEGORIES = [
-  { value: 'ERP', label: 'ERP', icon: Server, color: 'text-[var(--warning)]', bg: 'bg-orange-500/10' },
-  { value: 'WEB', label: 'Web', icon: Globe, color: 'text-[var(--info)]', bg: 'bg-blue-500/10' },
-  { value: 'MOBILE', label: 'Mobile', icon: Smartphone, color: 'text-[var(--success)]', bg: 'bg-[var(--success)]/8' },
-  { value: 'API', label: 'API', icon: Code, color: 'text-violet-400', bg: 'bg-violet-500/10' },
-  { value: 'DESKTOP', label: 'Desktop', icon: Monitor, color: 'text-[var(--info)]', bg: 'bg-cyan-500/10' },
-  { value: 'HARDWARE', label: 'Hardware', icon: Cpu, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-  { value: 'OTHER', label: 'Прочее', icon: HelpCircle, color: 'text-[var(--text-primary)]/50', bg: 'bg-[var(--hover-2)]' },
+  {
+    value: 'ERP',
+    label: 'ERP',
+    icon: Server,
+    color: 'text-[var(--warning)]',
+    bg: 'bg-orange-500/10',
+  },
+  {
+    value: 'WEB',
+    label: 'Web',
+    icon: Globe,
+    color: 'text-[var(--info)]',
+    bg: 'bg-blue-500/10',
+  },
+  {
+    value: 'MOBILE',
+    label: 'Mobile',
+    icon: Smartphone,
+    color: 'text-[var(--success)]',
+    bg: 'bg-[var(--success)]/10',
+  },
+  {
+    value: 'API',
+    label: 'API',
+    icon: Code,
+    color: 'text-violet-400',
+    bg: 'bg-violet-500/10',
+  },
+  {
+    value: 'DESKTOP',
+    label: 'Desktop',
+    icon: Monitor,
+    color: 'text-[var(--info)]',
+    bg: 'bg-cyan-500/10',
+  },
+  {
+    value: 'HARDWARE',
+    label: 'Hardware',
+    icon: Cpu,
+    color: 'text-amber-400',
+    bg: 'bg-amber-500/10',
+  },
+  {
+    value: 'OTHER',
+    label: 'Прочее',
+    icon: HelpCircle,
+    color: 'text-[var(--text-primary)]/50',
+    bg: 'bg-[var(--hover-2)]',
+  },
 ] as const;
 
 const STATUSES = [
-  { value: 'active', label: 'Активный', dot: 'bg-emerald-400', color: 'text-[var(--success)]' },
-  { value: 'beta', label: 'Бета', dot: 'bg-blue-400', color: 'text-[var(--info)]' },
-  { value: 'deprecated', label: 'Устаревший', dot: 'bg-[var(--hover-1)]', color: 'text-[var(--text-primary)]/40' },
+  {
+    value: 'active',
+    label: 'Активный',
+    dot: 'bg-emerald-400',
+    color: 'text-[var(--success)]',
+  },
+  {
+    value: 'beta',
+    label: 'Бета',
+    dot: 'bg-blue-400',
+    color: 'text-[var(--info)]',
+  },
+  {
+    value: 'deprecated',
+    label: 'Устаревший',
+    dot: 'bg-[var(--text-primary)]/30',
+    color: 'text-[var(--text-primary)]/50',
+  },
 ] as const;
 
-const catMeta = (v: string) => CATEGORIES.find(c => c.value === v);
-const statusMeta = (v: string) => STATUSES.find(s => s.value === v);
-const statusLabel = (v: string) => statusMeta(v)?.label ?? v;
-const statusDot = (s: string) => statusMeta(s)?.dot ?? 'bg-[var(--hover-1)]';
-
 const ATTRIBUTE_LABELS: Record<string, string> = {
-  license_type: 'Лицензия', environment: 'Среда', db_connection_ref: 'Подключение к БД',
-  modules_enabled: 'Модули', max_concurrent_users: 'Макс. пользователей',
-  integration_points: 'Интеграции', backup_policy_ref: 'Политика бэкапов',
-  base_url: 'URL', admin_url: 'Админ-панель', hosting_provider: 'Хостинг',
-  tech_stack: 'Стек', ssl_expiry_date: 'SSL до', cdn_enabled: 'CDN',
-  cms_or_platform: 'Платформа', platform: 'Платформа', app_store_url: 'App Store',
-  google_play_url: 'Google Play', min_os_version: 'Мин. ОС', sdk_framework: 'Фреймворк',
-  push_provider: 'Push', backend_api_version: 'API версия', swagger_url: 'Swagger',
-  auth_method: 'Авторизация', rate_limit: 'Rate Limit', versioning_strategy: 'Версионирование',
-  webhook_endpoints: 'Webhooks', health_check_url: 'Health Check', data_format: 'Формат',
-  os_compatibility: 'ОС', architecture: 'Архитектура', default_install_path: 'Путь установки',
-  runtime_dependencies: 'Зависимости', auto_update_enabled: 'Автообновление',
-  distribution_method: 'Дистрибуция', model_sku: 'Модель', firmware_version: 'Прошивка',
-  network_config: 'Сеть', physical_location: 'Расположение', warranty_expiry: 'Гарантия до',
-  maintenance_contract_ref: 'Договор ТО', monitoring_agent: 'Мониторинг',
-  serial_prefix_pattern: 'Серийный №', notes: 'Заметки', support_group: 'Поддержка',
+  license_type: 'Лицензия',
+  environment: 'Среда',
+  db_connection_ref: 'Подключение к БД',
+  modules_enabled: 'Модули',
+  max_concurrent_users: 'Макс. пользователей',
+  integration_points: 'Интеграции',
+  backup_policy_ref: 'Политика бэкапов',
+  base_url: 'URL',
+  admin_url: 'Админ-панель',
+  hosting_provider: 'Хостинг',
+  tech_stack: 'Стек',
+  ssl_expiry_date: 'SSL до',
+  cdn_enabled: 'CDN',
+  cms_or_platform: 'Платформа',
+  platform: 'Платформа',
+  app_store_url: 'App Store',
+  google_play_url: 'Google Play',
+  min_os_version: 'Мин. ОС',
+  sdk_framework: 'Фреймворк',
+  push_provider: 'Push',
+  backend_api_version: 'API версия',
+  swagger_url: 'Swagger',
+  auth_method: 'Авторизация',
+  rate_limit: 'Rate Limit',
+  versioning_strategy: 'Версионирование',
+  webhook_endpoints: 'Webhooks',
+  health_check_url: 'Health Check',
+  data_format: 'Формат',
+  os_compatibility: 'ОС',
+  architecture: 'Архитектура',
+  default_install_path: 'Путь установки',
+  runtime_dependencies: 'Зависимости',
+  auto_update_enabled: 'Автообновление',
+  distribution_method: 'Дистрибуция',
+  model_sku: 'Модель',
+  firmware_version: 'Прошивка',
+  network_config: 'Сеть',
+  physical_location: 'Расположение',
+  warranty_expiry: 'Гарантия до',
+  maintenance_contract_ref: 'Договор ТО',
+  monitoring_agent: 'Мониторинг',
+  serial_prefix_pattern: 'Серийный №',
+  notes: 'Заметки',
+  support_group: 'Поддержка',
 };
 
-const getAttrLabel = (k: string) => ATTRIBUTE_LABELS[k] || k.replace(/_/g, ' ');
-const formatAttrValue = (v: any): string => {
-  if (v === true) return 'Да';
-  if (v === false) return 'Нет';
-  if (Array.isArray(v)) return v.join(', ');
-  return String(v);
-};
+const getCategoryMeta = (value: string) =>
+  CATEGORIES.find((category) => category.value === value);
 
-// ─── Filter Dropdown ───
+const getStatusMeta = (value: string) =>
+  STATUSES.find((status) => status.value === value);
 
-interface FilterOption { value: string; label: string; icon?: React.ReactNode; dot?: string; }
+const getStatusLabel = (value: string) =>
+  getStatusMeta(value)?.label ?? value;
 
-function FilterDropdown({
-  value, onChange, options, placeholder, icon,
-}: {
+const getStatusDot = (value: string) =>
+  getStatusMeta(value)?.dot ?? 'bg-[var(--text-primary)]/25';
+
+const getAttributeLabel = (key: string) =>
+  ATTRIBUTE_LABELS[key] ?? key.replace(/_/g, ' ');
+
+function formatAttributeValue(value: unknown): string {
+  if (value === null || value === undefined) return '—';
+  if (value === true) return 'Да';
+  if (value === false) return 'Нет';
+
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).join(', ');
+  }
+
+  if (typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+
+  return String(value);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Выпадающий фильтр
+────────────────────────────────────────────────────────────── */
+
+interface FilterOption {
   value: string;
-  onChange: (v: string) => void;
+  label: string;
+  icon?: React.ReactNode;
+  dot?: string;
+}
+
+interface FilterDropdownProps {
+  value: string;
+  onChange: (value: string) => void;
   options: FilterOption[];
   placeholder: string;
   icon: React.ReactNode;
-}) {
+}
+
+function FilterDropdown({
+  value,
+  onChange,
+  options,
+  placeholder,
+  icon,
+}: FilterDropdownProps) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
   const [openUp, setOpenUp] = useState(false);
   const [alignRight, setAlignRight] = useState(false);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const selectedOption = options.find((option) => option.value === value);
+
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+
+    document.addEventListener('pointerdown', handlePointerDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
   }, []);
 
-  useLayoutEffect(() => {
-    if (!open || !btnRef.current) return;
-    const rect = btnRef.current.getBoundingClientRect();
-    setOpenUp(window.innerHeight - rect.bottom < 260);
-    setAlignRight(window.innerWidth - rect.left < 220);
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+
+    if (open) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [open]);
 
-  const selected = options.find(o => o.value === value);
+  useLayoutEffect(() => {
+    if (!open || !buttonRef.current) return;
+
+    const updateMenuPosition = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      setOpenUp(window.innerHeight - rect.bottom < 300);
+      setAlignRight(window.innerWidth - rect.left < 280);
+    };
+
+    updateMenuPosition();
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+    };
+  }, [open]);
 
   return (
-    <div ref={containerRef} className="relative">
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={() => setOpen(!open)}
-        className={`
-          flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-base
-          transition-all whitespace-nowrap cursor-pointer
-          ${open
-            ? 'bg-[var(--hover-2)] border-[var(--accent)]/30 text-[var(--text-primary)]'
-            : value
-              ? 'bg-[var(--hover-2)] border-[var(--border-color)] text-[var(--text-primary)]/90'
-              : 'bg-[var(--hover-1)] border-[var(--border-color)] text-[var(--text-primary)]/50 hover:border-[var(--border-color)] hover:text-[var(--text-primary)]/70'
-          }
-        `}
-      >
-        <span className={value ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'}>{icon}</span>
-        <span>{selected ? selected.label : placeholder}</span>
-        {value ? (
-          <span
-            onClick={e => { e.stopPropagation(); onChange(''); setOpen(false); }}
-            className="ml-1 p-0.5 rounded-md hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 cursor-pointer transition-colors"
-          >
-            <X size={14} />
+    <div ref={containerRef} className="relative w-full sm:w-auto">
+      <div className="flex gap-1.5">
+        <button
+          ref={buttonRef}
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((current) => !current)}
+          className={[
+            'flex min-w-0 w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-sm transition-colors sm:w-auto sm:min-w-[160px]',
+            open
+              ? 'border-[var(--accent)]/40 bg-[var(--hover-2)] text-[var(--text-primary)]'
+              : value
+                ? 'border-[var(--border-color)] bg-[var(--hover-2)] text-[var(--text-primary)]'
+                : 'border-[var(--border-color)] bg-[var(--hover-1)] text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)]',
+          ].join(' ')}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 text-[var(--accent)]">{icon}</span>
+            <span className="min-w-0 truncate">
+              {selectedOption?.label ?? placeholder}
+            </span>
           </span>
-        ) : (
-          <ChevronDown size={16} className={`text-[var(--text-primary)]/40 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+
+          <ChevronDown
+            size={16}
+            className={`shrink-0 text-[var(--text-primary)]/40 transition-transform ${
+              open ? 'rotate-180' : ''
+            }`}
+          />
+        </button>
+
+        {value && (
+          <button
+            type="button"
+            aria-label={`Сбросить фильтр «${selectedOption?.label ?? placeholder}»`}
+            onClick={() => {
+              onChange('');
+              setOpen(false);
+            }}
+            className="flex shrink-0 items-center justify-center rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-2.5 text-[var(--text-primary)]/45 transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)]"
+          >
+            <X size={16} />
+          </button>
         )}
-      </button>
+      </div>
 
       {open && (
         <div
-          className={`
-            absolute z-[100]             min-w-[200px] w-max bg-[var(--bg-card)] border border-[var(--border-color)]
-            rounded-xl overflow-hidden
-            ${openUp ? 'bottom-full mb-2' : 'top-full mt-2'}
-            ${alignRight ? 'right-0' : 'left-0'}
-          `}
+          className={[
+            'absolute z-[100] w-64 min-w-[200px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]',
+            openUp ? 'bottom-full mb-2' : 'top-full mt-2',
+            alignRight ? 'right-0' : 'left-0',
+          ].join(' ')}
           style={{ boxShadow: 'var(--shadow-lg)' }}
         >
-          <div className="py-1.5 max-h-[300px] overflow-y-auto">
+          <div className="max-h-[min(60vh,320px)] overflow-y-auto py-1.5">
             <button
               type="button"
-              onClick={() => { onChange(''); setOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-left text-base transition-colors ${!value ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]' : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)]'
-                }`}
+              onClick={() => {
+                onChange('');
+                setOpen(false);
+              }}
+              className={[
+                'flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors',
+                !value
+                  ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]'
+                  : 'text-[var(--text-primary)]/65 hover:bg-[var(--hover-1)]',
+              ].join(' ')}
             >
-              {!value ? <Check size={16} className="text-[var(--accent)] flex-shrink-0" /> : <span className="w-4 flex-shrink-0" />}
-              <span>{placeholder}</span>
+              {!value ? (
+                <Check size={16} className="shrink-0 text-[var(--accent)]" />
+              ) : (
+                <span className="w-4 shrink-0" />
+              )}
+              <span className="min-w-0 whitespace-normal break-words">
+                {placeholder}
+              </span>
             </button>
-            <div className="h-px bg-[var(--hover-2)] mx-3 my-1" />
-            {options.map(opt => {
-              const active = opt.value === value;
+
+            <div className="mx-3 my-1 h-px bg-[var(--border-color)]" />
+
+            {options.map((option) => {
+              const isSelected = option.value === value;
+
               return (
                 <button
+                  key={option.value}
                   type="button"
-                  key={opt.value}
-                  onClick={() => { onChange(opt.value); setOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-left text-base transition-colors ${active ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]' : 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)]'
-                    }`}
+                  onClick={() => {
+                    onChange(option.value);
+                    setOpen(false);
+                  }}
+                  className={[
+                    'flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors',
+                    isSelected
+                      ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]'
+                      : 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)]',
+                  ].join(' ')}
                 >
-                  {active ? <Check size={16} className="text-[var(--accent)] flex-shrink-0" /> : <span className="w-4 flex-shrink-0" />}
-                  <span className="flex items-center gap-2.5">
-                    {opt.dot && <span className={`w-2.5 h-2.5 rounded-full ${opt.dot}`} />}
-                    {opt.icon}
-                    {opt.label}
+                  {isSelected ? (
+                    <Check size={16} className="shrink-0 text-[var(--accent)]" />
+                  ) : (
+                    <span className="w-4 shrink-0" />
+                  )}
+
+                  <span className="flex min-w-0 items-center gap-2.5 whitespace-normal break-words">
+                    {option.dot && (
+                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${option.dot}`} />
+                    )}
+                    {option.icon}
+                    <span>{option.label}</span>
                   </span>
                 </button>
               );
@@ -173,395 +400,713 @@ function FilterDropdown({
   );
 }
 
-// ─── Active Filters ────
+/* ──────────────────────────────────────────────────────────────
+   Выбранные фильтры
+────────────────────────────────────────────────────────────── */
+
+interface ActiveFiltersProps {
+  category: string;
+  status: string;
+  onClearCategory: () => void;
+  onClearStatus: () => void;
+  onClearAll: () => void;
+}
 
 function ActiveFilters({
-  category, status, onClearCategory, onClearStatus, onClearAll,
-}: {
-  category: string; status: string;
-  onClearCategory: () => void; onClearStatus: () => void; onClearAll: () => void;
-}) {
+  category,
+  status,
+  onClearCategory,
+  onClearStatus,
+  onClearAll,
+}: ActiveFiltersProps) {
   if (!category && !status) return null;
-  const catInfo = catMeta(category);
-  const sInfo = statusMeta(status);
+
+  const categoryMeta = getCategoryMeta(category);
+  const statusInfo = getStatusMeta(status);
+  const CategoryIcon = categoryMeta?.icon;
 
   return (
-    <div className="flex items-center gap-2.5 flex-wrap">
-      <span className="text-base text-[var(--text-primary)]/40 flex items-center gap-1.5">
-        <Filter size={14} /> Фильтры:
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="inline-flex items-center gap-1.5 text-sm text-[var(--text-primary)]/45">
+        <Filter size={14} />
+        Фильтры:
       </span>
-      {category && catInfo && (
-        <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${catInfo.bg} border border-[var(--border-color)] text-base ${catInfo.color}`}>
-          <catInfo.icon size={14} />
-          {catInfo.label}
-          <span onClick={onClearCategory} className="ml-0.5 p-0.5 rounded hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 cursor-pointer transition-colors">
-            <X size={12} />
-          </span>
+
+      {categoryMeta && (
+        <span
+          className={`inline-flex max-w-full items-center gap-2 rounded-lg border border-[var(--border-color)] px-3 py-1.5 text-sm ${categoryMeta.bg} ${categoryMeta.color}`}
+        >
+          {CategoryIcon && <CategoryIcon size={14} className="shrink-0" />}
+          <span>{categoryMeta.label}</span>
+          <button
+            type="button"
+            aria-label="Убрать фильтр категории"
+            onClick={onClearCategory}
+            className="ml-0.5 rounded p-0.5 text-[var(--text-primary)]/45 transition-colors hover:bg-[var(--hover-1)] hover:text-[var(--text-primary)]"
+          >
+            <X size={13} />
+          </button>
         </span>
       )}
-      {status && sInfo && (
-        <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--hover-2)] border border-[var(--border-color)] text-base text-[var(--text-primary)]/80">
-          <span className={`w-2.5 h-2.5 rounded-full ${sInfo.dot}`} />
-          {sInfo.label}
-          <span onClick={onClearStatus} className="ml-0.5 p-0.5 rounded hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 cursor-pointer transition-colors">
-            <X size={12} />
-          </span>
+
+      {statusInfo && (
+        <span className="inline-flex max-w-full items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--hover-2)] px-3 py-1.5 text-sm text-[var(--text-primary)]/75">
+          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${statusInfo.dot}`} />
+          <span>{statusInfo.label}</span>
+          <button
+            type="button"
+            aria-label="Убрать фильтр статуса"
+            onClick={onClearStatus}
+            className="ml-0.5 rounded p-0.5 text-[var(--text-primary)]/45 transition-colors hover:bg-[var(--hover-1)] hover:text-[var(--text-primary)]"
+          >
+            <X size={13} />
+          </button>
         </span>
       )}
-      <button onClick={onClearAll} className="text-base text-[var(--accent)]/60 hover:text-[var(--accent)] transition-colors ml-1">
-        Сбросить
+
+      <button
+        type="button"
+        onClick={onClearAll}
+        className="px-1 text-sm text-[var(--accent)]/75 transition-colors hover:text-[var(--accent)]"
+      >
+        Сбросить всё
       </button>
     </div>
   );
 }
 
-// ─── Product Row ──
+/* ──────────────────────────────────────────────────────────────
+   Карточка продукта в списке
+────────────────────────────────────────────────────────────── */
 
-const ProductRow = ({ product, onClick }: { product: any; onClick: () => void }) => {
-  const cat = catMeta(product.category);
-  const Icon = cat?.icon || Package;
-  const sInfo = statusMeta(product.status);
-
-  const truncate = (text: string, max = 60) =>
-    text.length <= max ? text : text.slice(0, max) + '...';
+function ProductRow({
+  product,
+  onClick,
+}: {
+  product: any;
+  onClick: () => void;
+}) {
+  const category = getCategoryMeta(product.category);
+  const CategoryIcon = category?.icon ?? Package;
+  const statusInfo = getStatusMeta(product.status);
+  const productName = String(
+    product.display_name || product.name || 'Без названия',
+  );
 
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="w-full flex items-center gap-4 px-5 py-4 text-left rounded-xl
-                 hover:bg-[var(--hover-1)] active:bg-[var(--hover-2)] transition-colors duration-100 group"
+      aria-label={`Открыть продукт: ${productName}`}
+      className="group w-full rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]/60 p-4 text-left transition-colors hover:border-[var(--accent)]/30 hover:bg-[var(--hover-1)] active:bg-[var(--hover-2)] sm:p-5"
     >
-      <div className={`flex-shrink-0 w-10 h-10 rounded-xl ${cat?.bg || 'bg-[var(--hover-2)]'}
-                      flex items-center justify-center ${cat?.color || 'text-[var(--text-primary)]/40'}
-                      group-hover:scale-105 transition-transform`}>
-        <Icon size={18} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <span className="text-base text-[var(--text-primary)] font-medium truncate block">
-          {product.display_name || product.name}
-        </span>
-        {product.description && (
-          <p className="text-base text-[var(--text-primary)]/40 mt-0.5 leading-snug">
-            {truncate(product.description)}
-          </p>
-        )}
-      </div>
-      <div className="flex items-center gap-5 flex-shrink-0">
-        <span className="text-base text-[var(--text-primary)]/50 hidden md:block w-[110px] truncate text-right">{product.vendor}</span>
-        <span className="text-base text-[var(--text-primary)]/40 hidden lg:block w-[70px] text-right font-mono">
-          {product.version ? `v${product.version}` : '—'}
-        </span>
-        <span className={`text-base px-2.5 py-1 rounded-lg ${cat?.bg || 'bg-[var(--hover-2)]'} ${cat?.color || 'text-[var(--text-primary)]/50'} hidden sm:block w-[90px] text-center`}>
-          {cat?.label || product.category}
-        </span>
-        <div className="flex items-center gap-2 w-[100px] justify-end">
-          <div className={`w-2 h-2 rounded-full ${statusDot(product.status)}`} />
-          <span className={`text-base ${sInfo?.color || 'text-[var(--text-primary)]/40'}`}>{statusLabel(product.status)}</span>
+      <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-11 sm:w-11 ${category?.bg ?? 'bg-[var(--hover-2)]'} ${category?.color ?? 'text-[var(--text-primary)]/50'}`}
+        >
+          <CategoryIcon size={19} />
         </div>
+
+        <div className="flex min-w-0 flex-1 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            {/* Название намеренно не обрезается: переносится на новую строку */}
+            <h3 className="whitespace-normal break-words text-base font-semibold leading-snug text-[var(--text-primary)] [overflow-wrap:anywhere] group-hover:text-[var(--accent)] sm:text-lg">
+              {productName}
+            </h3>
+
+            {product.description && (
+              <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--text-primary)]/45 [overflow-wrap:anywhere]">
+                {product.description}
+              </p>
+            )}
+
+            <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--text-primary)]/50">
+              {product.vendor && (
+                <span className="inline-flex min-w-0 items-start gap-1.5">
+                  <Building2 size={15} className="mt-0.5 shrink-0" />
+                  <span className="break-words [overflow-wrap:anywhere]">
+                    {product.vendor}
+                  </span>
+                </span>
+              )}
+
+              {product.version && (
+                <span className="inline-flex items-center gap-1.5 font-mono">
+                  <Tag size={14} className="shrink-0" />
+                  v{product.version}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex min-w-0 flex-wrap items-center gap-2 lg:max-w-[40%] lg:justify-end">
+            {category && (
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ${category.bg} ${category.color}`}
+              >
+                <CategoryIcon size={14} className="shrink-0" />
+                {category.label}
+              </span>
+            )}
+
+            <span className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--hover-1)] px-2.5 py-1 text-xs">
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${getStatusDot(product.status)}`}
+              />
+              <span className={statusInfo?.color ?? 'text-[var(--text-primary)]/55'}>
+                {getStatusLabel(product.status)}
+              </span>
+            </span>
+          </div>
+        </div>
+
+        <ChevronRight
+          size={18}
+          className="mt-1 shrink-0 text-[var(--text-primary)]/25 transition-all group-hover:translate-x-0.5 group-hover:text-[var(--accent)]"
+        />
       </div>
     </button>
   );
-};
+}
 
-// ─── Product Modal 
+/* ──────────────────────────────────────────────────────────────
+   Окно с подробностями продукта
+────────────────────────────────────────────────────────────── */
 
-const ProductModal = ({ product, onClose }: { product: any; onClose: () => void }) => {
-  const cat = catMeta(product.category);
-  const Icon = cat?.icon || Package;
-  const sInfo = statusMeta(product.status);
-  const attrEntries = Object.entries(product.attributes || {}).filter(
-    ([, v]) => v !== null && v !== '' && !(Array.isArray(v) && (v as any[]).length === 0)
+function ProductModal({
+  product,
+  onClose,
+}: {
+  product: any;
+  onClose: () => void;
+}) {
+  const category = getCategoryMeta(product.category);
+  const CategoryIcon = category?.icon ?? Package;
+  const statusInfo = getStatusMeta(product.status);
+  const productName = String(
+    product.display_name || product.name || 'Без названия',
+  );
+
+  const attributes = Object.entries(product.attributes || {}).filter(
+    ([, value]) =>
+      value !== null &&
+      value !== undefined &&
+      value !== '' &&
+      !(Array.isArray(value) && value.length === 0),
   );
 
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', h);
+    const previousOverflow = document.body.style.overflow;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
     document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div
-        className="relative w-full max-w-2xl max-h-[85vh] flex flex-col
-                   bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden"
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+      <button
+        type="button"
+        aria-label="Закрыть окно продукта"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/65 backdrop-blur-sm"
+      />
+
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="product-modal-title"
+        className="relative w-full max-w-3xl overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]"
         style={{ boxShadow: 'var(--shadow-lg)' }}
       >
-        <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-[var(--border-color)] flex-shrink-0 bg-[var(--hover-1)]">
-          <div className="flex items-center gap-4 min-w-0">
-            <div className={`w-12 h-12 rounded-xl ${cat?.bg || 'bg-[var(--hover-2)]'} flex items-center justify-center ${cat?.color || 'text-[var(--text-primary)]/40'} flex-shrink-0`}>
-              <Icon size={22} />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-xl font-bold text-[var(--text-primary)] truncate">{product.display_name || product.name}</h2>
-              <p className="text-base text-[var(--text-primary)]/50 truncate">{product.vendor}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2.5 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)] transition-colors flex-shrink-0">
-            <X size={20} />
-          </button>
-        </div>
+        {/* Кнопка остаётся на месте, даже когда содержимое окна прокручивается */}
+        <button
+          type="button"
+          aria-label="Закрыть окно"
+          onClick={onClose}
+          className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]/90 text-[var(--text-primary)]/55 backdrop-blur transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] sm:right-4 sm:top-4"
+        >
+          <X size={19} />
+        </button>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6">
-          <div className="flex flex-wrap gap-2.5">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--hover-1)] text-base text-[var(--text-primary)]/60 border border-[var(--border-color)]">
-              <Building2 size={16} className="text-[var(--text-primary)]/40" />{product.vendor}
+        <div className="max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain sm:max-h-[calc(100dvh-2rem)]">
+          <header className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 border-b border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-5 pr-16 sm:gap-4 sm:px-6 sm:py-6 sm:pr-20">
+            <div
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${category?.bg ?? 'bg-[var(--hover-2)]'} ${category?.color ?? 'text-[var(--text-primary)]/50'}`}
+            >
+              <CategoryIcon size={22} />
             </div>
-            {product.version && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--hover-1)] text-base text-[var(--text-primary)]/60 border border-[var(--border-color)] font-mono">
-                <Tag size={16} className="text-[var(--text-primary)]/40" />v{product.version}
+
+            <div className="min-w-0">
+              {/* Без truncate: длинное название переносится и показывается целиком */}
+              <h2
+                id="product-modal-title"
+                className="whitespace-normal break-words text-lg font-bold leading-snug text-[var(--text-primary)] [overflow-wrap:anywhere] sm:text-2xl"
+              >
+                {productName}
+              </h2>
+
+              {product.vendor && (
+                <p className="mt-1.5 whitespace-normal break-words text-sm text-[var(--text-primary)]/50 [overflow-wrap:anywhere] sm:text-base">
+                  {product.vendor}
+                </p>
+              )}
+            </div>
+          </header>
+
+          <div className="space-y-6 p-4 sm:p-6">
+            <div className="flex flex-wrap gap-2">
+              <div className="inline-flex max-w-full items-start gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-3 py-2 text-sm text-[var(--text-primary)]/65">
+                <Building2
+                  size={16}
+                  className="mt-0.5 shrink-0 text-[var(--text-primary)]/40"
+                />
+                <span className="break-words [overflow-wrap:anywhere]">
+                  {product.vendor || 'Поставщик не указан'}
+                </span>
+              </div>
+
+              {product.version && (
+                <div className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-3 py-2 font-mono text-sm text-[var(--text-primary)]/65">
+                  <Tag size={16} className="shrink-0 text-[var(--text-primary)]/40" />
+                  v{product.version}
+                </div>
+              )}
+
+              <div
+                className={`inline-flex items-center gap-2 rounded-xl border border-[var(--border-color)] px-3 py-2 text-sm ${category?.bg ?? 'bg-[var(--hover-1)]'} ${category?.color ?? 'text-[var(--text-primary)]/60'}`}
+              >
+                {category && <CategoryIcon size={16} className="shrink-0" />}
+                {category?.label ?? product.category}
+              </div>
+
+              <div className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-3 py-2 text-sm">
+                <span
+                  className={`h-2.5 w-2.5 shrink-0 rounded-full ${getStatusDot(product.status)}`}
+                />
+                <span className={statusInfo?.color ?? 'text-[var(--text-primary)]/55'}>
+                  {getStatusLabel(product.status)}
+                </span>
+              </div>
+            </div>
+
+            {product.description && (
+              <section>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)]/40">
+                  Описание
+                </h3>
+                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--text-primary)]/75 [overflow-wrap:anywhere] sm:text-base">
+                  {product.description}
+                </p>
+              </section>
+            )}
+
+            {attributes.length > 0 && (
+              <section>
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)]/40">
+                  Характеристики
+                </h3>
+
+                <div className="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)]">
+                  {attributes.map(([key, value]) => (
+                    <div
+                      key={key}
+                      className="grid grid-cols-1 gap-1 border-b border-[var(--border-color)] px-4 py-3 last:border-b-0 sm:grid-cols-[minmax(120px,0.4fr)_minmax(0,1fr)] sm:gap-4 sm:px-5"
+                    >
+                      <span className="min-w-0 whitespace-normal break-words text-sm text-[var(--text-primary)]/45 [overflow-wrap:anywhere]">
+                        {getAttributeLabel(key)}
+                      </span>
+
+                      <span className="min-w-0 whitespace-pre-wrap break-words text-sm text-[var(--text-primary)]/80 [overflow-wrap:anywhere]">
+                        {formatAttributeValue(value)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {!product.description && attributes.length === 0 && (
+              <div className="py-8 text-center text-sm text-[var(--text-primary)]/45">
+                Нет дополнительной информации
               </div>
             )}
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${cat?.bg || 'bg-[var(--hover-1)]'} text-base ${cat?.color || 'text-[var(--text-primary)]/60'} border border-[var(--border-color)]`}>
-              {cat && <cat.icon size={16} />}{cat?.label || product.category}
-            </div>
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--hover-1)] text-base border border-[var(--border-color)]">
-              <div className={`w-2.5 h-2.5 rounded-full ${statusDot(product.status)}`} />
-              <span className={sInfo?.color || 'text-[var(--text-primary)]/50'}>{statusLabel(product.status)}</span>
-            </div>
           </div>
-
-          {product.description && (
-            <div>
-              <div className="text-xs uppercase tracking-widest text-[var(--text-primary)]/40 mb-3 font-semibold">Описание</div>
-              <p className="text-base text-[var(--text-primary)]/70 leading-relaxed whitespace-pre-wrap">{product.description}</p>
-            </div>
-          )}
-
-          {attrEntries.length > 0 && (
-            <div>
-              <div className="text-xs uppercase tracking-widest text-[var(--text-primary)]/40 mb-3 font-semibold">Характеристики</div>
-              <div className="rounded-xl border border-[var(--border-color)] divide-y divide-[var(--border-color)] bg-[var(--hover-1)]">
-                {attrEntries.map(([key, value]) => (
-                  <div key={key} className="flex items-start gap-4 px-5 py-3.5">
-                    <span className="text-base text-[var(--text-primary)]/40 w-[150px] flex-shrink-0 pt-0.5">{getAttrLabel(key)}</span>
-                    <span className="text-base text-[var(--text-primary)]/80 break-words min-w-0">{formatAttrValue(value)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!product.description && attrEntries.length === 0 && (
-            <div className="text-center py-12 text-[var(--text-primary)]/40 text-base">Нет дополнительной информации</div>
-          )}
         </div>
-      </div>
+      </section>
     </div>
   );
-};
+}
 
-// ─── Main ─────────
+/* ──────────────────────────────────────────────────────────────
+   Страница продуктов
+────────────────────────────────────────────────────────────── */
 
 export default function ProductsPage() {
   const navigate = useNavigate();
 
   const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const loadRequestId = useRef(0);
 
   const loadProducts = useCallback(async () => {
+    const requestId = ++loadRequestId.current;
+
     setLoading(true);
     setError(null);
+
     try {
-      const res = await productsApi.getProducts({
-        page, size: 30,
+      const response = await productsApi.getProducts({
+        page,
+        size: 30,
         category: filterCategory || undefined,
         status: filterStatus || undefined,
       });
-      setProducts(res.items);
-      setTotalPages(res.total_pages);
+
+      // Игнорируем старый ответ, если пользователь уже сменил фильтр или страницу.
+      if (requestId !== loadRequestId.current) return;
+
+      setProducts(response.items ?? []);
+      setTotalPages(Math.max(1, response.total_pages ?? 1));
     } catch {
-      setError('Не удалось загрузить продукты');
+      if (requestId === loadRequestId.current) {
+        setError('Не удалось загрузить продукты');
+      }
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestId.current) {
+        setLoading(false);
+      }
     }
   }, [page, filterCategory, filterStatus]);
 
-  useEffect(() => { loadProducts(); }, [loadProducts]);
+  useEffect(() => {
+    void loadProducts();
+
+    return () => {
+      // Не даём ответу предыдущего запроса перезаписать актуальные данные.
+      loadRequestId.current += 1;
+    };
+  }, [loadProducts]);
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
 
   const filteredProducts = useMemo(() => {
     if (!normalizedSearch) return products;
-    return products.filter(p =>
-      (p.display_name || p.name || '').toLowerCase().includes(normalizedSearch) ||
-      (p.vendor || '').toLowerCase().includes(normalizedSearch) ||
-      (p.description || '').toLowerCase().includes(normalizedSearch)
-    );
+
+    return products.filter((product) => {
+      const name = String(product.display_name || product.name || '').toLowerCase();
+      const vendor = String(product.vendor || '').toLowerCase();
+      const description = String(product.description || '').toLowerCase();
+
+      return (
+        name.includes(normalizedSearch) ||
+        vendor.includes(normalizedSearch) ||
+        description.includes(normalizedSearch)
+      );
+    });
   }, [products, normalizedSearch]);
 
-  const categoryOptions: FilterOption[] = CATEGORIES.map(c => ({
-    value: c.value, label: c.label, icon: <c.icon size={16} className={c.color} />,
-  }));
-  const statusOptions: FilterOption[] = STATUSES.map(s => ({
-    value: s.value, label: s.label, dot: s.dot,
-  }));
+  const categoryOptions = useMemo<FilterOption[]>(
+    () =>
+      CATEGORIES.map((category) => {
+        const CategoryIcon = category.icon;
+
+        return {
+          value: category.value,
+          label: category.label,
+          icon: <CategoryIcon size={16} className={category.color} />,
+        };
+      }),
+    [],
+  );
+
+  const statusOptions = useMemo<FilterOption[]>(
+    () =>
+      STATUSES.map((status) => ({
+        value: status.value,
+        label: status.label,
+        dot: status.dot,
+      })),
+    [],
+  );
+
+  const closeProductModal = useCallback(() => {
+    setSelectedProduct(null);
+  }, []);
+
+  const visiblePageNumbers = useMemo(() => {
+    const count = Math.min(5, totalPages);
+    const start = Math.max(
+      1,
+      Math.min(page - Math.floor(count / 2), totalPages - count + 1),
+    );
+
+    return Array.from({ length: count }, (_, index) => start + index);
+  }, [page, totalPages]);
+
+  const clearFilters = () => {
+    setFilterCategory('');
+    setFilterStatus('');
+    setPage(1);
+  };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-3xl md:text-4xl font-bold text-[var(--text-primary)] mb-1.5">Продукты</h2>
-          <p className="text-base text-[var(--text-primary)]/50">Справочник ПО и оборудования</p>
+    <div className="min-w-0 space-y-5 animate-in fade-in duration-500 sm:space-y-6">
+      {/* Заголовок страницы */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] sm:text-3xl">
+            Продукты
+          </h1>
+          <p className="mt-1 text-sm text-[var(--text-primary)]/50 sm:text-base">
+            Справочник программного обеспечения и оборудования
+          </p>
         </div>
-        <div className="flex items-center gap-2.5">
+
+        <div className="flex w-full gap-2 sm:w-auto">
           <button
-            onClick={loadProducts}
-            className="p-2.5 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/70 transition-colors"
+            type="button"
+            onClick={() => void loadProducts()}
+            disabled={loading}
+            aria-label="Обновить список продуктов"
             title="Обновить"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] text-[var(--text-primary)]/55 transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <RefreshCcw size={18} />
+            <RefreshCcw size={18} className={loading ? 'animate-spin' : ''} />
           </button>
-<ActionButton
-  onClick={() => navigate('/products/new')}
-  className="py-4 px-8 text-base font-semibold"
->
-  <Plus size={18} />
-  Добавить продукт
-</ActionButton>
-        </div>
-      </div>
 
-      {/* ── Поиск + фильтры ──────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2.5">
-        {/* Поиск — единый визуал */}
-        <div className="relative flex-1 min-w-[220px]">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/40 pointer-events-none" />
-          <input
-            value={searchQuery}
-            onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
-            placeholder="Поиск по названию, вендору..."
-            className="w-full pl-10 pr-10 py-3 glass-card border border-[var(--border-color)]
-                       rounded-xl text-[var(--text-primary)] text-base placeholder-[var(--text-muted)]
-                       focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)]
-                       transition-all"
+          <ActionButton
+            onClick={() => navigate('/products/new')}
+            className="flex-1 justify-center px-4 py-3 text-sm font-semibold sm:flex-none sm:text-base"
+          >
+            <Plus size={18} />
+            Добавить продукт
+          </ActionButton>
+        </div>
+      </header>
+
+      {/* Поиск и фильтры */}
+      <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] p-3 sm:p-4">
+        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-[minmax(0,1fr)_minmax(160px,auto)_minmax(160px,auto)]">
+          <div className="relative min-w-0">
+            <Search
+              size={17}
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/40"
+            />
+
+            <input
+              value={searchQuery}
+              onChange={(event) => {
+                setSearchQuery(event.target.value);
+                setPage(1);
+              }}
+              placeholder="Поиск по названию, поставщику..."
+              aria-label="Поиск продуктов"
+              className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-3 pl-10 pr-10 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/35 transition-colors focus:border-[var(--accent)]/40 focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)] sm:text-base"
+            />
+
+            {searchQuery && (
+              <button
+                type="button"
+                aria-label="Очистить поиск"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-[var(--text-primary)]/45 transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)]"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+
+          <FilterDropdown
+            value={filterCategory}
+            onChange={(value) => {
+              setFilterCategory(value);
+              setPage(1);
+            }}
+            options={categoryOptions}
+            placeholder="Все категории"
+            icon={<Package size={16} />}
           />
-          {searchQuery && (
+
+          <FilterDropdown
+            value={filterStatus}
+            onChange={(value) => {
+              setFilterStatus(value);
+              setPage(1);
+            }}
+            options={statusOptions}
+            placeholder="Все статусы"
+            icon={<Filter size={16} />}
+          />
+        </div>
+      </section>
+
+      <ActiveFilters
+        category={filterCategory}
+        status={filterStatus}
+        onClearCategory={() => {
+          setFilterCategory('');
+          setPage(1);
+        }}
+        onClearStatus={() => {
+          setFilterStatus('');
+          setPage(1);
+        }}
+        onClearAll={clearFilters}
+      />
+
+      {/* Количество результатов */}
+      {!loading && !error && (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-[var(--text-primary)]/45">
+          <span>
+            На этой странице: {filteredProducts.length}
+            {normalizedSearch ? ' найдено' : ''}
+          </span>
+
+          {totalPages > 1 && (
+            <span>
+              Страница {page} из {totalPages}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Список продуктов */}
+      {loading ? (
+        <div className="flex min-h-56 items-center justify-center">
+          <Loader2 size={30} className="animate-spin text-[var(--accent)]" />
+        </div>
+      ) : error ? (
+        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] px-5 py-10 text-center">
+          <p className="text-sm text-[var(--accent)]">{error}</p>
+          <button
+            type="button"
+            onClick={() => void loadProducts()}
+            className="mt-4 rounded-lg border border-[var(--border-color)] px-4 py-2 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--hover-2)]"
+          >
+            Попробовать снова
+          </button>
+        </div>
+      ) : filteredProducts.length === 0 ? (
+        <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-color)] px-5 py-12 text-center">
+          <Package size={40} className="mb-4 text-[var(--text-primary)]/20" />
+
+          <p className="text-base font-medium text-[var(--text-primary)]/65">
+            {normalizedSearch
+              ? 'Продукты не найдены'
+              : filterCategory || filterStatus
+                ? 'Нет продуктов с выбранными фильтрами'
+                : 'Список продуктов пуст'}
+          </p>
+
+          {normalizedSearch && (
+            <p className="mt-1 max-w-md text-sm text-[var(--text-primary)]/40">
+              Поиск выполняется по продуктам на текущей странице. Попробуйте
+              изменить запрос или перейти на другую страницу.
+            </p>
+          )}
+
+          {(filterCategory || filterStatus) && (
             <button
               type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 rounded-md
-                         text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 hover:bg-[var(--hover-2)] transition-colors"
+              onClick={clearFilters}
+              className="mt-4 text-sm font-medium text-[var(--accent)] hover:underline"
             >
-              <X size={14} />
+              Сбросить фильтры
             </button>
           )}
         </div>
-
-        <FilterDropdown
-          value={filterCategory}
-          onChange={v => { setFilterCategory(v); setPage(1); }}
-          options={categoryOptions}
-          placeholder="Категория"
-          icon={<Package size={16} />}
-        />
-        <FilterDropdown
-          value={filterStatus}
-          onChange={v => { setFilterStatus(v); setPage(1); }}
-          options={statusOptions}
-          placeholder="Статус"
-          icon={<Filter size={16} />}
-        />
-      </div>
-
-      {/* ── Активные фильтры ─────────────────────────────────────────────── */}
-      <ActiveFilters
-        category={filterCategory} status={filterStatus}
-        onClearCategory={() => { setFilterCategory(''); setPage(1); }}
-        onClearStatus={() => { setFilterStatus(''); setPage(1); }}
-        onClearAll={() => { setFilterCategory(''); setFilterStatus(''); setPage(1); }}
-      />
-
-      {/* ── Заголовок таблицы ────────────────────────────────────────────── */}
-      <div className="flex items-center gap-4 px-5 py-2.5 text-xs uppercase
-                      tracking-wider text-[var(--text-primary)]/40 border-b border-[var(--border-color)] font-semibold">
-        <div className="w-10" />
-        <div className="flex-1">Название</div>
-        <div className="hidden md:block w-[110px] text-right">Вендор</div>
-        <div className="hidden lg:block w-[70px] text-right">Версия</div>
-        <div className="hidden sm:block w-[90px] text-center">Тип</div>
-        <div className="w-[100px] text-right">Статус</div>
-      </div>
-
-      {/* ── Список ── */}
-      {loading ? (
-        <div className="flex justify-center py-24">
-          <Loader2 size={24} className="animate-spin text-[var(--accent)]/50" />
-        </div>
-      ) : error ? (
-        <div className="px-5 py-10 text-base text-[var(--accent)]">{error}</div>
-      ) : filteredProducts.length === 0 ? (
-        <div className="flex flex-col items-center py-24 text-[var(--text-primary)]/40">
-          <Package size={40} className="mb-4 text-[var(--text-primary)]/15" />
-          <p className="text-base">
-            {searchQuery ? 'На текущей странице ничего не найдено' : 'Нет продуктов'}
-          </p>
-        </div>
       ) : (
-        <div className="divide-y divide-[var(--border-color)]">
-          {filteredProducts.map(product => (
-            <ProductRow key={product.id} product={product} onClick={() => setSelectedProduct(product)} />
+        <div className="space-y-3">
+          {filteredProducts.map((product) => (
+            <ProductRow
+              key={product.id}
+              product={product}
+              onClick={() => setSelectedProduct(product)}
+            />
           ))}
         </div>
       )}
 
-      {/* ── Пагинация ────────────────────────────────────────────────────── */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-4 border-t border-[var(--border-color)]">
+      {/* Пагинация */}
+      {totalPages > 1 && !loading && !error && (
+        <nav
+          aria-label="Страницы продуктов"
+          className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-color)] pt-4 sm:justify-center"
+        >
           <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
+            type="button"
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
             disabled={page <= 1}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card border border-[var(--border-color)]
-                       hover:bg-[var(--hover-2)] disabled:opacity-40 disabled:cursor-not-allowed
-                       text-[var(--text-primary)] text-base transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-3 py-2.5 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--hover-2)] disabled:cursor-not-allowed disabled:opacity-40 sm:px-4"
           >
-            <ChevronLeft size={16} /> Назад
+            <ChevronLeft size={16} />
+            <span>Назад</span>
           </button>
 
-          <div className="flex items-center gap-1.5">
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              const pageNum = Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
-              if (pageNum > totalPages) return null;
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => setPage(pageNum)}
-                  className={`w-10 h-10 rounded-xl text-base font-medium transition-colors ${pageNum === page
-                      ? 'bg-[var(--accent)] text-white'
-                      : 'glass-card text-[var(--text-primary)]/60 border border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                    }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
+          <span className="px-2 text-sm text-[var(--text-primary)]/55 sm:hidden">
+            {page} / {totalPages}
+          </span>
+
+          <div className="hidden items-center gap-1.5 sm:flex">
+            {visiblePageNumbers.map((pageNumber) => (
+              <button
+                key={pageNumber}
+                type="button"
+                aria-current={pageNumber === page ? 'page' : undefined}
+                onClick={() => setPage(pageNumber)}
+                className={[
+                  'h-10 w-10 rounded-xl border text-sm font-medium transition-colors',
+                  pageNumber === page
+                    ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
+                    : 'border-[var(--border-color)] bg-[var(--hover-1)] text-[var(--text-primary)]/65 hover:bg-[var(--hover-2)]',
+                ].join(' ')}
+              >
+                {pageNumber}
+              </button>
+            ))}
           </div>
 
           <button
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            type="button"
+            onClick={() =>
+              setPage((current) => Math.min(totalPages, current + 1))
+            }
             disabled={page >= totalPages}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card border border-[var(--border-color)]
-                       hover:bg-[var(--hover-2)] disabled:opacity-40 disabled:cursor-not-allowed
-                       text-[var(--text-primary)] text-base transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-3 py-2.5 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--hover-2)] disabled:cursor-not-allowed disabled:opacity-40 sm:px-4"
           >
-            Вперёд <ChevronRight size={16} />
+            <span>Вперёд</span>
+            <ChevronRight size={16} />
           </button>
-        </div>
+        </nav>
       )}
 
-      {/* ── Модалка продукта ─────────────────────────────────────────────── */}
+      {/* Подробности продукта */}
       {selectedProduct && (
-        <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />
+        <ProductModal
+          product={selectedProduct}
+          onClose={closeProductModal}
+        />
       )}
     </div>
   );
