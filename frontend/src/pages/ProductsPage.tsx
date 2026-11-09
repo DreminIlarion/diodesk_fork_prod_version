@@ -479,115 +479,102 @@ function ActiveFilters({
    Карточка продукта в списке
 ────────────────────────────────────────────────────────────── */
 
-function ProductRow({
+const ProductRow = ({
   product,
   onClick,
 }: {
   product: any;
   onClick: () => void;
-}) {
-  const category = getCategoryMeta(product.category);
-  const CategoryIcon = category?.icon ?? Package;
-  const statusInfo = getStatusMeta(product.status);
-  const productName = String(
-    product.display_name || product.name || 'Без названия',
-  );
+}) => {
+  const cat = catMeta(product.category);
+  const Icon = cat?.icon || Package;
+  const sInfo = statusMeta(product.status);
+
+  const truncate = (text: string, max = 60) =>
+    text.length <= max ? text : text.slice(0, max) + '...';
+
+  const productName = product.display_name || product.name || 'Без названия';
 
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={`Открыть продукт: ${productName}`}
-      className="group w-full rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]/60 p-4 text-left transition-colors hover:border-[var(--accent)]/30 hover:bg-[var(--hover-1)] active:bg-[var(--hover-2)] sm:p-5"
+      className="w-full flex items-center gap-4 px-5 py-4 text-left rounded-xl
+                 hover:bg-[var(--hover-1)] active:bg-[var(--hover-2)] transition-colors duration-100 group"
     >
-      <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-        <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-11 sm:w-11 ${category?.bg ?? 'bg-[var(--hover-2)]'} ${category?.color ?? 'text-[var(--text-primary)]/50'}`}
+      <div
+        className={`flex-shrink-0 w-10 h-10 rounded-xl ${cat?.bg || 'bg-[var(--hover-2)]'}
+                    flex items-center justify-center ${cat?.color || 'text-[var(--text-primary)]/40'}
+                    group-hover:scale-105 transition-transform`}
+      >
+        <Icon size={18} />
+      </div>
+
+      <div className="flex-1 min-w-0">
+        {/* Название не обрезается: переносится на следующие строки */}
+        <span
+          className="block text-base text-[var(--text-primary)] font-medium
+                     whitespace-normal break-words leading-snug"
+          style={{ overflowWrap: 'anywhere' }}
         >
-          <CategoryIcon size={19} />
+          {productName}
+        </span>
+
+        {product.description && (
+          <p className="text-base text-[var(--text-primary)]/40 mt-0.5 leading-snug">
+            {truncate(product.description)}
+          </p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-5 flex-shrink-0">
+        <span className="text-base text-[var(--text-primary)]/50 hidden md:block w-[110px] truncate text-right">
+          {product.vendor}
+        </span>
+
+        <span className="text-base text-[var(--text-primary)]/40 hidden lg:block w-[70px] text-right font-mono">
+          {product.version ? `v${product.version}` : '—'}
+        </span>
+
+        <span
+          className={`text-base px-2.5 py-1 rounded-lg ${
+            cat?.bg || 'bg-[var(--hover-2)]'
+          } ${
+            cat?.color || 'text-[var(--text-primary)]/50'
+          } hidden sm:block w-[90px] text-center`}
+        >
+          {cat?.label || product.category}
+        </span>
+
+        <div className="flex items-center gap-2 w-[100px] justify-end">
+          <div className={`w-2 h-2 rounded-full ${statusDot(product.status)}`} />
+          <span className={`text-base ${sInfo?.color || 'text-[var(--text-primary)]/40'}`}>
+            {statusLabel(product.status)}
+          </span>
         </div>
-
-        <div className="flex min-w-0 flex-1 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 flex-1">
-            {/* Название намеренно не обрезается: переносится на новую строку */}
-            <h3 className="whitespace-normal break-words text-base font-semibold leading-snug text-[var(--text-primary)] [overflow-wrap:anywhere] group-hover:text-[var(--accent)] sm:text-lg">
-              {productName}
-            </h3>
-
-            {product.description && (
-              <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--text-primary)]/45 [overflow-wrap:anywhere]">
-                {product.description}
-              </p>
-            )}
-
-            <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--text-primary)]/50">
-              {product.vendor && (
-                <span className="inline-flex min-w-0 items-start gap-1.5">
-                  <Building2 size={15} className="mt-0.5 shrink-0" />
-                  <span className="break-words [overflow-wrap:anywhere]">
-                    {product.vendor}
-                  </span>
-                </span>
-              )}
-
-              {product.version && (
-                <span className="inline-flex items-center gap-1.5 font-mono">
-                  <Tag size={14} className="shrink-0" />
-                  v{product.version}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex min-w-0 flex-wrap items-center gap-2 lg:max-w-[40%] lg:justify-end">
-            {category && (
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ${category.bg} ${category.color}`}
-              >
-                <CategoryIcon size={14} className="shrink-0" />
-                {category.label}
-              </span>
-            )}
-
-            <span className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--hover-1)] px-2.5 py-1 text-xs">
-              <span
-                className={`h-2 w-2 shrink-0 rounded-full ${getStatusDot(product.status)}`}
-              />
-              <span className={statusInfo?.color ?? 'text-[var(--text-primary)]/55'}>
-                {getStatusLabel(product.status)}
-              </span>
-            </span>
-          </div>
-        </div>
-
-        <ChevronRight
-          size={18}
-          className="mt-1 shrink-0 text-[var(--text-primary)]/25 transition-all group-hover:translate-x-0.5 group-hover:text-[var(--accent)]"
-        />
       </div>
     </button>
   );
-}
+};
 
 /* ──────────────────────────────────────────────────────────────
    Окно с подробностями продукта
 ────────────────────────────────────────────────────────────── */
 
-function ProductModal({
+const ProductModal = ({
   product,
   onClose,
 }: {
   product: any;
   onClose: () => void;
-}) {
-  const category = getCategoryMeta(product.category);
-  const CategoryIcon = category?.icon ?? Package;
-  const statusInfo = getStatusMeta(product.status);
-  const productName = String(
-    product.display_name || product.name || 'Без названия',
-  );
+}) => {
+  const cat = catMeta(product.category);
+  const Icon = cat?.icon || Package;
+  const sInfo = statusMeta(product.status);
 
-  const attributes = Object.entries(product.attributes || {}).filter(
+  const productName = product.display_name || product.name || 'Без названия';
+
+  const attrEntries = Object.entries(product.attributes || {}).filter(
     ([, value]) =>
       value !== null &&
       value !== undefined &&
@@ -595,12 +582,20 @@ function ProductModal({
       !(Array.isArray(value) && value.length === 0),
   );
 
+  // ref нужен, чтобы Escape закрывал модалку,
+  // даже если родитель передал новую функцию onClose.
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
       }
     };
 
@@ -611,132 +606,178 @@ function ProductModal({
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onClose]);
+  }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
+      {/* Затемнённый фон; клик по нему закрывает окно */}
       <button
         type="button"
         aria-label="Закрыть окно продукта"
         onClick={onClose}
-        className="absolute inset-0 bg-black/65 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
       />
 
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="product-modal-title"
-        className="relative w-full max-w-3xl overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]"
-        style={{ boxShadow: 'var(--shadow-lg)' }}
+        className="relative z-10 w-full max-w-3xl max-h-[90vh]
+                   overflow-hidden rounded-2xl border border-[var(--border-color)]
+                   bg-[var(--bg-card)]"
+        style={{
+          boxShadow: 'var(--shadow-lg)',
+          maxHeight: 'min(90vh, calc(100dvh - 24px))',
+        }}
       >
-        {/* Кнопка остаётся на месте, даже когда содержимое окна прокручивается */}
+        {/* Кнопка закрытия остаётся на месте при прокрутке */}
         <button
           type="button"
-          aria-label="Закрыть окно"
+          aria-label="Закрыть"
           onClick={onClose}
-          className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]/90 text-[var(--text-primary)]/55 backdrop-blur transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] sm:right-4 sm:top-4"
+          className="absolute right-3 top-3 z-20 flex h-10 w-10 items-center justify-center
+                     rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]
+                     text-[var(--text-primary)]/50 transition-colors
+                     hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)]"
         >
-          <X size={19} />
+          <X size={20} />
         </button>
 
-        <div className="max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain sm:max-h-[calc(100dvh-2rem)]">
-          <header className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 border-b border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-5 pr-16 sm:gap-4 sm:px-6 sm:py-6 sm:pr-20">
-            <div
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${category?.bg ?? 'bg-[var(--hover-2)]'} ${category?.color ?? 'text-[var(--text-primary)]/50'}`}
-            >
-              <CategoryIcon size={22} />
-            </div>
-
-            <div className="min-w-0">
-              {/* Без truncate: длинное название переносится и показывается целиком */}
-              <h2
-                id="product-modal-title"
-                className="whitespace-normal break-words text-lg font-bold leading-snug text-[var(--text-primary)] [overflow-wrap:anywhere] sm:text-2xl"
-              >
-                {productName}
-              </h2>
-
-              {product.vendor && (
-                <p className="mt-1.5 whitespace-normal break-words text-sm text-[var(--text-primary)]/50 [overflow-wrap:anywhere] sm:text-base">
-                  {product.vendor}
-                </p>
-              )}
-            </div>
-          </header>
-
-          <div className="space-y-6 p-4 sm:p-6">
-            <div className="flex flex-wrap gap-2">
-              <div className="inline-flex max-w-full items-start gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-3 py-2 text-sm text-[var(--text-primary)]/65">
-                <Building2
-                  size={16}
-                  className="mt-0.5 shrink-0 text-[var(--text-primary)]/40"
-                />
-                <span className="break-words [overflow-wrap:anywhere]">
-                  {product.vendor || 'Поставщик не указан'}
-                </span>
-              </div>
-
-              {product.version && (
-                <div className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-3 py-2 font-mono text-sm text-[var(--text-primary)]/65">
-                  <Tag size={16} className="shrink-0 text-[var(--text-primary)]/40" />
-                  v{product.version}
-                </div>
-              )}
-
+        {/* Прокручивается всё содержимое окна, в том числе длинное название */}
+        <div
+          className="max-h-[90vh] overflow-y-auto overscroll-contain"
+          style={{
+            maxHeight: 'min(90vh, calc(100dvh - 24px))',
+          }}
+        >
+          {/* Заголовок */}
+          <div className="border-b border-[var(--border-color)] bg-[var(--hover-1)] px-5 py-5 pr-16 sm:px-7 sm:py-6 sm:pr-20">
+            <div className="flex items-start gap-4">
               <div
-                className={`inline-flex items-center gap-2 rounded-xl border border-[var(--border-color)] px-3 py-2 text-sm ${category?.bg ?? 'bg-[var(--hover-1)]'} ${category?.color ?? 'text-[var(--text-primary)]/60'}`}
+                className={`w-12 h-12 rounded-xl flex items-center justify-center
+                            flex-shrink-0 ${cat?.bg || 'bg-[var(--hover-2)]'}
+                            ${cat?.color || 'text-[var(--text-primary)]/40'}`}
               >
-                {category && <CategoryIcon size={16} className="shrink-0" />}
-                {category?.label ?? product.category}
+                <Icon size={22} />
               </div>
 
-              <div className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-3 py-2 text-sm">
-                <span
-                  className={`h-2.5 w-2.5 shrink-0 rounded-full ${getStatusDot(product.status)}`}
-                />
-                <span className={statusInfo?.color ?? 'text-[var(--text-primary)]/55'}>
-                  {getStatusLabel(product.status)}
-                </span>
+              <div className="min-w-0 flex-1">
+                <h2
+                  id="product-modal-title"
+                  className="text-xl sm:text-2xl font-bold leading-snug
+                             text-[var(--text-primary)] whitespace-normal break-words"
+                  style={{ overflowWrap: 'anywhere' }}
+                >
+                  {productName}
+                </h2>
+
+                {product.vendor && (
+                  <p
+                    className="mt-2 flex items-start gap-2 text-sm sm:text-base
+                               text-[var(--text-primary)]/50 whitespace-normal break-words"
+                    style={{ overflowWrap: 'anywhere' }}
+                  >
+                    <Building2 size={16} className="mt-0.5 flex-shrink-0" />
+                    <span>{product.vendor}</span>
+                  </p>
+                )}
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {cat && (
+                    <span
+                      className={`inline-flex items-center gap-2 rounded-lg border
+                                  border-[var(--border-color)] px-3 py-1.5 text-sm
+                                  ${cat.bg} ${cat.color}`}
+                    >
+                      <Icon size={15} />
+                      {cat.label}
+                    </span>
+                  )}
+
+                  <span
+                    className="inline-flex items-center gap-2 rounded-lg border
+                               border-[var(--border-color)] bg-[var(--bg-card)]
+                               px-3 py-1.5 text-sm"
+                  >
+                    <span className={`w-2.5 h-2.5 rounded-full ${statusDot(product.status)}`} />
+                    <span className={sInfo?.color || 'text-[var(--text-primary)]/60'}>
+                      {statusLabel(product.status)}
+                    </span>
+                  </span>
+
+                  {product.version && (
+                    <span
+                      className="inline-flex items-center gap-2 rounded-lg border
+                                 border-[var(--border-color)] bg-[var(--bg-card)]
+                                 px-3 py-1.5 font-mono text-sm text-[var(--text-primary)]/65"
+                    >
+                      <Tag size={15} />
+                      v{product.version}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
+          </div>
 
+          {/* Описание и характеристики */}
+          <div className="space-y-6 p-5 sm:p-7">
             {product.description && (
-              <section>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)]/40">
+              <section className="rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] p-4 sm:p-5">
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)]/45">
                   Описание
                 </h3>
-                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--text-primary)]/75 [overflow-wrap:anywhere] sm:text-base">
+
+                <p
+                  className="text-sm sm:text-base leading-relaxed text-[var(--text-primary)]/75
+                             whitespace-pre-wrap break-words"
+                  style={{ overflowWrap: 'anywhere' }}
+                >
                   {product.description}
                 </p>
               </section>
             )}
 
-            {attributes.length > 0 && (
+            {attrEntries.length > 0 && (
               <section>
-                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)]/40">
-                  Характеристики
-                </h3>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)]/45">
+                    Характеристики
+                  </h3>
+                  <span className="text-xs text-[var(--text-primary)]/35">
+                    {attrEntries.length}
+                  </span>
+                </div>
 
-                <div className="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)]">
-                  {attributes.map(([key, value]) => (
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  {attrEntries.map(([key, value]) => (
                     <div
                       key={key}
-                      className="grid grid-cols-1 gap-1 border-b border-[var(--border-color)] px-4 py-3 last:border-b-0 sm:grid-cols-[minmax(120px,0.4fr)_minmax(0,1fr)] sm:gap-4 sm:px-5"
+                      className="min-w-0 rounded-xl border border-[var(--border-color)]
+                                 bg-[var(--hover-1)] p-4"
                     >
-                      <span className="min-w-0 whitespace-normal break-words text-sm text-[var(--text-primary)]/45 [overflow-wrap:anywhere]">
-                        {getAttributeLabel(key)}
-                      </span>
+                      <p
+                        className="text-xs text-[var(--text-primary)]/45
+                                   whitespace-normal break-words"
+                        style={{ overflowWrap: 'anywhere' }}
+                      >
+                        {getAttrLabel(key)}
+                      </p>
 
-                      <span className="min-w-0 whitespace-pre-wrap break-words text-sm text-[var(--text-primary)]/80 [overflow-wrap:anywhere]">
-                        {formatAttributeValue(value)}
-                      </span>
+                      <p
+                        className="mt-2 text-sm text-[var(--text-primary)]/80
+                                   whitespace-pre-wrap break-words"
+                        style={{ overflowWrap: 'anywhere' }}
+                      >
+                        {formatAttrValue(value)}
+                      </p>
                     </div>
                   ))}
                 </div>
               </section>
             )}
 
-            {!product.description && attributes.length === 0 && (
+            {!product.description && attrEntries.length === 0 && (
               <div className="py-8 text-center text-sm text-[var(--text-primary)]/45">
                 Нет дополнительной информации
               </div>
@@ -746,7 +787,7 @@ function ProductModal({
       </section>
     </div>
   );
-}
+};
 
 /* ──────────────────────────────────────────────────────────────
    Страница продуктов
