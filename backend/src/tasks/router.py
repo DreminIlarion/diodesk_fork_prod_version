@@ -1,6 +1,5 @@
 from uuid import UUID
 
-from ddf.application.dsl import Group
 from fastapi import APIRouter, Depends, status
 
 from src.iam.dependencies import CurrentSubjectDep, get_current_subject
@@ -12,11 +11,11 @@ from .dependencies import (
     TaskServiceDep,
     get_task_or_404,
 )
-from .dsl import unpack_kanban_request
 from .schemas import (
     AssigneeId,
     KanbanBoard,
-    KanbanRequest,
+    KanbanContextType,
+    KanbanSearchRequest,
     NewStatus,
     ReviewDecision,
     ReviewerId,
@@ -26,6 +25,7 @@ from .schemas import (
 )
 
 router = APIRouter(prefix="/tasks", tags=["Задания сотрудникам"])
+v2_router = APIRouter(prefix="/tasks", tags=["Задания сотрудникам v2"])
 
 
 @router.post(
@@ -147,22 +147,35 @@ async def archive_task(
     summary="Получить канбан доску"
 )
 async def get_kanban_board(
-    request: KanbanRequest,
+    context: KanbanContextType,
     pagination: PaginationDep,
-    legacy_query: KanbanQueryDep,
+    query: KanbanQueryDep,
     current_subject: CurrentSubjectDep,
     service: TaskBoardServiceDep,
 ) -> KanbanBoard:
-    context, body_query = unpack_kanban_request(request)
-    query = body_query
-    if query is None:
-        query = legacy_query
-    elif legacy_query is not None:
-        query = Group(op="$and", filters=(query, legacy_query))
-
     return await service.get_kanban_board(
         pagination=pagination,
         context=context,
         query=query,
+        current_subject=current_subject,
+    )
+
+
+@v2_router.post(
+    path="/kanban",
+    status_code=status.HTTP_200_OK,
+    response_model=KanbanBoard,
+    summary="Получить канбан доску через DDF DSL",
+)
+async def get_kanban_board_v2(
+    request: KanbanSearchRequest,
+    pagination: PaginationDep,
+    current_subject: CurrentSubjectDep,
+    service: TaskBoardServiceDep,
+) -> KanbanBoard:
+    return await service.get_kanban_board(
+        pagination=pagination,
+        context=request.context,
+        query=request.query,
         current_subject=current_subject,
     )

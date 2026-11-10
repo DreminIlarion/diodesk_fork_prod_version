@@ -245,9 +245,6 @@ class KanbanSearchRequest(BaseModel):
     )
 
 
-type KanbanRequest = KanbanSearchRequest | KanbanContextType
-
-
 class KanbanColumn(BaseModel):
     """Колонка канбан доски, соответствующая статусу задачи"""
 

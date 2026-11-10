@@ -10,8 +10,6 @@ from .domain.vo import TaskStatus
 from .schemas import (
     AssigneeKanbanContext,
     KanbanContextType,
-    KanbanRequest,
-    KanbanSearchRequest,
     ProjectKanbanContext,
     TicketKanbanContext,
 )
@@ -136,14 +134,3 @@ def apply_kanban_context(
         return context_expression
 
     return Group(op="$and", filters=(context_expression, query))
-
-
-def unpack_kanban_request(
-    request: KanbanRequest,
-) -> tuple[KanbanContextType, Expression | None]:
-    """Разбирает старое и расширенное тело запроса."""
-
-    if isinstance(request, KanbanSearchRequest):
-        return request.context, request.query
-
-    return request, None

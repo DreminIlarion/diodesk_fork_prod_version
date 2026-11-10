@@ -16,9 +16,10 @@ from src.shared.schemas import Page
 
 from .dependencies import (
     CommentServiceDep,
+    DslTicketSearchExpressionDep,
+    LegacyTicketSearchExpressionDep,
     ReactionServiceDep,
     TicketQueryServiceDep,
-    TicketSearchExpressionDep,
     TicketServiceDep,
     get_ticket_or_404,
 )
@@ -42,6 +43,7 @@ from .schemas import (
 )
 
 router = APIRouter(prefix="/tickets", tags=["Заявки"])
+v2_router = APIRouter(prefix="/tickets", tags=["Заявки v2"])
 
 
 @router.post(
@@ -64,7 +66,23 @@ async def create_ticket(
     summary="Получить список тикетов",
 )
 async def search_tickets(
-    query: TicketSearchExpressionDep,
+    query: LegacyTicketSearchExpressionDep,
+    current_subject: CurrentSubjectDep,
+    pagination: PaginationDep,
+    service: TicketQueryServiceDep,
+) -> Page[TicketViewResponse]:
+    return await service.get_tickets(pagination, query=query, current_subject=current_subject)
+
+
+@v2_router.post(
+    path="/search",
+    status_code=status.HTTP_200_OK,
+    response_model=Page[TicketViewResponse],
+    dependencies=[Depends(get_current_subject)],
+    summary="Получить список тикетов через DDF DSL",
+)
+async def search_tickets_v2(
+    query: DslTicketSearchExpressionDep,
     current_subject: CurrentSubjectDep,
     pagination: PaginationDep,
     service: TicketQueryServiceDep,
