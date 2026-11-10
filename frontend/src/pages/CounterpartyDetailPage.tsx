@@ -2038,11 +2038,12 @@ function BranchesTab({
 }
 
 // ─── Вкладка продуктов ────────────────────────────────────────────────────────
-
 function ProductsTab({
   counterpartyId,
+  onCountChange,
 }: {
   counterpartyId: string;
+  onCountChange?: (n: number) => void;
 }) {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -2078,16 +2079,26 @@ function ProductsTab({
     setError(null);
 
     try {
-      const res =
-        await counterpartiesApi.getProducts(
-          counterpartyId,
-          page,
-          10,
-        );
+const res =
+  await counterpartiesApi.getProducts(
+    counterpartyId,
+    page,
+    10,
+  );
 
-      setProducts(res.items);
-      setTotalPages(res.total_pages);
-      setTotalItems(res.total_items);
+setProducts(
+  res.items.map((it: any) => ({
+    ...it.product,
+    id: it.id,
+    link_id: it.id,
+    product_id: it.product_id,
+    serial_number: it.serial_number,
+    counterparty_id: it.counterparty_id,
+  })),
+);
+setTotalPages(res.total_pages);
+setTotalItems(res.total_items);
+onCountChange?.(res.total_items);
     } catch {
       setError('Не удалось загрузить продукты');
     } finally {
@@ -2799,6 +2810,8 @@ export default function CounterpartyDetailPage() {
   const [projectsCount, setProjectsCount] =
     useState(0);
 
+  const [productsCount, setProductsCount] = useState(0);  
+
   const [branches, setBranches] =
     useState<Counterparty[]>([]);
 
@@ -2890,6 +2903,15 @@ export default function CounterpartyDetailPage() {
         setProjects([]);
         setProjectsCount(0);
       }
+
+      try {
+  const r = await counterpartiesApi.getProducts(id!, 1, 1);
+  setProductsCount(
+    typeof r?.total_items === 'number' ? r.total_items : 0,
+  );
+} catch {
+  setProductsCount(0);
+}
 
       try {
         const r =
@@ -2996,6 +3018,7 @@ export default function CounterpartyDetailPage() {
         id: 'products',
         label: 'Продукты',
         icon: Layers,
+        count: productsCount,
       },
       {
         id: 'projects',
@@ -3305,10 +3328,11 @@ export default function CounterpartyDetailPage() {
           {/* Продукты */}
 
           {activeTab === 'products' && (
-            <ProductsTab
-              counterpartyId={id!}
-            />
-          )}
+  <ProductsTab
+    counterpartyId={id!}
+    onCountChange={setProductsCount}
+  />
+)}
 
           {/* Проекты */}
 

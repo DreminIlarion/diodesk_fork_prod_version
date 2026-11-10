@@ -228,7 +228,7 @@ const ACTION_CONFIG: Record<string, {
     icon: <Clock className="w-4.5 h-4.5" />,
     color: 'bg-amber-500/15 text-amber-400',
   },
-  canceled: {
+  cancelled: {
     label: 'Отменил заявку',
     icon: <X className="w-4.5 h-4.5" />,
     color: 'bg-red-500/15 text-red-400',
