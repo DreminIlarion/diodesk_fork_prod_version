@@ -11,6 +11,7 @@ from src.core.settings import settings
 from ddf.infra.database.sqlalchemy import Base
 
 from src.crm.infra.models import CounterpartyOrm
+from src.feedbacks.infra.models import FeedbackOrm
 from src.iam.infra.models import InvitationOrm, UserOrm
 from src.media.infra.models import AttachmentOrm
 from src.notifications.infra.models import NotificationOrm, UserPreferenceOrm
