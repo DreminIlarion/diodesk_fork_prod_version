@@ -6,7 +6,7 @@ if TYPE_CHECKING:
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import Date, DateTime, Enum, UniqueConstraint
+from sqlalchemy import Date, DateTime, Enum, Index, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -52,6 +52,16 @@ class TaskOrm(Base):
         ),
         lazy="selectin",
         viewonly=True,
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_tasks_ticket_id_active",
+            "ticket_id",
+            postgresql_where=text(
+                "ticket_id IS NOT NULL AND deleted_at IS NULL"
+            ),
+        ),
     )
 
 
