@@ -6,17 +6,17 @@ if TYPE_CHECKING:
 from datetime import date, datetime
 from uuid import UUID
 
+from ddf.infra.database.sqlalchemy import Base, EntityMixin
 from sqlalchemy import Date, DateTime, Enum, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.core.database import Base
 from src.shared.domain.vo import Priority
 
 from ..domain.vo import TaskStatus
 
 
-class TaskOrm(Base):
+class TaskOrm(EntityMixin, Base):
     __tablename__ = "tasks"
 
     ticket_id: Mapped[UUID | None] = mapped_column(nullable=True)
@@ -37,15 +37,24 @@ class TaskOrm(Base):
     actual_hours: Mapped[float] = mapped_column(default=0.0)
 
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    working_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    working_since: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     created_by: Mapped[UUID]
 
     tags: Mapped[list[dict[str, str]]] = mapped_column(JSONB)
 
-    attachments: Mapped[list["AttachmentOrm"]] = relationship(
+    attachments: Mapped[list["AttachmentOrm"]] = relationship(  # noqa: UP037
         primaryjoin=(
             "and_(AttachmentOrm.owner_type=='task', "
             "foreign(AttachmentOrm.owner_id)==TaskOrm.id)"
@@ -55,7 +64,7 @@ class TaskOrm(Base):
     )
 
 
-class TaskSequence(Base):
+class TaskSequence(EntityMixin, Base):
     __tablename__ = "tasks_sequences"
 
     project_id: Mapped[UUID | None] = mapped_column(nullable=True)

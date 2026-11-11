@@ -2,15 +2,15 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
+from ddf.infra.database.sqlalchemy import Base, EntityMixin
 from sqlalchemy import TEXT, Date, DateTime, Enum, ForeignKey, Index, Numeric, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ...core.database import Base
 from ..domain.vo import TimesheetStatus, WorklogStatus
 
 
-class WorklogOrm(Base):
+class WorklogOrm(EntityMixin, Base):
     __tablename__ = "worklogs"
 
     timesheet_id: Mapped[UUID | None] = mapped_column(
@@ -39,7 +39,7 @@ class WorklogOrm(Base):
     )
 
 
-class TimesheetOrm(Base):
+class TimesheetOrm(EntityMixin, Base):
     __tablename__ = "timesheets"
 
     user_id: Mapped[UUID]

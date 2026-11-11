@@ -7,6 +7,7 @@ import uvicorn
 from fastapi import APIRouter, FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastmcp.utilities.lifespan import combine_lifespans
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.comments.router import router as comments_router
@@ -18,10 +19,13 @@ from src.crm.router import router as counterparty_router
 from src.feedbacks.router import router as feedback_router
 from src.iam.routers import router as iam_router
 from src.iam.routers.invitations import broker_router as invitations_broker_router  # Добавить
+from src.mcp.server import mcp
 from src.media.router import router as media_router
 from src.notifications.infra.handlers import router as notifications_broker_router
+from src.notifications.routers.notifications import (
+    broker_router as notifications_sse_broker_router,
+)  # Добавить
 from src.notifications.routers.notifications import router as notification_router
-from src.notifications.routers.notifications import broker_router as notifications_sse_broker_router  # Добавить
 from src.products.router import router as product_router
 from src.projects.routers import router as project_router
 from src.shared.domain.exceptions import AppError
@@ -30,7 +34,9 @@ from src.shared.router import router as shared_router
 from src.shared.utils.cli import run_cli_command
 from src.tasks.infra.handlers import router as task_broker_router
 from src.tasks.router import router as task_router
+from src.tasks.router import v2_router as task_v2_router
 from src.tickets.router import router as tickets_router
+from src.tickets.router import v2_router as tickets_v2_router
 
 logger = logging.getLogger(__name__)
 
@@ -53,43 +59,51 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
 
 
+mcp_app = mcp.http_app(path="/", stateless_http=True)
+
 app = FastAPI(
     title="Ticket management system",
     description="REST API тикет-системы компании **ДИО-Консалт**",
     version="0.1.0",
-    lifespan=lifespan,
+    lifespan=combine_lifespans(lifespan, mcp_app.lifespan),
 )
 
 # Prometheus мониторинг
 Instrumentator(
     should_group_status_codes=True,
     should_group_untemplated=True,
-    excluded_handlers=["/health", "/metrics"]
+    excluded_handlers=["/health", "/metrics"],
 ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 # Rabbit обработчики (все subscriber'ы)
-broker_router.include_router(notification_router)
 broker_router.include_router(notifications_broker_router)
 broker_router.include_router(task_broker_router)
-broker_router.include_router(invitations_broker_router)          # Добавить
-broker_router.include_router(notifications_sse_broker_router)    # Добавить
+broker_router.include_router(invitations_broker_router)  # Добавить
+broker_router.include_router(notifications_sse_broker_router)  # Добавить
 
 # HTTP роутеры
-router = APIRouter(prefix="/api/v1")
+api_v1_router = APIRouter(prefix="/api/v1")
 
-router.include_router(iam_router)
-router.include_router(counterparty_router)
-router.include_router(comments_router)
-router.include_router(media_router)
-router.include_router(tickets_router)
-router.include_router(shared_router)
-router.include_router(product_router)
-router.include_router(project_router)
-router.include_router(task_router)
-router.include_router(feedback_router)
+api_v1_router.include_router(iam_router)
+api_v1_router.include_router(counterparty_router)
+api_v1_router.include_router(comments_router)
+api_v1_router.include_router(media_router)
+api_v1_router.include_router(tickets_router)
+api_v1_router.include_router(shared_router)
+api_v1_router.include_router(product_router)
+api_v1_router.include_router(project_router)
+api_v1_router.include_router(task_router)
+api_v1_router.include_router(feedback_router)
+api_v1_router.include_router(notification_router)
 
-app.include_router(router)
+api_v2_router = APIRouter(prefix="/api/v2")
+api_v2_router.include_router(tickets_v2_router)
+api_v2_router.include_router(task_v2_router)
+
+app.include_router(api_v1_router)
+app.include_router(api_v2_router)
 app.include_router(broker_router)
+app.mount("/mcp", mcp_app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -112,7 +126,7 @@ def value_exception_handler(request: Request, exc: ValueError) -> JSONResponse: 
                 "status": status.HTTP_400_BAD_REQUEST,
                 "details": {},
             }
-        }
+        },
     )
 
 
@@ -128,7 +142,7 @@ def app_exception_handler(request: Request, exc: AppError) -> JSONResponse:  # n
                 "status": exc.status_code,
                 "details": exc.details,
             }
-        }
+        },
     )
 
 

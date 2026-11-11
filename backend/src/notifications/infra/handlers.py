@@ -1,18 +1,15 @@
 from typing import Annotated
 
 from fastapi import Depends
-from faststream.rabbit import RabbitQueue
-from faststream.rabbit.fastapi import RabbitRouter
-from src.core.settings import settings
+from faststream.rabbit import RabbitQueue, RabbitRouter
 
-from ...tickets.domain.events import TicketAssigned, TicketCreated
+from ...tickets.domain.events import TicketAssigned, TicketCreated, TicketStatusChanged
 from ..dependencies import get_notification_service, get_target_resolver
 from ..factories import NotificationFactory
 from ..resolvers import TargetResolver
 from ..services import NotificationService
-from ...tickets.domain.events import TicketStatusChanged
 
-router = RabbitRouter(settings.rabbit.url)
+router = RabbitRouter()
 
 
 @router.subscriber(queue=RabbitQueue("tickets.create", durable=True))
@@ -26,6 +23,7 @@ async def on_ticket_created(
     for notification in notifications:
         await service.notify(notification)
 
+
 @router.subscriber(queue=RabbitQueue("tickets.status_changed", durable=True))
 async def on_ticket_status_changed(
         event: TicketStatusChanged,
@@ -36,6 +34,7 @@ async def on_ticket_status_changed(
     notifications = NotificationFactory.from_ticket_status_changed(event, targets)
     for notification in notifications:
         await service.notify(notification)
+
 
 @router.subscriber(queue=RabbitQueue("tickets.assigned", durable=True))
 async def on_ticket_assigned(
