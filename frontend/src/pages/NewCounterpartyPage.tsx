@@ -952,7 +952,7 @@ export default function NewCounterpartyPage() {
   );
 
   const companyContactsValid =
-    companyPhone.isComplete &&
+    (companyPhone.isEmpty || companyPhone.isComplete) &&
     isEmailValid(formData.email);
 
   const isFormValid =
@@ -1543,9 +1543,7 @@ export default function NewCounterpartyPage() {
                 <div>
                   <label className={labelCls}>
                     Телефон
-                    <span className="text-[var(--accent)] ml-1">
-                      *
-                    </span>
+                    
                   </label>
 
                   <input
