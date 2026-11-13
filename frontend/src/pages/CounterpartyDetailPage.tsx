@@ -15,6 +15,7 @@ import {
   ticketsApi,
   productsApi,
   projectsApi,
+  contractsApi,
 } from '../api/client';
 import type {
   Counterparty,
@@ -2776,6 +2777,652 @@ onCountChange?.(res.total_items);
   );
 }
 
+// ─── Вкладка договоров ────────────────────────────────────────────────────────
+
+const CONTRACT_TYPES = ['ИТС', 'СП', 'С', 'В', 'ВН'] as const;
+const CONTRACT_PERIODS = ['Месяц', 'Квартал', 'Полугодие', 'Год'] as const;
+
+const EMPTY_RATE: ContractRateInput = {
+  type_rate: 'фиксированная',
+  rate: 0,
+  unit_measurement_rate: 'часы',
+  hours_subscription: null,
+  hours_its: null,
+};
+
+function ContractsTab({
+  counterpartyId,
+  onCountChange,
+}: {
+  counterpartyId: string;
+  onCountChange?: (n: number) => void;
+}) {
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const [form, setForm] = useState({
+    name: '',
+    date_start: '',
+    date_end: '',
+    status: 'Договор оформлен и подписан',
+    type: 'ИТС' as string,
+    period: 'Год' as string,
+    sum: '',
+  });
+  const [rates, setRates] = useState<ContractRateInput[]>([{ ...EMPTY_RATE }]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await contractsApi.list({
+        counterparty_id: counterpartyId,
+        page,
+        size: 10,
+      });
+      setContracts(res.items);
+      setTotalPages(res.total_pages);
+      setTotalItems(res.total_items);
+      onCountChange?.(res.total_items);
+    } catch {
+      setError('Не удалось загрузить договоры');
+    } finally {
+      setLoading(false);
+    }
+  }, [counterpartyId, page]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const resetForm = () => {
+    setForm({
+      name: '',
+      date_start: '',
+      date_end: '',
+      status: 'Договор оформлен и подписан',
+      type: 'ИТС',
+      period: 'Год',
+      sum: '',
+    });
+    setRates([{ ...EMPTY_RATE }]);
+    setEditingId(null);
+    setFormError(null);
+    setShowForm(false);
+  };
+
+  const startCreate = () => {
+    resetForm();
+    setShowForm(true);
+  };
+
+  const startEdit = (c: Contract) => {
+    setEditingId(c.id);
+    setForm({
+      name: c.name,
+      date_start: c.date_start,
+      date_end: c.date_end ?? '',
+      status: c.status,
+      type: c.type,
+      period: c.period ?? 'Год',
+      sum: c.sum ?? '',
+    });
+    setRates(
+      c.rates.length
+        ? c.rates.map(r => ({
+            type_rate: r.type_rate,
+            rate: Number(r.rate),
+            unit_measurement_rate: r.unit_measurement_rate,
+            hours_subscription: r.hours_subscription ?? null,
+            hours_its: r.hours_its ?? null,
+          }))
+        : [{ ...EMPTY_RATE }],
+    );
+    setFormError(null);
+    setShowForm(true);
+    setExpandedId(null);
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim() || !form.date_start || !form.status.trim() || !form.type.trim()) {
+      setFormError('Заполните обязательные поля: наименование, дата начала, статус, вид');
+      return;
+    }
+
+    setSaving(true);
+    setFormError(null);
+
+    const payloadBase = {
+      name: form.name.trim(),
+      date_start: form.date_start,
+      date_end: form.date_end || null,
+      status: form.status.trim(),
+      type: form.type.trim(),
+      period: form.period.trim() || null,
+      sum: form.sum ? Number(form.sum) : null,
+      rates: rates.map(r => ({
+        type_rate: r.type_rate.trim(),
+        rate: Number(r.rate),
+        unit_measurement_rate: r.unit_measurement_rate.trim(),
+        hours_subscription:
+          r.hours_subscription === null || r.hours_subscription === undefined
+            ? null
+            : Number(r.hours_subscription),
+        hours_its:
+          r.hours_its === null || r.hours_its === undefined
+            ? null
+            : Number(r.hours_its),
+      })),
+    };
+
+    try {
+      if (editingId) {
+        await contractsApi.update(editingId, payloadBase);
+      } else {
+        await contractsApi.create({
+          counterparty_id: counterpartyId,
+          ...payloadBase,
+        });
+      }
+      resetForm();
+      load();
+    } catch (e: any) {
+      setFormError(
+        typeof e?.response?.data?.error?.message === 'string'
+          ? e.response.data.error.message
+          : typeof e?.response?.data?.detail === 'string'
+            ? e.response.data.detail
+            : 'Не удалось сохранить договор',
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    setDeleting(true);
+    try {
+      await contractsApi.remove(id);
+      setConfirmDeleteId(null);
+      load();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const setRate = (idx: number, patch: Partial<ContractRateInput>) =>
+    setRates(prev => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+
+  const addRate = () => setRates(prev => [...prev, { ...EMPTY_RATE }]);
+  const removeRate = (idx: number) => setRates(prev => prev.filter((_, i) => i !== idx));
+
+  const fmtDate = (d: string | null) =>
+    d ? new Date(d).toLocaleDateString('ru-RU') : '—';
+
+  return (
+    <div className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] overflow-hidden">
+      {/* HEADER */}
+      <div className="px-6 py-5 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--hover-1)]">
+        <h2 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2.5">
+          <FileText className="w-5 h-5 text-[var(--text-primary)]/40" />
+          Договоры
+          {totalItems > 0 && (
+            <span className="px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-sm text-[var(--text-primary)]/50">
+              {totalItems}
+            </span>
+          )}
+        </h2>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={load}
+            className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/70 transition-colors"
+          >
+            <RefreshCcw size={16} />
+          </button>
+          <button
+            onClick={() => (showForm ? resetForm() : startCreate())}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-base font-medium transition-all ${
+              showForm
+                ? 'bg-[var(--hover-2)] text-[var(--text-primary)]/70'
+                : 'bg-[var(--accent)] text-white shadow-md'
+            }`}
+          >
+            {showForm ? <X size={16} /> : <Plus size={16} />}
+            {showForm ? 'Отмена' : 'Добавить'}
+          </button>
+        </div>
+      </div>
+
+      {/* FORM */}
+      {showForm && (
+        <div className="border-b border-[var(--border-color)] bg-[var(--hover-1)] p-6 space-y-4">
+          {formError && (
+            <div className="p-3 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-xl text-sm text-[var(--accent)] flex items-center gap-2">
+              <AlertTriangle size={15} className="flex-shrink-0" />
+              {formError}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
+              Наименование <span className="text-[var(--accent)]">*</span>
+            </label>
+            <input
+              value={form.name}
+              onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+              placeholder="Договор на 1С:ИТС №123 от 01.01.2026"
+              className={inputCls}
+            />
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
+                Дата начала <span className="text-[var(--accent)]">*</span>
+              </label>
+              <input
+                type="date"
+                value={form.date_start}
+                onChange={e => setForm(p => ({ ...p, date_start: e.target.value }))}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
+                Дата окончания
+              </label>
+              <input
+                type="date"
+                value={form.date_end}
+                onChange={e => setForm(p => ({ ...p, date_end: e.target.value }))}
+                className={inputCls}
+              />
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
+                Статус <span className="text-[var(--accent)]">*</span>
+              </label>
+              <input
+                value={form.status}
+                onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
+                placeholder="Договор оформлен и подписан"
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
+                Вид договора <span className="text-[var(--accent)]">*</span>
+              </label>
+              <select
+                value={form.type}
+                onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
+                className={inputCls}
+              >
+                {CONTRACT_TYPES.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
+                Период оплаты
+              </label>
+              <select
+                value={form.period}
+                onChange={e => setForm(p => ({ ...p, period: e.target.value }))}
+                className={inputCls}
+              >
+                {CONTRACT_PERIODS.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
+                Сумма
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.sum}
+                onChange={e => setForm(p => ({ ...p, sum: e.target.value }))}
+                placeholder="120000.00"
+                className={inputCls}
+              />
+            </div>
+          </div>
+
+          {/* RATES */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm text-[var(--text-primary)]/50">
+                Ставки
+              </label>
+              <button
+                type="button"
+                onClick={addRate}
+                className="inline-flex items-center gap-1.5 text-sm text-[var(--accent)] hover:text-[var(--accent-hover)]"
+              >
+                <Plus size={14} /> Добавить ставку
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {rates.map((r, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] p-4 space-y-3"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-[1.5fr_1fr_1fr] gap-3">
+                    <div>
+                      <label className="block text-xs text-[var(--text-primary)]/40 mb-1">
+                        Вид ставки
+                      </label>
+                      <input
+                        value={r.type_rate}
+                        onChange={e => setRate(idx, { type_rate: e.target.value })}
+                        placeholder="фиксированная"
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-[var(--text-primary)]/40 mb-1">
+                        Ставка
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={r.rate}
+                        onChange={e => setRate(idx, { rate: Number(e.target.value) })}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-[var(--text-primary)]/40 mb-1">
+                        Ед. измерения
+                      </label>
+                      <input
+                        value={r.unit_measurement_rate}
+                        onChange={e => setRate(idx, { unit_measurement_rate: e.target.value })}
+                        placeholder="часы"
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs text-[var(--text-primary)]/40 mb-1">
+                        Часы абонентские
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={r.hours_subscription ?? ''}
+                        onChange={e =>
+                          setRate(idx, {
+                            hours_subscription: e.target.value === '' ? null : Number(e.target.value),
+                          })
+                        }
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-[var(--text-primary)]/40 mb-1">
+                        Часы ИТС
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={r.hours_its ?? ''}
+                        onChange={e =>
+                          setRate(idx, {
+                            hours_its: e.target.value === '' ? null : Number(e.target.value),
+                          })
+                        }
+                        className={inputCls}
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        onClick={() => removeRate(idx)}
+                        disabled={rates.length === 1}
+                        className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/20 text-[var(--accent)] text-sm font-medium transition-colors disabled:opacity-40"
+                      >
+                        <Trash2 size={14} /> Удалить
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <button
+              onClick={resetForm}
+              disabled={saving}
+              className="flex-1 px-4 py-3 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-base font-medium transition-colors disabled:opacity-50"
+            >
+              Отмена
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[var(--accent)] text-white text-base font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+            >
+              {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+              {saving ? 'Сохранение...' : editingId ? 'Сохранить' : 'Создать'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* LIST */}
+      <div className="divide-y divide-[var(--border-color)]">
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <Loader2 size={24} className="text-[var(--accent)]/40 animate-spin" />
+          </div>
+        ) : error ? (
+          <div className="py-12 text-center text-base text-[var(--accent)]">{error}</div>
+        ) : contracts.length === 0 ? (
+          <div className="flex flex-col items-center py-20 text-center px-6">
+            <FileText size={36} className="text-[var(--text-primary)]/15 mb-4" />
+            <p className="text-[var(--text-primary)]/60 text-base font-semibold mb-1">
+              Нет договоров
+            </p>
+            <p className="text-[var(--text-primary)]/40 text-sm mb-5">
+              Добавьте договор с контрагентом
+            </p>
+            {!showForm && (
+              <button
+                onClick={startCreate}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)]/20 hover:bg-[var(--accent)]/30 border border-[var(--accent)]/15 text-[var(--accent)] text-base font-medium transition-colors"
+              >
+                <Plus size={16} /> Добавить договор
+              </button>
+            )}
+          </div>
+        ) : (
+          contracts.map(c => {
+            const isExpanded = expandedId === c.id;
+            const isConfirming = confirmDeleteId === c.id;
+            return (
+              <div key={c.id} className={isExpanded ? 'bg-[var(--hover-1)]' : ''}>
+                <button
+                  onClick={() => setExpandedId(isExpanded ? null : c.id)}
+                  className="w-full flex items-center gap-4 px-6 py-4 text-left hover:bg-[var(--hover-1)] transition-colors group"
+                >
+                  <div className="w-11 h-11 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center text-[var(--accent)] flex-shrink-0 group-hover:scale-105 transition-transform">
+                    <FileText size={20} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                      <span className="text-base font-semibold text-[var(--text-primary)] truncate">
+                        {c.name}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md bg-[var(--hover-3)] text-xs font-mono text-[var(--text-primary)]/60">
+                        {c.type}
+                      </span>
+                    </div>
+                    <p className="text-sm text-[var(--text-primary)]/40">
+                      {c.status}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    {c.sum && (
+                      <span className="text-sm font-mono text-[var(--text-primary)]/60 hidden sm:block">
+                        {Number(c.sum).toLocaleString('ru-RU')} ₽
+                      </span>
+                    )}
+                    {isExpanded ? (
+                      <ChevronUp size={18} className="text-[var(--text-primary)]/40" />
+                    ) : (
+                      <ChevronDown size={18} className="text-[var(--text-primary)]/20" />
+                    )}
+                  </div>
+                </button>
+
+                {isExpanded && (
+                  <div className="px-6 pb-6 pl-20 space-y-5 border-t border-[var(--border-color)]">
+                    <div className="flex flex-wrap gap-2.5 pt-4">
+                      <span className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--hover-2)] text-base text-[var(--text-primary)]/60 border border-[var(--border-color)]">
+                        <Calendar size={16} className="text-[var(--text-primary)]/40" />
+                        {fmtDate(c.date_start)} — {fmtDate(c.date_end)}
+                      </span>
+                      {c.period && (
+                        <span className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--hover-2)] text-base text-[var(--text-primary)]/60 border border-[var(--border-color)]">
+                          <Clock size={16} className="text-[var(--text-primary)]/40" />
+                          {c.period}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--hover-2)] text-base text-[var(--text-primary)]/60 border border-[var(--border-color)]">
+                        <Hash size={16} className="text-[var(--text-primary)]/40" />
+                        {c.status}
+                      </span>
+                    </div>
+
+                    {c.rates.length > 0 && (
+                      <div>
+                        <p className="text-xs uppercase tracking-widest text-[var(--text-primary)]/40 mb-3 font-semibold">
+                          Ставки
+                        </p>
+                        <div className="rounded-xl border border-[var(--border-color)] divide-y divide-white/[0.06] bg-[var(--hover-1)]">
+                          {c.rates.map(r => (
+                            <div key={r.id} className="flex items-start gap-4 px-5 py-3.5">
+                              <span className="text-base text-[var(--text-primary)]/40 w-[160px] flex-shrink-0">
+                                {r.type_rate}
+                              </span>
+                              <span className="text-base text-[var(--text-primary)]/80 break-words min-w-0">
+                                {Number(r.rate).toLocaleString('ru-RU')} за {r.unit_measurement_rate}
+                                {r.hours_subscription != null && ` · абон. ${r.hours_subscription} ч`}
+                                {r.hours_its != null && ` · ИТС ${r.hours_its} ч`}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {isConfirming ? (
+                      <div className="px-4 py-3 rounded-xl bg-[var(--accent)]/5 border border-[var(--accent)]/20">
+                        <p className="text-sm text-[var(--text-primary)] mb-3">
+                          Удалить договор <span className="font-semibold">{c.name}</span>?
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="flex-1 px-3 py-2 rounded-lg bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-sm font-medium transition-colors"
+                          >
+                            Отмена
+                          </button>
+                          <button
+                            onClick={() => handleDelete(c.id)}
+                            disabled={deleting}
+                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[var(--accent)]/20 hover:bg-[var(--accent)]/30 border border-[var(--accent)]/30 text-[var(--accent)] text-sm font-medium transition-colors disabled:opacity-50"
+                          >
+                            {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            Удалить
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2 flex-wrap">
+                        <button
+                          onClick={() => startEdit(c)}
+                          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-sm font-medium transition-colors"
+                        >
+                          <Edit size={16} /> Изменить
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(c.id)}
+                          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/20 text-[var(--accent)] text-sm font-medium transition-colors"
+                        >
+                          <Trash2 size={16} /> Удалить
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-6 py-4 border-t border-[var(--border-color)]">
+          <span className="text-base text-[var(--text-primary)]/40">
+            Стр. {page} из {totalPages}
+          </span>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="p-2 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 disabled:opacity-20"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="p-2 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 disabled:opacity-20"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Типы вкладок ─────────────────────────────────────────────────────────────
 
 type TabType =
@@ -2784,6 +3431,7 @@ type TabType =
   | 'products'
   | 'projects'
   | 'branches'
+  | 'contracts'
   | 'customers'
   | 'tickets'
   | 'history';
@@ -2811,6 +3459,7 @@ export default function CounterpartyDetailPage() {
     useState(0);
 
   const [productsCount, setProductsCount] = useState(0);  
+  const [contractsCount, setContractsCount] = useState(0);
 
   const [branches, setBranches] =
     useState<Counterparty[]>([]);
@@ -2911,6 +3560,15 @@ export default function CounterpartyDetailPage() {
   );
 } catch {
   setProductsCount(0);
+}
+
+try {
+  const r = await contractsApi.list({ counterparty_id: id!, page: 1, size: 1 });
+  setContractsCount(
+    typeof r?.total_items === 'number' ? r.total_items : 0,
+  );
+} catch {
+  setContractsCount(0);
 }
 
       try {
@@ -3020,6 +3678,12 @@ export default function CounterpartyDetailPage() {
         icon: Layers,
         count: productsCount,
       },
+      {
+  id: 'contracts',
+  label: 'Договоры',
+  icon: FileText,
+  count: contractsCount,
+},
       {
         id: 'projects',
         label: 'Проекты',
@@ -3331,6 +3995,13 @@ export default function CounterpartyDetailPage() {
   <ProductsTab
     counterpartyId={id!}
     onCountChange={setProductsCount}
+  />
+)}
+
+{activeTab === 'contracts' && (
+  <ContractsTab
+    counterpartyId={id!}
+    onCountChange={setContractsCount}
   />
 )}
 
