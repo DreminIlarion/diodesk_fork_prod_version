@@ -2789,7 +2789,7 @@ const EMPTY_RATE: ContractRateInput = {
   hours_subscription: null,
   hours_its: null,
 };
-tsx
+
 function ContractSelect({
   label,
   value,
