@@ -83,7 +83,9 @@ class CounterpartyBase(BaseModel):
         max_length=10,
         description="ОКПО — Общероссийский классификатор предприятий и организаций",
     )
-    phone: str = Field(..., description="Номер телефона", examples=["88005553535", "+78005553535"])
+    phone: str | None = Field(
+        None, description="Номер телефона", examples=["88005553535", "+78005553535"]
+    )
     email: EmailStr | None = Field(None, description="Адрес электронной почты")
     address: str | None = Field(None, description="Фактический адрес компании")
 
