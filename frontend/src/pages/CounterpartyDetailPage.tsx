@@ -2779,7 +2779,7 @@ onCountChange?.(res.total_items);
 
 // ─── Вкладка договоров ────────────────────────────────────────────────────────
 
-const CONTRACT_TYPES = ['ИТС', 'СП', 'С', 'В', 'ВН'] as const;
+const CONTRACT_TYPES = ['ИТС', 'Сопровождение', 'Сервис', 'Проект', 'Внутренние работы', 'Аутстаффинг'] as const;
 const CONTRACT_PERIODS = ['Месяц', 'Квартал', 'Полугодие', 'Год'] as const;
 
 const EMPTY_RATE: ContractRateInput = {
