@@ -2789,6 +2789,262 @@ const EMPTY_RATE: ContractRateInput = {
   hours_subscription: null,
   hours_its: null,
 };
+tsx
+function ContractSelect({
+  label,
+  value,
+  options,
+  onChange,
+  placeholder = 'Выберите значение',
+  required = false,
+}: {
+  label: string;
+  value: string;
+  options: readonly string[];
+  onChange: (value: string) => void;
+  placeholder?: string;
+  required?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  // Если в договоре сохранилось старое значение, которого уже нет в списке,
+  // показываем его, а не теряем при редактировании.
+  const optionList =
+    value && !options.includes(value)
+      ? [value, ...options]
+      : [...options];
+
+  const selectedIndex = optionList.indexOf(value);
+  const selectedLabel =
+    selectedIndex >= 0 ? optionList[selectedIndex] : placeholder;
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleOutsidePointer = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointer);
+
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointer);
+    };
+  }, [open]);
+
+  const focusOption = (index: number) => {
+    if (!optionList.length) return;
+
+    const nextIndex = (index + optionList.length) % optionList.length;
+    setActiveIndex(nextIndex);
+
+    window.requestAnimationFrame(() => {
+      optionRefs.current[nextIndex]?.focus();
+    });
+  };
+
+  const openAt = (index: number) => {
+    if (!optionList.length) return;
+
+    const nextIndex = Math.max(0, Math.min(index, optionList.length - 1));
+    setActiveIndex(nextIndex);
+    setOpen(true);
+
+    window.requestAnimationFrame(() => {
+      optionRefs.current[nextIndex]?.focus();
+    });
+  };
+
+  const closeMenu = () => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  const chooseOption = (option: string) => {
+    onChange(option);
+    closeMenu();
+  };
+
+  return (
+    <div ref={rootRef} className="relative min-w-0">
+      <div className="mb-1.5 text-sm text-[var(--text-primary)]/55">
+        {label}
+        {required && <span className="ml-1 text-[var(--accent)]">*</span>}
+      </div>
+
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label={`${label}: ${selectedLabel}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-required={required}
+        onClick={() => {
+          if (open) {
+            setOpen(false);
+          } else {
+            openAt(selectedIndex >= 0 ? selectedIndex : 0);
+          }
+        }}
+        onKeyDown={event => {
+          if (event.key === 'Escape' && open) {
+            event.preventDefault();
+            closeMenu();
+            return;
+          }
+
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+
+            const direction = event.key === 'ArrowDown' ? 1 : -1;
+
+            if (open) {
+              focusOption(activeIndex + direction);
+            } else {
+              const startIndex =
+                selectedIndex >= 0
+                  ? selectedIndex
+                  : direction > 0
+                    ? 0
+                    : optionList.length - 1;
+
+              openAt(startIndex);
+            }
+
+            return;
+          }
+
+          if (
+            open &&
+            (event.key === 'Enter' || event.key === ' ')
+          ) {
+            event.preventDefault();
+
+            const option = optionList[activeIndex];
+            if (option !== undefined) chooseOption(option);
+          }
+        }}
+        className={`
+          flex min-h-[48px] w-full items-center justify-between gap-3
+          rounded-xl border px-4 py-3 text-left text-base transition-all
+          focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)]
+          ${
+            open
+              ? 'border-[var(--accent)]/40 bg-[var(--hover-2)]'
+              : 'border-[var(--border-color)] bg-[var(--hover-2)] hover:border-[var(--accent)]/35'
+          }
+        `}
+      >
+        <span
+          className={`min-w-0 flex-1 whitespace-normal break-words leading-snug ${
+            value
+              ? 'text-[var(--text-primary)]'
+              : 'text-[var(--text-primary)]/40'
+          }`}
+          style={{ overflowWrap: 'anywhere' }}
+        >
+          {selectedLabel}
+        </span>
+
+        <ChevronDown
+          size={17}
+          className={`flex-shrink-0 text-[var(--text-primary)]/45 transition-transform ${
+            open ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-label={label}
+          className="absolute left-0 right-0 top-full z-[100] mt-2 overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-1.5"
+          style={{ boxShadow: 'var(--shadow-lg)' }}
+        >
+          <div className="max-h-[280px] overflow-y-auto overscroll-contain">
+            {optionList.map((option, index) => {
+              const selected = option === value;
+
+              return (
+                <button
+                  key={`${option}-${index}`}
+                  ref={element => {
+                    optionRefs.current[index] = element;
+                  }}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  tabIndex={activeIndex === index ? 0 : -1}
+                  onClick={() => chooseOption(option)}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onKeyDown={event => {
+                    if (event.key === 'Escape') {
+                      event.preventDefault();
+                      closeMenu();
+                    } else if (event.key === 'ArrowDown') {
+                      event.preventDefault();
+                      focusOption(index + 1);
+                    } else if (event.key === 'ArrowUp') {
+                      event.preventDefault();
+                      focusOption(index - 1);
+                    } else if (event.key === 'Home') {
+                      event.preventDefault();
+                      focusOption(0);
+                    } else if (event.key === 'End') {
+                      event.preventDefault();
+                      focusOption(optionList.length - 1);
+                    } else if (
+                      event.key === 'Enter' ||
+                      event.key === ' '
+                    ) {
+                      event.preventDefault();
+                      chooseOption(option);
+                    }
+                  }}
+                  className={`
+                    flex w-full items-center gap-3 rounded-lg px-3.5 py-3
+                    text-left text-sm transition-colors
+                    ${
+                      selected
+                        ? 'bg-[var(--accent)]/10 text-[var(--text-primary)]'
+                        : 'text-[var(--text-primary)]/75 hover:bg-[var(--hover-2)]'
+                    }
+                    ${
+                      activeIndex === index
+                        ? 'ring-1 ring-[var(--accent)]/25'
+                        : ''
+                    }
+                  `}
+                >
+                  <span
+                    className="min-w-0 flex-1 whitespace-normal break-words leading-snug"
+                    style={{ overflowWrap: 'anywhere' }}
+                  >
+                    {option}
+                  </span>
+
+                  {selected && (
+                    <CheckCircle2
+                      size={16}
+                      className="flex-shrink-0 text-[var(--accent)]"
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ContractsTab({
   counterpartyId,
@@ -2798,7 +3054,7 @@ function ContractsTab({
   onCountChange?: (n: number) => void;
 }) {
   const [contracts, setContracts] = useState<Contract[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [page, setPage] = useState(1);
@@ -2813,7 +3069,10 @@ function ContractsTab({
   const [formError, setFormError] = useState<string | null>(null);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const formRef = useRef<HTMLDivElement>(null);
 
   const [form, setForm] = useState({
     name: '',
@@ -2824,30 +3083,48 @@ function ContractsTab({
     period: 'Год' as string,
     sum: '',
   });
-  const [rates, setRates] = useState<ContractRateInput[]>([{ ...EMPTY_RATE }]);
+
+  const [rates, setRates] = useState<ContractRateInput[]>([
+    { ...EMPTY_RATE },
+  ]);
+
+  const fieldCls = `
+    mt-1.5 w-full min-h-[46px] rounded-xl border
+    border-[var(--border-color)] bg-[var(--hover-2)]
+    px-3.5 py-3 text-base text-[var(--text-primary)]
+    placeholder-[var(--text-muted)]
+    transition-all
+    focus:outline-none focus:border-[var(--accent)]/40
+    focus:ring-2 focus:ring-[var(--accent-ring)]
+  `;
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+
     try {
       const res = await contractsApi.list({
         counterparty_id: counterpartyId,
         page,
         size: 10,
       });
-      setContracts(res.items);
-      setTotalPages(res.total_pages);
-      setTotalItems(res.total_items);
-      onCountChange?.(res.total_items);
+
+      const items = res.items ?? [];
+      const count = Number(res.total_items ?? 0);
+
+      setContracts(items);
+      setTotalPages(Math.max(1, Number(res.total_pages) || 1));
+      setTotalItems(count);
+      onCountChange?.(count);
     } catch {
       setError('Не удалось загрузить договоры');
     } finally {
       setLoading(false);
     }
-  }, [counterpartyId, page]);
+  }, [counterpartyId, page, onCountChange]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const resetForm = () => {
@@ -2860,47 +3137,76 @@ function ContractsTab({
       period: 'Год',
       sum: '',
     });
+
     setRates([{ ...EMPTY_RATE }]);
     setEditingId(null);
     setFormError(null);
     setShowForm(false);
   };
 
+  const scrollToForm = () => {
+    window.requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  };
+
   const startCreate = () => {
     resetForm();
     setShowForm(true);
+    scrollToForm();
   };
 
-  const startEdit = (c: Contract) => {
-    setEditingId(c.id);
+  const startEdit = (contract: Contract) => {
+    const contractRates = Array.isArray(contract.rates)
+      ? contract.rates
+      : [];
+
+    setEditingId(contract.id);
     setForm({
-      name: c.name,
-      date_start: c.date_start,
-      date_end: c.date_end ?? '',
-      status: c.status,
-      type: c.type,
-      period: c.period ?? 'Год',
-      sum: c.sum ?? '',
+      name: contract.name,
+      date_start: contract.date_start,
+      date_end: contract.date_end ?? '',
+      status: contract.status,
+      type: contract.type,
+      period: contract.period ?? 'Год',
+      sum:
+        contract.sum === null || contract.sum === undefined
+          ? ''
+          : String(contract.sum),
     });
+
     setRates(
-      c.rates.length
-        ? c.rates.map(r => ({
-            type_rate: r.type_rate,
-            rate: Number(r.rate),
-            unit_measurement_rate: r.unit_measurement_rate,
-            hours_subscription: r.hours_subscription ?? null,
-            hours_its: r.hours_its ?? null,
+      contractRates.length
+        ? contractRates.map(rate => ({
+            type_rate: rate.type_rate,
+            rate: Number(rate.rate),
+            unit_measurement_rate: rate.unit_measurement_rate,
+            hours_subscription: rate.hours_subscription ?? null,
+            hours_its: rate.hours_its ?? null,
           }))
         : [{ ...EMPTY_RATE }],
     );
+
     setFormError(null);
     setShowForm(true);
     setExpandedId(null);
+    setConfirmDeleteId(null);
+    scrollToForm();
   };
 
   const handleSave = async () => {
-    if (!form.name.trim() || !form.date_start || !form.status.trim() || !form.type.trim()) {
-      setFormError('Заполните обязательные поля: наименование, дата начала, статус, вид');
+    if (
+      !form.name.trim() ||
+      !form.date_start ||
+      !form.status.trim() ||
+      !form.type.trim()
+    ) {
+      setFormError(
+        'Заполните обязательные поля: наименование, дата начала, статус и вид договора.',
+      );
       return;
     }
 
@@ -2914,19 +3220,20 @@ function ContractsTab({
       status: form.status.trim(),
       type: form.type.trim(),
       period: form.period.trim() || null,
-      sum: form.sum ? Number(form.sum) : null,
-      rates: rates.map(r => ({
-        type_rate: r.type_rate.trim(),
-        rate: Number(r.rate),
-        unit_measurement_rate: r.unit_measurement_rate.trim(),
+      sum: form.sum.trim() ? Number(form.sum) : null,
+      rates: rates.map(rate => ({
+        type_rate: rate.type_rate.trim(),
+        rate: Number(rate.rate),
+        unit_measurement_rate: rate.unit_measurement_rate.trim(),
         hours_subscription:
-          r.hours_subscription === null || r.hours_subscription === undefined
+          rate.hours_subscription === null ||
+          rate.hours_subscription === undefined
             ? null
-            : Number(r.hours_subscription),
+            : Number(rate.hours_subscription),
         hours_its:
-          r.hours_its === null || r.hours_its === undefined
+          rate.hours_its === null || rate.hours_its === undefined
             ? null
-            : Number(r.hours_its),
+            : Number(rate.hours_its),
       })),
     };
 
@@ -2939,8 +3246,9 @@ function ContractsTab({
           ...payloadBase,
         });
       }
+
       resetForm();
-      load();
+      await load();
     } catch (e: any) {
       setFormError(
         typeof e?.response?.data?.error?.message === 'string'
@@ -2955,474 +3263,940 @@ function ContractsTab({
   };
 
   const handleDelete = async (id: string) => {
-    setDeleting(true);
+    setDeletingId(id);
+    setDeleteError(null);
+
     try {
       await contractsApi.remove(id);
       setConfirmDeleteId(null);
-      load();
-    } catch (e) {
-      console.error(e);
+
+      // Если удалили последний договор на странице, возвращаемся на предыдущую.
+      if (contracts.length === 1 && page > 1) {
+        setPage(currentPage => Math.max(1, currentPage - 1));
+      } else {
+        await load();
+      }
+    } catch {
+      setDeleteError('Не удалось удалить договор. Попробуйте ещё раз.');
     } finally {
-      setDeleting(false);
+      setDeletingId(null);
     }
   };
 
-  const setRate = (idx: number, patch: Partial<ContractRateInput>) =>
-    setRates(prev => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  const setRate = (
+    index: number,
+    patch: Partial<ContractRateInput>,
+  ) => {
+    setRates(current =>
+      current.map((rate, rateIndex) =>
+        rateIndex === index ? { ...rate, ...patch } : rate,
+      ),
+    );
+  };
 
-  const addRate = () => setRates(prev => [...prev, { ...EMPTY_RATE }]);
-  const removeRate = (idx: number) => setRates(prev => prev.filter((_, i) => i !== idx));
+  const addRate = () => {
+    setRates(current => [...current, { ...EMPTY_RATE }]);
+  };
 
-  const fmtDate = (d: string | null) =>
-    d ? new Date(d).toLocaleDateString('ru-RU') : '—';
+  const removeRate = (index: number) => {
+    setRates(current => current.filter((_, rateIndex) => rateIndex !== index));
+  };
+
+  const fmtDate = (dateValue: string | null | undefined) => {
+    if (!dateValue) return '—';
+
+    const dateString = /^\d{4}-\d{2}-\d{2}$/.test(dateValue)
+      ? `${dateValue}T00:00:00`
+      : dateValue;
+
+    const date = new Date(dateString);
+
+    if (Number.isNaN(date.getTime())) return dateValue;
+
+    return date.toLocaleDateString('ru-RU');
+  };
+
+  const formatMoney = (value: any): string | null => {
+    if (value === null || value === undefined || value === '') return null;
+
+    const amount = Number(value);
+
+    return Number.isFinite(amount)
+      ? `${amount.toLocaleString('ru-RU')} ₽`
+      : `${value} ₽`;
+  };
 
   return (
-    <div className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] overflow-hidden">
-      {/* HEADER */}
-      <div className="px-6 py-5 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--hover-1)]">
-        <h2 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2.5">
-          <FileText className="w-5 h-5 text-[var(--text-primary)]/40" />
-          Договоры
-          {totalItems > 0 && (
-            <span className="px-2 py-0.5 rounded-full bg-[var(--hover-3)] text-sm text-[var(--text-primary)]/50">
-              {totalItems}
-            </span>
-          )}
-        </h2>
-        <div className="flex items-center gap-2">
+    <div className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
+      {/* Заголовок вкладки */}
+      <div className="flex flex-col gap-4 border-b border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
+        <div className="flex min-w-0 items-center gap-3.5">
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--accent)]/10 text-[var(--accent)]">
+            <FileText size={21} />
+          </div>
+
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-bold text-[var(--text-primary)]">
+                Договоры
+              </h2>
+              <span className="rounded-full border border-[var(--border-color)] bg-[var(--hover-2)] px-2.5 py-0.5 text-xs font-medium text-[var(--text-primary)]/55">
+                {totalItems}
+              </span>
+            </div>
+            <p className="mt-0.5 text-sm text-[var(--text-primary)]/45">
+              Сроки, условия и ставки по договорам
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-shrink-0 items-center gap-2">
           <button
-            onClick={load}
-            className="p-2 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/70 transition-colors"
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            title="Обновить список"
+            aria-label="Обновить список договоров"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)]/50 transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <RefreshCcw size={16} />
+            <RefreshCcw
+              size={16}
+              className={loading ? 'animate-spin' : ''}
+            />
           </button>
+
           <button
+            type="button"
+            disabled={saving}
             onClick={() => (showForm ? resetForm() : startCreate())}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-base font-medium transition-all ${
+            className={`flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
               showForm
-                ? 'bg-[var(--hover-2)] text-[var(--text-primary)]/70'
-                : 'bg-[var(--accent)] text-white shadow-md'
+                ? 'border border-[var(--border-color)] bg-[var(--hover-2)] text-[var(--text-primary)]/75 hover:bg-[var(--hover-3)]'
+                : 'bg-[var(--accent)] text-white shadow-sm hover:brightness-110'
             }`}
           >
             {showForm ? <X size={16} /> : <Plus size={16} />}
-            {showForm ? 'Отмена' : 'Добавить'}
+            {showForm ? 'Закрыть форму' : 'Добавить договор'}
           </button>
         </div>
       </div>
 
-      {/* FORM */}
+      {/* Создание / редактирование */}
       {showForm && (
-        <div className="border-b border-[var(--border-color)] bg-[var(--hover-1)] p-6 space-y-4">
-          {formError && (
-            <div className="p-3 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-xl text-sm text-[var(--accent)] flex items-center gap-2">
-              <AlertTriangle size={15} className="flex-shrink-0" />
-              {formError}
+        <div
+          ref={formRef}
+          className="scroll-mt-6 border-b border-[var(--border-color)] bg-[var(--hover-1)]"
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-[var(--border-color)] px-4 py-4 sm:px-6">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--accent)]/10 text-[var(--accent)]">
+                {editingId ? <Edit size={17} /> : <Plus size={18} />}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)]">
+                  {editingId ? 'Редактирование' : 'Новый договор'}
+                </p>
+                <h3 className="mt-1 text-lg font-bold text-[var(--text-primary)]">
+                  {editingId ? 'Изменить условия договора' : 'Добавить договор'}
+                </h3>
+                <p className="mt-1 text-sm text-[var(--text-primary)]/45">
+                  Заполните основные данные и при необходимости добавьте ставки.
+                </p>
+              </div>
             </div>
-          )}
 
-          <div>
-            <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-              Наименование <span className="text-[var(--accent)]">*</span>
-            </label>
-            <input
-              value={form.name}
-              onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-              placeholder="Договор на 1С:ИТС №123 от 01.01.2026"
-              className={inputCls}
-            />
+            <button
+              type="button"
+              onClick={resetForm}
+              disabled={saving}
+              aria-label="Закрыть форму"
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-[var(--text-primary)]/45 transition-colors hover:bg-[var(--hover-2)] hover:text-[var(--text-primary)] disabled:opacity-50"
+            >
+              <X size={18} />
+            </button>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                Дата начала <span className="text-[var(--accent)]">*</span>
-              </label>
-              <input
-                type="date"
-                value={form.date_start}
-                onChange={e => setForm(p => ({ ...p, date_start: e.target.value }))}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                Дата окончания
-              </label>
-              <input
-                type="date"
-                value={form.date_end}
-                onChange={e => setForm(p => ({ ...p, date_end: e.target.value }))}
-                className={inputCls}
-              />
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                Статус <span className="text-[var(--accent)]">*</span>
-              </label>
-              <input
-                value={form.status}
-                onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
-                placeholder="Договор оформлен и подписан"
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                Вид договора <span className="text-[var(--accent)]">*</span>
-              </label>
-              <select
-                value={form.type}
-                onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
-                className={inputCls}
-              >
-                {CONTRACT_TYPES.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                Период оплаты
-              </label>
-              <select
-                value={form.period}
-                onChange={e => setForm(p => ({ ...p, period: e.target.value }))}
-                className={inputCls}
-              >
-                {CONTRACT_PERIODS.map(p => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                Сумма
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={form.sum}
-                onChange={e => setForm(p => ({ ...p, sum: e.target.value }))}
-                placeholder="120000.00"
-                className={inputCls}
-              />
-            </div>
-          </div>
-
-          {/* RATES */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm text-[var(--text-primary)]/50">
-                Ставки
-              </label>
-              <button
-                type="button"
-                onClick={addRate}
-                className="inline-flex items-center gap-1.5 text-sm text-[var(--accent)] hover:text-[var(--accent-hover)]"
-              >
-                <Plus size={14} /> Добавить ставку
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {rates.map((r, idx) => (
+          <form
+            onSubmit={event => {
+              event.preventDefault();
+              void handleSave();
+            }}
+          >
+            <div className="space-y-4 p-4 sm:p-6">
+              {formError && (
                 <div
-                  key={idx}
-                  className="rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] p-4 space-y-3"
+                  role="alert"
+                  className="flex items-start gap-2.5 rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/10 px-4 py-3 text-sm text-[var(--accent)]"
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-[1.5fr_1fr_1fr] gap-3">
-                    <div>
-                      <label className="block text-xs text-[var(--text-primary)]/40 mb-1">
-                        Вид ставки
-                      </label>
-                      <input
-                        value={r.type_rate}
-                        onChange={e => setRate(idx, { type_rate: e.target.value })}
-                        placeholder="фиксированная"
-                        className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-[var(--text-primary)]/40 mb-1">
-                        Ставка
-                      </label>
+                  <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
+              {/* Основные данные */}
+              <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 sm:p-5">
+                <div className="mb-4 flex items-start gap-3">
+                  <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--hover-2)] text-xs font-bold text-[var(--text-primary)]/50">
+                    1
+                  </span>
+                  <div>
+                    <h4 className="font-semibold text-[var(--text-primary)]">
+                      Основные данные
+                    </h4>
+                    <p className="mt-0.5 text-sm text-[var(--text-primary)]/40">
+                      Наименование, вид договора и сроки действия
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <label className="block min-w-0 md:col-span-2">
+                    <span className="text-sm text-[var(--text-primary)]/55">
+                      Наименование
+                      <span className="ml-1 text-[var(--accent)]">*</span>
+                    </span>
+                    <input
+                      value={form.name}
+                      onChange={event =>
+                        setForm(current => ({
+                          ...current,
+                          name: event.target.value,
+                        }))
+                      }
+                      placeholder="Например: Договор на 1С:ИТС №123"
+                      className={fieldCls}
+                    />
+                  </label>
+
+                  <ContractSelect
+                    label="Вид договора"
+                    required
+                    value={form.type}
+                    onChange={type =>
+                      setForm(current => ({ ...current, type }))
+                    }
+                    options={CONTRACT_TYPES}
+                    placeholder="Выберите вид договора"
+                  />
+
+                  <label className="block min-w-0">
+                    <span className="text-sm text-[var(--text-primary)]/55">
+                      Статус
+                      <span className="ml-1 text-[var(--accent)]">*</span>
+                    </span>
+                    <input
+                      value={form.status}
+                      onChange={event =>
+                        setForm(current => ({
+                          ...current,
+                          status: event.target.value,
+                        }))
+                      }
+                      placeholder="Например: Договор оформлен и подписан"
+                      className={fieldCls}
+                    />
+                  </label>
+
+                  <label className="block min-w-0">
+                    <span className="text-sm text-[var(--text-primary)]/55">
+                      Дата начала
+                      <span className="ml-1 text-[var(--accent)]">*</span>
+                    </span>
+                    <input
+                      type="date"
+                      value={form.date_start}
+                      onChange={event =>
+                        setForm(current => ({
+                          ...current,
+                          date_start: event.target.value,
+                        }))
+                      }
+                      className={fieldCls}
+                    />
+                  </label>
+
+                  <label className="block min-w-0">
+                    <span className="text-sm text-[var(--text-primary)]/55">
+                      Дата окончания
+                    </span>
+                    <input
+                      type="date"
+                      value={form.date_end}
+                      onChange={event =>
+                        setForm(current => ({
+                          ...current,
+                          date_end: event.target.value,
+                        }))
+                      }
+                      className={fieldCls}
+                    />
+                  </label>
+
+                  <ContractSelect
+                    label="Период оплаты"
+                    value={form.period}
+                    onChange={period =>
+                      setForm(current => ({ ...current, period }))
+                    }
+                    options={CONTRACT_PERIODS}
+                    placeholder="Выберите период оплаты"
+                  />
+
+                  <label className="block min-w-0">
+                    <span className="text-sm text-[var(--text-primary)]/55">
+                      Сумма договора
+                    </span>
+                    <div className="relative">
                       <input
                         type="number"
                         step="0.01"
                         min="0"
-                        value={r.rate}
-                        onChange={e => setRate(idx, { rate: Number(e.target.value) })}
-                        className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-[var(--text-primary)]/40 mb-1">
-                        Ед. измерения
-                      </label>
-                      <input
-                        value={r.unit_measurement_rate}
-                        onChange={e => setRate(idx, { unit_measurement_rate: e.target.value })}
-                        placeholder="часы"
-                        className={inputCls}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs text-[var(--text-primary)]/40 mb-1">
-                        Часы абонентские
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={r.hours_subscription ?? ''}
-                        onChange={e =>
-                          setRate(idx, {
-                            hours_subscription: e.target.value === '' ? null : Number(e.target.value),
-                          })
+                        value={form.sum}
+                        onChange={event =>
+                          setForm(current => ({
+                            ...current,
+                            sum: event.target.value,
+                          }))
                         }
-                        className={inputCls}
+                        placeholder="120000"
+                        className={`${fieldCls} pr-12`}
                       />
+                      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[var(--text-primary)]/35">
+                        ₽
+                      </span>
                     </div>
-                    <div>
-                      <label className="block text-xs text-[var(--text-primary)]/40 mb-1">
-                        Часы ИТС
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={r.hours_its ?? ''}
-                        onChange={e =>
-                          setRate(idx, {
-                            hours_its: e.target.value === '' ? null : Number(e.target.value),
-                          })
-                        }
-                        className={inputCls}
-                      />
-                    </div>
-                    <div className="flex items-end">
-                      <button
-                        type="button"
-                        onClick={() => removeRate(idx)}
-                        disabled={rates.length === 1}
-                        className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/20 text-[var(--accent)] text-sm font-medium transition-colors disabled:opacity-40"
-                      >
-                        <Trash2 size={14} /> Удалить
-                      </button>
-                    </div>
-                  </div>
+                  </label>
                 </div>
-              ))}
-            </div>
-          </div>
+              </section>
 
-          <div className="flex gap-3 pt-1">
-            <button
-              onClick={resetForm}
-              disabled={saving}
-              className="flex-1 px-4 py-3 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-base font-medium transition-colors disabled:opacity-50"
-            >
-              Отмена
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[var(--accent)] text-white text-base font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
-            >
-              {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-              {saving ? 'Сохранение...' : editingId ? 'Сохранить' : 'Создать'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* LIST */}
-      <div className="divide-y divide-[var(--border-color)]">
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 size={24} className="text-[var(--accent)]/40 animate-spin" />
-          </div>
-        ) : error ? (
-          <div className="py-12 text-center text-base text-[var(--accent)]">{error}</div>
-        ) : contracts.length === 0 ? (
-          <div className="flex flex-col items-center py-20 text-center px-6">
-            <FileText size={36} className="text-[var(--text-primary)]/15 mb-4" />
-            <p className="text-[var(--text-primary)]/60 text-base font-semibold mb-1">
-              Нет договоров
-            </p>
-            <p className="text-[var(--text-primary)]/40 text-sm mb-5">
-              Добавьте договор с контрагентом
-            </p>
-            {!showForm && (
-              <button
-                onClick={startCreate}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)]/20 hover:bg-[var(--accent)]/30 border border-[var(--accent)]/15 text-[var(--accent)] text-base font-medium transition-colors"
-              >
-                <Plus size={16} /> Добавить договор
-              </button>
-            )}
-          </div>
-        ) : (
-          contracts.map(c => {
-            const isExpanded = expandedId === c.id;
-            const isConfirming = confirmDeleteId === c.id;
-            return (
-              <div key={c.id} className={isExpanded ? 'bg-[var(--hover-1)]' : ''}>
-                <button
-                  onClick={() => setExpandedId(isExpanded ? null : c.id)}
-                  className="w-full flex items-center gap-4 px-6 py-4 text-left hover:bg-[var(--hover-1)] transition-colors group"
-                >
-                  <div className="w-11 h-11 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center text-[var(--accent)] flex-shrink-0 group-hover:scale-105 transition-transform">
-                    <FileText size={20} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                      <span className="text-base font-semibold text-[var(--text-primary)] truncate">
-                        {c.name}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-md bg-[var(--hover-3)] text-xs font-mono text-[var(--text-primary)]/60">
-                        {c.type}
-                      </span>
+              {/* Ставки */}
+              <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 sm:p-5">
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--hover-2)] text-xs font-bold text-[var(--text-primary)]/50">
+                      2
+                    </span>
+                    <div>
+                      <h4 className="font-semibold text-[var(--text-primary)]">
+                        Ставки
+                      </h4>
+                      <p className="mt-0.5 text-sm text-[var(--text-primary)]/40">
+                        Тарифы и часы по договору
+                      </p>
                     </div>
-                    <p className="text-sm text-[var(--text-primary)]/40">
-                      {c.status}
-                    </p>
                   </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    {c.sum && (
-                      <span className="text-sm font-mono text-[var(--text-primary)]/60 hidden sm:block">
-                        {Number(c.sum).toLocaleString('ru-RU')} ₽
-                      </span>
-                    )}
-                    {isExpanded ? (
-                      <ChevronUp size={18} className="text-[var(--text-primary)]/40" />
-                    ) : (
-                      <ChevronDown size={18} className="text-[var(--text-primary)]/20" />
-                    )}
-                  </div>
+
+                  <button
+                    type="button"
+                    onClick={addRate}
+                    className="inline-flex min-h-9 items-center justify-center gap-2 self-start rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/10 px-3.5 py-2 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/15 sm:self-auto"
+                  >
+                    <Plus size={15} />
+                    Добавить ставку
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {rates.map((rate, index) => (
+                    <div
+                      key={index}
+                      className="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)]"
+                    >
+                      <div className="flex items-center justify-between gap-3 border-b border-[var(--border-color)] px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--hover-2)] text-xs font-semibold text-[var(--text-primary)]/55">
+                            {String(index + 1).padStart(2, '0')}
+                          </span>
+                          <span className="text-sm font-semibold text-[var(--text-primary)]">
+                            Ставка
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeRate(index)}
+                          disabled={rates.length <= 1}
+                          title={
+                            rates.length <= 1
+                              ? 'Должна остаться хотя бы одна ставка'
+                              : 'Удалить ставку'
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/10 disabled:cursor-not-allowed disabled:opacity-35"
+                        >
+                          <Trash2 size={14} />
+                          Удалить
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-3">
+                        <label className="block min-w-0">
+                          <span className="text-xs text-[var(--text-primary)]/45">
+                            Вид ставки
+                          </span>
+                          <input
+                            value={rate.type_rate}
+                            onChange={event =>
+                              setRate(index, {
+                                type_rate: event.target.value,
+                              })
+                            }
+                            placeholder="Фиксированная"
+                            className={fieldCls}
+                          />
+                        </label>
+
+                        <label className="block min-w-0">
+                          <span className="text-xs text-[var(--text-primary)]/45">
+                            Размер ставки
+                          </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={rate.rate}
+                            onChange={event =>
+                              setRate(index, {
+                                rate:
+                                  event.target.value === ''
+                                    ? 0
+                                    : Number(event.target.value),
+                              })
+                            }
+                            placeholder="0"
+                            className={fieldCls}
+                          />
+                        </label>
+
+                        <label className="block min-w-0">
+                          <span className="text-xs text-[var(--text-primary)]/45">
+                            Единица измерения
+                          </span>
+                          <input
+                            value={rate.unit_measurement_rate}
+                            onChange={event =>
+                              setRate(index, {
+                                unit_measurement_rate: event.target.value,
+                              })
+                            }
+                            placeholder="Часы"
+                            className={fieldCls}
+                          />
+                        </label>
+
+                        <label className="block min-w-0">
+                          <span className="text-xs text-[var(--text-primary)]/45">
+                            Абонентские часы
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={rate.hours_subscription ?? ''}
+                            onChange={event =>
+                              setRate(index, {
+                                hours_subscription:
+                                  event.target.value === ''
+                                    ? null
+                                    : Number(event.target.value),
+                              })
+                            }
+                            placeholder="Не указано"
+                            className={fieldCls}
+                          />
+                        </label>
+
+                        <label className="block min-w-0">
+                          <span className="text-xs text-[var(--text-primary)]/45">
+                            Часы ИТС
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={rate.hours_its ?? ''}
+                            onChange={event =>
+                              setRate(index, {
+                                hours_its:
+                                  event.target.value === ''
+                                    ? null
+                                    : Number(event.target.value),
+                              })
+                            }
+                            placeholder="Не указано"
+                            className={fieldCls}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
+
+            {/* Кнопки формы */}
+            <div className="flex flex-col-reverse gap-3 border-t border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <p className="text-xs text-[var(--text-primary)]/40">
+                Поля, отмеченные звёздочкой, обязательны.
+              </p>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  disabled={saving}
+                  className="flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)]/70 transition-colors hover:bg-[var(--hover-2)] disabled:opacity-50 sm:flex-none"
+                >
+                  Отмена
                 </button>
 
-                {isExpanded && (
-                  <div className="px-6 pb-6 pl-20 space-y-5 border-t border-[var(--border-color)]">
-                    <div className="flex flex-wrap gap-2.5 pt-4">
-                      <span className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--hover-2)] text-base text-[var(--text-primary)]/60 border border-[var(--border-color)]">
-                        <Calendar size={16} className="text-[var(--text-primary)]/40" />
-                        {fmtDate(c.date_start)} — {fmtDate(c.date_end)}
-                      </span>
-                      {c.period && (
-                        <span className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--hover-2)] text-base text-[var(--text-primary)]/60 border border-[var(--border-color)]">
-                          <Clock size={16} className="text-[var(--text-primary)]/40" />
-                          {c.period}
-                        </span>
-                      )}
-                      <span className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--hover-2)] text-base text-[var(--text-primary)]/60 border border-[var(--border-color)]">
-                        <Hash size={16} className="text-[var(--text-primary)]/40" />
-                        {c.status}
-                      </span>
-                    </div>
-
-                    {c.rates.length > 0 && (
-                      <div>
-                        <p className="text-xs uppercase tracking-widest text-[var(--text-primary)]/40 mb-3 font-semibold">
-                          Ставки
-                        </p>
-                        <div className="rounded-xl border border-[var(--border-color)] divide-y divide-white/[0.06] bg-[var(--hover-1)]">
-                          {c.rates.map(r => (
-                            <div key={r.id} className="flex items-start gap-4 px-5 py-3.5">
-                              <span className="text-base text-[var(--text-primary)]/40 w-[160px] flex-shrink-0">
-                                {r.type_rate}
-                              </span>
-                              <span className="text-base text-[var(--text-primary)]/80 break-words min-w-0">
-                                {Number(r.rate).toLocaleString('ru-RU')} за {r.unit_measurement_rate}
-                                {r.hours_subscription != null && ` · абон. ${r.hours_subscription} ч`}
-                                {r.hours_its != null && ` · ИТС ${r.hours_its} ч`}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {isConfirming ? (
-                      <div className="px-4 py-3 rounded-xl bg-[var(--accent)]/5 border border-[var(--accent)]/20">
-                        <p className="text-sm text-[var(--text-primary)] mb-3">
-                          Удалить договор <span className="font-semibold">{c.name}</span>?
-                        </p>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setConfirmDeleteId(null)}
-                            className="flex-1 px-3 py-2 rounded-lg bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-sm font-medium transition-colors"
-                          >
-                            Отмена
-                          </button>
-                          <button
-                            onClick={() => handleDelete(c.id)}
-                            disabled={deleting}
-                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[var(--accent)]/20 hover:bg-[var(--accent)]/30 border border-[var(--accent)]/30 text-[var(--accent)] text-sm font-medium transition-colors disabled:opacity-50"
-                          >
-                            {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                            Удалить
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2 flex-wrap">
-                        <button
-                          onClick={() => startEdit(c)}
-                          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--hover-2)] hover:bg-[var(--hover-3)] text-[var(--text-primary)]/70 text-sm font-medium transition-colors"
-                        >
-                          <Edit size={16} /> Изменить
-                        </button>
-                        <button
-                          onClick={() => setConfirmDeleteId(c.id)}
-                          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/20 text-[var(--accent)] text-sm font-medium transition-colors"
-                        >
-                          <Trash2 size={16} /> Удалить
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
+                >
+                  {saving ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={16} />
+                  )}
+                  {saving
+                    ? 'Сохранение…'
+                    : editingId
+                      ? 'Сохранить изменения'
+                      : 'Создать договор'}
+                </button>
               </div>
-            );
-          })
-        )}
-      </div>
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between px-6 py-4 border-t border-[var(--border-color)]">
-          <span className="text-base text-[var(--text-primary)]/40">
-            Стр. {page} из {totalPages}
-          </span>
-          <div className="flex gap-1.5">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="p-2 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 disabled:opacity-20"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="p-2 rounded-lg hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 disabled:opacity-20"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
+            </div>
+          </form>
         </div>
       )}
+
+      {/* Список договоров */}
+      <div>
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--border-color)] px-4 py-4 sm:px-6">
+          <div>
+            <h3 className="font-semibold text-[var(--text-primary)]">
+              Список договоров
+            </h3>
+            <p className="mt-0.5 text-sm text-[var(--text-primary)]/40">
+              Всего: {totalItems}
+            </p>
+          </div>
+
+          {totalPages > 1 && (
+            <span className="text-xs text-[var(--text-primary)]/40">
+              Страница {page} из {totalPages}
+            </span>
+          )}
+        </div>
+
+        <div className="space-y-3 p-3 sm:p-4">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-16">
+              <Loader2
+                size={24}
+                className="animate-spin text-[var(--accent)]"
+              />
+              <p className="text-sm text-[var(--text-primary)]/40">
+                Загружаем договоры…
+              </p>
+            </div>
+          ) : error ? (
+            <div
+              role="alert"
+              className="flex flex-col items-center justify-center rounded-2xl border border-[var(--accent)]/15 bg-[var(--accent)]/5 px-5 py-12 text-center"
+            >
+              <AlertTriangle
+                size={28}
+                className="mb-3 text-[var(--accent)]"
+              />
+              <p className="font-medium text-[var(--text-primary)]">
+                {error}
+              </p>
+              <button
+                type="button"
+                onClick={() => void load()}
+                className="mt-4 inline-flex items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3.5 py-2 text-sm text-[var(--text-primary)]/70 transition-colors hover:bg-[var(--hover-2)]"
+              >
+                <RefreshCcw size={14} />
+                Попробовать снова
+              </button>
+            </div>
+          ) : contracts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-color)] px-5 py-14 text-center">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--hover-1)] text-[var(--text-primary)]/35">
+                <FileText size={25} />
+              </div>
+              <p className="font-semibold text-[var(--text-primary)]">
+                Договоров пока нет
+              </p>
+              <p className="mt-1 max-w-sm text-sm text-[var(--text-primary)]/40">
+                Добавьте договор, чтобы сохранить сроки, сумму и условия обслуживания.
+              </p>
+              {!showForm && (
+                <button
+                  type="button"
+                  onClick={startCreate}
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white transition-all hover:brightness-110"
+                >
+                  <Plus size={16} />
+                  Добавить договор
+                </button>
+              )}
+            </div>
+          ) : (
+            contracts.map(contract => {
+              const isExpanded = expandedId === contract.id;
+              const isConfirming = confirmDeleteId === contract.id;
+              const contractRates = Array.isArray(contract.rates)
+                ? contract.rates
+                : [];
+              const amount = formatMoney(contract.sum);
+
+              return (
+                <article
+                  key={contract.id}
+                  className={`overflow-hidden rounded-2xl border bg-[var(--bg-card)] transition-colors ${
+                    isExpanded
+                      ? 'border-[var(--accent)]/25'
+                      : 'border-[var(--border-color)] hover:border-[var(--border-color)]'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    aria-expanded={isExpanded}
+                    onClick={() =>
+                      setExpandedId(isExpanded ? null : contract.id)
+                    }
+                    className="flex w-full items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-[var(--hover-1)] sm:items-center sm:gap-4 sm:px-5"
+                  >
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--accent)]/10 text-[var(--accent)]">
+                      <FileText size={18} />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className="min-w-0 whitespace-normal break-words font-semibold text-[var(--text-primary)]"
+                          style={{ overflowWrap: 'anywhere' }}
+                        >
+                          {contract.name}
+                        </span>
+
+                        <span className="rounded-lg border border-[var(--border-color)] bg-[var(--hover-1)] px-2 py-0.5 text-xs font-medium text-[var(--text-primary)]/60">
+                          {contract.type}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--hover-1)] px-2.5 py-1 text-xs text-[var(--text-primary)]/65">
+                          <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[var(--accent)]" />
+                          <span
+                            className="whitespace-normal break-words"
+                            style={{ overflowWrap: 'anywhere' }}
+                          >
+                            {contract.status || 'Без статуса'}
+                          </span>
+                        </span>
+
+                        <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-primary)]/45">
+                          <Calendar size={13} className="flex-shrink-0" />
+                          {contract.date_end
+                            ? `${fmtDate(contract.date_start)} — ${fmtDate(contract.date_end)}`
+                            : `С ${fmtDate(contract.date_start)}`}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-shrink-0 flex-col items-end gap-2 pt-0.5">
+                      {amount && (
+                        <span className="max-w-[115px] break-words text-right text-xs font-semibold text-[var(--text-primary)]/70 sm:max-w-none sm:text-sm">
+                          {amount}
+                        </span>
+                      )}
+
+                      {isExpanded ? (
+                        <ChevronUp
+                          size={17}
+                          className="text-[var(--text-primary)]/40"
+                        />
+                      ) : (
+                        <ChevronDown
+                          size={17}
+                          className="text-[var(--text-primary)]/35"
+                        />
+                      )}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-[var(--border-color)] px-4 pb-4 pt-4 sm:px-5 sm:pb-5">
+                      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+                        <div className="flex min-w-0 items-start gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] p-3.5">
+                          <Calendar
+                            size={17}
+                            className="mt-0.5 flex-shrink-0 text-[var(--text-primary)]/40"
+                          />
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-primary)]/40">
+                              Срок действия
+                            </p>
+                            <p className="mt-1 break-words text-sm font-medium text-[var(--text-primary)]/80">
+                              {fmtDate(contract.date_start)}
+                              {' — '}
+                              {fmtDate(contract.date_end)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex min-w-0 items-start gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] p-3.5">
+                          <Clock
+                            size={17}
+                            className="mt-0.5 flex-shrink-0 text-[var(--text-primary)]/40"
+                          />
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-primary)]/40">
+                              Период оплаты
+                            </p>
+                            <p className="mt-1 break-words text-sm font-medium text-[var(--text-primary)]/80">
+                              {contract.period || 'Не указан'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex min-w-0 items-start gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] p-3.5">
+                          <Hash
+                            size={17}
+                            className="mt-0.5 flex-shrink-0 text-[var(--text-primary)]/40"
+                          />
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-primary)]/40">
+                              Сумма договора
+                            </p>
+                            <p className="mt-1 break-words text-sm font-medium text-[var(--text-primary)]/80">
+                              {amount || 'Не указана'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-5">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <div>
+                            <h4 className="text-sm font-semibold text-[var(--text-primary)]">
+                              Ставки
+                            </h4>
+                            <p className="mt-0.5 text-xs text-[var(--text-primary)]/40">
+                              {contractRates.length
+                                ? `Указано ставок: ${contractRates.length}`
+                                : 'Ставки не добавлены'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {contractRates.length > 0 && (
+                          <div className="overflow-hidden rounded-xl border border-[var(--border-color)]">
+                            {contractRates.map((rate, index) => {
+                              const numericRate = Number(rate.rate);
+                              const rateText = Number.isFinite(numericRate)
+                                ? numericRate.toLocaleString('ru-RU')
+                                : String(rate.rate ?? '—');
+
+                              const hours = [
+                                rate.hours_subscription != null
+                                  ? `Абонентские: ${rate.hours_subscription} ч`
+                                  : null,
+                                rate.hours_its != null
+                                  ? `ИТС: ${rate.hours_its} ч`
+                                  : null,
+                              ]
+                                .filter(Boolean)
+                                .join(' · ');
+
+                              return (
+                                <div
+                                  key={rate.id ?? `${rate.type_rate}-${index}`}
+                                  className={`grid grid-cols-1 gap-3 bg-[var(--hover-1)] p-4 sm:grid-cols-3 ${
+                                    index > 0
+                                      ? 'border-t border-[var(--border-color)]'
+                                      : ''
+                                  }`}
+                                >
+                                  <div className="min-w-0">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-primary)]/40">
+                                      Вид ставки
+                                    </p>
+                                    <p className="mt-1 break-words text-sm font-medium text-[var(--text-primary)]/80">
+                                      {rate.type_rate || `Ставка ${index + 1}`}
+                                    </p>
+                                  </div>
+
+                                  <div className="min-w-0">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-primary)]/40">
+                                      Размер
+                                    </p>
+                                    <p className="mt-1 break-words text-sm text-[var(--text-primary)]/75">
+                                      {rateText}
+                                      {rate.unit_measurement_rate
+                                        ? ` за ${rate.unit_measurement_rate}`
+                                        : ''}
+                                    </p>
+                                  </div>
+
+                                  <div className="min-w-0">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-primary)]/40">
+                                      Часы
+                                    </p>
+                                    <p className="mt-1 break-words text-sm text-[var(--text-primary)]/75">
+                                      {hours || 'Не указаны'}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-5 border-t border-[var(--border-color)] pt-4">
+                        {isConfirming ? (
+                          <div className="rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-4">
+                            <div className="flex items-start gap-3">
+                              <AlertTriangle
+                                size={18}
+                                className="mt-0.5 flex-shrink-0 text-[var(--accent)]"
+                              />
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                                  Удалить этот договор?
+                                </p>
+                                <p
+                                  className="mt-1 break-words text-sm text-[var(--text-primary)]/55"
+                                  style={{ overflowWrap: 'anywhere' }}
+                                >
+                                  {contract.name}. Это действие нельзя отменить.
+                                </p>
+                              </div>
+                            </div>
+
+                            {deleteError && (
+                              <p
+                                role="alert"
+                                className="mt-3 text-sm text-[var(--accent)]"
+                              >
+                                {deleteError}
+                              </p>
+                            )}
+
+                            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setConfirmDeleteId(null);
+                                  setDeleteError(null);
+                                }}
+                                disabled={deletingId === contract.id}
+                                className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-2 text-sm font-medium text-[var(--text-primary)]/70 transition-colors hover:bg-[var(--hover-2)] disabled:opacity-50"
+                              >
+                                Оставить договор
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => void handleDelete(contract.id)}
+                                disabled={deletingId === contract.id}
+                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {deletingId === contract.id ? (
+                                  <Loader2
+                                    size={15}
+                                    className="animate-spin"
+                                  />
+                                ) : (
+                                  <Trash2 size={15} />
+                                )}
+                                Удалить договор
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <p className="text-xs text-[var(--text-primary)]/40">
+                              Можно изменить условия или удалить договор.
+                            </p>
+
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => startEdit(contract)}
+                                className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--hover-1)] px-3.5 py-2 text-sm font-medium text-[var(--text-primary)]/75 transition-colors hover:bg-[var(--hover-2)]"
+                              >
+                                <Edit size={15} />
+                                Изменить
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDeleteError(null);
+                                  setConfirmDeleteId(contract.id);
+                                }}
+                                className="inline-flex items-center gap-2 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 px-3.5 py-2 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/10"
+                              >
+                                <Trash2 size={15} />
+                                Удалить
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </article>
+              );
+            })
+          )}
+        </div>
+
+        {!loading && !error && contracts.length > 0 && totalPages > 1 && (
+          <div className="flex items-center justify-between gap-3 border-t border-[var(--border-color)] px-4 py-4 sm:px-6">
+            <span className="text-sm text-[var(--text-primary)]/45">
+              Страница {page} из {totalPages}
+            </span>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setPage(currentPage => Math.max(1, currentPage - 1))
+                }
+                disabled={page <= 1}
+                aria-label="Предыдущая страница"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)]/65 transition-colors hover:bg-[var(--hover-2)] disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <ChevronLeft size={17} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setPage(currentPage =>
+                    Math.min(totalPages, currentPage + 1),
+                  )
+                }
+                disabled={page >= totalPages}
+                aria-label="Следующая страница"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)]/65 transition-colors hover:bg-[var(--hover-2)] disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <ChevronRight size={17} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
-
 // ─── Типы вкладок ─────────────────────────────────────────────────────────────
 
 type TabType =
