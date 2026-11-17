@@ -1363,3 +1363,26 @@ export const feedbacksApi = {
     return res.data;
   },
 };
+
+// ==== Contracts API ====
+export const contractsApi = {
+  create: async (data: CreateContractInput): Promise<Contract> => {
+    const r = await api.post<Contract>('/api/v1/contracts', data);
+    return r.data;
+  },
+  getById: async (id: string): Promise<Contract> => {
+    const r = await api.get<Contract>(`/api/v1/contracts/${id}`);
+    return r.data;
+  },
+  list: async (params: { counterparty_id?: string; page?: number; size?: number }) => {
+    const r = await api.get<PaginatedResponse<Contract>>('/api/v1/contracts', { params });
+    return r.data;
+  },
+  update: async (id: string, data: UpdateContractInput): Promise<Contract> => {
+    const r = await api.put<Contract>(`/api/v1/contracts/${id}`, data);
+    return r.data;
+  },
+  remove: async (id: string): Promise<void> => {
+    await api.delete(`/api/v1/contracts/${id}`);
+  },
+};

@@ -20,7 +20,7 @@ class CounterpartyOrm(Base):
     inn: Mapped[str]
     kpp: Mapped[str | None] = mapped_column(nullable=True)
     okpo: Mapped[str | None] = mapped_column(nullable=True)
-    phone: Mapped[str]
+    phone: Mapped[str | None] = mapped_column(nullable=True)
     email: Mapped[str | None] = mapped_column(unique=True, nullable=True)
     address: Mapped[str | None] = mapped_column(nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(nullable=True)

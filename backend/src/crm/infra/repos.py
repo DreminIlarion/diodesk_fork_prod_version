@@ -65,7 +65,7 @@ class CounterpartyMapper(ModelMapper[Counterparty, CounterpartyOrm]):
             inn=entity.inn.value,
             kpp=None if entity.kpp is None else entity.kpp.value,
             okpo=None if entity.okpo is None else entity.okpo.value,
-            phone=entity.phone.value,
+            phone=None if entity.phone is None else entity.phone.value,
             email=entity.email,
             address=entity.address,
             avatar_url=entity.avatar_url,

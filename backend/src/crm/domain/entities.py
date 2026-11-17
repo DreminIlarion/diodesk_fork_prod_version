@@ -54,7 +54,7 @@ class Counterparty(Entity):
     inn: Inn
     kpp: Kpp | None = None
     okpo: Okpo | None = None
-    phone: Phone
+    phone: Phone | None = None
     email: EmailStr
     address: str | None = None
     avatar_url: str | None = None

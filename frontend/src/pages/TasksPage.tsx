@@ -134,7 +134,7 @@ const ST_LABEL: Record<TaskStatus, string> = {
 
 
 const TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
-  backlog: ['todo', 'in_progress', 'cancelled'],
+  backlog: ['todo', 'cancelled'],
   todo: ['backlog', 'in_progress', 'paused', 'blocked', 'to_review', 'to_fix', 'to_test', 'done', 'cancelled'],
   in_progress: ['backlog', 'todo', 'paused', 'blocked', 'to_review', 'to_fix', 'to_test', 'done', 'cancelled'],
   paused: ['backlog', 'todo', 'in_progress', 'blocked', 'cancelled'],
@@ -987,6 +987,7 @@ function ListView({ tasks, umap, onView }: {
               <th className="px-4 py-3 font-medium">Статус</th>
               <th className="px-4 py-3 font-medium">Приоритет</th>
               <th className="px-4 py-3 font-medium">Исполнитель</th>
+              <th className="px-4 py-3 font-medium">Ревьювер</th>
               <th className="px-4 py-3 font-medium">Срок</th>
               <th className="px-4 py-3 font-medium">Трудозатраты (План)</th>
               <th className="px-4 py-3 font-medium">Трудозатраты (Факт)</th>
@@ -1033,6 +1034,20 @@ function ListView({ tasks, umap, onView }: {
                       </div>
                     ) : <span className="text-[var(--text-primary)]/30">—</span>}
                   </td>
+
+                  <td className="px-4 py-3">
+  {t.reviewer_id ? (() => {
+    const r = umap.get(t.reviewer_id);
+    return r ? (
+      <div className="flex items-center gap-2">
+        <Ava name={r.full_name || r.username} url={r.avatar_url} sz="xs" />
+        <span className="text-[var(--text-primary)]/70 truncate max-w-[140px] text-sm">
+          {r.full_name || r.username}
+        </span>
+      </div>
+    ) : <span className="text-[var(--text-primary)]/30">—</span>;
+  })() : <span className="text-[var(--text-primary)]/30">—</span>}
+</td>
                   <td className="px-4 py-3">
                     {t.due_date ? (
                       <span className={`text-sm ${od ? 'text-red-400 font-medium' : 'text-[var(--text-primary)]/50'}`}>{fmtTaskDue(t)}</span>
@@ -1161,6 +1176,9 @@ export const TCard = memo(function TCard({
           {t.stage_id && (
             <Milestone className="w-4.5 h-4.5 text-amber-400/60" />
           )}
+          {t.reviewer_id && (
+  <Eye className="w-4.5 h-4.5 text-violet-400/70" />
+)}
 
           {t.due_date && (
             <span
@@ -1317,7 +1335,7 @@ function DragPanel({
     >
       <div className="w-[310px] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-2xl overflow-hidden pointer-events-auto">
         <div className="px-4 py-4 border-b border-[var(--border-color)] bg-[var(--hover-1)]">
-          <p className="text-[10px] uppercase tracking-widest text-[var(--text-primary)]/40 font-semibold mb-2">
+          <p className="text-[10px]  tracking-widest text-[var(--text-primary)]/40  mb-2">
             Вы переносите
           </p>
 
@@ -1325,10 +1343,10 @@ function DragPanel({
 
             <div className="min-w-0">
               <div className="text-xs font-mono font-bold text-[var(--accent)]">
-                # <span className="text-xs font-mono font-bold text-[var(--text-primary)]" >{task.number} </span>
+                # <span className="text-xs font-mono  text-[var(--text-primary)]" >{task.number} </span>
               </div>
 
-              <div className="text-sm font-bold text-[var(--text-primary)] leading-snug mt-1 line-clamp-3">
+              <div className="text-sm  text-[var(--text-primary)] leading-snug mt-1 line-clamp-3">
                 {task.title}
               </div>
 
@@ -3562,6 +3580,34 @@ function DetailModal({
                     )}
                   </div>
 
+                  {/* Reviewer */}
+{t.reviewer_id && (
+  <div className="px-4 py-3">
+    <div className="text-sm text-[var(--text-primary)]/45 mb-2">
+      Ревьювер
+    </div>
+    {(() => {
+      const reviewer = umap.get(t.reviewer_id!);
+      return reviewer ? (
+        <div className="flex items-center gap-2">
+          <Ava
+            name={reviewer.full_name || reviewer.username}
+            url={reviewer.avatar_url}
+            sz="xs"
+          />
+          <span className="text-sm font-medium text-[var(--text-primary)]/80 truncate">
+            {reviewer.full_name || reviewer.username}
+          </span>
+        </div>
+      ) : (
+        <span className="text-sm text-[var(--text-primary)]/30">
+          —
+        </span>
+      );
+    })()}
+  </div>
+)}
+
                   {/* Due date */}
                   <div className="flex items-start justify-between gap-4 px-4 py-3">
                     <span className="text-sm text-[var(--text-primary)]/45">
@@ -4154,7 +4200,7 @@ export default function TasksPage() {
     if (up) return 'project';
     if (ua) return 'assignee';
     if (ut) return 'ticket';
-    return staff ? 'internal' : 'my';
+    return 'my';
   });
 
     const [selP, setSelP] = useState(up ?? '');

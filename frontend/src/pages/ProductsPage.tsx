@@ -61,7 +61,12 @@ const formatAttrValue = (v: any): string => {
 
 // ─── Filter Dropdown ───
 
-interface FilterOption { value: string; label: string; icon?: React.ReactNode; dot?: string; }
+interface FilterOption {
+  value: string;
+  label: string;
+  icon?: React.ReactNode;
+  dot?: string;
+}
 
 function FilterDropdown({
   value, onChange, options, placeholder, icon,
@@ -80,14 +85,18 @@ function FilterDropdown({
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
     };
+
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   useLayoutEffect(() => {
     if (!open || !btnRef.current) return;
+
     const rect = btnRef.current.getBoundingClientRect();
     setOpenUp(window.innerHeight - rect.bottom < 260);
     setAlignRight(window.innerWidth - rect.left < 220);
@@ -112,24 +121,34 @@ function FilterDropdown({
           }
         `}
       >
-        <span className={value ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'}>{icon}</span>
+        <span className={value ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]/40'}>
+          {icon}
+        </span>
         <span>{selected ? selected.label : placeholder}</span>
+
         {value ? (
           <span
-            onClick={e => { e.stopPropagation(); onChange(''); setOpen(false); }}
+            onClick={e => {
+              e.stopPropagation();
+              onChange('');
+              setOpen(false);
+            }}
             className="ml-1 p-0.5 rounded-md hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 cursor-pointer transition-colors"
           >
             <X size={14} />
           </span>
         ) : (
-          <ChevronDown size={16} className={`text-[var(--text-primary)]/40 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+          <ChevronDown
+            size={16}
+            className={`text-[var(--text-primary)]/40 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+          />
         )}
       </button>
 
       {open && (
         <div
           className={`
-            absolute z-[100]             min-w-[200px] w-max bg-[var(--bg-card)] border border-[var(--border-color)]
+            absolute z-[100] min-w-[200px] w-max bg-[var(--bg-card)] border border-[var(--border-color)]
             rounded-xl overflow-hidden
             ${openUp ? 'bottom-full mb-2' : 'top-full mt-2'}
             ${alignRight ? 'right-0' : 'left-0'}
@@ -139,25 +158,44 @@ function FilterDropdown({
           <div className="py-1.5 max-h-[300px] overflow-y-auto">
             <button
               type="button"
-              onClick={() => { onChange(''); setOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-left text-base transition-colors ${!value ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]' : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)]'
-                }`}
+              onClick={() => {
+                onChange('');
+                setOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-left text-base transition-colors ${
+                !value
+                  ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]'
+                  : 'text-[var(--text-primary)]/60 hover:bg-[var(--hover-1)]'
+              }`}
             >
-              {!value ? <Check size={16} className="text-[var(--accent)] flex-shrink-0" /> : <span className="w-4 flex-shrink-0" />}
+              {!value
+                ? <Check size={16} className="text-[var(--accent)] flex-shrink-0" />
+                : <span className="w-4 flex-shrink-0" />}
               <span>{placeholder}</span>
             </button>
+
             <div className="h-px bg-[var(--hover-2)] mx-3 my-1" />
+
             {options.map(opt => {
               const active = opt.value === value;
+
               return (
                 <button
                   type="button"
                   key={opt.value}
-                  onClick={() => { onChange(opt.value); setOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-left text-base transition-colors ${active ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]' : 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)]'
-                    }`}
+                  onClick={() => {
+                    onChange(opt.value);
+                    setOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left text-base transition-colors ${
+                    active
+                      ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]'
+                      : 'text-[var(--text-primary)]/70 hover:bg-[var(--hover-1)]'
+                  }`}
                 >
-                  {active ? <Check size={16} className="text-[var(--accent)] flex-shrink-0" /> : <span className="w-4 flex-shrink-0" />}
+                  {active
+                    ? <Check size={16} className="text-[var(--accent)] flex-shrink-0" />
+                    : <span className="w-4 flex-shrink-0" />}
                   <span className="flex items-center gap-2.5">
                     {opt.dot && <span className={`w-2.5 h-2.5 rounded-full ${opt.dot}`} />}
                     {opt.icon}
@@ -178,10 +216,14 @@ function FilterDropdown({
 function ActiveFilters({
   category, status, onClearCategory, onClearStatus, onClearAll,
 }: {
-  category: string; status: string;
-  onClearCategory: () => void; onClearStatus: () => void; onClearAll: () => void;
+  category: string;
+  status: string;
+  onClearCategory: () => void;
+  onClearStatus: () => void;
+  onClearAll: () => void;
 }) {
   if (!category && !status) return null;
+
   const catInfo = catMeta(category);
   const sInfo = statusMeta(status);
 
@@ -190,25 +232,37 @@ function ActiveFilters({
       <span className="text-base text-[var(--text-primary)]/40 flex items-center gap-1.5">
         <Filter size={14} /> Фильтры:
       </span>
+
       {category && catInfo && (
         <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${catInfo.bg} border border-[var(--border-color)] text-base ${catInfo.color}`}>
           <catInfo.icon size={14} />
           {catInfo.label}
-          <span onClick={onClearCategory} className="ml-0.5 p-0.5 rounded hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 cursor-pointer transition-colors">
+          <span
+            onClick={onClearCategory}
+            className="ml-0.5 p-0.5 rounded hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 cursor-pointer transition-colors"
+          >
             <X size={12} />
           </span>
         </span>
       )}
+
       {status && sInfo && (
         <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--hover-2)] border border-[var(--border-color)] text-base text-[var(--text-primary)]/80">
           <span className={`w-2.5 h-2.5 rounded-full ${sInfo.dot}`} />
           {sInfo.label}
-          <span onClick={onClearStatus} className="ml-0.5 p-0.5 rounded hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 cursor-pointer transition-colors">
+          <span
+            onClick={onClearStatus}
+            className="ml-0.5 p-0.5 rounded hover:bg-[var(--hover-1)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/60 cursor-pointer transition-colors"
+          >
             <X size={12} />
           </span>
         </span>
       )}
-      <button onClick={onClearAll} className="text-base text-[var(--accent)]/60 hover:text-[var(--accent)] transition-colors ml-1">
+
+      <button
+        onClick={onClearAll}
+        className="text-base text-[var(--accent)]/60 hover:text-[var(--accent)] transition-colors ml-1"
+      >
         Сбросить
       </button>
     </div>
@@ -233,21 +287,30 @@ const ProductRow = ({ product, onClick }: { product: any; onClick: () => void })
     >
       <div className={`flex-shrink-0 w-10 h-10 rounded-xl ${cat?.bg || 'bg-[var(--hover-2)]'}
                       flex items-center justify-center ${cat?.color || 'text-[var(--text-primary)]/40'}
-                      group-hover:scale-105 transition-transform`}>
+                      group-hover:scale-105 transition-transform`}
+      >
         <Icon size={18} />
       </div>
+
       <div className="flex-1 min-w-0">
-        <span className="text-base text-[var(--text-primary)] font-medium truncate block">
+        <span
+          className="block text-base text-[var(--text-primary)] font-medium whitespace-normal break-words leading-snug"
+          style={{ overflowWrap: 'anywhere' }}
+        >
           {product.display_name || product.name}
         </span>
+
         {product.description && (
           <p className="text-base text-[var(--text-primary)]/40 mt-0.5 leading-snug">
             {truncate(product.description)}
           </p>
         )}
       </div>
+
       <div className="flex items-center gap-5 flex-shrink-0">
-        <span className="text-base text-[var(--text-primary)]/50 hidden md:block w-[110px] truncate text-right">{product.vendor}</span>
+        <span className="text-base text-[var(--text-primary)]/50 hidden md:block w-[110px] truncate text-right">
+          {product.vendor}
+        </span>
         <span className="text-base text-[var(--text-primary)]/40 hidden lg:block w-[70px] text-right font-mono">
           {product.version ? `v${product.version}` : '—'}
         </span>
@@ -256,87 +319,167 @@ const ProductRow = ({ product, onClick }: { product: any; onClick: () => void })
         </span>
         <div className="flex items-center gap-2 w-[100px] justify-end">
           <div className={`w-2 h-2 rounded-full ${statusDot(product.status)}`} />
-          <span className={`text-base ${sInfo?.color || 'text-[var(--text-primary)]/40'}`}>{statusLabel(product.status)}</span>
+          <span className={`text-base ${sInfo?.color || 'text-[var(--text-primary)]/40'}`}>
+            {statusLabel(product.status)}
+          </span>
         </div>
       </div>
     </button>
   );
 };
 
-// ─── Product Modal 
+// ─── Product Modal ──
 
 const ProductModal = ({ product, onClose }: { product: any; onClose: () => void }) => {
   const cat = catMeta(product.category);
   const Icon = cat?.icon || Package;
   const sInfo = statusMeta(product.status);
+  const productTitle = product.display_name || product.name || 'Без названия';
+
   const attrEntries = Object.entries(product.attributes || {}).filter(
     ([, v]) => v !== null && v !== '' && !(Array.isArray(v) && (v as any[]).length === 0)
   );
 
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', h);
+    const previousOverflow = document.body.style.overflow;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
     document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-8">
       <div
-        className="relative w-full max-w-2xl max-h-[85vh] flex flex-col
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="product-modal-title"
+        className="relative w-full max-w-2xl max-h-[90vh] sm:max-h-[85vh] flex flex-col
                    bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden"
         style={{ boxShadow: 'var(--shadow-lg)' }}
       >
-        <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-[var(--border-color)] flex-shrink-0 bg-[var(--hover-1)]">
-          <div className="flex items-center gap-4 min-w-0">
-            <div className={`w-12 h-12 rounded-xl ${cat?.bg || 'bg-[var(--hover-2)]'} flex items-center justify-center ${cat?.color || 'text-[var(--text-primary)]/40'} flex-shrink-0`}>
+        <div className="flex items-start justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5 border-b border-[var(--border-color)] flex-shrink-0 bg-[var(--hover-1)]">
+          <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
+            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl ${cat?.bg || 'bg-[var(--hover-2)]'} flex items-center justify-center ${cat?.color || 'text-[var(--text-primary)]/40'} flex-shrink-0`}>
               <Icon size={22} />
             </div>
-            <div className="min-w-0">
-              <h2 className="text-xl font-bold text-[var(--text-primary)] truncate">{product.display_name || product.name}</h2>
-              <p className="text-base text-[var(--text-primary)]/50 truncate">{product.vendor}</p>
+
+            <div className="min-w-0 flex-1">
+              <h2
+                id="product-modal-title"
+                className="text-lg sm:text-xl font-bold text-[var(--text-primary)] whitespace-normal break-words leading-snug"
+                style={{ overflowWrap: 'anywhere' }}
+              >
+                {productTitle}
+              </h2>
+              <p
+                className="text-base text-[var(--text-primary)]/50 whitespace-normal break-words"
+                style={{ overflowWrap: 'anywhere' }}
+              >
+                {product.vendor}
+              </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2.5 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)] transition-colors flex-shrink-0">
+
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Закрыть"
+            className="p-2.5 rounded-xl hover:bg-[var(--hover-2)] text-[var(--text-primary)]/40 hover:text-[var(--text-primary)] transition-colors flex-shrink-0"
+          >
             <X size={20} />
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5 sm:space-y-6">
           <div className="flex flex-wrap gap-2.5">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--hover-1)] text-base text-[var(--text-primary)]/60 border border-[var(--border-color)]">
-              <Building2 size={16} className="text-[var(--text-primary)]/40" />{product.vendor}
+            <div className="flex items-start gap-2 min-w-0 max-w-full px-3 py-2 rounded-xl bg-[var(--hover-1)] text-base text-[var(--text-primary)]/60 border border-[var(--border-color)]">
+              <Building2 size={16} className="text-[var(--text-primary)]/40 flex-shrink-0 mt-0.5" />
+              <span
+                className="min-w-0 whitespace-normal break-words"
+                style={{ overflowWrap: 'anywhere' }}
+              >
+                {product.vendor}
+              </span>
             </div>
+
             {product.version && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--hover-1)] text-base text-[var(--text-primary)]/60 border border-[var(--border-color)] font-mono">
-                <Tag size={16} className="text-[var(--text-primary)]/40" />v{product.version}
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--hover-1)] text-base text-[var(--text-primary)]/60 border border-[var(--border-color)] font-mono break-all">
+                <Tag size={16} className="text-[var(--text-primary)]/40 flex-shrink-0" />
+                v{product.version}
               </div>
             )}
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${cat?.bg || 'bg-[var(--hover-1)]'} text-base ${cat?.color || 'text-[var(--text-primary)]/60'} border border-[var(--border-color)]`}>
-              {cat && <cat.icon size={16} />}{cat?.label || product.category}
+
+            <div className={`flex items-center gap-2 min-w-0 max-w-full px-3 py-2 rounded-xl ${cat?.bg || 'bg-[var(--hover-1)]'} text-base ${cat?.color || 'text-[var(--text-primary)]/60'} border border-[var(--border-color)]`}>
+              {cat && <cat.icon size={16} className="flex-shrink-0" />}
+              <span
+                className="min-w-0 whitespace-normal break-words"
+                style={{ overflowWrap: 'anywhere' }}
+              >
+                {cat?.label || product.category}
+              </span>
             </div>
+
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--hover-1)] text-base border border-[var(--border-color)]">
               <div className={`w-2.5 h-2.5 rounded-full ${statusDot(product.status)}`} />
-              <span className={sInfo?.color || 'text-[var(--text-primary)]/50'}>{statusLabel(product.status)}</span>
+              <span className={sInfo?.color || 'text-[var(--text-primary)]/50'}>
+                {statusLabel(product.status)}
+              </span>
             </div>
           </div>
 
           {product.description && (
             <div>
-              <div className="text-xs uppercase tracking-widest text-[var(--text-primary)]/40 mb-3 font-semibold">Описание</div>
-              <p className="text-base text-[var(--text-primary)]/70 leading-relaxed whitespace-pre-wrap">{product.description}</p>
+              <div className="text-xs uppercase tracking-widest text-[var(--text-primary)]/40 mb-3 font-semibold">
+                Описание
+              </div>
+              <p
+                className="text-base text-[var(--text-primary)]/70 leading-relaxed whitespace-pre-wrap break-words"
+                style={{ overflowWrap: 'anywhere' }}
+              >
+                {product.description}
+              </p>
             </div>
           )}
 
           {attrEntries.length > 0 && (
             <div>
-              <div className="text-xs uppercase tracking-widest text-[var(--text-primary)]/40 mb-3 font-semibold">Характеристики</div>
+              <div className="text-xs uppercase tracking-widest text-[var(--text-primary)]/40 mb-3 font-semibold">
+                Характеристики
+              </div>
+
               <div className="rounded-xl border border-[var(--border-color)] divide-y divide-[var(--border-color)] bg-[var(--hover-1)]">
                 {attrEntries.map(([key, value]) => (
-                  <div key={key} className="flex items-start gap-4 px-5 py-3.5">
-                    <span className="text-base text-[var(--text-primary)]/40 w-[150px] flex-shrink-0 pt-0.5">{getAttrLabel(key)}</span>
-                    <span className="text-base text-[var(--text-primary)]/80 break-words min-w-0">{formatAttrValue(value)}</span>
+                  <div
+                    key={key}
+                    className="grid grid-cols-1 sm:grid-cols-[150px_minmax(0,1fr)] gap-1 sm:gap-4 px-4 sm:px-5 py-3.5"
+                  >
+                    <span
+                      className="text-base text-[var(--text-primary)]/40 pt-0.5 break-words"
+                      style={{ overflowWrap: 'anywhere' }}
+                    >
+                      {getAttrLabel(key)}
+                    </span>
+                    <span
+                      className="text-base text-[var(--text-primary)]/80 min-w-0 whitespace-pre-wrap break-words"
+                      style={{ overflowWrap: 'anywhere' }}
+                    >
+                      {formatAttrValue(value)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -344,7 +487,9 @@ const ProductModal = ({ product, onClose }: { product: any; onClose: () => void 
           )}
 
           {!product.description && attrEntries.length === 0 && (
-            <div className="text-center py-12 text-[var(--text-primary)]/40 text-base">Нет дополнительной информации</div>
+            <div className="text-center py-12 text-[var(--text-primary)]/40 text-base">
+              Нет дополнительной информации
+            </div>
           )}
         </div>
       </div>
@@ -370,12 +515,15 @@ export default function ProductsPage() {
   const loadProducts = useCallback(async () => {
     setLoading(true);
     setError(null);
+
     try {
       const res = await productsApi.getProducts({
-        page, size: 30,
+        page,
+        size: 30,
         category: filterCategory || undefined,
         status: filterStatus || undefined,
       });
+
       setProducts(res.items);
       setTotalPages(res.total_pages);
     } catch {
@@ -385,12 +533,15 @@ export default function ProductsPage() {
     }
   }, [page, filterCategory, filterStatus]);
 
-  useEffect(() => { loadProducts(); }, [loadProducts]);
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
 
   const filteredProducts = useMemo(() => {
     if (!normalizedSearch) return products;
+
     return products.filter(p =>
       (p.display_name || p.name || '').toLowerCase().includes(normalizedSearch) ||
       (p.vendor || '').toLowerCase().includes(normalizedSearch) ||
@@ -399,21 +550,30 @@ export default function ProductsPage() {
   }, [products, normalizedSearch]);
 
   const categoryOptions: FilterOption[] = CATEGORIES.map(c => ({
-    value: c.value, label: c.label, icon: <c.icon size={16} className={c.color} />,
+    value: c.value,
+    label: c.label,
+    icon: <c.icon size={16} className={c.color} />,
   }));
+
   const statusOptions: FilterOption[] = STATUSES.map(s => ({
-    value: s.value, label: s.label, dot: s.dot,
+    value: s.value,
+    label: s.label,
+    dot: s.dot,
   }));
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-
       {/* ── Header ── */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-3xl md:text-4xl font-bold text-[var(--text-primary)] mb-1.5">Продукты</h2>
-          <p className="text-base text-[var(--text-primary)]/50">Справочник ПО и оборудования</p>
+          <h2 className="text-3xl md:text-4xl font-bold text-[var(--text-primary)] mb-1.5">
+            Продукты
+          </h2>
+          <p className="text-base text-[var(--text-primary)]/50">
+            Справочник ПО и оборудования
+          </p>
         </div>
+
         <div className="flex items-center gap-2.5">
           <button
             onClick={loadProducts}
@@ -422,30 +582,37 @@ export default function ProductsPage() {
           >
             <RefreshCcw size={18} />
           </button>
-<ActionButton
-  onClick={() => navigate('/products/new')}
-  className="py-4 px-8 text-base font-semibold"
->
-  <Plus size={18} />
-  Добавить продукт
-</ActionButton>
+
+          <ActionButton
+            onClick={() => navigate('/products/new')}
+            className="py-4 px-8 text-base font-semibold"
+          >
+            <Plus size={18} />
+            Добавить продукт
+          </ActionButton>
         </div>
       </div>
 
-      {/* ── Поиск + фильтры ──────────────────────────────────────────────── */}
+      {/* ── Поиск + фильтры ── */}
       <div className="flex flex-wrap items-center gap-2.5">
-        {/* Поиск — единый визуал */}
         <div className="relative flex-1 min-w-[220px]">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/40 pointer-events-none" />
+          <Search
+            size={16}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/40 pointer-events-none"
+          />
           <input
             value={searchQuery}
-            onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
+            onChange={e => {
+              setSearchQuery(e.target.value);
+              setPage(1);
+            }}
             placeholder="Поиск по названию, вендору..."
             className="w-full pl-10 pr-10 py-3 glass-card border border-[var(--border-color)]
                        rounded-xl text-[var(--text-primary)] text-base placeholder-[var(--text-muted)]
                        focus:outline-none focus:border-[var(--accent)]/30 focus:ring-2 focus:ring-[var(--accent-ring)]
                        transition-all"
           />
+
           {searchQuery && (
             <button
               type="button"
@@ -460,31 +627,50 @@ export default function ProductsPage() {
 
         <FilterDropdown
           value={filterCategory}
-          onChange={v => { setFilterCategory(v); setPage(1); }}
+          onChange={v => {
+            setFilterCategory(v);
+            setPage(1);
+          }}
           options={categoryOptions}
           placeholder="Категория"
           icon={<Package size={16} />}
         />
+
         <FilterDropdown
           value={filterStatus}
-          onChange={v => { setFilterStatus(v); setPage(1); }}
+          onChange={v => {
+            setFilterStatus(v);
+            setPage(1);
+          }}
           options={statusOptions}
           placeholder="Статус"
           icon={<Filter size={16} />}
         />
       </div>
 
-      {/* ── Активные фильтры ─────────────────────────────────────────────── */}
+      {/* ── Активные фильтры ── */}
       <ActiveFilters
-        category={filterCategory} status={filterStatus}
-        onClearCategory={() => { setFilterCategory(''); setPage(1); }}
-        onClearStatus={() => { setFilterStatus(''); setPage(1); }}
-        onClearAll={() => { setFilterCategory(''); setFilterStatus(''); setPage(1); }}
+        category={filterCategory}
+        status={filterStatus}
+        onClearCategory={() => {
+          setFilterCategory('');
+          setPage(1);
+        }}
+        onClearStatus={() => {
+          setFilterStatus('');
+          setPage(1);
+        }}
+        onClearAll={() => {
+          setFilterCategory('');
+          setFilterStatus('');
+          setPage(1);
+        }}
       />
 
-      {/* ── Заголовок таблицы ────────────────────────────────────────────── */}
+      {/* ── Заголовок таблицы ── */}
       <div className="flex items-center gap-4 px-5 py-2.5 text-xs uppercase
-                      tracking-wider text-[var(--text-primary)]/40 border-b border-[var(--border-color)] font-semibold">
+                      tracking-wider text-[var(--text-primary)]/40 border-b border-[var(--border-color)] font-semibold"
+      >
         <div className="w-10" />
         <div className="flex-1">Название</div>
         <div className="hidden md:block w-[110px] text-right">Вендор</div>
@@ -499,7 +685,9 @@ export default function ProductsPage() {
           <Loader2 size={24} className="animate-spin text-[var(--accent)]/50" />
         </div>
       ) : error ? (
-        <div className="px-5 py-10 text-base text-[var(--accent)]">{error}</div>
+        <div className="px-5 py-10 text-base text-[var(--accent)]">
+          {error}
+        </div>
       ) : filteredProducts.length === 0 ? (
         <div className="flex flex-col items-center py-24 text-[var(--text-primary)]/40">
           <Package size={40} className="mb-4 text-[var(--text-primary)]/15" />
@@ -510,12 +698,16 @@ export default function ProductsPage() {
       ) : (
         <div className="divide-y divide-[var(--border-color)]">
           {filteredProducts.map(product => (
-            <ProductRow key={product.id} product={product} onClick={() => setSelectedProduct(product)} />
+            <ProductRow
+              key={product.id}
+              product={product}
+              onClick={() => setSelectedProduct(product)}
+            />
           ))}
         </div>
       )}
 
-      {/* ── Пагинация ────────────────────────────────────────────────────── */}
+      {/* ── Пагинация ── */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-4 border-t border-[var(--border-color)]">
           <button
@@ -532,14 +724,16 @@ export default function ProductsPage() {
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
               const pageNum = Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
               if (pageNum > totalPages) return null;
+
               return (
                 <button
                   key={pageNum}
                   onClick={() => setPage(pageNum)}
-                  className={`w-10 h-10 rounded-xl text-base font-medium transition-colors ${pageNum === page
+                  className={`w-10 h-10 rounded-xl text-base font-medium transition-colors ${
+                    pageNum === page
                       ? 'bg-[var(--accent)] text-white'
                       : 'glass-card text-[var(--text-primary)]/60 border border-[var(--border-color)] hover:bg-[var(--hover-2)]'
-                    }`}
+                  }`}
                 >
                   {pageNum}
                 </button>
@@ -559,9 +753,12 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* ── Модалка продукта ─────────────────────────────────────────────── */}
+      {/* ── Модалка продукта ── */}
       {selectedProduct && (
-        <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />
+        <ProductModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+        />
       )}
     </div>
   );
