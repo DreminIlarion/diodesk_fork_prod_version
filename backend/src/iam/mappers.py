@@ -34,7 +34,6 @@ def map_invitation_to_response(invitation: Invitation) -> InvitationResponse:
         email=invitation.email.value,
         granted_roles=invitation.granted_roles,
         counterparty_id=invitation.counterparty_id,
-        contact_person_id=invitation.contact_person_id,
         expires_at=invitation.expires_at,
         used_at=invitation.used_at,
         is_used=invitation.is_used,

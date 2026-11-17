@@ -141,7 +141,6 @@ class Invitation(Entity):
     """
 
     email: Email
-    contact_person_id: UUID | None = None
     token: str = field(default_factory=_generate_invite_token)
     invited_by: UUID
     granted_roles: set[UserRole]
@@ -156,11 +155,6 @@ class Invitation(Entity):
 
         _validate_counterparty(self.granted_roles, self.counterparty_id)
 
-        if self.contact_person_id is not None and self.counterparty_id is None:
-            raise InvariantViolationError(
-                "Contact person requires a counterparty"
-            )
-
     @property
     def is_valid(self) -> bool:
         return not self.is_used and self.expires_at > current_datetime()
@@ -172,7 +166,6 @@ class Invitation(Entity):
             invited_by: UUID,
             granted_roles: set[UserRole],
             counterparty_id: UUID | None = None,
-            contact_person_id: UUID | None = None
     ) -> Self:
         expires_at = get_expiration_time(expires_in=timedelta(days=INVITATION_EXPIRES_IN_DAYS))
         invitation = cls(
@@ -180,7 +173,6 @@ class Invitation(Entity):
             invited_by=invited_by,
             granted_roles=granted_roles,
             counterparty_id=counterparty_id,
-            contact_person_id=contact_person_id,
             expires_at=expires_at,
         )
         invitation.invite()
