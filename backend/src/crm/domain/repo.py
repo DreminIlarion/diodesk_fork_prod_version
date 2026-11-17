@@ -64,3 +64,5 @@ class CounterpartyRepository(Repository[Counterparty]):
         """
         Получение программных продуктов, которые используются контрагентом
         """
+
+    async def read_for_update(self, uid: UUID) -> Counterparty | None: ...
