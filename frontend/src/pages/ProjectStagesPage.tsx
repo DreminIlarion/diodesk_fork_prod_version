@@ -157,6 +157,29 @@ const formatDateTime = (value?: string | null) => {
 const daysBetween = (a: Date, b: Date) =>
   Math.round((b.getTime() - a.getTime()) / 86400000);
 
+/**
+ * Количество рабочих (будних) дней между датами включительно.
+ * Учитываются только пн–пт. Праздники не учитываются.
+ * Если `end < start` — возвращает 0.
+ */
+const countWorkdays = (start: Date, end: Date): number => {
+  if (end < start) return 0;
+
+  let count = 0;
+  const current = new Date(start);
+  current.setHours(0, 0, 0, 0);
+
+  const last = new Date(end);
+  last.setHours(0, 0, 0, 0);
+
+  while (current <= last) {
+    const day = current.getDay(); // 0 = вс, 6 = сб
+    if (day !== 0 && day !== 6) count++;
+    current.setDate(current.getDate() + 1);
+  }
+
+  return count;
+};
 const sortStages = (stages: ProjectStageResponse[]) =>
   [...stages].sort((a, b) =>
     a.execution_order - b.execution_order || a.name.localeCompare(b.name, 'ru'),
@@ -2085,7 +2108,26 @@ function StageFormView({
     stage ? stageToForm(stage) : emptyForm(nextOrder),
   );
 
+  const [durationManual, setDurationManual] = useState(
+    Boolean(stage?.planned_duration_days),
+  );
+
   const [errors, setErrors] = useState<Record<string, string>>({});
+   useEffect(() => {
+    if (durationManual) return;
+
+    const start = parseDate(form.planned_start);
+    const end = parseDate(form.planned_end);
+
+    if (!start || !end) return;
+
+    const workdays = countWorkdays(start, end);
+    const nextValue = workdays > 0 ? String(workdays) : '';
+
+    if (form.planned_duration_days !== nextValue) {
+      setForm(prev => ({ ...prev, planned_duration_days: nextValue }));
+    }
+  }, [form.planned_start, form.planned_end, durationManual]);
 
   const update = <K extends keyof StageForm>(key: K, value: StageForm[K]) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -2268,17 +2310,54 @@ function StageFormView({
                 </div>
               </div>
 
-              <div>
-                <label className={labelCls}>Плановая длительность, дней</label>
-                <input type="number" min={1} value={form.planned_duration_days}
-                  onChange={e => update('planned_duration_days', e.target.value)}
-                  placeholder="Не указана" className={inputCls} />
-                {errors.planned_duration_days && (
-                  <p className="mt-2 text-xs text-red-500">{errors.planned_duration_days}</p>
-                )}
-                <p className="mt-2 text-xs text-[var(--text-muted)]">
-                  Укажите длительность, если она отличается от календарного периода.
-                </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Плановая длительность, дней</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={form.planned_duration_days}
+                    onChange={e => {
+                      setDurationManual(true);
+                      update('planned_duration_days', e.target.value);
+                    }}
+                    placeholder="Не указана"
+                    className={inputCls}
+                  />
+                  {errors.planned_duration_days && (
+                    <p className="mt-2 text-xs text-red-500">{errors.planned_duration_days}</p>
+                  )}
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">
+                    Рабочие дни (пн–пт). Пересчитывается по датам, но можно изменить вручную.
+                  </p>
+                  {durationManual && (
+                    <button
+                      type="button"
+                      onClick={() => setDurationManual(false)}
+                      className="mt-2 text-xs font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+                    >
+                      Пересчитать по датам
+                    </button>
+                  )}
+                </div>
+
+                <div>
+                  <label className={labelCls}>Рабочих часов</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={
+                      form.planned_duration_days
+                        ? `${Number(form.planned_duration_days) * 8} ч`
+                        : '—'
+                    }
+                    className={`${inputCls} cursor-not-allowed opacity-70`}
+                    tabIndex={-1}
+                  />
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">
+                    Из расчёта 8 часов в рабочем дне.
+                  </p>
+                </div>
               </div>
             </div>
           </SectionCard>

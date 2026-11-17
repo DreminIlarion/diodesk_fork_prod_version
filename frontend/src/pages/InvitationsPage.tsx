@@ -823,7 +823,7 @@ setContactPersonsError(null);
 
           {/* ═══ Вкладка «Отправить» ═══ */}
           {activeTab === 'send' && (
-            <div className="bg-[var(--hover-1)] rounded-xl border border-[var(--border-color)] overflow-hidden">
+            <div className="bg-[var(--hover-1)] rounded-xl border border-[var(--border-color)]">
 
               {/* Header */}
               <div className="px-6 py-5 border-b border-[var(--border-color)]">
