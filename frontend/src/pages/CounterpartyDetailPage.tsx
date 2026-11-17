@@ -2779,13 +2779,36 @@ onCountChange?.(res.total_items);
 
 // ─── Вкладка договоров ────────────────────────────────────────────────────────
 
-const CONTRACT_TYPES = ['ИТС', 'Сопровождение', 'Сервис', 'Проект', 'Внутренние работы', 'Аутстаффинг'] as const;
+const CONTRACT_TYPES = [
+  'ИТС',
+  'Сопровождение',
+  'Сервис',
+  'Проект',
+  'Внутренние работы',
+  'Аутстаффинг',
+] as const;
+
 const CONTRACT_PERIODS = ['Месяц', 'Квартал', 'Полугодие', 'Год'] as const;
 
+const CONTRACT_STATUSES = [
+  'Договор оформлен и подписан',
+  'Подписан заказчиком, есть скан копия',
+  'Расторгнут',
+  'Черновик',
+] as const;
+
+const CONTRACT_RATES_TYPES = [
+  'Фиксированная',
+  'До превышения',
+  'После превышения',
+] as const;
+
+const CONTRACT_RATES_MEASUREMENT = ['Часы', 'Дни'] as const;
+
 const EMPTY_RATE: ContractRateInput = {
-  type_rate: 'фиксированная',
+  type_rate: 'Фиксированная',
   rate: 0,
-  unit_measurement_rate: 'часы',
+  unit_measurement_rate: 'Часы',
   hours_subscription: null,
   hours_its: null,
 };
@@ -3479,23 +3502,16 @@ function ContractsTab({
                     placeholder="Выберите вид договора"
                   />
 
-                  <label className="block min-w-0">
-                    <span className="text-sm text-[var(--text-primary)]/55">
-                      Статус
-                      <span className="ml-1 text-[var(--accent)]">*</span>
-                    </span>
-                    <input
-                      value={form.status}
-                      onChange={event =>
-                        setForm(current => ({
-                          ...current,
-                          status: event.target.value,
-                        }))
-                      }
-                      placeholder="Например: Договор оформлен и подписан"
-                      className={fieldCls}
-                    />
-                  </label>
+                  <ContractSelect
+  label="Статус"
+  required
+  value={form.status}
+  onChange={status =>
+    setForm(current => ({ ...current, status }))
+  }
+  options={CONTRACT_STATUSES}
+  placeholder="Выберите статус"
+/>
 
                   <label className="block min-w-0">
                     <span className="text-sm text-[var(--text-primary)]/55">
@@ -3629,21 +3645,16 @@ function ContractsTab({
                       </div>
 
                       <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-3">
-                        <label className="block min-w-0">
-                          <span className="text-xs text-[var(--text-primary)]/45">
-                            Вид ставки
-                          </span>
-                          <input
-                            value={rate.type_rate}
-                            onChange={event =>
-                              setRate(index, {
-                                type_rate: event.target.value,
-                              })
-                            }
-                            placeholder="Фиксированная"
-                            className={fieldCls}
-                          />
-                        </label>
+                        <ContractSelect
+  label="Вид ставки"
+  required
+  value={rate.type_rate}
+  onChange={value =>
+    setRate(index, { type_rate: value })
+  }
+  options={CONTRACT_RATES_TYPES}
+  placeholder="Выберите вид ставки"
+/>
 
                         <label className="block min-w-0">
                           <span className="text-xs text-[var(--text-primary)]/45">
@@ -3667,21 +3678,16 @@ function ContractsTab({
                           />
                         </label>
 
-                        <label className="block min-w-0">
-                          <span className="text-xs text-[var(--text-primary)]/45">
-                            Единица измерения
-                          </span>
-                          <input
-                            value={rate.unit_measurement_rate}
-                            onChange={event =>
-                              setRate(index, {
-                                unit_measurement_rate: event.target.value,
-                              })
-                            }
-                            placeholder="Часы"
-                            className={fieldCls}
-                          />
-                        </label>
+                        <ContractSelect
+  label="Единица измерения"
+  required
+  value={rate.unit_measurement_rate}
+  onChange={value =>
+    setRate(index, { unit_measurement_rate: value })
+  }
+  options={CONTRACT_RATES_MEASUREMENT}
+  placeholder="Выберите единицу"
+/>
 
                         <label className="block min-w-0">
                           <span className="text-xs text-[var(--text-primary)]/45">
