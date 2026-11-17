@@ -3616,7 +3616,7 @@ function ContractsTab({
                   {rates.map((rate, index) => (
                     <div
                       key={index}
-                      className="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)]"
+                      className="rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)]"
                     >
                       <div className="flex items-center justify-between gap-3 border-b border-[var(--border-color)] px-4 py-3">
                         <div className="flex items-center gap-2.5">
