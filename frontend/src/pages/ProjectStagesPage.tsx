@@ -2779,7 +2779,7 @@ const actualDays = started && finished ? Math.max(1, daysBetween(started, finish
                     <div>
                       <p className="text-xs text-[var(--text-muted)]">Длительность</p>
                       <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
-                        {plannedDays != null ? `${plannedDays} дн.` : '—'}
+                        {plannedDays != null ? `${plannedDays} дн. / ${plannedHours} ч` : '—'}
                       </p>
                     </div>
                   </div>
