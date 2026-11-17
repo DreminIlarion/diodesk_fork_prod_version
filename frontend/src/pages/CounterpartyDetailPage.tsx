@@ -727,10 +727,12 @@ function EditCounterpartyModal({
 function ContactsTab({
   counterpartyId,
   persons,
+  customers,
   onRefresh,
 }: {
   counterpartyId: string;
-  persons: any[];
+  persons: ContactPerson[];
+  customers: CounterpartyCustomer[];
   onRefresh: () => void;
 }) {
   const [showForm, setShowForm] = useState(false);
@@ -1247,12 +1249,33 @@ function ContactsTab({
                         />
 
                         <div className="min-w-0 pt-0.5">
-                          <p className="text-base font-semibold text-[var(--text-primary)] break-words">
-                            {person.full_name}
-                          </p>
+  <p className="text-base font-semibold text-[var(--text-primary)] break-words">
+    {person.full_name}
+  </p>
 
+  {person.user_id && (() => {
+    const linkedUser = customers.find(user => user.id === person.user_id);
+    const linkedUserName = linkedUser?.full_name || linkedUser?.email;
 
-                        </div>
+    return (
+      <span
+        title={
+          linkedUserName
+            ? `Связанный пользователь: ${linkedUserName}`
+            : 'Пользователь привязан'
+        }
+        className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/10 px-2.5 py-1 text-xs font-medium text-[var(--accent)]"
+      >
+        <UserCheck size={13} className="flex-shrink-0" />
+        <span className="min-w-0 whitespace-normal break-words">
+          {linkedUserName
+            ? `Пользователь: ${linkedUserName}`
+            : 'Пользователь привязан'}
+        </span>
+      </span>
+    );
+  })()}
+</div>
                       </div>
 
                       <button
@@ -4759,15 +4782,13 @@ try {
           {/* Контактные лица */}
 
           {activeTab === 'contact' && (
-            <ContactsTab
-              counterpartyId={id!}
-              persons={
-                counterparty.contact_persons ||
-                []
-              }
-              onRefresh={loadData}
-            />
-          )}
+  <ContactsTab
+    counterpartyId={id!}
+    persons={counterparty.contact_persons || []}
+    customers={customers}
+    onRefresh={loadData}
+  />
+)}
 
           {/* Продукты */}
 

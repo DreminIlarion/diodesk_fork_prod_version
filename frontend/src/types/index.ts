@@ -74,9 +74,13 @@ export interface ContactPersonInput {
 
 // Контактное лицо (из API)
 export interface ContactPerson {
+  id: string;
+  user_id?: string | null;
   full_name: string;
   phone?: string;
   email?: string;
+  position?: string;
+  extension?: string;
   messengers?: ContactMessengers;
 }
 
@@ -404,6 +408,7 @@ export interface Invitation {
   email: string;
   assigned_role: UserRole;
   counterparty_id: string | null;
+  contact_person_id: string | null;
   expires_at: string;
   used_at: string | null;
   is_used: boolean;
@@ -412,8 +417,9 @@ export interface Invitation {
 // Создание приглашения (ВАЖНО: assigned_role, не role!)
 export interface InvitationCreate {
   email: string;
-  assigned_role: UserRole;
+  granted_roles: UserRole[];
   counterparty_id?: string;
+  contact_person_id?: string | null;
 }
 
 // Роли которые можно приглашать
