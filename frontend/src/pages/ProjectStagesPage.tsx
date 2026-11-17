@@ -2589,9 +2589,7 @@ function StageDetail({
   const started = parseDate(stage.started_at);
   const finished = actualEnd(stage);
 
-  const plannedDays = stage.planned_duration_days ?? (
-  plannedStart && plannedEnd ? daysBetween(plannedStart, plannedEnd) + 1 : null
-);
+ const plannedDays = plannedStart && plannedEnd ? countWorkdays(plannedStart, plannedEnd) : null;
 const plannedHours = plannedDays != null ? plannedDays * 8 : null;
 const actualDays = started && finished ? Math.max(1, daysBetween(started, finished) + 1) : null;
   const late = isOverPlan(stage);
@@ -2847,10 +2845,7 @@ const actualDays = started && finished ? Math.max(1, daysBetween(started, finish
                   <div>
                     <div className="flex justify-between mb-1 text-xs text-[var(--text-muted)]">
                       <span>Плановая длительность</span>
-                      <span>{plannedDays} дн.</span>
-{plannedHours != null && (
-  <span className="text-[var(--text-muted)]"> · {plannedHours} ч</span>
-)}
+                      {plannedDays != null ? `${plannedDays} дн. / ${plannedHours} ч` : '—'}
                     </div>
                     <div className="h-2.5 rounded-full bg-[var(--hover-3)] overflow-hidden">
                       <div className="h-full w-full rounded-full bg-blue-500/70" />
