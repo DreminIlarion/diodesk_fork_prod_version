@@ -58,7 +58,6 @@ class ContactPersonOut(BaseModel):
 
     id: UUID = Field(..., description="Уникальный идентификатор контактного лица")
 
-    user_id: UUID | None = None
     full_name: str = Field(..., description="ФИО лица", examples=["Иванов Иван Иванович"])
     phone: str | None = Field(
         None, description="Номер телефона", examples=["88005553535", "+78005553535"]

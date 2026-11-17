@@ -5,9 +5,8 @@ from datetime import timedelta
 from uuid import UUID
 
 from src.core.settings import settings
-from src.crm.domain.repo import CounterpartyRepository
 from src.shared.domain.events import EventPublisher
-from src.shared.domain.exceptions import AlreadyExistsError, InvariantViolationError, NotFoundError
+from src.shared.domain.exceptions import AlreadyExistsError, NotFoundError
 from src.shared.domain.repos import UnitOfWork, get_or_raise_404
 from src.shared.infra.mail import MailSender
 from src.shared.utils.time import get_expiration_timestamp
@@ -84,13 +83,11 @@ class AuthService:
             uow: UnitOfWork,
             user_repo: UserRepository,
             invitation_repo: InvitationRepository,
-            counterparty_repo: CounterpartyRepository,
             token_store: TokenStore,
     ) -> None:
         self.uow = uow
         self.user_repo = user_repo
         self.invitation_repo = invitation_repo
-        self.counterparty_repo = counterparty_repo
         self.token_store = token_store
 
     async def register(self, token: str, data: UserCreate) -> Tokens:
@@ -107,16 +104,6 @@ class AuthService:
             raise AlreadyExistsError(f"User with email `{invitation.email}` already exists'")
 
         password_hash = await hash_password_async(data.password)
-        counterparty = None
-        if invitation.contact_person_id is not None:
-            if invitation.counterparty_id is None:
-                raise InvariantViolationError("Contact person requires a counterparty")
-            counterparty = await self.counterparty_repo.read_for_update(
-                invitation.counterparty_id
-            )
-            if counterparty is None:
-                raise NotFoundError("Counterparty not found")
-
         user = register_new_user(
             invitation=invitation,
             password_hash=password_hash,
@@ -124,13 +111,8 @@ class AuthService:
             full_name=data.full_name,
         )
 
-        if counterparty is not None:
-            counterparty.link_contact_person_user(invitation.contact_person_id, user.id)
-
         await self.user_repo.create(user)
         await self.invitation_repo.update(invitation)
-        if counterparty is not None:
-            await self.counterparty_repo.update(counterparty)
 
         tokens = create_tokens_for_user(user)
         await self.uow.commit()
@@ -212,13 +194,11 @@ class InvitationService:
             self,
             uow: UnitOfWork,
             invitation_repo: InvitationRepository,
-            counterparty_repo: CounterpartyRepository,
             mail_sender: MailSender,
             event_publisher: EventPublisher,
     ) -> None:
         self.uow = uow
         self.invitation_repo = invitation_repo
-        self.counterparty_repo = counterparty_repo
         self.mail_sender = mail_sender
         self.event_publisher = event_publisher
 
@@ -233,23 +213,6 @@ class InvitationService:
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
 
-        if data.contact_person_id is not None:
-            if data.counterparty_id is None:
-                raise InvariantViolationError("Contact person requires a counterparty")
-
-            counterparty = await self.counterparty_repo.read(data.counterparty_id)
-            if counterparty is None:
-                raise NotFoundError("Counterparty not found")
-
-            person = next(
-                (p for p in counterparty.contact_persons if p.id == data.contact_person_id),
-                None,
-            )
-            if person is None:
-                raise NotFoundError("Contact person not found")
-            if person.user_id is not None:
-                raise AlreadyExistsError("Contact person already linked to a user")
-
         invitation = await self.invitation_repo.get_active(Email(data.email), data.granted_roles)
 
         if invitation is None:
@@ -260,18 +223,10 @@ class InvitationService:
                 invited_by=current_subject.id,
                 granted_roles=data.granted_roles,
                 counterparty_id=data.counterparty_id,
-                contact_person_id=data.contact_person_id,
             )
             await self.invitation_repo.create(invitation)
             await self.uow.commit()
         else:
-            if (
-                invitation.counterparty_id != data.counterparty_id
-                or invitation.contact_person_id != data.contact_person_id
-            ):
-                raise AlreadyExistsError(
-                    "Active invitation has different counterparty or contact person"
-                )
             invitation.invite()
 
         for event in invitation.collect_events():

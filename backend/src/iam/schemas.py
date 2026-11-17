@@ -4,7 +4,7 @@ from datetime import datetime
 from uuid import UUID
 
 from fastapi import Body
-from pydantic import BaseModel, EmailStr, Field, PositiveInt, AliasChoices
+from pydantic import BaseModel, EmailStr, Field, PositiveInt
 
 from .domain.vo import UserRole, UserType
 
@@ -96,10 +96,6 @@ class InvitationBase(BaseModel):
     )
     counterparty_id: UUID | None = Field(
         None, description="Для клиентов необходимо указать контрагента"
-    )
-    contact_person_id: UUID | None = Field(
-        None,
-        validation_alias=AliasChoices("contactPersonId", "contact_person_id"),
     )
 
 

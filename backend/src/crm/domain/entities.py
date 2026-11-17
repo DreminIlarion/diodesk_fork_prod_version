@@ -7,7 +7,7 @@ from pydantic import EmailStr
 
 from src.products.domain.entities import SoftwareProduct
 from src.shared.domain.entities import Entity
-from src.shared.domain.exceptions import AlreadyExistsError, InvariantViolationError, NotFoundError
+from src.shared.domain.exceptions import InvariantViolationError
 from src.shared.utils.time import current_datetime
 
 from .vo import ContactPerson, CounterpartyType, Inn, Kpp, Okpo, Phone
@@ -258,18 +258,3 @@ class Counterparty(Entity):
         if target is not None:
             self.contact_persons.pop(target)
             self.updated_at = current_datetime()
-
-    def link_contact_person_user(
-        self, contact_person_id: UUID, user_id: UUID
-    ) -> None:
-        person = next(
-            (p for p in self.contact_persons if p.id == contact_person_id),
-            None,
-        )
-        if person is None:
-            raise NotFoundError("Contact person not found")
-        if person.user_id is not None:
-            raise AlreadyExistsError("Contact person already linked to a user")
-
-        person.user_id = user_id
-        self.updated_at = current_datetime()
