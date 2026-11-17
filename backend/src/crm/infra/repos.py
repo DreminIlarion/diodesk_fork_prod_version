@@ -40,6 +40,8 @@ class CounterpartyMapper(ModelMapper[Counterparty, CounterpartyOrm]):
             contact_persons=[
                 ContactPerson(
                     id=UUID(contact_person["id"]) if contact_person.get("id") else uuid4(),
+                    user_id=UUID(contact_person["user_id"])
+                    if contact_person.get("user_id") else None,
                     full_name=FullName(contact_person["full_name"]),
                     phone=Phone(contact_person["phone"]) if contact_person["phone"] else None,
                     email=contact_person["email"],
@@ -72,6 +74,7 @@ class CounterpartyMapper(ModelMapper[Counterparty, CounterpartyOrm]):
             contact_persons=[
                 {
                     "id": str(contact_person.id),
+                    "user_id": str(contact_person.user_id) if contact_person.user_id else None,
                     "full_name": contact_person.full_name.value,
                     "phone": contact_person.phone.value if contact_person.phone else None,
                     "email": contact_person.email,
@@ -118,6 +121,14 @@ class CounterpartyProductMapper(
 class SqlCounterpartyRepository(SqlAlchemyRepository[Counterparty, CounterpartyOrm]):
     model = CounterpartyOrm
     model_mapper = CounterpartyMapper
+
+    async def read_for_update(self, uid: UUID) -> Counterparty | None:
+        stmt = select(self.model).where(self.model.id == uid).with_for_update()
+        result = await self.session.execute(
+            stmt.execution_options(populate_existing=True)
+        )
+        model = result.scalar_one_or_none()
+        return None if model is None else self.model_mapper.to_entity(model)
 
     def _apply_counterparty_filters(
             self, stmt: Select[tuple[CounterpartyOrm]], filters: CounterpartyFilters,

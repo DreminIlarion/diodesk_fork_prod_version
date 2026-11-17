@@ -8,6 +8,7 @@ from fastapi.security import OAuth2PasswordBearer
 
 from src.core.redis import redis_client
 from src.core.settings import settings
+from src.crm.dependencies import CounterpartyRepoDep
 from src.shared.dependencies import EventPublisherDep, PaginationDep, SessionDep
 from src.shared.domain.exceptions import NotFoundError
 from src.shared.domain.repos import get_or_raise_404
@@ -53,12 +54,14 @@ def get_auth_service(
         session: SessionDep,
         user_repo: UserRepoDep,
         invitation_repo: InvitationRepoDep,
+        counterparty_repo: CounterpartyRepoDep,
         token_store: Annotated[TokenStore, Depends(get_token_store)],
 ) -> AuthService:
     return AuthService(
         uow=session,
         user_repo=user_repo,
         invitation_repo=invitation_repo,
+        counterparty_repo=counterparty_repo,
         token_store=token_store,
     )
 
@@ -74,12 +77,14 @@ def get_mail_sender() -> SmtpMailSender:
 def get_invitation_service(
         session: SessionDep,
         invitation_repo: InvitationRepoDep,
+        counterparty_repo: CounterpartyRepoDep,
         mail_sender: Annotated[SmtpMailSender, Depends(get_mail_sender)],
         event_publisher: EventPublisherDep,
 ) -> InvitationService:
     return InvitationService(
         uow=session,
         invitation_repo=invitation_repo,
+        counterparty_repo=counterparty_repo,
         mail_sender=mail_sender,
         event_publisher=event_publisher,
     )

@@ -3,6 +3,7 @@ from typing import ClassVar
 import re
 from dataclasses import dataclass, field
 from enum import StrEnum
+from uuid import UUID
 
 from pydantic import EmailStr
 
@@ -198,6 +199,7 @@ class ContactPerson(Entity):
         "telegram", "whatsapp", "vk", "max", "signal", "skype",
     })
 
+    user_id: UUID | None = None
     full_name: FullName
     phone: Phone | None = None
     email: EmailStr | None = None
