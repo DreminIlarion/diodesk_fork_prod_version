@@ -45,9 +45,6 @@ async def search_users(
             Field(description="Пользователь должен иметь хотя бы одну роль. По умолчанию - "
                               "все сотрудники (без клиентов)"),
         ] = None,
-        include_inactive: Annotated[
-            bool, Field(description="Включать заблокированных пользователей")
-        ] = False,
         limit: ResultLimit = 20,
         user_repo: UserRepository = Depends(get_user_repo),
 ) -> list[UserBrief]:
@@ -58,7 +55,7 @@ async def search_users(
     users = await user_repo.search(
         query,
         roles=roles or UserRole.staff_roles(),
-        active_only=not include_inactive,
+        active_only=True,
         limit=limit,
     )
     return [to_user_brief(user) for user in users]
