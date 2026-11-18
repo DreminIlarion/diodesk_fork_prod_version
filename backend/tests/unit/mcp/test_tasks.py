@@ -4,7 +4,6 @@ from uuid import uuid4
 
 import pytest
 from ddf.application.dsl import Condition
-from pydantic import ValidationError
 
 from src.iam.domain.authz import Subject, SubjectType
 from src.iam.domain.exceptions import PermissionDeniedError
@@ -400,9 +399,24 @@ async def test_update_task_passes_changes_and_subject_to_service() -> None:
     assert result.number == response.number
 
 
-def test_task_changes_requires_at_least_one_field() -> None:
-    with pytest.raises(ValidationError, match="At least one task field"):
-        TaskChanges()
+async def test_update_task_rejects_empty_changes_before_repository_access() -> None:
+    subject = make_subject(UserRole.DEVELOPER)
+    repository = FakeTaskLookupRepository(None)
+    service = FakeTaskService(make_task_response(created_by=subject.id))
+    changes = TaskChanges()
+
+    with pytest.raises(ValueError, match="At least one task field"):
+        await update_task(
+            task="TASK-005",
+            changes=changes,
+            subject=subject,
+            task_repo=repository,
+            service=service,
+        )
+
+    assert repository.number_calls == []
+    assert repository.read_calls == []
+    assert service.edit_calls == []
 
 
 async def test_assign_task_passes_assignee_and_subject_to_service() -> None:

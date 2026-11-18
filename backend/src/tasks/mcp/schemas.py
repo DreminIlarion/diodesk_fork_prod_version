@@ -3,7 +3,7 @@ from typing import Literal
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from src.shared.domain.vo import Priority
 
@@ -83,23 +83,6 @@ class TaskChanges(BaseModel):
         None,
         description="Новый срок выполнения",
     )
-
-    @model_validator(mode="after")
-    def validate_changes(self) -> TaskChanges:
-        if all(
-            value is None
-            for value in (
-                self.title,
-                self.description,
-                self.priority,
-                self.story_points,
-                self.estimated_hours,
-                self.due_date,
-            )
-        ):
-            raise ValueError("At least one task field must be provided")
-
-        return self
 
 
 class TaskBrief(BaseModel):

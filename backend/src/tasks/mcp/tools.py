@@ -22,6 +22,7 @@ from .mappers import to_task_create, to_task_update
 from .presenters import to_task_brief, to_task_card
 from .references import TaskRef, find_task
 from .schemas import TaskBrief, TaskCard, TaskChanges, TaskDraft
+from .validators import validate_task_changes
 
 
 @tool(annotations=CREATE, tags={"tasks"})
@@ -58,6 +59,8 @@ async def update_task(
     Перед вызовом получи текущую карточку задачи, покажи пользователю
     планируемые изменения и дождись подтверждения.
     """
+
+    validate_task_changes(changes)
 
     found = await find_task(task_repo, task)
     updated = await service.edit(
