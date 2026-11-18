@@ -3123,6 +3123,7 @@ function ContractsTab({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+const [rateValidationAttempted, setRateValidationAttempted] = useState(false);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -3266,6 +3267,51 @@ setRateValidationAttempted(false);
       return;
     }
 
+    const invalidRateIndex = rates.findIndex(isInvalidContractRate);
+
+if (invalidRateIndex !== -1) {
+  setRateValidationAttempted(true);
+  setFormError(CONTRACT_RATE_VALIDATION_ERROR);
+  return;
+}
+
+setRateValidationAttempted(false);
+
+// Сумма договора необязательна, но если указана — должна быть числом ≥ 0.
+const sumValue = form.sum.trim() ? Number(form.sum) : null;
+
+if (sumValue !== null && (!Number.isFinite(sumValue) || sumValue < 0)) {
+  setFormError('Сумма договора должна быть числом не меньше 0.');
+  return;
+}
+
+// При noValidate проверяем вручную и часы: число целое и неотрицательное.
+const hasInvalidHours = rates.some(rate => {
+  const thresholdRate = ['До превышения', 'После превышения'].includes(
+    rate.type_rate.trim(),
+  );
+
+  if (!thresholdRate) return false;
+
+  const hours =
+    form.type === 'ИТС'
+      ? rate.hours_its
+      : form.type === 'Сопровождение'
+        ? rate.hours_subscription
+        : null;
+
+  if (hours === null || hours === undefined) return false;
+
+  const value = Number(hours);
+  return !Number.isInteger(value) || value < 0;
+});
+
+if (hasInvalidHours) {
+  setFormError('Количество часов должно быть целым числом не меньше 0.');
+  return;
+}
+
+
     setSaving(true);
     setFormError(null);
 
@@ -3276,7 +3322,7 @@ setRateValidationAttempted(false);
       status: form.status.trim(),
       type: form.type.trim(),
       period: form.period.trim() || null,
-      sum: form.sum.trim() ? Number(form.sum) : null,
+      sum: sumValue,
       rates: rates.map(rate => {
   const rateType = rate.type_rate.trim();
   const isThresholdRate = ['До превышения', 'После превышения'].includes(rateType);
@@ -3483,11 +3529,12 @@ setRateValidationAttempted(false);
           </div>
 
           <form
-            onSubmit={event => {
-              event.preventDefault();
-              void handleSave();
-            }}
-          >
+  noValidate
+  onSubmit={event => {
+    event.preventDefault();
+    void handleSave();
+  }}
+>
             <div className="space-y-4 p-4 sm:p-6">
               {formError && (
                 <div
