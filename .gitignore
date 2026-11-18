@@ -85,3 +85,5 @@ hf_cache
 backups
 
 node_modules/
+
+db_backup/

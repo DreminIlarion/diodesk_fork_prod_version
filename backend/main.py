@@ -15,6 +15,7 @@ from src.core.broker import broker_router
 from src.core.logging import configure_logging
 from src.core.redis import redis_client
 from src.core.settings import settings
+from src.crm.contracts.router import router as contracts_router
 from src.crm.router import router as counterparty_router
 from src.feedbacks.router import router as feedback_router
 from src.iam.routers import router as iam_router
@@ -86,6 +87,7 @@ api_v1_router = APIRouter(prefix="/api/v1")
 
 api_v1_router.include_router(iam_router)
 api_v1_router.include_router(counterparty_router)
+api_v1_router.include_router(contracts_router)
 api_v1_router.include_router(comments_router)
 api_v1_router.include_router(media_router)
 api_v1_router.include_router(tickets_router)

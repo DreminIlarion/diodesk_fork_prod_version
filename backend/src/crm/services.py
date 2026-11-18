@@ -42,7 +42,8 @@ class CounterpartyService:
         inn = Inn(data.inn)
         kpp = None if data.kpp is None else Kpp(data.kpp)
         okpo = None if data.okpo is None else Okpo(data.okpo)
-        phone = Phone(data.phone)
+        
+        phone = Phone(data.phone) if data.phone else None
 
         # 3. Формирование контактных лиц лица
         contact_persons = [

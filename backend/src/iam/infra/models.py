@@ -36,6 +36,7 @@ class InvitationOrm(EntityMixin, Base):
     invited_by: Mapped[UUID]
     granted_roles: Mapped[list[UserRole]] = mapped_column(JSONB)
     counterparty_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    contact_person_id: Mapped[UUID | None] = mapped_column(nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_used: Mapped[bool]

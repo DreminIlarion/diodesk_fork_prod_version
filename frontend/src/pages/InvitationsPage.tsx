@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Mail, Send, History, Loader2, AlertCircle, CheckCircle2, Clock,
   XCircle, Trash2, ChevronLeft, ChevronRight, HelpCircle, Building2,
   Users, Shield, UserPlus, Search, X, Check, ChevronDown, RefreshCcw,
-  User, Briefcase, HeadphonesIcon, Settings,
+  User, Briefcase, HeadphonesIcon, Settings, UserRound,
 } from 'lucide-react';
 import { invitationsApi, counterpartiesApi } from '../api/client';
 
@@ -230,6 +230,362 @@ function getInvitationStatus(inv: Invitation) {
   return { label: 'Ожидает', cls: 'bg-yellow-500/15 text-[var(--warning)] border border-yellow-500/20', Icon: Clock };
 }
 
+// ─── Контактное лицо (селект) ────────────────────────────────────────────────
+
+type InvitationContactPerson = {
+  id: string;
+  full_name: string;
+  user_id?: string | null;
+  position?: string | null;
+};
+
+function ContactPersonPicker({
+  value,
+  options,
+  loading,
+  error,
+  onChange,
+  onRetry,
+}: {
+  value: string;
+  options: InvitationContactPerson[];
+  loading: boolean;
+  error: string | null;
+  onChange: (id: string) => void;
+  onRetry: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const selected = options.find(person => person.id === value);
+  const normalizedQuery = query.trim().toLocaleLowerCase('ru');
+
+  const filteredOptions = options.filter(person =>
+    `${person.full_name} ${person.position ?? ''}`
+      .toLocaleLowerCase('ru')
+      .includes(normalizedQuery),
+  );
+
+  const disabled = loading || Boolean(error) || options.length === 0;
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+        setQuery('');
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+        setQuery('');
+        triggerRef.current?.focus();
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      if (options.length > 5) {
+        searchRef.current?.focus();
+      } else {
+        optionRefs.current[0]?.focus();
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, options.length]);
+
+  const focusOption = (index: number) => {
+    const optionCount = filteredOptions.length + 1;
+    const nextIndex = (index + optionCount) % optionCount;
+    setActiveIndex(nextIndex);
+    window.requestAnimationFrame(() => {
+      optionRefs.current[nextIndex]?.focus();
+    });
+  };
+
+  const choose = (id: string) => {
+    onChange(id);
+    setOpen(false);
+    setQuery('');
+    triggerRef.current?.focus();
+  };
+
+  const triggerLabel = loading
+    ? 'Загружаем контактные лица…'
+    : error
+      ? 'Не удалось загрузить контакты'
+      : selected?.full_name
+        || (options.length
+          ? 'Не привязывать контактное лицо'
+          : 'Контактных лиц пока нет');
+
+  return (
+    <div className="mt-4 border-t border-[var(--border-color)] pt-4">
+      <div className="mb-1.5 flex flex-wrap items-center gap-2">
+        <label className="text-sm font-medium text-[var(--text-primary)]/70">
+          Контактное лицо
+        </label>
+        <span className="rounded-full bg-[var(--hover-2)] px-2 py-0.5 text-xs text-[var(--text-primary)]/40">
+          Необязательно
+        </span>
+      </div>
+
+      <div ref={rootRef} className="relative">
+        <button
+          ref={triggerRef}
+          type="button"
+          disabled={disabled}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          onClick={() => {
+            setOpen(current => !current);
+            setActiveIndex(0);
+          }}
+          onKeyDown={event => {
+            if (event.key === 'ArrowDown' && !disabled) {
+              event.preventDefault();
+              setOpen(true);
+              focusOption(0);
+            }
+          }}
+          className={`
+            flex min-h-[50px] w-full items-center gap-3 rounded-xl border
+            border-[var(--border-color)] bg-[var(--hover-2)] px-3.5 py-2.5
+            text-left transition-all
+            focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)]
+            ${disabled
+              ? 'cursor-not-allowed opacity-60'
+              : 'hover:border-[var(--accent)]/35'
+            }
+            ${open ? 'border-[var(--accent)]/40' : ''}
+          `}
+        >
+          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--bg-card)] text-[var(--text-primary)]/45">
+            {loading
+              ? <Loader2 size={16} className="animate-spin" />
+              : <UserRound size={17} />
+            }
+          </span>
+
+          <span className="min-w-0 flex-1">
+            <span
+              className={`block whitespace-normal break-words text-sm leading-snug ${
+                selected
+                  ? 'font-medium text-[var(--text-primary)]'
+                  : 'text-[var(--text-primary)]/45'
+              }`}
+              style={{ overflowWrap: 'anywhere' }}
+            >
+              {triggerLabel}
+            </span>
+
+            {selected?.position && (
+              <span className="mt-0.5 block text-xs text-[var(--text-primary)]/40">
+                {selected.position}
+              </span>
+            )}
+          </span>
+
+          <ChevronDown
+            size={17}
+            className={`flex-shrink-0 text-[var(--text-primary)]/40 transition-transform ${
+              open ? 'rotate-180' : ''
+            }`}
+          />
+        </button>
+
+        {open && (
+          <div
+            className="absolute left-0 right-0 top-full z-[120] mt-2 overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-1.5"
+            style={{ boxShadow: 'var(--shadow-lg)' }}
+          >
+            {options.length > 5 && (
+              <div className="relative border-b border-[var(--border-color)] p-1.5">
+                <Search
+                  size={15}
+                  className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-primary)]/35"
+                />
+                <input
+                  ref={searchRef}
+                  value={query}
+                  onChange={event => {
+                    setQuery(event.target.value);
+                    setActiveIndex(0);
+                  }}
+                  onKeyDown={event => {
+                    if (event.key === 'ArrowDown') {
+                      event.preventDefault();
+                      focusOption(0);
+                    }
+                  }}
+                  placeholder="Найти контактное лицо..."
+                  aria-label="Поиск контактного лица"
+                  className="w-full rounded-lg bg-[var(--hover-1)] py-2.5 pl-10 pr-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/35 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30"
+                />
+              </div>
+            )}
+
+            <div
+              role="listbox"
+              aria-label="Контактные лица"
+              className="max-h-[260px] overflow-y-auto overscroll-contain"
+            >
+              <button
+                ref={element => {
+                  optionRefs.current[0] = element;
+                }}
+                type="button"
+                role="option"
+                aria-selected={!value}
+                tabIndex={activeIndex === 0 ? 0 : -1}
+                onClick={() => choose('')}
+                onMouseEnter={() => setActiveIndex(0)}
+                onKeyDown={event => {
+                  if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    focusOption(1);
+                  }
+                }}
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition-colors ${
+                  !value
+                    ? 'bg-[var(--accent)]/10 text-[var(--text-primary)]'
+                    : 'text-[var(--text-primary)]/65 hover:bg-[var(--hover-2)]'
+                } ${activeIndex === 0 ? 'ring-1 ring-[var(--accent)]/20' : ''}`}
+              >
+                <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--hover-2)] text-xs text-[var(--text-primary)]/40">
+                  —
+                </span>
+                <span className="min-w-0 flex-1">Не привязывать</span>
+                {!value && <Check size={16} className="text-[var(--accent)]" />}
+              </button>
+
+              {filteredOptions.map((person, index) => {
+                const isLinked = Boolean(person.user_id);
+                const isSelected = person.id === value;
+                const optionIndex = index + 1;
+
+                return (
+                  <button
+                    key={person.id}
+                    ref={element => {
+                      optionRefs.current[optionIndex] = element;
+                    }}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    disabled={isLinked}
+                    tabIndex={activeIndex === optionIndex ? 0 : -1}
+                    onClick={() => choose(person.id)}
+                    onMouseEnter={() => setActiveIndex(optionIndex)}
+                    onKeyDown={event => {
+                      if (event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        focusOption(optionIndex + 1);
+                      } else if (event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        focusOption(optionIndex - 1);
+                      }
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition-colors ${
+                      isLinked
+                        ? 'cursor-not-allowed opacity-45'
+                        : isSelected
+                          ? 'bg-[var(--accent)]/10 text-[var(--text-primary)]'
+                          : 'text-[var(--text-primary)]/75 hover:bg-[var(--hover-2)]'
+                    } ${activeIndex === optionIndex ? 'ring-1 ring-[var(--accent)]/20' : ''}`}
+                  >
+                    <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--hover-2)] text-[var(--text-primary)]/50">
+                      <UserRound size={15} />
+                    </span>
+
+                    <span className="min-w-0 flex-1">
+                      <span
+                        className="block whitespace-normal break-words"
+                        style={{ overflowWrap: 'anywhere' }}
+                      >
+                        {person.full_name || 'Без имени'}
+                      </span>
+                      {person.position && (
+                        <span className="mt-0.5 block text-xs text-[var(--text-primary)]/40">
+                          {person.position}
+                        </span>
+                      )}
+                    </span>
+
+                    {isLinked ? (
+                      <span className="flex-shrink-0 rounded-md bg-[var(--hover-2)] px-2 py-1 text-[10px] text-[var(--text-primary)]/45">
+                        Уже привязан
+                      </span>
+                    ) : isSelected ? (
+                      <Check
+                        size={16}
+                        className="flex-shrink-0 text-[var(--accent)]"
+                      />
+                    ) : null}
+                  </button>
+                );
+              })}
+
+              {filteredOptions.length === 0 && options.length > 0 && (
+                <p className="px-3 py-5 text-center text-sm text-[var(--text-primary)]/40">
+                  Ничего не найдено
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {error ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--warning)]">
+          <AlertCircle size={14} className="flex-shrink-0" />
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="font-medium underline underline-offset-2"
+          >
+            Повторить
+          </button>
+        </div>
+      ) : loading ? (
+        <p className="mt-2 text-xs text-[var(--text-primary)]/40">
+          Загружаем контактные лица контрагента…
+        </p>
+      ) : options.length === 0 ? (
+        <p className="mt-2 text-xs text-[var(--text-primary)]/40">
+          У этого контрагента пока нет контактных лиц. Приглашение можно отправить без привязки.
+        </p>
+      ) : (
+        <p className="mt-2 text-xs text-[var(--text-primary)]/40">
+          При принятии приглашения пользователь будет связан с выбранным контактом. Уже привязанные контакты недоступны для выбора.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── Основной компонент ──────────────────────────────────────────────────────
 
 export default function InvitationsPage() {
@@ -239,6 +595,12 @@ export default function InvitationsPage() {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<UserRole | ''>('');
   const [counterpartyId, setCounterpartyId] = useState('');
+  const [contactPersonId, setContactPersonId] = useState('');
+const [contactPersons, setContactPersons] = useState<InvitationContactPerson[]>([]);
+const [contactPersonsLoading, setContactPersonsLoading] = useState(false);
+const [contactPersonsError, setContactPersonsError] = useState<string | null>(null);
+
+const contactRequestSeq = useRef(0);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
   const [sending, setSending] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -284,6 +646,59 @@ export default function InvitationsPage() {
     finally { setLoading(false); }
   };
 
+  const loadContactPersons = useCallback(async (id: string) => {
+  const requestId = ++contactRequestSeq.current;
+
+  setContactPersonsLoading(true);
+  setContactPersonsError(null);
+
+  try {
+    const counterparty = await counterpartiesApi.getById(id);
+
+    if (requestId !== contactRequestSeq.current) return;
+
+    setContactPersons(
+      (counterparty.contact_persons ?? []).map(person => ({
+        id: person.id,
+        full_name: person.full_name,
+        user_id: person.user_id ?? null,
+        position: person.position ?? null,
+      })),
+    );
+  } catch {
+    if (requestId !== contactRequestSeq.current) return;
+
+    setContactPersons([]);
+    setContactPersonsError('Не удалось загрузить контактные лица');
+  } finally {
+    if (requestId === contactRequestSeq.current) {
+      setContactPersonsLoading(false);
+    }
+  }
+}, []);
+
+useEffect(() => {
+  setContactPersonId('');
+  setContactPersons([]);
+  setContactPersonsError(null);
+
+  if (!counterpartyId) {
+    contactRequestSeq.current += 1;
+    setContactPersonsLoading(false);
+    return;
+  }
+
+  void loadContactPersons(counterpartyId);
+
+  return () => {
+    contactRequestSeq.current += 1;
+  };
+}, [counterpartyId, loadContactPersons]);
+
+useEffect(() => {
+  setContactPersonId('');
+}, [role]);
+
   const handleSend = async () => {
     if (!email || !role) return;
     if (needsCounterparty && !counterpartyId) return;
@@ -295,14 +710,21 @@ export default function InvitationsPage() {
     try {
       // 🔥 Исправлено: отправляем массив ролей
       await invitationsApi.send({
-        email,
-        granted_roles: [role as UserRole],  // 👈 Массив с одной ролью
-        counterparty_id: needsCounterparty ? counterpartyId : undefined,
-      });
-      setSuccess(true);
-      setEmail('');
-      setRole('');
-      setCounterpartyId('');
+  email,
+  granted_roles: [role as UserRole],
+  counterparty_id: needsCounterparty ? counterpartyId : undefined,
+  contact_person_id:
+    needsCounterparty && contactPersonId
+      ? contactPersonId
+      : undefined,
+});
+setSuccess(true);
+setEmail('');
+setRole('');
+setCounterpartyId('');
+setContactPersonId('');
+setContactPersons([]);
+setContactPersonsError(null);
       setTimeout(() => setSuccess(false), 4000);
     } catch (e: any) {
       setError(e.response?.data?.detail || 'Ошибка отправки приглашения');
@@ -401,7 +823,7 @@ export default function InvitationsPage() {
 
           {/* ═══ Вкладка «Отправить» ═══ */}
           {activeTab === 'send' && (
-            <div className="bg-[var(--hover-1)] rounded-xl border border-[var(--border-color)] overflow-hidden">
+            <div className="bg-[var(--hover-1)] rounded-xl border border-[var(--border-color)]">
 
               {/* Header */}
               <div className="px-6 py-5 border-b border-[var(--border-color)]">
@@ -753,19 +1175,37 @@ export default function InvitationsPage() {
                       </div>
 
                       <div className="pl-0 sm:pl-10">
-                        <CounterpartyDropdown
-                          value={counterpartyId}
-                          onChange={setCounterpartyId}
-                          counterparties={counterparties}
-                        />
+  <CounterpartyDropdown
+    value={counterpartyId}
+    onChange={nextId => {
+      if (nextId !== counterpartyId) {
+        setContactPersonId('');
+        setContactPersons([]);
+        setContactPersonsError(null);
+      }
+      setCounterpartyId(nextId);
+    }}
+    counterparties={counterparties}
+  />
 
-                        {counterparties.length === 0 && (
-                          <p className="mt-2 text-sm text-[var(--warning)]/70 flex items-center gap-1.5">
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            Нет контрагентов. Сначала создайте контрагента.
-                          </p>
-                        )}
-                      </div>
+  {counterparties.length === 0 && (
+    <p className="mt-2 text-sm text-[var(--warning)]/70 flex items-center gap-1.5">
+      <AlertCircle className="w-3.5 h-3.5" />
+      Нет контрагентов. Сначала создайте контрагента.
+    </p>
+  )}
+
+  {needsCounterparty && counterpartyId && (
+    <ContactPersonPicker
+      value={contactPersonId}
+      options={contactPersons}
+      loading={contactPersonsLoading}
+      error={contactPersonsError}
+      onChange={setContactPersonId}
+      onRetry={() => void loadContactPersons(counterpartyId)}
+    />
+  )}
+</div>
                     </section>
                   </>
                 )}

@@ -25,6 +25,9 @@ from src.tickets.domain.vo import CommentType, ReactionType
 
 
 class InMemoryCounterpartyRepository(InMemoryRepository[Counterparty]):
+    async def read_for_update(self, uid: UUID) -> Counterparty | None:
+        return await self.read(uid)
+
     async def get_by_email(self, email: str) -> Counterparty | None:
         for entity in self.data.values():
             if entity.email == email:

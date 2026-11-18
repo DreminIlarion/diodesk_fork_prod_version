@@ -157,6 +157,36 @@ const formatDateTime = (value?: string | null) => {
 const daysBetween = (a: Date, b: Date) =>
   Math.round((b.getTime() - a.getTime()) / 86400000);
 
+/**
+ * Количество рабочих (будних) дней между датами включительно.
+ * Учитываются только пн–пт. Праздники не учитываются.
+ * Если `end < start` — возвращает 0.
+ */
+const countWorkdays = (start: Date, end: Date): number => {
+  if (end < start) return 0;
+
+  let count = 0;
+  const current = new Date(start);
+  current.setHours(0, 0, 0, 0);
+
+  const last = new Date(end);
+  last.setHours(0, 0, 0, 0);
+
+  while (current <= last) {
+    const day = current.getDay(); // 0 = вс, 6 = сб
+    if (day !== 0 && day !== 6) count++;
+    current.setDate(current.getDate() + 1);
+  }
+
+  return count;
+};
+
+/** Рабочих дней по этапу: из плановых дат (пн–пт). */
+const stageWorkdays = (stage: ProjectStageResponse): number | null => {
+  const s = parseDate(stage.planned_start);
+  const e = parseDate(stage.planned_end);
+  return s && e ? countWorkdays(s, e) : null;
+};
 const sortStages = (stages: ProjectStageResponse[]) =>
   [...stages].sort((a, b) =>
     a.execution_order - b.execution_order || a.name.localeCompare(b.name, 'ru'),
@@ -217,7 +247,7 @@ const stageToForm = (stage: ProjectStageResponse): StageForm => ({
   responsible_id: stage.responsible_id ?? '',
   planned_start: stage.planned_start ?? '',
   planned_end: stage.planned_end ?? '',
-  planned_duration_days: stage.planned_duration_days != null ? String(stage.planned_duration_days) : '',
+  planned_duration_days: '',
   description: stage.description ?? '',
   completion_criteria: [...stage.completion_criteria],
 });
@@ -229,7 +259,7 @@ const formToPayload = (form: StageForm): StagePayload => ({
   responsible_id: form.responsible_id || null,
   planned_start: form.planned_start || null,
   planned_end: form.planned_end || null,
-  planned_duration_days: form.planned_duration_days ? Math.max(1, Number(form.planned_duration_days)) : null,
+  planned_duration_days: null,
   description: form.description.trim() || null,
   completion_criteria: form.completion_criteria.map(c => c.trim()).filter(Boolean),
 });
@@ -682,10 +712,10 @@ function TableView({ stages, users, onOpen, onCreate }: {
               ))}
               <th className="px-5 py-4 text-left text-xs font-semibold text-[var(--text-muted)]">Исполнители</th>
               <th className="px-5 py-4 text-left">
-                <button onClick={() => toggleSort('duration')} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)]">
-                  Дни <SortIcon column="duration" />
-                </button>
-              </th>
+  <button onClick={() => toggleSort('duration')} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)]">
+    Дни / Часы <SortIcon column="duration" />
+  </button>
+</th>
               <th className="w-10" />
             </tr>
           </thead>
@@ -722,8 +752,11 @@ function TableView({ stages, users, onOpen, onCreate }: {
                   </td>
                   <td className="px-5 py-4"><AssigneeAvatars ids={stage.assignee_ids} users={users} /></td>
                   <td className="px-5 py-4 text-sm text-[var(--text-secondary)] whitespace-nowrap">
-                    {stage.planned_duration_days != null ? `${stage.planned_duration_days} дн.` : '—'}
-                  </td>
+  {(() => {
+  const wd = stageWorkdays(stage);
+  return wd != null ? `${wd} дн. / ${wd * 8} ч` : '—';
+})()}
+</td>
                   <td className="px-4 py-4">
                     <ChevronRight className="w-4 h-4 text-[var(--text-disabled)] group-hover:text-[var(--accent)] group-hover:translate-x-0.5 transition-all" />
                   </td>
@@ -1114,10 +1147,18 @@ function RoadmapView({
                     <Calendar className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                     <div>
                       <p>
-                        {formatShort(stage.planned_start)}
-                        {' — '}
-                        {formatShort(stage.planned_end)}
-                      </p>
+  {formatShort(stage.planned_start)}
+  {' — '}
+  {formatShort(stage.planned_end)}
+</p>
+{(() => {
+  const wd = stageWorkdays(stage);
+  return wd != null ? (
+    <p className="mt-1 text-xs">
+      {wd} дн. / {wd * 8} ч
+    </p>
+  ) : null;
+})()}
                       {overdue && (
                         <p className="mt-1 font-semibold text-[var(--accent)]">
                           Отклонение +{overdueDays} дн.
@@ -1311,8 +1352,12 @@ function OverviewView({ stages, users, onOpen, onCreate }: {
                         {stage.name}
                       </p>
                       <p className="mt-1 text-xs text-[var(--text-muted)]">
-                        {formatShort(stage.planned_start)} — {formatShort(stage.planned_end)}
-                      </p>
+  {formatShort(stage.planned_start)} — {formatShort(stage.planned_end)}
+ {(() => {
+  const wd = stageWorkdays(stage);
+  return wd != null ? ` · ${wd} дн. / ${wd * 8} ч` : null;
+})()}
+</p>
                     </div>
                     <span className={`hidden sm:block text-xs font-medium ${cfg.text}`}>{cfg.label}</span>
                     <ChevronRight className="w-4 h-4 text-[var(--text-disabled)] group-hover:text-[var(--accent)] shrink-0" />
@@ -1534,8 +1579,12 @@ function TimelineView({ stages, users, projectId, onOpen }: {
                   {s.execution_order}. {s.name}
                 </p>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  {formatShort(s.planned_start)} — {formatShort(s.planned_end)}
-                </p>
+  {formatShort(s.planned_start)} — {formatShort(s.planned_end)}
+  {(() => {
+  const wd = stageWorkdays(s);
+  return wd != null ? ` · ${wd} дн. / ${wd * 8} ч` : null;
+})()}
+</p>
                 {isOverPlan(s) && (
                   <p className="text-xs text-[var(--accent)] mt-0.5">+{overrunDays(s)} дн.</p>
                 )}
@@ -1809,9 +1858,13 @@ function BoardView({ stages, users, onOpen, onMove }: {
                         </div>
 
                         <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-                          <Calendar className="w-3.5 h-3.5" />
-                          {formatShort(stage.planned_end)}
-                        </div>
+  <Calendar className="w-3.5 h-3.5" />
+  {formatShort(stage.planned_end)}
+  {(() => {
+  const wd = stageWorkdays(stage);
+  return wd != null ? ` · ${wd * 8} ч` : null;
+})()}
+</div>
                       </div>
                     </motion.div>
                   );
@@ -1902,7 +1955,7 @@ function AnalyticsView({ stages, users, onOpen }: {
           { label: 'Выполнено', value: `${progress}%`, desc: `${completed} из ${total} этапов`, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
           { label: 'В работе', value: active, desc: 'Активных этапов', icon: PlayCircle, color: 'text-blue-400', bg: 'bg-blue-500/10' },
           { label: 'Просрочено', value: overdue.length, desc: 'Требуют внимания', icon: AlertTriangle, color: 'text-[var(--accent)]', bg: 'bg-[var(--accent-soft)]' },
-          { label: 'Средняя длительность', value: `${averageDuration} дн.`, desc: 'Плановая', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+          { label: 'Средняя длительность', value: `${averageDuration} дн. / ${averageDuration * 8} ч`, desc: 'Плановая', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500/10' },
         ].map(item => {
           const Icon = item.icon;
 
@@ -2085,6 +2138,8 @@ function StageFormView({
     stage ? stageToForm(stage) : emptyForm(nextOrder),
   );
 
+  
+
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const update = <K extends keyof StageForm>(key: K, value: StageForm[K]) => {
@@ -2126,12 +2181,7 @@ function StageFormView({
       next.planned_end = 'Дата окончания не может быть раньше начала';
     }
 
-    if (
-      form.planned_duration_days &&
-      (!Number.isInteger(Number(form.planned_duration_days)) || Number(form.planned_duration_days) < 1)
-    ) {
-      next.planned_duration_days = 'Введите положительное целое число';
-    }
+   
 
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -2268,18 +2318,44 @@ function StageFormView({
                 </div>
               </div>
 
-              <div>
-                <label className={labelCls}>Плановая длительность, дней</label>
-                <input type="number" min={1} value={form.planned_duration_days}
-                  onChange={e => update('planned_duration_days', e.target.value)}
-                  placeholder="Не указана" className={inputCls} />
-                {errors.planned_duration_days && (
-                  <p className="mt-2 text-xs text-red-500">{errors.planned_duration_days}</p>
-                )}
-                <p className="mt-2 text-xs text-[var(--text-muted)]">
-                  Укажите длительность, если она отличается от календарного периода.
-                </p>
-              </div>
+                                  {(() => {
+                const s = parseDate(form.planned_start);
+                const e = parseDate(form.planned_end);
+                const workdays = s && e ? countWorkdays(s, e) : null;
+                const hours = workdays != null ? workdays * 8 : null;
+
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className={labelCls}>Рабочих дней</label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={workdays != null ? `${workdays} дн.` : '—'}
+                        className={`${inputCls} cursor-not-allowed opacity-70`}
+                        tabIndex={-1}
+                      />
+                      <p className="mt-2 text-xs text-[var(--text-muted)]">
+                        Считается по датам: только пн–пт (праздники не учитываются).
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Рабочих часов</label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={hours != null ? `${hours} ч` : '—'}
+                        className={`${inputCls} cursor-not-allowed opacity-70`}
+                        tabIndex={-1}
+                      />
+                      <p className="mt-2 text-xs text-[var(--text-muted)]">
+                        Из расчёта 8 часов в рабочем дне.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </SectionCard>
 
@@ -2513,9 +2589,9 @@ function StageDetail({
   const started = parseDate(stage.started_at);
   const finished = actualEnd(stage);
 
-  const plannedDays = plannedStart && plannedEnd ? daysBetween(plannedStart, plannedEnd) + 1 : null;
-  const actualDays = started && finished ? Math.max(1, daysBetween(started, finished) + 1) : null;
-
+ const plannedDays = plannedStart && plannedEnd ? countWorkdays(plannedStart, plannedEnd) : null;
+const plannedHours = plannedDays != null ? plannedDays * 8 : null;
+const actualDays = started && finished ? Math.max(1, daysBetween(started, finished) + 1) : null;
   const late = isOverPlan(stage);
   const lateDays = overrunDays(stage);
 
@@ -2703,7 +2779,7 @@ function StageDetail({
                     <div>
                       <p className="text-xs text-[var(--text-muted)]">Длительность</p>
                       <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
-                        {plannedDays != null ? `${plannedDays} дн.` : '—'}
+                        {plannedDays != null ? `${plannedDays} дн. / ${plannedHours} ч` : '—'}
                       </p>
                     </div>
                   </div>
@@ -2769,7 +2845,7 @@ function StageDetail({
                   <div>
                     <div className="flex justify-between mb-1 text-xs text-[var(--text-muted)]">
                       <span>Плановая длительность</span>
-                      <span>{plannedDays} дн.</span>
+                      {plannedDays != null ? `${plannedDays} дн. / ${plannedHours} ч` : '—'}
                     </div>
                     <div className="h-2.5 rounded-full bg-[var(--hover-3)] overflow-hidden">
                       <div className="h-full w-full rounded-full bg-blue-500/70" />
