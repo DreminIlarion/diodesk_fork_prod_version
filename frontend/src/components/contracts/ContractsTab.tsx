@@ -4,9 +4,8 @@ import {
   ChevronRight, ChevronUp, Clock, Edit, FileText, Hash, Link2,
   Loader2, Plus, RefreshCcw, Trash2, X,
 } from 'lucide-react';
-import { contractsApi } from '../api/client';
-import type { Contract } from '../types';
-
+import { contractsApi } from '../../api/client';
+import type { Contract } from '../../types';
 // ─── Типы ─────────────────────────────────────────────────────────────────────
 
 interface ContractRateInput {
