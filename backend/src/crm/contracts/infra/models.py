@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, Numeric, String
+from sqlalchemy import CheckConstraint, ForeignKey, Index, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
@@ -58,17 +58,21 @@ class ContractRateOrm(Base):
         CheckConstraint("rate >= 0", name="ck_contract_rates_rate_non_negative"),
         Index("ix_contract_rates_contract_id", "contract_id"),
     )
-
 class ProjectContractOrm(Base):
     __tablename__ = "project_contracts"
 
     project_id: Mapped[UUID] = mapped_column(
-        ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
     )
     contract_id: Mapped[UUID] = mapped_column(
-        ForeignKey("contracts.id", ondelete="CASCADE"), primary_key=True
+        ForeignKey("contracts.id", ondelete="CASCADE"), nullable=False
     )
 
     __table_args__ = (
+        UniqueConstraint(
+            "project_id", "contract_id",
+            name="uq_project_contracts_project_contract",
+        ),
+        Index("ix_project_contracts_project", "project_id"),
         Index("ix_project_contracts_contract", "contract_id"),
     )
