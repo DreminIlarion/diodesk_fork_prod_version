@@ -42,16 +42,16 @@ class ProductResponse(ProductBase):
 class ProductCreate(ProductBase):
     """API схема для создания программного продукта"""
 
-    registration_number: NonEmptyIdentifier = Field(
-        ..., description="Регистрационный номер продукта в 1С УФФ"
+    registration_number: NonEmptyIdentifier | None = Field(
+        None, description="Регистрационный номер продукта в 1С УФФ (необязательно)"
     )
 
 
 class ProductUpdate(BaseModel):
     """API схема для обновления регистрационного номера продукта."""
 
-    registration_number: NonEmptyIdentifier = Field(
-        ..., description="Новый регистрационный номер продукта"
+    registration_number: NonEmptyIdentifier | None = Field(
+        None, description="Новый регистрационный номер продукта (необязательно)"
     )
 
 

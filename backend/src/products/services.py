@@ -37,13 +37,14 @@ class ProductService:
 
         validate_product_attributes(data.category, data.attributes)
 
-        existing_product = await self.repository.get_by_registration_number(
-            data.registration_number
-        )
-        if existing_product is not None:
-            raise AlreadyExistsError(
-                f"Product with registration number {data.registration_number} already exists"
+        if data.registration_number is not None:
+            existing_product = await self.repository.get_by_registration_number(
+                data.registration_number
             )
+            if existing_product is not None:
+                raise AlreadyExistsError(
+                    f"Product with registration number {data.registration_number} already exists"
+                )
 
         # 2. Создание и сохранение продукта
         product = SoftwareProduct(
@@ -75,13 +76,14 @@ class ProductService:
         if product is None:
             raise NotFoundError(f"Product with ID {product_id} not found")
 
-        existing_product = await self.repository.get_by_registration_number(
-            data.registration_number
-        )
-        if existing_product is not None and existing_product.id != product.id:
-            raise AlreadyExistsError(
-                f"Product with registration number {data.registration_number} already exists"
+        if data.registration_number is not None:
+            existing_product = await self.repository.get_by_registration_number(
+                data.registration_number
             )
+            if existing_product is not None and existing_product.id != product.id:
+                raise AlreadyExistsError(
+                    f"Product with registration number {data.registration_number} already exists"
+                )
 
         product.change_registration_number(data.registration_number, changed_by=updated_by)
         await self.repository.update(product)

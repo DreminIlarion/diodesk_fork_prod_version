@@ -48,11 +48,12 @@ class SoftwareProduct(Entity):
                 raise ValueError("Product registration number cannot be empty")
 
     def change_registration_number(
-            self, registration_number: str, changed_by: UUID | None = None
+            self, registration_number: str | None, changed_by: UUID | None = None
     ) -> None:
-        registration_number = registration_number.strip()
-        if not registration_number:
-            raise ValueError("Product registration number cannot be empty")
+        if registration_number is not None:
+            registration_number = registration_number.strip()
+            if not registration_number:
+                raise ValueError("Product registration number cannot be empty")
         if registration_number == self.registration_number:
             return
 
