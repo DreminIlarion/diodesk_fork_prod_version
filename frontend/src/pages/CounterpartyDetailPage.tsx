@@ -509,34 +509,19 @@ function EditCounterpartyModal({
             : undefined,
       };
 
-      console.group('📤 [ContactsTab] POST /contact-persons');
-      console.log('counterpartyId:', counterpartyId);
-      console.log('form state:', form);
-      console.log('payload (will be sent):', payload);
-      console.log('payload JSON:', JSON.stringify(payload));
-      console.groupEnd();
+      
 
       const res = await counterpartiesApi.updateContactPerson(
         counterpartyId,
         payload,
       );
 
-      console.group('📥 [ContactsTab] response from /contact-persons');
-      console.log('response:', res);
-      console.groupEnd();
+     
 
       resetForm();
       onRefresh();
     } catch (e: any) {
-      console.group('❌ [ContactsTab] error on /contact-persons');
-      console.error('error:', e);
-      console.log('status:', e?.response?.status);
-      console.log('response data:', e?.response?.data);
-      console.log(
-        'response data (stringified):',
-        JSON.stringify(e?.response?.data, null, 2),
-      );
-      console.groupEnd();
+      
     } finally {
       setSaving(false);
     }
@@ -783,6 +768,7 @@ function ContactsTab({
       return;
     }
 
+      
     setSaving(true);
 
     try {
@@ -1610,6 +1596,7 @@ function BranchesTab({
 
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [rateValidationAttempted, setRateValidationAttempted] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -2836,6 +2823,29 @@ const EMPTY_RATE: ContractRateInput = {
   hours_its: null,
 };
 
+const CONTRACT_RATE_VALIDATION_ERROR =
+  'Размер каждой добавленной ставки должен быть числом не меньше 0.';
+
+const parseContractRate = (value: unknown): number => {
+  if (value === null || value === undefined || value === '') {
+    return Number.NaN;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+};
+
+const isInvalidContractRate = (rate: ContractRateInput): boolean => {
+  const raw: unknown = rate.rate;
+
+  if (raw === null || raw === undefined || raw === '') {
+    return true;
+  }
+
+  const amount = Number(raw);
+  return !Number.isFinite(amount) || amount < 0;
+};
+
 function ContractSelect({
   label,
   value,
@@ -3130,9 +3140,7 @@ function ContractsTab({
     sum: '',
   });
 
-  const [rates, setRates] = useState<ContractRateInput[]>([
-    { ...EMPTY_RATE },
-  ]);
+  const [rates, setRates] = useState<ContractRateInput[]>([]);
 
   const fieldCls = `
     mt-1.5 w-full min-h-[46px] rounded-xl border
@@ -3184,7 +3192,8 @@ function ContractsTab({
       sum: '',
     });
 
-    setRates([{ ...EMPTY_RATE }]);
+    setRates([]);
+setRateValidationAttempted(false);
     setEditingId(null);
     setFormError(null);
     setShowForm(false);
@@ -3225,17 +3234,18 @@ function ContractsTab({
     });
 
     setRates(
-      contractRates.length
-        ? contractRates.map(rate => ({
-            type_rate: rate.type_rate,
-            rate: Number(rate.rate),
-            unit_measurement_rate: rate.unit_measurement_rate,
-            hours_subscription: rate.hours_subscription ?? null,
-            hours_its: rate.hours_its ?? null,
-          }))
-        : [{ ...EMPTY_RATE }],
-    );
+  contractRates.length
+    ? contractRates.map(rate => ({
+        type_rate: rate.type_rate,
+        rate: parseContractRate(rate.rate),
+        unit_measurement_rate: rate.unit_measurement_rate,
+        hours_subscription: rate.hours_subscription ?? null,
+        hours_its: rate.hours_its ?? null,
+      }))
+    : [],
+);
 
+    setRateValidationAttempted(false);
     setFormError(null);
     setShowForm(true);
     setExpandedId(null);
@@ -3267,20 +3277,27 @@ function ContractsTab({
       type: form.type.trim(),
       period: form.period.trim() || null,
       sum: form.sum.trim() ? Number(form.sum) : null,
-      rates: rates.map(rate => ({
-        type_rate: rate.type_rate.trim(),
-        rate: Number(rate.rate),
-        unit_measurement_rate: rate.unit_measurement_rate.trim(),
-        hours_subscription:
-          rate.hours_subscription === null ||
-          rate.hours_subscription === undefined
-            ? null
-            : Number(rate.hours_subscription),
-        hours_its:
-          rate.hours_its === null || rate.hours_its === undefined
-            ? null
-            : Number(rate.hours_its),
-      })),
+      rates: rates.map(rate => {
+  const rateType = rate.type_rate.trim();
+  const isThresholdRate = ['До превышения', 'После превышения'].includes(rateType);
+
+  const showItsHours = isThresholdRate && form.type === 'ИТС';
+  const showSubscriptionHours = isThresholdRate && form.type === 'Сопровождение';
+
+  return {
+    type_rate: rateType,
+    rate: Number(rate.rate),
+    unit_measurement_rate: rate.unit_measurement_rate.trim(),
+    hours_subscription:
+      showSubscriptionHours && rate.hours_subscription != null
+        ? Number(rate.hours_subscription)
+        : null,
+    hours_its:
+      showItsHours && rate.hours_its != null
+        ? Number(rate.hours_its)
+        : null,
+  };
+}),
     };
 
     try {
@@ -3341,8 +3358,11 @@ function ContractsTab({
   };
 
   const addRate = () => {
-    setRates(current => [...current, { ...EMPTY_RATE }]);
-  };
+  setRates(current => [
+    ...current,
+    { ...EMPTY_RATE, rate: Number.NaN },
+  ]);
+};
 
   const removeRate = (index: number) => {
     setRates(current => current.filter((_, rateIndex) => rateIndex !== index));
@@ -3515,15 +3535,22 @@ function ContractsTab({
                   </label>
 
                   <ContractSelect
-                    label="Вид договора"
-                    required
-                    value={form.type}
-                    onChange={type =>
-                      setForm(current => ({ ...current, type }))
-                    }
-                    options={CONTRACT_TYPES}
-                    placeholder="Выберите вид договора"
-                  />
+  label="Вид договора"
+  required
+  value={form.type}
+  onChange={type => {
+    setForm(current => ({ ...current, type }));
+    setRates(current =>
+      current.map(r => ({
+        ...r,
+        hours_its: type === 'ИТС' ? r.hours_its : null,
+        hours_subscription: type === 'Сопровождение' ? r.hours_subscription : null,
+      })),
+    );
+  }}
+  options={CONTRACT_TYPES}
+  placeholder="Выберите вид договора"
+/>
 
                   <ContractSelect
   label="Статус"
@@ -3620,7 +3647,7 @@ function ContractsTab({
                         Ставки
                       </h4>
                       <p className="mt-0.5 text-sm text-[var(--text-primary)]/40">
-                        Тарифы и часы по договору
+                        Ставки необязательны — договор можно сохранить без них.
                       </p>
                     </div>
                   </div>
@@ -3634,6 +3661,23 @@ function ContractsTab({
                     Добавить ставку
                   </button>
                 </div>
+
+                {rates.length === 0 && (
+  <div className="mb-3 flex items-start gap-3 rounded-xl border border-dashed border-[var(--border-color)] bg-[var(--hover-1)] p-4">
+    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--bg-card)] text-[var(--text-primary)]/45">
+      <Plus size={17} />
+    </span>
+
+    <div className="min-w-0">
+      <p className="text-sm font-medium text-[var(--text-primary)]/75">
+        Ставки не добавлены
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-[var(--text-primary)]/40">
+        Это необязательный раздел. Если ставки нужны, добавьте их кнопкой выше.
+      </p>
+    </div>
+  </div>
+)}
 
                 <div className="space-y-3">
                   {rates.map((rate, index) => (
@@ -3652,54 +3696,82 @@ function ContractsTab({
                         </div>
 
                         <button
-                          type="button"
-                          onClick={() => removeRate(index)}
-                          disabled={rates.length <= 1}
-                          title={
-                            rates.length <= 1
-                              ? 'Должна остаться хотя бы одна ставка'
-                              : 'Удалить ставку'
-                          }
-                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/10 disabled:cursor-not-allowed disabled:opacity-35"
-                        >
-                          <Trash2 size={14} />
-                          Удалить
-                        </button>
+  type="button"
+  onClick={() => removeRate(index)}
+  title="Удалить ставку"
+  aria-label={`Удалить ставку ${index + 1}`}
+  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/10"
+>
+  <Trash2 size={14} />
+  Удалить
+</button>
                       </div>
 
                       <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-3">
-                        <ContractSelect
+<ContractSelect
   label="Вид ставки"
   required
   value={rate.type_rate}
   onChange={value =>
-    setRate(index, { type_rate: value })
+    setRate(index, {
+      type_rate: value,
+      hours_its: ['До превышения', 'После превышения'].includes(value)
+        ? rate.hours_its
+        : null,
+      hours_subscription: ['До превышения', 'После превышения'].includes(value)
+        ? rate.hours_subscription
+        : null,
+    })
   }
   options={CONTRACT_RATES_TYPES}
   placeholder="Выберите вид ставки"
 />
 
                         <label className="block min-w-0">
-                          <span className="text-xs text-[var(--text-primary)]/45">
-                            Размер ставки
-                          </span>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={rate.rate}
-                            onChange={event =>
-                              setRate(index, {
-                                rate:
-                                  event.target.value === ''
-                                    ? 0
-                                    : Number(event.target.value),
-                              })
-                            }
-                            placeholder="0"
-                            className={fieldCls}
-                          />
-                        </label>
+  <span className="text-xs text-[var(--text-primary)]/45">
+    Размер ставки
+    <span className="ml-1 text-[var(--accent)]">*</span>
+  </span>
+
+  <input
+    type="number"
+    step="0.01"
+    min="0"
+    required
+    value={Number.isFinite(rate.rate) ? rate.rate : ''}
+    onChange={event => {
+      setRate(index, {
+        rate: parseContractRate(event.target.value),
+      });
+
+      setFormError(current =>
+        current === CONTRACT_RATE_VALIDATION_ERROR ? null : current,
+      );
+    }}
+    placeholder="Введите сумму"
+    aria-invalid={rateValidationAttempted && isInvalidContractRate(rate)}
+    aria-describedby={
+      rateValidationAttempted && isInvalidContractRate(rate)
+        ? `contract-rate-error-${index}`
+        : undefined
+    }
+    className={`${fieldCls} ${
+      rateValidationAttempted && isInvalidContractRate(rate)
+        ? 'border-[var(--accent)]/50 focus:border-[var(--accent)]/60'
+        : ''
+    }`}
+  />
+
+  {rateValidationAttempted && isInvalidContractRate(rate) && (
+    <span
+      id={`contract-rate-error-${index}`}
+      className="mt-1.5 flex items-center gap-1.5 text-xs text-[var(--accent)]"
+    >
+      <AlertTriangle size={13} />
+      Укажите число от 0 и выше.
+    </span>
+  )}
+</label>
 
                         <ContractSelect
   label="Единица измерения"
@@ -3712,49 +3784,55 @@ function ContractsTab({
   placeholder="Выберите единицу"
 />
 
-                        <label className="block min-w-0">
-                          <span className="text-xs text-[var(--text-primary)]/45">
-                            Абонентские часы
-                          </span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={rate.hours_subscription ?? ''}
-                            onChange={event =>
-                              setRate(index, {
-                                hours_subscription:
-                                  event.target.value === ''
-                                    ? null
-                                    : Number(event.target.value),
-                              })
-                            }
-                            placeholder="Не указано"
-                            className={fieldCls}
-                          />
-                        </label>
+                        {form.type === 'ИТС' &&
+  ['До превышения', 'После превышения'].includes(rate.type_rate.trim()) && (
+    <label className="block min-w-0">
+      <span className="text-xs text-[var(--text-primary)]/45">
+        Часы ИТС
+      </span>
+      <input
+        type="number"
+        min="0"
+        step="1"
+        value={rate.hours_its ?? ''}
+        onChange={event =>
+          setRate(index, {
+            hours_its:
+              event.target.value === ''
+                ? null
+                : Number(event.target.value),
+          })
+        }
+        placeholder="Не указано"
+        className={fieldCls}
+      />
+    </label>
+  )}
 
-                        <label className="block min-w-0">
-                          <span className="text-xs text-[var(--text-primary)]/45">
-                            Часы ИТС
-                          </span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={rate.hours_its ?? ''}
-                            onChange={event =>
-                              setRate(index, {
-                                hours_its:
-                                  event.target.value === ''
-                                    ? null
-                                    : Number(event.target.value),
-                              })
-                            }
-                            placeholder="Не указано"
-                            className={fieldCls}
-                          />
-                        </label>
+{form.type === 'Сопровождение' &&
+  ['До превышения', 'После превышения'].includes(rate.type_rate.trim()) && (
+    <label className="block min-w-0">
+      <span className="text-xs text-[var(--text-primary)]/45">
+        Абонентские часы
+      </span>
+      <input
+        type="number"
+        min="0"
+        step="1"
+        value={rate.hours_subscription ?? ''}
+        onChange={event =>
+          setRate(index, {
+            hours_subscription:
+              event.target.value === ''
+                ? null
+                : Number(event.target.value),
+          })
+        }
+        placeholder="Не указано"
+        className={fieldCls}
+      />
+    </label>
+  )}
                       </div>
                     </div>
                   ))}
