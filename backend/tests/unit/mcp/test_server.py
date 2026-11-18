@@ -7,7 +7,8 @@ from fastapi.testclient import TestClient
 
 from src.iam.domain.vo import Email, UserRole
 from src.iam.security import create_access_token
-from src.mcp.server import create_server
+from src.mcp.auth import JwtTokenVerifier
+from src.mcp.server import mcp
 
 pytestmark = pytest.mark.unit
 
@@ -45,8 +46,13 @@ class FakeTokenStore:
         return False
 
 
+@pytest.fixture(autouse=True)
+def fake_token_store(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(mcp, "auth", JwtTokenVerifier(FakeTokenStore()))
+
+
 def test_mcp_endpoint_requires_bearer_token():
-    app = create_server(FakeTokenStore()).http_app(path="/", stateless_http=True)
+    app = mcp.http_app(path="/", stateless_http=True)
 
     with TestClient(app) as client:
         response = client.post("/", json=INITIALIZE_REQUEST, headers=MCP_HEADERS)
@@ -56,7 +62,7 @@ def test_mcp_endpoint_requires_bearer_token():
 
 
 def test_mcp_endpoint_accepts_staff_access_token():
-    app = create_server(FakeTokenStore()).http_app(path="/", stateless_http=True)
+    app = mcp.http_app(path="/", stateless_http=True)
     token = create_access_token(
         uuid4(),
         Email("agent@test.com"),
@@ -71,7 +77,7 @@ def test_mcp_endpoint_accepts_staff_access_token():
 
 
 def test_mcp_endpoint_lists_mounted_tools_for_staff_access_token():
-    app = create_server(FakeTokenStore()).http_app(path="/", stateless_http=True)
+    app = mcp.http_app(path="/", stateless_http=True)
     token = create_access_token(
         uuid4(),
         Email("agent@test.com"),

@@ -2,7 +2,6 @@ from fastmcp import FastMCP
 from fastmcp.server.middleware import AuthMiddleware
 
 from src.core.redis import redis_client
-from src.iam.domain.repos import TokenStore
 from src.iam.infra.token_store import RedisTokenStore
 from src.iam.mcp.server import mcp as users_mcp
 from src.tasks.mcp.server import mcp as tasks_mcp
@@ -28,27 +27,16 @@ INSTRUCTIONS = """\
 - Если операция запрещена правами или нарушает правила DioDesk, понятно объясни причину.
 """
 
+mcp = FastMCP(
+    name="diodesk",
+    instructions=INSTRUCTIONS,
+    auth=JwtTokenVerifier(RedisTokenStore(redis_client)),
+    middleware=[
+        AuthMiddleware(auth=require_staff),
+        DomainErrorMiddleware(),
+    ],
+    mask_error_details=True,
+)
 
-def create_server(token_store: TokenStore | None = None) -> FastMCP:
-    """Create the root DioDesk MCP server."""
-
-    if token_store is None:
-        token_store = RedisTokenStore(redis_client)
-
-    server = FastMCP(
-        name="diodesk",
-        instructions=INSTRUCTIONS,
-        auth=JwtTokenVerifier(token_store),
-        middleware=[
-            AuthMiddleware(auth=require_staff),
-            DomainErrorMiddleware(),
-        ],
-        mask_error_details=True,
-    )
-    server.mount(users_mcp)
-    server.mount(tasks_mcp)
-
-    return server
-
-
-mcp = create_server()
+mcp.mount(users_mcp)
+mcp.mount(tasks_mcp)
