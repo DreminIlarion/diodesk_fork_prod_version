@@ -18,6 +18,7 @@ from ..domain.repos import TaskRepository
 from ..domain.vo import TaskStatus
 from ..services import TaskService
 from .dependencies import get_task_repo, get_task_service
+from .mappers import to_task_create, to_task_update
 from .presenters import to_task_brief, to_task_card
 from .references import TaskRef, find_task
 from .schemas import TaskBrief, TaskCard, TaskChanges, TaskDraft
@@ -37,7 +38,7 @@ async def create_task(
     """
 
     created = await service.create(
-        task.to_task_create(),
+        to_task_create(task),
         subject,
     )
     return to_task_card(created)
@@ -61,7 +62,7 @@ async def update_task(
     found = await find_task(task_repo, task)
     updated = await service.edit(
         found.id,
-        changes.to_task_update(),
+        to_task_update(changes),
         subject,
     )
     return to_task_card(updated)

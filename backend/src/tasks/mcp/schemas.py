@@ -5,10 +5,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
 
-from src.shared.domain.vo import Priority, Tag
+from src.shared.domain.vo import Priority
 
 from ..domain.vo import TaskStatus
-from ..schemas import TaskCreate, TaskUpdate
 
 StoryPointsValue = Literal[1, 2, 3, 5, 8, 13, 21]
 
@@ -52,22 +51,6 @@ class TaskDraft(BaseModel):
         False,
         description="Создать сразу в статусе todo вместо backlog",
     )
-
-    def to_task_create(self) -> TaskCreate:
-        return TaskCreate(
-            title=self.title,
-            description=self.description,
-            priority=self.priority,
-            story_points=self.story_points,
-            estimated_hours=self.estimated_hours,
-            due_date=self.due_date,
-            assignee_id=self.assignee_id,
-            ticket_id=self.ticket_id,
-            project_id=self.project_id,
-            stage_id=self.stage_id,
-            tags=[Tag(name=name) for name in self.tags],
-            mark_as_todo=self.ready_for_work,
-        )
 
 
 class TaskChanges(BaseModel):
@@ -117,16 +100,6 @@ class TaskChanges(BaseModel):
             raise ValueError("At least one task field must be provided")
 
         return self
-
-    def to_task_update(self) -> TaskUpdate:
-        return TaskUpdate(
-            title=self.title,
-            description=self.description,
-            priority=self.priority,
-            story_points=self.story_points,
-            estimated_hours=self.estimated_hours,
-            due_date=self.due_date,
-        )
 
 
 class TaskBrief(BaseModel):
