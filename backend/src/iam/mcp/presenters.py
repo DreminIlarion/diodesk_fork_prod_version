@@ -1,4 +1,3 @@
-from collections import UserDict
 from collections.abc import Iterable
 from uuid import UUID
 
@@ -6,12 +5,11 @@ from ..domain.entities import User
 from ..domain.repos import UserRepository
 from .schemas import UserBrief
 
+type UserBriefs = dict[UUID, UserBrief]
 
-class UserBriefs(UserDict[UUID, UserBrief]):
-    """Загруженные пользователи, индексированные по ID."""
 
-    def find(self, user_id: UUID | None) -> UserBrief | None:
-        return None if user_id is None else self.get(user_id)
+def find_user_brief(users: UserBriefs, user_id: UUID | None) -> UserBrief | None:
+    return None if user_id is None else users.get(user_id)
 
 
 def to_user_brief(user: User) -> UserBrief:
@@ -35,11 +33,11 @@ async def load_user_briefs(
     })
 
     if not unique_ids:
-        return UserBriefs()
+        return {}
 
     users = await user_repo.get_by_ids(unique_ids)
 
-    return UserBriefs(
-        (user.id, to_user_brief(user))
+    return {
+        user.id: to_user_brief(user)
         for user in users
-    )
+    }
