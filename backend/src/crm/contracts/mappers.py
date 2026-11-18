@@ -1,11 +1,17 @@
+from uuid import UUID
+
 from .domain.entities import Contract
 from .schemas import ContractRateOut, ContractResponse
 
 
-def map_contract_to_response(contract: Contract) -> ContractResponse:
+def map_contract_to_response(
+        contract: Contract,
+        project_ids: list[UUID] | None = None,
+) -> ContractResponse:
     return ContractResponse(
         id=contract.id,
         counterparty_id=contract.counterparty_id,
+        project_ids=project_ids or [],
         name=contract.name,
         date_start=contract.date_start,
         date_end=contract.date_end,

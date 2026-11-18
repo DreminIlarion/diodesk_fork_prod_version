@@ -53,14 +53,19 @@ class ContractService:
         ]
 
         await self.repository.create(contract)
+        await self.session.flush()
+        if data.project_ids:
+            await self.repository.set_project_ids(contract.id, data.project_ids)
         await self.session.commit()
-        return map_contract_to_response(contract)
+        project_ids = await self.repository.get_project_ids(contract.id)
+        return map_contract_to_response(contract, project_ids=project_ids)
 
     async def get(self, contract_id: UUID) -> ContractResponse:
         contract = await self.repository.read(contract_id)
         if contract is None:
             raise NotFoundError(f"Contract with ID {contract_id} not found")
-        return map_contract_to_response(contract)
+        project_ids = await self.repository.get_project_ids(contract.id)
+        return map_contract_to_response(contract, project_ids=project_ids)
 
     async def update(self, contract_id: UUID, data: ContractUpdate) -> ContractResponse:
         contract = await self.repository.read(contract_id)
@@ -92,12 +97,32 @@ class ContractService:
             rates=new_rates,
         )
         await self.repository.update(contract)
+        if data.project_ids is not None:
+            await self.repository.set_project_ids(contract.id, data.project_ids)
         await self.session.commit()
-        return map_contract_to_response(contract)
+        project_ids = await self.repository.get_project_ids(contract.id)
+        return map_contract_to_response(contract, project_ids=project_ids)
 
     async def delete(self, contract_id: UUID) -> None:
         contract = await self.repository.read(contract_id)
         if contract is None:
             raise NotFoundError(f"Contract with ID {contract_id} not found")
         await self.repository.delete(contract_id)
+        await self.session.commit()
+
+    async def link_project(self, contract_id: UUID, project_id: UUID) -> None:
+        contract = await self.repository.read(contract_id)
+        if contract is None:
+            raise NotFoundError(f"Contract with ID {contract_id} not found")
+        ids = await self.repository.get_project_ids(contract_id)
+        if project_id not in ids:
+            await self.repository.set_project_ids(contract_id, ids + [project_id])
+        await self.session.commit()
+
+    async def unlink_project(self, contract_id: UUID, project_id: UUID) -> None:
+        ids = await self.repository.get_project_ids(contract_id)
+        if project_id in ids:
+            await self.repository.set_project_ids(
+                contract_id, [x for x in ids if x != project_id]
+            )
         await self.session.commit()

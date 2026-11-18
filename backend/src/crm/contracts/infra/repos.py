@@ -1,7 +1,7 @@
 from typing import override
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import selectinload
 
 from src.shared.infra.repos import ModelMapper, SqlAlchemyRepository
@@ -9,7 +9,7 @@ from src.shared.schemas import Page, Pagination
 
 from ..domain.entities import Contract, ContractRate
 from ..domain.repo import ContractFilters
-from .models import ContractOrm, ContractRateOrm
+from .models import ContractOrm, ContractRateOrm, ProjectContractOrm
 
 
 class ContractMapper(ModelMapper[Contract, ContractOrm]):
@@ -92,6 +92,12 @@ class SqlContractRepository(SqlAlchemyRepository[Contract, ContractOrm]):
         if filters and filters.counterparty_id is not None:
             stmt = stmt.where(self.model.counterparty_id == filters.counterparty_id)
 
+        if filters and filters.project_id is not None:
+            stmt = stmt.join(
+                ProjectContractOrm,
+                ProjectContractOrm.contract_id == self.model.id,
+            ).where(ProjectContractOrm.project_id == filters.project_id)
+
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = await self.session.scalar(count_stmt)
         if not total:
@@ -115,3 +121,26 @@ class SqlContractRepository(SqlAlchemyRepository[Contract, ContractOrm]):
         )
         result = await self.session.execute(stmt)
         return [self.model_mapper.to_entity(m) for m in result.scalars().all()]
+
+    async def get_project_ids(self, contract_id: UUID) -> list[UUID]:
+        stmt = select(ProjectContractOrm.project_id).where(
+            ProjectContractOrm.contract_id == contract_id
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def set_project_ids(
+            self, contract_id: UUID, project_ids: list[UUID],
+    ) -> None:
+        await self.session.execute(
+            delete(ProjectContractOrm).where(
+                ProjectContractOrm.contract_id == contract_id
+            )
+        )
+        unique_ids = list(dict.fromkeys(project_ids))
+        if unique_ids:
+            self.session.add_all([
+                ProjectContractOrm(contract_id=contract_id, project_id=pid)
+                for pid in unique_ids
+            ])
+        await self.session.flush()

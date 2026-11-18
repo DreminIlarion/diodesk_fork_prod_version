@@ -37,9 +37,11 @@ def get_contract_filters(
         counterparty_id: Annotated[
             UUID | None, Query(..., description="Фильтр по контрагенту")
         ] = None,
+        project_id: Annotated[
+            UUID | None, Query(..., description="Фильтр по проекту")
+        ] = None,
 ) -> ContractFilters:
-    return ContractFilters(counterparty_id=counterparty_id)
-
+    return ContractFilters(counterparty_id=counterparty_id, project_id=project_id)
 
 ContractFiltersDep = Annotated[ContractFilters, Depends(get_contract_filters)]
 
@@ -50,4 +52,8 @@ async def paginate_contracts(
         repo: ContractRepoDep,
 ) -> Page[ContractResponse]:
     page = await repo.paginate(pagination, filters)
-    return page.to_response(map_contract_to_response)
+    result = []
+    for contract in page.items:
+        project_ids = await repo.get_project_ids(contract.id)
+        result.append(map_contract_to_response(contract, project_ids=project_ids))
+    return Page.create(result, page.total_items, page.page, page.size)

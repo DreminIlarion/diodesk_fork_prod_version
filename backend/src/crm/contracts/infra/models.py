@@ -58,3 +58,17 @@ class ContractRateOrm(Base):
         CheckConstraint("rate >= 0", name="ck_contract_rates_rate_non_negative"),
         Index("ix_contract_rates_contract_id", "contract_id"),
     )
+
+class ProjectContractOrm(Base):
+    __tablename__ = "project_contracts"
+
+    project_id: Mapped[UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    contract_id: Mapped[UUID] = mapped_column(
+        ForeignKey("contracts.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    __table_args__ = (
+        Index("ix_project_contracts_contract", "contract_id"),
+    )

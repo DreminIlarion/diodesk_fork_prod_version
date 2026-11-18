@@ -6,7 +6,7 @@ import {
   ArrowLeft, FolderOpen, Building2, Users, Calendar,
   User, Mail, Phone, Loader2, Archive, Plus, Ticket,
   Crown, Hash, UserPlus, ChevronRight, Search, X,
-  Check, Settings, AlertTriangle, Milestone, Pencil,Layers
+  Check, Settings, AlertTriangle, Milestone, Pencil,Layers,FileText
 } from 'lucide-react';
 
 import {
@@ -15,6 +15,8 @@ import {
   counterpartiesApi,
   usersApi,
 } from '../api/client';
+
+import { ContractsTab } from '../components/contracts/ContractsTab';
 
 import { useAuthStore } from '../stores/authStore';
 import { useToast } from '../components/ui/use-toast';
@@ -32,7 +34,7 @@ import type {
    TYPES
    ═══════════════════════════════════════════════════════════════ */
 
-type TabType = 'info' | 'members' | 'tickets';
+type TabType = 'info' | 'members' | 'tickets' | 'contracts';
 
 type ProjectMember = {
   user_id: string;
@@ -860,10 +862,11 @@ export default function ProjectDetailPage() {
       {/* NAVIGATION */}
       <div className="flex gap-1 border-b border-[var(--border-color)] overflow-x-auto">
 
-        {([
+                {([
           { id: 'info' as TabType, label: 'Информация', icon: FolderOpen },
           { id: 'members' as TabType, label: 'Участники', icon: Users, count: members.length },
           { id: 'tickets' as TabType, label: 'Заявки', icon: Ticket, count: projectTickets.length },
+          { id: 'contracts' as TabType, label: 'Договоры', icon: FileText },
         ]).map(tab => {
           const Icon = tab.icon;
 
@@ -1260,6 +1263,13 @@ export default function ProjectDetailPage() {
                 )}
               </div>
             </div>
+          )}
+
+                    {activeTab === 'contracts' && project && project.counterparty_id && (
+            <ContractsTab
+              counterpartyId={project.counterparty_id}
+              projectId={project.id}
+            />
           )}
         </div>
 

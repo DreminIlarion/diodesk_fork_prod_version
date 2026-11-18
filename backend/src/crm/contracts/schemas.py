@@ -29,6 +29,9 @@ class ContractCreate(BaseModel):
     period: str | None = Field(None, max_length=64, description="Период оплаты")
     sum: Decimal | None = Field(None, ge=0, description="Сумма по договору")
     rates: list[ContractRateIn] = Field(default_factory=list, description="Ставки")
+    project_ids: list[UUID] | None = Field(
+        None, description="Проекты, к которым привязать договор (опционально)"
+    )
 
 
 class ContractUpdate(BaseModel):
@@ -40,11 +43,15 @@ class ContractUpdate(BaseModel):
     period: str | None = Field(None, max_length=64)
     sum: Decimal | None = Field(None, ge=0)
     rates: list[ContractRateIn] | None = None
+    project_ids: list[UUID] | None = Field(
+        None, description="Проекты договора (полная замена списка)"
+    )
 
 
 class ContractResponse(BaseModel):
     id: UUID
     counterparty_id: UUID
+    project_ids: list[UUID] = Field(default_factory=list, description="ID проектов договора")
     name: str
     date_start: date
     date_end: date | None
@@ -55,3 +62,5 @@ class ContractResponse(BaseModel):
     rates: list[ContractRateOut]
     created_at: datetime
     updated_at: datetime
+
+    

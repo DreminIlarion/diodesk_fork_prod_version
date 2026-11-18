@@ -1385,4 +1385,10 @@ export const contractsApi = {
   remove: async (id: string): Promise<void> => {
     await api.delete(`/api/v1/contracts/${id}`);
   },
+      linkProject: async (contractId: string, projectId: string): Promise<void> => {
+    await api.post(`/api/v1/contracts/${contractId}/projects/${projectId}`);
+  },
+  unlinkProject: async (contractId: string, projectId: string): Promise<void> => {
+    await api.delete(`/api/v1/contracts/${contractId}/projects/${projectId}`);
+  },
 };

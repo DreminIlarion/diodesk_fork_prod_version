@@ -51,6 +51,23 @@ async def list_contracts(
     return contracts
 
 
+@router.post("/{contract_id}/projects/{project_id}", status_code=204)
+async def link_project(
+    contract_id: UUID,
+    project_id: UUID,
+    service: ContractServiceDep,
+) -> None:
+    await service.link_project(contract_id, project_id)
+
+
+@router.delete("/{contract_id}/projects/{project_id}", status_code=204)
+async def unlink_project(
+    contract_id: UUID,
+    project_id: UUID,
+    service: ContractServiceDep,
+) -> None:
+    await service.unlink_project(contract_id, project_id)
+
 @router.put(
     path="/{contract_id}",
     response_model=ContractResponse,
