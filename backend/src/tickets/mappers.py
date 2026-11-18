@@ -87,6 +87,7 @@ def map_ticket_to_view_response(
         status=ticket.status,
         priority=ticket.priority,
         has_attachments=ticket.has_attachments,
+        has_tasks=ticket.has_tasks,
     )
 
 
@@ -149,6 +150,7 @@ def map_ticket_to_response(ticket: Ticket) -> TicketResponse:
         assignee_id=ticket.assignee_id,
         closed_at=ticket.closed_at,
         is_archived=ticket.is_deleted,
+        has_tasks=ticket.has_tasks,
         tags=[Tag(name=tag.name, color=tag.color) for tag in ticket.tags],
         attachments=[map_attachment_to_response(attachment) for attachment in ticket.attachments],
     )
