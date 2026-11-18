@@ -21,19 +21,22 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.create_table(
         "project_contracts",
+        sa.Column("id", sa.UUID(), server_default=sa.text("gen_random_uuid()"), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("project_id", sa.UUID(), nullable=False),
         sa.Column("contract_id", sa.UUID(), nullable=False),
         sa.ForeignKeyConstraint(["project_id"], ["projects.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["contract_id"], ["contracts.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("project_id", "contract_id"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("project_id", "contract_id", name="uq_project_contracts_project_contract"),
     )
-    op.create_index(
-        "ix_project_contracts_contract",
-        "project_contracts",
-        ["contract_id"],
-    )
+    op.create_index("ix_project_contracts_project", "project_contracts", ["project_id"])
+    op.create_index("ix_project_contracts_contract", "project_contracts", ["contract_id"])
 
 
 def downgrade() -> None:
     op.drop_index("ix_project_contracts_contract", table_name="project_contracts")
+    op.drop_index("ix_project_contracts_project", table_name="project_contracts")
     op.drop_table("project_contracts")
