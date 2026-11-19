@@ -395,12 +395,14 @@ const PROJECT_STATUS_LABELS: Record<string, string> = {
   cancelled: 'Отменён',
 };
 
+const ALL_STATUSES = ['active', 'on_hold', 'completed', 'cancelled', 'archived'];
+
 const NEXT_STATUSES: Record<string, string[]> = {
-  active: ['on_hold', 'completed', 'cancelled', 'archived'],
-  on_hold: ['active', 'cancelled', 'archived'],
-  completed: ['archived'],
-  cancelled: ['archived'],
-  archived: [],
+  active: ALL_STATUSES.filter(s => s !== 'active'),
+  on_hold: ALL_STATUSES.filter(s => s !== 'on_hold'),
+  completed: ALL_STATUSES.filter(s => s !== 'completed'),
+  cancelled: ALL_STATUSES.filter(s => s !== 'cancelled'),
+  archived: ALL_STATUSES.filter(s => s !== 'archived'),
 };
 
 /* ═══════════════════════════════════════════════════════════════
@@ -877,9 +879,10 @@ export default function ProjectDetailPage() {
 
         {canEdit && project && NEXT_STATUSES[project.status]?.length > 0 && (
           <div className="relative">
-            <ActionButton onClick={() => setStatusMenuOpen(v => !v)}>
-              Сменить статус
-            </ActionButton>
+            <button onClick={() => setStatusMenuOpen(v => !v)}
+  className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--hover-2)] px-4 py-3 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--hover-3)]">
+  Сменить статус
+</button>
             {statusMenuOpen && (
               <div className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-lg">
                 {NEXT_STATUSES[project.status].map(next => (

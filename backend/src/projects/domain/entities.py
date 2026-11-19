@@ -383,11 +383,9 @@ class Project(AggregateRoot):
         )
 
     def change_status(self, new_status: ProjectStatus) -> None:
-        """Смена статуса проекта с проверкой допустимости перехода."""
+        """Смена статуса проекта. Любой статус → любой."""
         if new_status == self.status:
             return
-        if self.status == ProjectStatus.ARCHIVED:
-            raise InvalidStateError("Cannot change status of an archived project")
         self.status = new_status
         self.updated_at = current_datetime()
 
