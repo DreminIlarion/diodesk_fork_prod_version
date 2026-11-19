@@ -100,8 +100,6 @@ class Counterparty(Entity):
                 "to attach a branch. Missing parent_id value."
             )
 
-
-
     @property
     def is_head(self) -> bool:
         """Является ли контрагент основным"""
@@ -201,24 +199,6 @@ class Counterparty(Entity):
     ) -> Self:
         """Добавления контактного лица"""
 
-        # Проверка дубликатов
-        for contact_person in self.contact_persons:
-            # Пропускаем проверку, если оба поля пустые
-            if not phone and not email:
-                continue
-
-            # Проверяем совпадение по телефону
-            if phone and contact_person.phone == Phone(phone):
-                raise ValueError(
-                    f"Contact person with phone - '{phone}' already exists"
-                )
-
-            # Проверяем совпадение по email
-            if email and contact_person.email == email:
-                raise ValueError(
-                    f"Contact person with email - '{email}' already exists"
-                )
-
         self.contact_persons.append(
             ContactPerson.create(
                 first_name=first_name,
@@ -226,19 +206,20 @@ class Counterparty(Entity):
                 middle_name=middle_name,
                 phone=phone,
                 email=email,
-                position=position,        # ← добавил
-                extension=extension,
                 messengers=messengers,
+                position=position,
+                extension=extension,
             )
         )
         self.updated_at = current_datetime()
+        return self
 
     def remove_contact_person_by_id(self, contact_person_id: UUID) -> None:
-        """Удаление контактного лица по его ID"""
+        """Удаление контактного лица по уникальному ID."""
 
-        for i, contact_person in enumerate(self.contact_persons):
+        for index, contact_person in enumerate(self.contact_persons):
             if contact_person.id == contact_person_id:
-                self.contact_persons.pop(i)
+                self.contact_persons.pop(index)
                 self.updated_at = current_datetime()
                 return
 

@@ -6,7 +6,6 @@ from sqlalchemy import Select, and_, delete, func, or_, select
 from sqlalchemy.orm import joinedload
 
 from src.iam.domain.entities import User
-from src.iam.domain.vo import FullName
 from src.products.domain.entities import SoftwareProduct
 from src.products.infra.models import SoftwareProductOrm
 from src.products.infra.repo import SoftwareProductMapper
@@ -15,7 +14,14 @@ from src.shared.schemas import Page, Pagination
 
 from ..domain.entities import Counterparty, CounterpartyProduct
 from ..domain.repo import CounterpartyFilters
-from ..domain.vo import ContactPerson, Inn, Kpp, Okpo, Phone
+from ..domain.vo import (
+    ContactPerson,
+    ContactPersonFullName,
+    Inn,
+    Kpp,
+    Okpo,
+    Phone,
+)
 from .models import CounterpartyOrm, CounterpartyProductOrm
 
 
@@ -42,8 +48,16 @@ class CounterpartyMapper(ModelMapper[Counterparty, CounterpartyOrm]):
                     id=UUID(contact_person["id"]) if contact_person.get("id") else uuid4(),
                     user_id=UUID(contact_person["user_id"])
                     if contact_person.get("user_id") else None,
-                    full_name=FullName(contact_person.get("full_name") or ""),
-                    phone=Phone(contact_person["phone"]) if contact_person.get("phone") else None,
+                    full_name=(
+                        ContactPersonFullName(contact_person["full_name"])
+                        if contact_person.get("full_name")
+                        else None
+                    ),
+                    phone=(
+                        Phone(contact_person["phone"])
+                        if contact_person.get("phone")
+                        else None
+                    ),
                     email=contact_person.get("email"),
                     position=contact_person.get("position"),
                     extension=contact_person.get("extension"),
@@ -75,7 +89,11 @@ class CounterpartyMapper(ModelMapper[Counterparty, CounterpartyOrm]):
                 {
                     "id": str(contact_person.id),
                     "user_id": str(contact_person.user_id) if contact_person.user_id else None,
-                    "full_name": contact_person.full_name.value,
+                    "full_name": (
+                        contact_person.full_name.value
+                        if contact_person.full_name is not None
+                        else None
+                    ),
                     "phone": contact_person.phone.value if contact_person.phone else None,
                     "email": contact_person.email,
                     "position": contact_person.position,
