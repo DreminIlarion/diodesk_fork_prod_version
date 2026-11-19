@@ -1,6 +1,6 @@
 from typing import Self
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from uuid import UUID
 
 from pydantic import EmailStr
@@ -10,7 +10,7 @@ from src.shared.domain.entities import Entity
 from src.shared.domain.exceptions import AlreadyExistsError, InvariantViolationError, NotFoundError
 from src.shared.utils.time import current_datetime
 
-from .vo import ContactPerson, CounterpartyType, Inn, Kpp, Okpo, Phone
+from .vo import ContactPerson, ContactPersonFullName, CounterpartyType, Inn, Kpp, Okpo, Phone
 
 INDIVIDUAL_INN_LENGTH = 12
 LEGAL_INN_LENGTH = 10
@@ -64,7 +64,7 @@ class Counterparty(Entity):
     # Поля для master-slave иерархии (удобно для филиалов)
     parent_id: UUID | None = None
 
-    def __post_init__(self) -> None:  # noqa: C901
+    def __post_init__(self) -> None:
 
         # 1. Проверка корректности длины ИНН в зависимости от типа контрагента
         inn_length = len(self.inn.value)
@@ -99,8 +99,6 @@ class Counterparty(Entity):
                 "It is necessary to specify the ID of the head counterparty "
                 "to attach a branch. Missing parent_id value."
             )
-
-
 
     @property
     def is_head(self) -> bool:
@@ -201,24 +199,6 @@ class Counterparty(Entity):
     ) -> Self:
         """Добавления контактного лица"""
 
-        # Проверка дубликатов
-        for contact_person in self.contact_persons:
-            # Пропускаем проверку, если оба поля пустые
-            if not phone and not email:
-                continue
-
-            # Проверяем совпадение по телефону
-            if phone and contact_person.phone == Phone(phone):
-                raise ValueError(
-                    f"Contact person with phone - '{phone}' already exists"
-                )
-
-            # Проверяем совпадение по email
-            if email and contact_person.email == email:
-                raise ValueError(
-                    f"Contact person with email - '{email}' already exists"
-                )
-
         self.contact_persons.append(
             ContactPerson.create(
                 first_name=first_name,
@@ -226,19 +206,67 @@ class Counterparty(Entity):
                 middle_name=middle_name,
                 phone=phone,
                 email=email,
-                position=position,        # ← добавил
-                extension=extension,
                 messengers=messengers,
+                position=position,
+                extension=extension,
             )
         )
         self.updated_at = current_datetime()
+        return self
+
+    def get_contact_person(self, contact_person_id: UUID) -> ContactPerson:
+        """Найти контактное лицо только среди контактов этого контрагента."""
+
+        for contact_person in self.contact_persons:
+            if contact_person.id == contact_person_id:
+                return contact_person
+
+        raise NotFoundError(f"Contact person with ID {contact_person_id} not found")
+
+    def edit_contact_person(
+        self,
+        contact_person_id: UUID,
+        *,
+        full_name: ContactPersonFullName | None,
+        phone: Phone | None,
+        email: str | None,
+        position: str | None,
+        extension: str | None,
+        messengers: dict[str, str],
+    ) -> bool:
+        """Изменить поля контакта, сохранив его идентичность и связь с пользователем."""
+
+        contact_person = self.get_contact_person(contact_person_id)
+        # Проверяем все значения до изменения исходного объекта.
+        candidate = replace(
+            contact_person,
+            full_name=full_name,
+            phone=phone,
+            email=email,
+            position=position,
+            extension=extension,
+            messengers=messengers.copy(),
+        )
+        editable_fields = (
+            "full_name", "phone", "email", "position", "extension", "messengers",
+        )
+        if all(
+            getattr(candidate, name) == getattr(contact_person, name)
+            for name in editable_fields
+        ):
+            return False
+
+        for name in editable_fields:
+            setattr(contact_person, name, getattr(candidate, name))
+        contact_person.updated_at = self.updated_at = current_datetime()
+        return True
 
     def remove_contact_person_by_id(self, contact_person_id: UUID) -> None:
-        """Удаление контактного лица по его ID"""
+        """Удаление контактного лица по уникальному ID."""
 
-        for i, contact_person in enumerate(self.contact_persons):
+        for index, contact_person in enumerate(self.contact_persons):
             if contact_person.id == contact_person_id:
-                self.contact_persons.pop(i)
+                self.contact_persons.pop(index)
                 self.updated_at = current_datetime()
                 return
 

@@ -7,10 +7,11 @@ from src.shared.domain.exceptions import AlreadyExistsError, NotFoundError
 
 from .domain.entities import Counterparty, CounterpartyProduct
 from .domain.repo import CounterpartyRepository
-from .domain.vo import ContactPerson, Inn, Kpp, Okpo, Phone
+from .domain.vo import ContactPerson, ContactPersonFullName, Inn, Kpp, Okpo, Phone
 from .mappers import map_counterparty_product_to_response, map_counterparty_to_response
 from .schemas import (
     BranchAdd,
+    ContactPersonEdit,
     ContactPersonIn,
     CounterpartyCreate,
     CounterpartyEdit,
@@ -42,7 +43,7 @@ class CounterpartyService:
         inn = Inn(data.inn)
         kpp = None if data.kpp is None else Kpp(data.kpp)
         okpo = None if data.okpo is None else Okpo(data.okpo)
-        
+
         phone = Phone(data.phone) if data.phone else None
 
         # 3. Формирование контактных лиц лица
@@ -155,6 +156,41 @@ class CounterpartyService:
         await self.repository.update(counterparty)
         await self.session.commit()
 
+        return map_counterparty_to_response(counterparty)
+
+    async def edit_contact_person(
+        self,
+        counterparty_id: UUID,
+        contact_person_id: UUID,
+        data: ContactPersonEdit,
+    ) -> CounterpartyResponse:
+        """Обновить явно переданные поля существующего контактного лица."""
+
+        counterparty = await self.repository.read_for_update(counterparty_id)
+        if counterparty is None:
+            raise NotFoundError(f"Counterparty with ID {counterparty_id} not found")
+
+        contact_person = counterparty.get_contact_person(contact_person_id)
+        fields = data.model_fields_set
+        full_name = contact_person.full_name
+        if "full_name" in fields:
+            full_name = ContactPersonFullName(data.full_name) if data.full_name else None
+        phone = contact_person.phone
+        if "phone" in fields:
+            phone = Phone(data.phone) if data.phone else None
+
+        edited = counterparty.edit_contact_person(
+            contact_person_id,
+            full_name=full_name,
+            phone=phone,
+            email=data.email if "email" in fields else contact_person.email,
+            position=data.position if "position" in fields else contact_person.position,
+            extension=data.extension if "extension" in fields else contact_person.extension,
+            messengers=data.messengers if "messengers" in fields else contact_person.messengers,
+        )
+        if edited:
+            await self.repository.update(counterparty)
+        await self.session.commit()
         return map_counterparty_to_response(counterparty)
 
     async def link_product(
