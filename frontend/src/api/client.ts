@@ -339,15 +339,12 @@ export const counterpartiesApi = {
   },
 
   deleteContactPerson: async (
-    id: string,
-    params: { phone?: string; email?: string }
+    counterpartyId: string,
+    contactPersonId: string,
   ): Promise<Counterparty> => {
-    const response = await api.delete<Counterparty>(`/api/v1/counterparties/${id}/contact-persons`, {
-      params: {
-        phone: params.phone || undefined,
-        email: params.email || undefined,
-      },
-    });
+    const response = await api.delete<Counterparty>(
+      `/api/v1/counterparties/${counterpartyId}/contact-persons/${contactPersonId}`,
+    );
     return response.data;
   },
 

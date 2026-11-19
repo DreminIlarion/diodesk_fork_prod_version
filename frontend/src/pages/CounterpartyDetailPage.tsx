@@ -490,8 +490,8 @@ function EditCounterpartyModal({
       }
 
       const payload = {
-        first_name: form.first_name.trim(),
-        last_name: form.last_name.trim(),
+        first_name: form.first_name.trim() || undefined,
+        last_name: form.last_name.trim() || undefined,
         middle_name:
           form.middle_name.trim() || undefined,
         phone: form.phone.trim()
@@ -817,18 +817,12 @@ function ContactsTab({
   };
 
   const handleDelete = async (person: any) => {
-    if (!person.phone && !person.email) return;
+    if (!person.id) return;
 
     setDeleting(true);
 
     try {
-      await counterpartiesApi.deleteContactPerson(
-        counterpartyId,
-        {
-          phone: person.phone,
-          email: person.email,
-        },
-      );
+      await counterpartiesApi.deleteContactPerson(counterpartyId, person.id);
 
       setConfirmDelete(null);
       onRefresh();
@@ -935,8 +929,7 @@ function ContactsTab({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                      Фамилия{' '}
-                      <span className="text-[var(--accent)]">*</span>
+                      Фамилия
                     </label>
 
                     <input
@@ -952,8 +945,7 @@ function ContactsTab({
 
                   <div>
                     <label className="block text-sm text-[var(--text-primary)]/50 mb-1.5">
-                      Имя{' '}
-                      <span className="text-[var(--accent)]">*</span>
+                      Имя
                     </label>
 
                     <input
@@ -1134,13 +1126,14 @@ function ContactsTab({
                 Отмена
               </button>
 
-              <button
+                          <button
                 type="button"
                 onClick={handleSave}
                 disabled={
                   saving ||
-                  !form.last_name.trim() ||
-                  !form.first_name.trim()
+                  (!form.last_name.trim() &&
+                   !form.first_name.trim() &&
+                   !form.middle_name.trim())
                 }
                 className="
                 min-w-[135px]
