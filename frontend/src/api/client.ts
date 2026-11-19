@@ -660,6 +660,11 @@ setStageAssignees: async (
     return response.data;
   },
 
+    changeStatus: async (id: string, status: ProjectStatus): Promise<Project> => {
+    const response = await api.patch<Project>(`/api/v1/projects/${id}/status`, { status });
+    return response.data;
+  },
+
 
 };
 

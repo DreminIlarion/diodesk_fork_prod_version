@@ -467,62 +467,51 @@ function EditCounterpartyModal({
     }));
 
   const handleSave = async () => {
-    if (
-      !form.last_name.trim() &&
-      !form.first_name.trim() &&
-      !form.middle_name.trim()
-    ) {
+    if (!form.name.trim()) {
       return;
     }
 
     setSaving(true);
+    setError(null);
 
     try {
-      const messengers: Record<string, string> = {};
-
-      if (form.telegram.trim()) {
-        messengers.telegram = form.telegram
-          .trim()
-          .replace('@', '');
-      }
-
-      if (form.vk.trim()) {
-        messengers.vk = form.vk.trim();
-      }
-
-      const payload = {
-        first_name: form.first_name.trim() || undefined,
-        last_name: form.last_name.trim() || undefined,
-        middle_name:
-          form.middle_name.trim() || undefined,
-        phone: form.phone.trim()
-          ? phoneToApi(form.phone)
-          : undefined,
-        extension:
-          form.extension.trim() || undefined,
-        position:
-          form.position.trim() || undefined,
-        email:
-          form.email.trim() || undefined,
-        messengers:
-          Object.keys(messengers).length > 0
-            ? messengers
-            : undefined,
+      const payload: Partial<Counterparty> = {
+        name: form.name.trim(),
       };
 
-      
+      if (form.legal_name.trim()) {
+        payload.legal_name = form.legal_name.trim();
+      }
 
-      const res = await counterpartiesApi.updateContactPerson(
-        counterpartyId,
+      if (form.okpo.trim()) {
+        payload.okpo = form.okpo.trim();
+      }
+
+      if (form.phone.trim()) {
+        payload.phone = phoneToApi(form.phone);
+      }
+
+      if (form.email.trim()) {
+        payload.email = form.email.trim();
+      }
+
+      if (form.address.trim()) {
+        payload.address = form.address.trim();
+      }
+
+      const updated = await counterpartiesApi.update(
+        counterparty.id,
         payload,
       );
 
-     
-
-      resetForm();
-      onRefresh();
+      onSave(updated);
+      onClose();
     } catch (e: any) {
-      
+      setError(
+        typeof e?.response?.data?.detail === 'string'
+          ? e.response.data.detail
+          : 'Не удалось сохранить контрагента',
+      );
     } finally {
       setSaving(false);
     }

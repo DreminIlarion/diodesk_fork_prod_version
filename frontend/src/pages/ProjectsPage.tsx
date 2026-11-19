@@ -23,6 +23,7 @@ const STATUS_OPTIONS = [
   { value: 'on_hold', label: 'На паузе' },
   { value: 'completed', label: 'Завершённые' },
   { value: 'archived', label: 'В архиве' },
+  { value: 'cancelled', label: 'Отменённые' },
 ] as const;
 
 type ProjectStatus = typeof STATUS_OPTIONS[number]['value'];

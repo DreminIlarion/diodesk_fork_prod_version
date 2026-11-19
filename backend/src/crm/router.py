@@ -119,6 +119,7 @@ async def delete_counterparty(counterparty_id: UUID, repository: CounterpartyRep
         raise NotFoundError(f"Counterparty with ID {counterparty_id} not found")
     counterparty.is_active = False
     await repository.update(counterparty)
+    await repository.session.commit()
 
 
 @router.post(

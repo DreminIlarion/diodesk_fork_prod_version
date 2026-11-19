@@ -382,6 +382,15 @@ class Project(AggregateRoot):
             ProjectArchived(project_id=self.id, archived_by=archived_by)
         )
 
+    def change_status(self, new_status: ProjectStatus) -> None:
+        """Смена статуса проекта с проверкой допустимости перехода."""
+        if new_status == self.status:
+            return
+        if self.status == ProjectStatus.ARCHIVED:
+            raise InvalidStateError("Cannot change status of an archived project")
+        self.status = new_status
+        self.updated_at = current_datetime()
+
     @property
     def active_stages(self) -> list[ProjectStage]:
         """

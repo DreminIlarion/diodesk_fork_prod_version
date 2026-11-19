@@ -204,3 +204,8 @@ class ProjectStageAssigneesUpdate(BaseModel):
     user_ids: list[UUID] = Field(
         default_factory=list, description="Новый список исполнителей этапа"
     )
+
+class ProjectStatusUpdate(BaseModel):
+    """Смена статуса проекта"""
+
+    status: ProjectStatus = Field(..., description="Новый статус проекта")
