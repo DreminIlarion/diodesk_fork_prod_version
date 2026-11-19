@@ -168,7 +168,9 @@ async def paginate_users(
 def require_role(allowed_roles: Iterable[UserRole]):
 
     def checker(current_subject: CurrentSubjectDep):
-        return current_subject.has_any_role(allowed_roles)
+        if not current_subject.has_any_role(allowed_roles):
+            raise PermissionDeniedError("Недостаточно прав")
+        return True
 
     return checker
 

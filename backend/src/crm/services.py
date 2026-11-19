@@ -260,3 +260,23 @@ class CounterpartyService:
         await self.session.commit()
 
         return map_counterparty_to_response(counterparty)
+
+    async def delete_contact_person_by_id(
+        self,
+        counterparty_id: UUID,
+        contact_person_id: UUID,
+    ) -> CounterpartyResponse:
+        """Удаление контактного лица контрагента по ID."""
+
+        counterparty = await self.repository.read(counterparty_id)
+        if counterparty is None:
+            raise NotFoundError(
+                f"Counterparty  with ID {counterparty_id} not found"
+            )
+
+        counterparty.remove_contact_person_by_id(contact_person_id)
+
+        await self.repository.update(counterparty)
+        await self.session.commit()
+
+        return map_counterparty_to_response(counterparty)

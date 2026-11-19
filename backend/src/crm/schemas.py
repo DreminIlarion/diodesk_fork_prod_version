@@ -1,9 +1,9 @@
-from typing import Annotated
+from typing import Annotated, Any
 
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, StringConstraints
+from pydantic import BaseModel, EmailStr, Field, StringConstraints, field_validator
 
 from src.products.schemas import ProductResponse
 
@@ -36,7 +36,7 @@ class CounterpartyProductResponse(BaseModel):
 class ContactPersonIn(BaseModel):
     """Добавление контактного лица контрагента"""
 
-    first_name: str = Field(..., description="Имя")
+    first_name: str | None = Field(None, description="Имя")
     last_name: str | None = Field(None, description="Фамилия")
 
     middle_name: str | None = Field(None, description="Отчество")
@@ -46,11 +46,32 @@ class ContactPersonIn(BaseModel):
     email: EmailStr | None = Field(None, description="Адрес электронной почты")
     position: str | None = Field(None, description="Должность", examples=["Главный бухгалтер"])
     extension: str | None = Field(None, description="Добавочный номер", examples=["1234"])
-    messengers: dict[str, str] = Field(
+    messengers: dict[str, str] | None = Field(
         default_factory=dict,
         description="Контакты в мессенджерах",
         examples=[{"telegram": "exampleUser05", "vk": "1254752"}]
     )
+
+    @field_validator(
+        "first_name",
+        "last_name",
+        "middle_name",
+        "phone",
+        "email",
+        "position",
+        "extension",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+
+    @field_validator("messengers", mode="before")
+    @classmethod
+    def normalize_messangers(cls, value: Any) -> Any:
+        return {} if value is None else value
 
 
 class ContactPersonOut(BaseModel):
@@ -59,7 +80,7 @@ class ContactPersonOut(BaseModel):
     id: UUID = Field(..., description="Уникальный идентификатор контактного лица")
 
     user_id: UUID | None = None
-    full_name: str = Field(..., description="ФИО лица", examples=["Иванов Иван Иванович"])
+    full_name: str | None = Field(None, description="ФИО лица", examples=["Иванов Иван Иванович"])
     phone: str | None = Field(
         None, description="Номер телефона", examples=["88005553535", "+78005553535"]
     )

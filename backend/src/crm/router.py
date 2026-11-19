@@ -226,3 +226,21 @@ async def unlink_counterparty_product(
         service: CounterpartyServiceDep,
 ) -> None:
     await service.unlink_product(counterparty_id, link_id)
+
+
+@router.delete(
+    path="/{counterparty_id}/contact-persons/{contact_person_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=CounterpartyResponse,
+    dependencies=[Depends(require_role(REQUIRED_ROLES))],
+    summary="Удаление контактного лица по ID",
+)
+async def delete_contact_person_by_id(
+    counterparty_id: UUID,
+    contact_person_id: UUID,
+    service: CounterpartyServiceDep,
+) -> CounterpartyResponse:
+    return await service.delete_contact_person_by_id(
+        counterparty_id=counterparty_id,
+        contact_person_id=contact_person_id,
+    )

@@ -248,35 +248,32 @@ def test_branch_without_parent_id_raises_error(valid_inn_legal, valid_kpp, valid
         )
 
 
-def test_non_unique_contact_data_raises_error(valid_inn_legal, valid_kpp, valid_phone):
-    with pytest.raises(InvariantViolationError, match="phone number and email must be unique"):
-        Counterparty(
-            counterparty_type=CounterpartyType.LEGAL_ENTITY,
-            name="Филиал",
-            legal_name="Филиал в СПб",
-            inn=valid_inn_legal,
-            kpp=valid_kpp,
-            phone=valid_phone,
-            email="branch@example.com",
-            contact_persons=[
-                ContactPerson.create(
-                    first_name="Иван",
-                    last_name="Иванов",
-                    middle_name=None,
-                    phone="8 800 555 3535",
-                    email="kakoy.to.eben@main.com",
-                    messengers={},
-                ),
-                ContactPerson.create(
-                    first_name="Олег",
-                    last_name="Олегов",
-                    middle_name=None,
-                    phone="+78005553535",
-                    email="kakoy.to.eben@main.com",
-                    messengers={},
-                ),
-            ],
-        )
+@pytest.mark.parametrize(
+    ("phone", "email"),
+    [
+        (None, None),
+        ("+78005553535", None),
+        (None, "contact@example.com"),
+        ("+78005553535", "contact@example.com"),
+    ],
+)
+def test_non_unique_contact_data_is_allowed(
+    valid_inn_legal, valid_kpp, valid_phone, phone, email
+):
+    contacts = [ContactPerson.create(phone=phone, email=email) for _ in range(2)]
+    counterparty = Counterparty(
+        counterparty_type=CounterpartyType.LEGAL_ENTITY,
+        name="Компания",
+        legal_name="ООО Компания",
+        inn=valid_inn_legal,
+        kpp=valid_kpp,
+        phone=valid_phone,
+        email="company@example.com",
+        contact_persons=contacts,
+    )
+
+    first, second = counterparty.contact_persons
+    assert first.id != second.id
 
 
 # ====================== Свойства ======================
@@ -336,7 +333,16 @@ def test_add_contact_person_success():
     assert counterparty.updated_at > counterparty.created_at
 
 
-def test_add_already_exists_contact_person_failed():
+@pytest.mark.parametrize(
+    ("phone", "email"),
+    [
+        (None, None),
+        ("+78005553535", None),
+        (None, "contact@example.com"),
+        ("+78005553535", "contact@example.com"),
+    ],
+)
+def test_add_duplicate_contact_person_is_allowed(phone, email):
     counterparty = Counterparty(
         counterparty_type=CounterpartyType.LEGAL_ENTITY,
         name="Головная компания",
@@ -346,24 +352,14 @@ def test_add_already_exists_contact_person_failed():
         phone=Phone("+79991234567"),
         email="head@company.ru",
     )
-    counterparty.add_contact_person(
-        first_name="Иван",
-        last_name="Иванов",
-        middle_name="Иванович",
-        phone="88005553535",
-        email="ivanov.ivan@mail.ru",
-        messengers={"vk": "12345"},
-    )
+    for _ in range(2):
+        result = counterparty.add_contact_person(phone=phone, email=email)
 
-    with pytest.raises(ValueError, match="already exists"):
-        counterparty.add_contact_person(
-            first_name="Иван",
-            last_name="Иванов",
-            middle_name="Иванович",
-            phone="88005553535",
-            email="ivanov.ivan@mail.ru",
-            messengers={"vk": "12345", "telegram": "someUser"},
-        )
+    first, second = counterparty.contact_persons
+    assert result is counterparty
+    assert first.id != second.id
+    assert first.phone == second.phone
+    assert first.email == second.email
 
 
 # ====================== Удаление контактного лица ======================
