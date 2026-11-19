@@ -116,9 +116,13 @@ def test_contact_name_preserves_length_limit():
         ContactPerson.create(first_name="а" * 155)
 
 
-def test_contact_and_user_names_accept_single_part():
-    assert ContactPersonFullName("иван").value == "Иван"
-    assert FullName("иван").value == "Иван"
+def test_only_contact_names_accept_single_part():
+    name = ContactPersonFullName("иван")
+    assert name.value == "Иван"
+    assert name.middle_name is None
+    assert FullName("иван иванов").value == "Иван Иванов"
+    with pytest.raises(ValueError, match="at least 2 parts"):
+        FullName("иван")
 
 
 def test_mapper_reads_contact_with_missing_optional_keys(counterparty):

@@ -7,6 +7,7 @@ from pydantic import (
     AfterValidator,
     BaseModel,
     BeforeValidator,
+    ConfigDict,
     EmailStr,
     Field,
     StringConstraints,
@@ -108,6 +109,22 @@ class ContactPersonIn(BaseModel):
     )
 
 
+class ContactPersonEdit(BaseModel):
+    """Частичное редактирование контактного лица."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    full_name: OptionalTrimmedStr = Field(None, description="ФИО")
+    phone: OptionalTrimmedStr = Field(None, description="Номер телефона")
+    email: OptionalContactEmail = Field(None, description="Адрес электронной почты")
+    position: OptionalTrimmedStr = Field(None, description="Должность")
+    extension: OptionalTrimmedStr = Field(None, description="Добавочный номер")
+    messengers: ContactMessengers = Field(
+        default_factory=dict,
+        description="Контакты в мессенджерах",
+    )
+
+
 class ContactPersonOut(BaseModel):
     """Созданное контактное лицо"""
 
@@ -133,7 +150,11 @@ class CounterpartyBase(BaseModel):
 
     name: str = Field(..., max_length=255, description="Наименование")
     legal_name: str = Field(..., max_length=255, description="Юридическое наименование")
-    kpp: str | None = Field(None, max_length=11, description="КПП — только для юрлиц и обособленных подразделений")
+    kpp: str | None = Field(
+        None,
+        max_length=11,
+        description="КПП — только для юрлиц и обособленных подразделений",
+    )
     okpo: str | None = Field(
         None,
         max_length=10,

@@ -8,8 +8,6 @@ from src.iam.domain.vo import FullName
 @pytest.mark.parametrize(
     ("input_str", "expected_normalized"),
     [
-        ("иван", "Иван"),
-        ("И", "И"),
         ("иван иванов", "Иван Иванов"),
         ("ИВАН ИВАНОВИЧ ИВАНОВ", "Иван Иванович Иванов"),
         ("  петр   петрович   петров  ", "Петр Петрович Петров"),
@@ -30,6 +28,8 @@ def test_valid_full_names_are_normalized(input_str: str, expected_normalized: st
     [
         ("", "cannot be empty"),
         ("   ", "cannot be empty"),
+        ("иван", "at least 2 parts"),
+        ("И", "at least 2 parts"),
         ("Иван123 Иванов", "Invalid characters"),
         ("Иван @ Иванов", "Invalid characters"),
         ("Иван Иванов!", "Invalid characters"),
@@ -90,11 +90,9 @@ def test_minimal_name_two_parts():
     assert name.middle_name is None
 
 
-def test_single_part_name_has_no_middle_name():
-    name = FullName("Иван")
-
-    assert name.first_name == "Иван"
-    assert name.middle_name is None
+def test_single_part_user_name_is_rejected():
+    with pytest.raises(ValueError, match="at least 2 parts"):
+        FullName("Иван")
 
 
 def test_multiple_middle_names():
