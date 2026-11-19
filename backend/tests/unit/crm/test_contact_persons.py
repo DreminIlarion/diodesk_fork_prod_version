@@ -1,4 +1,5 @@
 from itertools import combinations
+from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -115,10 +116,26 @@ def test_contact_name_preserves_length_limit():
         ContactPerson.create(first_name="а" * 155)
 
 
-def test_user_name_still_requires_two_parts():
+def test_contact_and_user_names_accept_single_part():
     assert ContactPersonFullName("иван").value == "Иван"
-    with pytest.raises(ValueError, match="Must have at least first and last name"):
-        FullName("Иван")
+    assert FullName("иван").value == "Иван"
+
+
+def test_mapper_reads_contact_with_missing_optional_keys(counterparty):
+    model = CounterpartyMapper.from_entity(counterparty)
+    contact_id = uuid4()
+    model.contact_persons = [{"id": str(contact_id)}]
+
+    restored = CounterpartyMapper.to_entity(model)
+    contact = restored.contact_persons[0]
+
+    assert contact.id == contact_id
+    assert contact.full_name is None
+    assert contact.phone is None
+    assert contact.email is None
+    assert contact.position is None
+    assert contact.extension is None
+    assert contact.messengers == {}
 
 
 def test_supplied_email_still_requires_valid_format():

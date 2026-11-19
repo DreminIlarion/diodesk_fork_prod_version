@@ -53,11 +53,15 @@ class CounterpartyMapper(ModelMapper[Counterparty, CounterpartyOrm]):
                         if contact_person.get("full_name")
                         else None
                     ),
-                    phone=Phone(contact_person["phone"]) if contact_person["phone"] else None,
-                    email=contact_person["email"],
+                    phone=(
+                        Phone(contact_person["phone"])
+                        if contact_person.get("phone")
+                        else None
+                    ),
+                    email=contact_person.get("email"),
                     position=contact_person.get("position"),
                     extension=contact_person.get("extension"),
-                    messengers=contact_person["messengers"],
+                    messengers=contact_person.get("messengers") or {},
                 )
                 for contact_person in model.contact_persons
             ],

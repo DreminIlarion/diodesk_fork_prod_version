@@ -484,7 +484,7 @@ export interface Attachment {
 
 // ==================== PROJECTS ====================
 
-export type ProjectStatus = 'active' | 'archived' | 'deleted';
+export type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived' | 'cancelled';
 
 export interface ProjectParticipant {
   user_id: string;

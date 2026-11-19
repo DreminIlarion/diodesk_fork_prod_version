@@ -16,6 +16,9 @@ import {
   usersApi,
 } from '../api/client';
 
+
+import { ActionButton } from '../components/ui/ActionButton';
+
 import { ContractsTab } from '../components/contracts/ContractsTab';
 
 import { useAuthStore } from '../stores/authStore';
@@ -384,6 +387,22 @@ function ArchiveModal({
   );
 }
 
+const PROJECT_STATUS_LABELS: Record<string, string> = {
+  active: 'Активный',
+  on_hold: 'На паузе',
+  completed: 'Завершён',
+  archived: 'В архиве',
+  cancelled: 'Отменён',
+};
+
+const NEXT_STATUSES: Record<string, string[]> = {
+  active: ['on_hold', 'completed', 'cancelled', 'archived'],
+  on_hold: ['active', 'cancelled', 'archived'],
+  completed: ['archived'],
+  cancelled: ['archived'],
+  archived: [],
+};
+
 /* ═══════════════════════════════════════════════════════════════
    PROJECT DETAIL PAGE
    ═══════════════════════════════════════════════════════════════ */
@@ -409,6 +428,7 @@ export default function ProjectDetailPage() {
 
   const [showEditProjectModal, setShowEditProjectModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -591,6 +611,22 @@ export default function ProjectDetailPage() {
   /* ═══════════════════════════════════════════════════════════
      ACTIONS
      ═══════════════════════════════════════════════════════════ */
+
+    const handleChangeStatus = async (next: ProjectStatus) => {
+    if (!id) return;
+    setStatusMenuOpen(false);
+    try {
+      await projectsApi.changeStatus(id, next);
+      toast({ title: `Статус: ${PROJECT_STATUS_LABELS[next]}` });
+      await loadProject();
+    } catch {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось изменить статус',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const handleArchive = async () => {
     if (!id) return;
@@ -817,11 +853,15 @@ export default function ProjectDetailPage() {
                 </h1>
 
                 <span className={`rounded-lg border px-3 py-1 text-sm font-medium ${
-                  isActive
+                  project.status === 'active'
                     ? 'status-resolved'
-                    : 'status-closed'
+                    : project.status === 'cancelled'
+                      ? 'status-rejected'
+                      : project.status === 'on_hold'
+                        ? 'status-agreement'
+                        : 'status-closed'
                 }`}>
-                  {isActive ? 'Активен' : 'Архивирован'}
+                  {PROJECT_STATUS_LABELS[project.status] ?? project.status}
                 </span>
               </div>
 
@@ -834,6 +874,28 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </div>
+
+        {canEdit && project && NEXT_STATUSES[project.status]?.length > 0 && (
+          <div className="relative">
+            <ActionButton onClick={() => setStatusMenuOpen(v => !v)}>
+              Сменить статус
+            </ActionButton>
+            {statusMenuOpen && (
+              <div className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-lg">
+                {NEXT_STATUSES[project.status].map(next => (
+                  <button
+                    key={next}
+                    type="button"
+                    onClick={() => handleChangeStatus(next as ProjectStatus)}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-[var(--hover-2)]"
+                  >
+                    {PROJECT_STATUS_LABELS[next]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {canEdit && isActive && (
           <div className="flex flex-wrap items-center gap-2">
@@ -1287,7 +1349,7 @@ export default function ProjectDetailPage() {
 
               {[
                 { label: 'Ключ', value: project.key },
-                { label: 'Статус', value: isActive ? 'Активен' : 'Архивирован' },
+                                { label: 'Статус', value: PROJECT_STATUS_LABELS[project.status] ?? project.status },
                 { label: 'Участников', value: String(members.length) },
                 { label: 'Этапов', value: String(stages.length) },
                 { label: 'Заявок', value: String(projectTickets.length) },

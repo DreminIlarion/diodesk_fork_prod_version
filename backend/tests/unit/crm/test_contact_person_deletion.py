@@ -229,15 +229,14 @@ async def test_delete_invalid_contact_id_returns_422(
     mock_session.commit.assert_not_awaited()
 
 
-async def test_legacy_delete_by_phone_still_works(
+async def test_delete_last_contact_by_id_returns_empty_list(
     contact_client, counterparty, repository, mock_session
 ):
     contact = ContactPerson.create(phone="+78005553535", email="contact@example.com")
     counterparty.contact_persons = [contact]
 
     response = await contact_client.delete(
-        f"/api/v1/counterparties/{counterparty.id}/contact-persons",
-        params={"phone": "+78005553535", "email": "contact@example.com"},
+        f"/api/v1/counterparties/{counterparty.id}/contact-persons/{contact.id}",
     )
 
     assert response.status_code == status.HTTP_200_OK

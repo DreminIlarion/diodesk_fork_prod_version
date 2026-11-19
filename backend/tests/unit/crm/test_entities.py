@@ -393,7 +393,8 @@ def test_remove_contact_person_success():
 
     assert len(counterparty.contact_persons) == 1 + 1
 
-    counterparty.remove_contact_person(Phone("87775553322"), "petr.petrovich@main.com")
+    contact_to_remove = counterparty.contact_persons[-1]
+    counterparty.remove_contact_person_by_id(contact_to_remove.id)
 
     assert len(counterparty.contact_persons) == 1
     assert Phone("87775553322") not in [

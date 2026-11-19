@@ -2,8 +2,7 @@ from typing import Annotated, Any
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Path, Query, status
-from pydantic import EmailStr
+from fastapi import APIRouter, Depends, Path, status
 
 from src.iam.dependencies import get_current_user, require_role
 from src.iam.domain.vo import UserRole
@@ -119,6 +118,7 @@ async def delete_counterparty(counterparty_id: UUID, repository: CounterpartyRep
         raise NotFoundError(f"Counterparty with ID {counterparty_id} not found")
     counterparty.is_active = False
     await repository.update(counterparty)
+    await repository.session.commit()
 
 
 @router.post(
@@ -135,7 +135,7 @@ async def add_contact_person(
 
 
 @router.delete(
-    path="/{counterparty_id}/contact-persons",
+    path="/{counterparty_id}/contact-persons/{contact_person_id}",
     status_code=status.HTTP_200_OK,
     response_model=CounterpartyResponse,
     dependencies=[Depends(require_role(REQUIRED_ROLES))],
@@ -143,13 +143,10 @@ async def add_contact_person(
 )
 async def delete_contact_person(
         counterparty_id: UUID,
-        phone: Annotated[str, Query(..., description="Номер телефона")],
-
+        contact_person_id: UUID,
         service: CounterpartyServiceDep,
-        email: EmailStr | None = Query(None, description="Email адрес"),
-
 ) -> CounterpartyResponse:
-    return await service.delete_contact_person(counterparty_id, phone, email)
+    return await service.delete_contact_person(counterparty_id, contact_person_id)
 
 
 @router.get(
@@ -226,21 +223,3 @@ async def unlink_counterparty_product(
         service: CounterpartyServiceDep,
 ) -> None:
     await service.unlink_product(counterparty_id, link_id)
-
-
-@router.delete(
-    path="/{counterparty_id}/contact-persons/{contact_person_id}",
-    status_code=status.HTTP_200_OK,
-    response_model=CounterpartyResponse,
-    dependencies=[Depends(require_role(REQUIRED_ROLES))],
-    summary="Удаление контактного лица по ID",
-)
-async def delete_contact_person_by_id(
-    counterparty_id: UUID,
-    contact_person_id: UUID,
-    service: CounterpartyServiceDep,
-) -> CounterpartyResponse:
-    return await service.delete_contact_person_by_id(
-        counterparty_id=counterparty_id,
-        contact_person_id=contact_person_id,
-    )

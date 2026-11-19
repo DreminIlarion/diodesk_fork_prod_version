@@ -12,6 +12,7 @@ from ..schemas import (
     KeyCheckResult,
     ProjectCreate,
     ProjectResponse,
+    ProjectStatusUpdate,
     ProjectUpdate,
 )
 
@@ -95,6 +96,24 @@ async def archive_project(
         current_subject=current_subject,
     )
 
+
+@router.patch(
+    path="/{project_id}/status",
+    status_code=status.HTTP_200_OK,
+    response_model=ProjectResponse,
+    summary="Смена статуса проекта",
+)
+async def change_project_status(
+        project_id: UUID,
+        data: ProjectStatusUpdate,
+        current_subject: CurrentSubjectDep,
+        service: ProjectServiceDep,
+) -> ProjectResponse:
+    return await service.change_status(
+        project_id=project_id,
+        new_status=data.status,
+        current_subject=current_subject,
+    )
 
 @router.get(
     path="/my",

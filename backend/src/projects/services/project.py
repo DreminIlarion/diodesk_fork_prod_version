@@ -15,7 +15,7 @@ from ..domain.authz import ProjectAuthZService
 from ..domain.entities import Project
 from ..domain.repos import ProjectMemberRepository, ProjectRepository
 from ..domain.services import generate_key_suggestions
-from ..domain.vo import MemberRole, ProjectKey
+from ..domain.vo import MemberRole, ProjectKey, ProjectStatus
 from ..mappers import (
     map_project_stage_to_response,
     map_project_to_detailed_response,
@@ -176,6 +176,17 @@ class ProjectService:
             raise PermissionDeniedError(permission.reason)
 
         project.archive(archived_by=current_subject.id)
+        await self.project_repo.update(project)
+        await finalize(self.uow, project, event_publisher=self.event_publisher)
+
+        return map_project_to_response(project)
+    
+    async def change_status(
+            self, project_id: UUID, new_status: ProjectStatus, current_subject: Subject,
+    ) -> ProjectResponse:
+        project = await get_or_raise_404(self.project_repo.read, project_id, Project)
+
+        project.change_status(new_status)
         await self.project_repo.update(project)
         await finalize(self.uow, project, event_publisher=self.event_publisher)
 

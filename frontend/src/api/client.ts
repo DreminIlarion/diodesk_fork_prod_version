@@ -339,15 +339,12 @@ export const counterpartiesApi = {
   },
 
   deleteContactPerson: async (
-    id: string,
-    params: { phone?: string; email?: string }
+    counterpartyId: string,
+    contactPersonId: string,
   ): Promise<Counterparty> => {
-    const response = await api.delete<Counterparty>(`/api/v1/counterparties/${id}/contact-persons`, {
-      params: {
-        phone: params.phone || undefined,
-        email: params.email || undefined,
-      },
-    });
+    const response = await api.delete<Counterparty>(
+      `/api/v1/counterparties/${counterpartyId}/contact-persons/${contactPersonId}`,
+    );
     return response.data;
   },
 
@@ -660,6 +657,11 @@ setStageAssignees: async (
   // Возобновить этап
   resumeStage: async (projectId: string, stageId: string): Promise<Project> => {
     const response = await api.post<Project>(`/api/v1/projects/${projectId}/stages/${stageId}/resume`);
+    return response.data;
+  },
+
+    changeStatus: async (id: string, status: ProjectStatus): Promise<Project> => {
+    const response = await api.patch<Project>(`/api/v1/projects/${id}/status`, { status });
     return response.data;
   },
 

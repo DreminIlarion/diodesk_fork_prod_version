@@ -227,20 +227,6 @@ class Counterparty(Entity):
             f"Contact person with ID {contact_person_id} not found"
         )
 
-    def remove_contact_person(self, phone: Phone, email: str) -> None:
-        """Удаление контактного лица"""
-
-        target = None
-
-        for i, contact_person in enumerate(self.contact_persons):
-            if contact_person.phone == phone and contact_person.email == email:
-                target = i
-                break
-
-        if target is not None:
-            self.contact_persons.pop(target)
-            self.updated_at = current_datetime()
-
     def link_contact_person_user(
         self, contact_person_id: UUID, user_id: UUID
     ) -> None:

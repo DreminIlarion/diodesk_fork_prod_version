@@ -74,7 +74,7 @@ class FullName(ValueObject):
     ФИО - доменный примитив для валидации российских имён
     """
 
-    MIN_PARTS: ClassVar[int] = 2
+    MIN_PARTS: ClassVar[int] = 1
     MAX_LENGTH: ClassVar[int] = 155
 
     value: str = field(compare=True, hash=True)
@@ -88,7 +88,7 @@ class FullName(ValueObject):
 
         parts = [part.strip() for part in self.value.split() if part.strip()]
         if len(parts) < self.MIN_PARTS:
-            raise ValueError("Must have at least first and last name")
+            raise ValueError("Full name must contain at least one part")
 
         pattern = re.compile(r"^[A-Za-zА-Яа-яЁё\s\-'’]+$")
         if not all(pattern.match(p) for p in parts):
@@ -130,11 +130,9 @@ class FullName(ValueObject):
 
     @property
     def middle_name(self) -> str | None:
-        """Отчество"""
+        """Отчество, если оно присутсвует"""
 
-        if len(self._parts) > self.MIN_PARTS:
-            return " ".join(self._parts[1:-1])
-        return None
+        return " ".join(self._parts[1:-1]) or None
 
 
 @dataclass(frozen=True, slots=True)
