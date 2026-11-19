@@ -1,9 +1,16 @@
-from typing import Annotated
+from typing import Annotated, Any
 
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, StringConstraints
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    BeforeValidator,
+    EmailStr,
+    Field,
+    StringConstraints,
+)
 
 from src.products.schemas import ProductResponse
 
@@ -33,23 +40,71 @@ class CounterpartyProductResponse(BaseModel):
     product: ProductResponse
 
 
+def empty_to_none(value: str | None) -> str | None:
+    return value or None
+
+
+def blank_email_to_none(value: Any) -> Any:
+    if isinstance(value, str) and (not value or value.isspace()):
+        return None
+    return value
+
+
+def none_to_empty_dict(value: Any) -> Any:
+    return {} if value is None else value
+
+
+TrimmedStr = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True),
+]
+
+OptionalTrimmedStr = Annotated[
+    TrimmedStr | None,
+    AfterValidator(empty_to_none),
+]
+
+OptionalContactEmail = Annotated[
+    EmailStr | None,
+    BeforeValidator(blank_email_to_none),
+]
+
+ContactMessengers = Annotated[
+    dict[str, str],
+    BeforeValidator(none_to_empty_dict),
+]
+
+
 class ContactPersonIn(BaseModel):
-    """Добавление контактного лица контрагента"""
+    """Добавление контактного лица контрагента."""
 
-    first_name: str | None = Field(None, description="Имя")
-    last_name: str | None = Field(None, description="Фамилия")
+    first_name: OptionalTrimmedStr = Field(None, description="Имя")
+    last_name: OptionalTrimmedStr = Field(None, description="Фамилия")
+    middle_name: OptionalTrimmedStr = Field(None, description="Отчество")
 
-    middle_name: str | None = Field(None, description="Отчество")
-    phone: str | None = Field(
-        None, description="Номер телефона", examples=["88005553535", "+78005553535"]
+    phone: OptionalTrimmedStr = Field(
+        None,
+        description="Номер телефона",
+        examples=["88005553535", "+78005553535"],
     )
-    email: EmailStr | None = Field(None, description="Адрес электронной почты")
-    position: str | None = Field(None, description="Должность", examples=["Главный бухгалтер"])
-    extension: str | None = Field(None, description="Добавочный номер", examples=["1234"])
-    messengers: dict[str, str] = Field(
+    email: OptionalContactEmail = Field(
+        None,
+        description="Адрес электронной почты",
+    )
+    position: OptionalTrimmedStr = Field(
+        None,
+        description="Должность",
+        examples=["Главный бухгалтер"],
+    )
+    extension: OptionalTrimmedStr = Field(
+        None,
+        description="Добавочный номер",
+        examples=["1234"],
+    )
+    messengers: ContactMessengers = Field(
         default_factory=dict,
         description="Контакты в мессенджерах",
-        examples=[{"telegram": "exampleUser05", "vk": "1254752"}]
+        examples=[{"telegram": "exampleUser05", "vk": "1254752"}],
     )
 
 
@@ -59,7 +114,7 @@ class ContactPersonOut(BaseModel):
     id: UUID = Field(..., description="Уникальный идентификатор контактного лица")
 
     user_id: UUID | None = None
-    full_name: str = Field(..., description="ФИО лица", examples=["Иванов Иван Иванович"])
+    full_name: str | None = Field(None, description="ФИО лица", examples=["Иванов Иван Иванович"])
     phone: str | None = Field(
         None, description="Номер телефона", examples=["88005553535", "+78005553535"]
     )

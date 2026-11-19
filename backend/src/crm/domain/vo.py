@@ -189,6 +189,11 @@ class Phone:
         return f"Phone({self.value!r})"
 
 
+class ContactPersonFullName(FullName):
+    """ФИО контакта: достаточно одной заполненной части"""
+    MIN_PARTS: ClassVar[int] = 1
+
+
 @dataclass(kw_only=True)
 class ContactPerson(Entity):
     """
@@ -200,7 +205,7 @@ class ContactPerson(Entity):
     })
 
     user_id: UUID | None = None
-    full_name: FullName
+    full_name: ContactPersonFullName | None = None
     phone: Phone | None = None
     email: EmailStr | None = None
     position: str | None = None          # ← добавил
@@ -238,24 +243,41 @@ class ContactPerson(Entity):
     @classmethod
     def create(
             cls,
-            first_name: str | None,
-            last_name: str | None,
-            middle_name: str | None,
-            phone: str | None,
-            email: str | None,
-            messengers: dict[str, str],
+            first_name: str | None = None,
+            last_name: str | None = None,
+            middle_name: str | None = None,
+            phone: str | None = None,
+            email: str | None = None,
+            messengers: dict[str, str] | None = None,
             position: str | None = None,      # ← добавил
             extension: str | None = None,     # ← добавил
     ) -> "ContactPerson":
         # Формируем ФИО аккуратно, без "None" в строке
-        parts = [p for p in (last_name, first_name, middle_name) if p]
+        parts = [
+            part.strip()
+            for part in (last_name, first_name, middle_name)
+            if part and part.strip()
+        ]
         full_name_str = " ".join(parts)
+        full_name = (
+            ContactPersonFullName(full_name_str)
+            if full_name_str
+            else None
+        )
 
         return cls(
-            full_name=FullName(full_name_str),
-            phone=Phone(phone) if phone else None,
-            email=email,
-            position=position.strip() if position and position.strip() else None,
-            extension=extension.strip() if extension and extension.strip() else None,
-            messengers=messengers,
+            full_name=full_name,
+            phone=Phone(phone) if phone and phone.strip() else None,
+            email=email.strip() if email and email.strip() else None,
+            position=(
+                position.strip()
+                if position and position.strip()
+                else None
+            ),
+            extension=(
+                extension.strip()
+                if extension and extension.strip()
+                else None
+            ),
+            messengers=messengers or {},
         )

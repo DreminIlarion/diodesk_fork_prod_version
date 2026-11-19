@@ -130,11 +130,9 @@ class FullName(ValueObject):
 
     @property
     def middle_name(self) -> str | None:
-        """Отчество"""
+        """Отчество, если оно присутсвует"""
 
-        if len(self._parts) > self.MIN_PARTS:
-            return " ".join(self._parts[1:-1])
-        return None
+        return " ".join(self._parts[1:-1]) or None
 
 
 @dataclass(frozen=True, slots=True)

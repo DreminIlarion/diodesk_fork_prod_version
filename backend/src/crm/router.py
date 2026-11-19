@@ -2,8 +2,7 @@ from typing import Annotated, Any
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Path, Query, status
-from pydantic import EmailStr
+from fastapi import APIRouter, Depends, Path, status
 
 from src.iam.dependencies import get_current_user, require_role
 from src.iam.domain.vo import UserRole
