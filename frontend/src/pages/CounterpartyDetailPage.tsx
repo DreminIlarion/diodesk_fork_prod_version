@@ -468,8 +468,9 @@ function EditCounterpartyModal({
 
   const handleSave = async () => {
     if (
-      !form.last_name.trim() ||
-      !form.first_name.trim()
+      !form.last_name.trim() &&
+      !form.first_name.trim() &&
+      !form.middle_name.trim()
     ) {
       return;
     }
@@ -786,9 +787,9 @@ function ContactsTab({
 
       await counterpartiesApi.updateContactPerson(
         counterpartyId,
-        {
-          first_name: form.first_name.trim(),
-          last_name: form.last_name.trim(),
+                {
+          first_name: form.first_name.trim() || undefined,
+          last_name: form.last_name.trim() || undefined,
           middle_name:
             form.middle_name.trim() || undefined,
           phone: form.phone.trim()
