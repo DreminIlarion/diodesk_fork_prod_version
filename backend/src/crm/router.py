@@ -135,7 +135,7 @@ async def add_contact_person(
 
 
 @router.delete(
-    path="/{counterparty_id}/contact-persons",
+    path="/{counterparty_id}/contact-persons/{contact_person_id}",
     status_code=status.HTTP_200_OK,
     response_model=CounterpartyResponse,
     dependencies=[Depends(require_role(REQUIRED_ROLES))],
@@ -143,13 +143,10 @@ async def add_contact_person(
 )
 async def delete_contact_person(
         counterparty_id: UUID,
-        phone: Annotated[str, Query(..., description="Номер телефона")],
-
+        contact_person_id: UUID,
         service: CounterpartyServiceDep,
-        email: EmailStr | None = Query(None, description="Email адрес"),
-
 ) -> CounterpartyResponse:
-    return await service.delete_contact_person(counterparty_id, phone, email)
+    return await service.delete_contact_person(counterparty_id, contact_person_id)
 
 
 @router.get(

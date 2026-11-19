@@ -238,7 +238,7 @@ class ContactPerson(Entity):
     @classmethod
     def create(
             cls,
-            first_name: str,
+            first_name: str | None,
             last_name: str | None,
             middle_name: str | None,
             phone: str | None,

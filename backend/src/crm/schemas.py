@@ -36,7 +36,7 @@ class CounterpartyProductResponse(BaseModel):
 class ContactPersonIn(BaseModel):
     """Добавление контактного лица контрагента"""
 
-    first_name: str = Field(..., description="Имя")
+    first_name: str | None = Field(None, description="Имя")
     last_name: str | None = Field(None, description="Фамилия")
 
     middle_name: str | None = Field(None, description="Отчество")

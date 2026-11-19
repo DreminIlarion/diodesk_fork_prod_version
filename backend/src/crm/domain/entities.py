@@ -100,19 +100,7 @@ class Counterparty(Entity):
                 "to attach a branch. Missing parent_id value."
             )
 
-        # 5. Телефон и электронная почта контактного лица должны быть уникальны
-        seen_contact_data = set()
-        for contact_person in self.contact_persons:
-            # Пропускаем проверку, если оба поля пустые
-            if not contact_person.phone and not contact_person.email:
-                continue
 
-            contact_data = (contact_person.phone, contact_person.email)
-            if contact_data in seen_contact_data:
-                raise InvariantViolationError(
-                    "Combination of phone number and email must be unique for contact persons"
-                )
-            seen_contact_data.add(contact_data)
 
     @property
     def is_head(self) -> bool:
@@ -202,10 +190,10 @@ class Counterparty(Entity):
 
     def add_contact_person(
             self,
-            first_name: str,
-            last_name: str,
-            phone: str,
-            email: str,
+            first_name: str | None = None,
+            last_name: str | None = None,
+            phone: str | None = None,
+            email: str | None = None,
             middle_name: str | None = None,
             messengers: dict[str, str] | None = None,
             position: str | None = None,       # ← добавить
@@ -245,19 +233,18 @@ class Counterparty(Entity):
         )
         self.updated_at = current_datetime()
 
-    def remove_contact_person(self, phone: Phone, email: str) -> None:
-        """Удаление контактного лица"""
-
-        target = None
+    def remove_contact_person_by_id(self, contact_person_id: UUID) -> None:
+        """Удаление контактного лица по его ID"""
 
         for i, contact_person in enumerate(self.contact_persons):
-            if contact_person.phone == phone and contact_person.email == email:
-                target = i
-                break
+            if contact_person.id == contact_person_id:
+                self.contact_persons.pop(i)
+                self.updated_at = current_datetime()
+                return
 
-        if target is not None:
-            self.contact_persons.pop(target)
-            self.updated_at = current_datetime()
+        raise NotFoundError(
+            f"Contact person with ID {contact_person_id} not found"
+        )
 
     def link_contact_person_user(
         self, contact_person_id: UUID, user_id: UUID
