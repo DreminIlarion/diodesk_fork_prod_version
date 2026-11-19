@@ -763,8 +763,9 @@ function ContactsTab({
 
   const handleSave = async () => {
     if (
-      !form.last_name.trim() ||
-      !form.first_name.trim()
+      !form.last_name.trim() &&
+      !form.first_name.trim() &&
+      !form.middle_name.trim()
     ) {
       return;
     }
