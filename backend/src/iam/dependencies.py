@@ -169,7 +169,7 @@ def require_role(allowed_roles: Iterable[UserRole]):
 
     def checker(current_subject: CurrentSubjectDep):
         if not current_subject.has_any_role(allowed_roles):
-            raise PermissionDeniedError("Недостаточно прав")
+            raise PermissionDeniedError("Insufficient permissions")
         return True
 
     return checker
