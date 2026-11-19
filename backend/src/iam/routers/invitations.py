@@ -1,10 +1,8 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
-from faststream.rabbit import RabbitQueue
-from faststream.rabbit.fastapi import RabbitRouter
+from faststream.rabbit import RabbitQueue, RabbitRouter
 
-from src.core.settings import settings
 from src.shared.schemas import Page
 
 from ..dependencies import (
@@ -22,7 +20,7 @@ from ..schemas import InvitationCreate, InvitationResponse
 router = APIRouter(prefix="/invitations", tags=["Приглашения"])
 
 # RabbitMQ брокер для subscriber'ов
-broker_router = RabbitRouter(settings.rabbit.url)
+broker_router = RabbitRouter()
 
 
 @router.post(

@@ -3,6 +3,7 @@ from typing import Annotated
 
 from uuid import UUID
 
+from ddf.application.dsl import Expression
 from fastapi import Depends, Query
 
 from src.activity_logs.dependencies import ActivityLogRecorderDep
@@ -16,9 +17,10 @@ from src.tickets.dependencies import TicketRepoDep
 from .domain.authz import TaskAuthZService
 from .domain.entities import Task
 from .domain.repos import TaskRepository
+from .dsl import legacy_kanban_filters_to_expression
 from .infra.repos import SqlTaskRepository
 from .mappers import map_task_to_response
-from .schemas import KanbanFilters, TaskResponse
+from .schemas import TaskResponse
 from .services import TaskBoardService, TaskService
 
 
@@ -76,19 +78,28 @@ TaskServiceDep = Annotated[TaskService, Depends(get_task_service)]
 TaskBoardServiceDep = Annotated[TaskBoardService, Depends(get_task_board_service)]
 
 
-def get_kanban_filters(
-        priorities: Annotated[
-            list[Priority] | None, Query(..., description="По приоритету")
-        ] = None,
-        overdue_only: Annotated[bool, Query(..., description="Только просроченные")] = False,
-        stage_ids: Annotated[
-            list[UUID] | None, Query(..., description="По этапам проекта")
-        ] = None,
-) -> KanbanFilters:
-    return KanbanFilters(
+def get_kanban_query(
+    priorities: Annotated[
+        list[Priority] | None,
+        Query(..., description="По приоритету"),
+    ] = None,
+    overdue_only: Annotated[
+        bool,
+        Query(..., description="Только просроченные"),
+    ] = False,
+    stage_ids: Annotated[
+        list[UUID] | None,
+        Query(..., description="По этапам проекта"),
+    ] = None,
+) -> Expression | None:
+    return legacy_kanban_filters_to_expression(
         priorities=priorities,
         overdue_only=overdue_only,
-        stage_ids=set(stage_ids) if stage_ids else None,
+        stage_ids=stage_ids,
     )
 
-KanbanFiltersDep = Annotated[KanbanFilters, Depends(get_kanban_filters)]
+
+KanbanQueryDep = Annotated[
+    Expression | None,
+    Depends(get_kanban_query),
+]

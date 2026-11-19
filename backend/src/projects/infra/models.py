@@ -1,14 +1,15 @@
 from datetime import date, datetime
 from uuid import UUID
 
+from ddf.infra.database.sqlalchemy import Base, EntityMixin
 from sqlalchemy import TEXT, Date, DateTime, Enum, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ...core.database import Base
 from ..domain.vo import MemberRole, ProjectStageStatus, ProjectStatus
 
-class ProjectMemberOrm(Base):
+
+class ProjectMemberOrm(EntityMixin, Base):
     __tablename__ = "project_members"
 
     project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id"), unique=False)
@@ -24,7 +25,7 @@ class ProjectMemberOrm(Base):
 	)
 
 
-class ProjectStageOrm(Base):
+class ProjectStageOrm(EntityMixin, Base):
     __tablename__ = "project_stages"
 
     project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id"), unique=False)
@@ -62,7 +63,7 @@ class ProjectStageOrm(Base):
     )
 
 
-class ProjectOrm(Base):
+class ProjectOrm(EntityMixin, Base):
     __tablename__ = "projects"
 
     name: Mapped[str]
@@ -96,7 +97,7 @@ class ProjectOrm(Base):
 
 
 
-class ProjectStageAssigneeOrm(Base):
+class ProjectStageAssigneeOrm(EntityMixin, Base):
     __tablename__ = "project_stage_assignees"
 
     stage_id: Mapped[UUID] = mapped_column(

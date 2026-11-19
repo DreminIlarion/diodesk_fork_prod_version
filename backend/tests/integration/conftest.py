@@ -1,4 +1,5 @@
 import pytest
+from ddf.infra.database.sqlalchemy import Base
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from testcontainers.core.wait_strategies import PortWaitStrategy
@@ -6,7 +7,6 @@ from testcontainers.minio import MinioContainer
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
-from src.core.database import Base
 from src.media.infra.repo import SqlAttachmentRepository
 from src.media.infra.s3 import S3Storage
 
@@ -20,7 +20,9 @@ def minio_secret_key():
 def minio_container(minio_secret_key):
     minio_container = (
         MinioContainer(
-            image="quay.io/minio/minio", access_key="minioadmin", secret_key=minio_secret_key,
+            image="quay.io/minio/minio",
+            access_key="minioadmin",
+            secret_key=minio_secret_key,
         )
         .waiting_for(PortWaitStrategy(port=9000))
         .with_env("MINIO_ROOT_USER", "minioadmin")
@@ -36,7 +38,7 @@ def minio_container(minio_secret_key):
 
 @pytest.fixture(scope="session")
 def postgres_container():
-    with PostgresContainer(image="postgres:16.9", driver="asyncpg") as postgres:
+    with PostgresContainer(image="postgres:18.6", driver="asyncpg") as postgres:
         yield postgres
 
 
@@ -62,6 +64,14 @@ async def engine(postgres_container):
         url=postgres_container.get_connection_url(), echo=True, pool_pre_ping=True
     )
     async with engine.begin() as conn:
+        await conn.execute(
+            text(
+                "CREATE OR REPLACE FUNCTION uuid_generate_v7() "
+                "RETURNS uuid "
+                "LANGUAGE sql "
+                "AS 'SELECT uuidv7()'"
+            )
+        )
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
         await conn.run_sync(Base.metadata.create_all)
     yield engine

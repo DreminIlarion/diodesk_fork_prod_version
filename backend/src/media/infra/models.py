@@ -1,13 +1,12 @@
 from datetime import datetime
 from uuid import UUID
 
+from ddf.infra.database.sqlalchemy import Base, EntityMixin
 from sqlalchemy import DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.core.database import Base
 
-
-class AttachmentOrm(Base):
+class AttachmentOrm(EntityMixin, Base):
     __tablename__ = "attachments"
 
     original_filename: Mapped[str]

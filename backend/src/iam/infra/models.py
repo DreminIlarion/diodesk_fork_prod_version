@@ -1,16 +1,15 @@
 from datetime import datetime
 from uuid import UUID
 
+from ddf.infra.database.sqlalchemy import Base, EntityMixin
 from sqlalchemy import DateTime, Index
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.core.database import Base
-
 from ..domain.vo import UserRole
 
 
-class UserOrm(Base):
+class UserOrm(EntityMixin, Base):
     __tablename__ = "users"
 
     email: Mapped[str] = mapped_column(unique=True)
@@ -29,7 +28,7 @@ class UserOrm(Base):
     )
 
 
-class InvitationOrm(Base):
+class InvitationOrm(EntityMixin, Base):
     __tablename__ = "invitations"
 
     email: Mapped[str]

@@ -143,6 +143,14 @@ class TicketMapper(ModelMapper[Ticket, TicketOrm]):
             ],
         )
 
+    def from_model(self, model: TicketOrm) -> Ticket:
+        """Map list-query rows without loading attachment relationships."""
+
+        return self.to_light(model)
+
+    def to_model(self, entity: Ticket) -> TicketOrm:
+        return self.from_entity(entity)
+
 
 class ReactionMapper(ModelMapper[Reaction, ReactionOrm]):
     @staticmethod

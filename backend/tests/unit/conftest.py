@@ -2,7 +2,6 @@ from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
-from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.crm.domain.entities import Counterparty
@@ -10,7 +9,7 @@ from src.crm.domain.repo import CounterpartyRepository
 from src.crm.domain.vo import CounterpartyType, Inn, Kpp, Phone
 from src.iam.domain.entities import User
 from src.iam.domain.repos import InvitationRepository, TokenStore, UserRepository
-from src.iam.domain.vo import FullName, UserRole
+from src.iam.domain.vo import Email, FullName, PasswordHash, UserRole
 from src.notifications.domain.repos import NotificationRepository, PreferenceRepository
 from src.products.domain.repo import ProductRepository
 from src.projects.domain.authz import ProjectAuthZService
@@ -178,17 +177,17 @@ def user_factory(fake_user_repo):
         user_id = overrides.pop("id", uuid4())
         email = overrides.pop("email", f"user.{role}@test.com")
         full_name = overrides.pop("full_name", "Тестов Тест Тестович")
-        password_hash = SecretStr("123456789")
+        password_hash = PasswordHash("123456789")
         counterparty_id = None
 
-        if role.is_customer():
+        if role.is_customer:
             counterparty_id = overrides.pop("counterparty_id", uuid4())
 
         user = User(
             id=user_id,
-            email=email,
+            email=Email(email),
             password_hash=password_hash,
-            role=role,
+            roles={role},
             counterparty_id=counterparty_id,
             full_name=FullName(full_name),
         )
@@ -264,7 +263,6 @@ def ticket_factory(fake_ticket_repo):
             product_id=overrides.pop("product_id", None),
             tags=overrides.pop("tags", []),
             attachments=overrides.pop("attachments", []),
-            history=overrides.pop("history", []),
             created_at=overrides.pop("created_at", current_datetime()),
             updated_at=overrides.pop("updated_at", current_datetime()),
             deleted_at=overrides.pop("deleted_at", None),

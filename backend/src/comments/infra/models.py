@@ -6,15 +6,14 @@ if TYPE_CHECKING:
 
 from uuid import UUID
 
+from ddf.infra.database.sqlalchemy import Base, EntityMixin
 from sqlalchemy import TEXT, Enum, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from src.core.database import Base
 
 from ..domain.vo import AggregateType, CommentVisibility
 
 
-class CommentOrm(Base):
+class CommentOrm(EntityMixin, Base):
     __tablename__ = "comments"
 
     aggregate_type: Mapped[AggregateType | None] = mapped_column(Enum(AggregateType), nullable=True)
@@ -57,7 +56,7 @@ class CommentOrm(Base):
     )
 
 
-class ReactionOrm(Base):
+class ReactionOrm(EntityMixin, Base):
     __tablename__ = "reactions"
 
     comment_id: Mapped[UUID] = mapped_column(ForeignKey("comments.id"), unique=False)

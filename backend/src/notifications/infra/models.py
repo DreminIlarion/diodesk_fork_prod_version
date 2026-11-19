@@ -3,15 +3,15 @@ from typing import Any
 from datetime import datetime
 from uuid import UUID
 
+from ddf.infra.database.sqlalchemy import Base, EntityMixin
 from sqlalchemy import TEXT, DateTime, Enum, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ...core.database import Base
 from ..domain.vo import ChannelType, NotificationType
 
 
-class NotificationOrm(Base):
+class NotificationOrm(EntityMixin, Base):
     __tablename__ = "notifications"
 
     user_id: Mapped[UUID]
@@ -22,7 +22,7 @@ class NotificationOrm(Base):
     data: Mapped[dict[str, Any]] = mapped_column(JSONB)
 
 
-class UserPreferenceOrm(Base):
+class UserPreferenceOrm(EntityMixin, Base):
     __tablename__ = "user_preferences"
 
     user_id: Mapped[UUID]

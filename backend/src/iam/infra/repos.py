@@ -1,16 +1,18 @@
 from typing import override
 
-from sqlalchemy import Select, cast, select
-from sqlalchemy.dialects.postgresql import JSONB, array, ARRAY, VARCHAR
+from collections.abc import Collection
+from uuid import UUID
+
+from sqlalchemy import Select, cast, literal, or_, select, type_coerce
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, VARCHAR
+
 from src.shared.infra.repos import ModelMapper, SqlAlchemyRepository
 from src.shared.schemas import Page, Pagination
-from sqlalchemy import type_coerce, literal
 
 from ..domain.entities import Invitation, User
 from ..domain.repos import UserFilters
 from ..domain.vo import Email, FullName, PasswordHash, Username, UserRole
 from .models import InvitationOrm, UserOrm
-from uuid import UUID
 
 
 class UserMapper(ModelMapper[User, UserOrm]):
@@ -57,7 +59,7 @@ class SqlUserRepository(SqlAlchemyRepository[User, UserOrm]):
         if filters.roles is not None and filters.roles:
             roles_as_strings: list[str] = [role.value for role in filters.roles]
             stmt = stmt.where(
-                type_coerce(self.model.roles, JSONB).op('?|')(
+                type_coerce(self.model.roles, JSONB).op("?|")(
                     cast(literal(roles_as_strings), ARRAY(VARCHAR))
                 )
             )
@@ -83,11 +85,48 @@ class SqlUserRepository(SqlAlchemyRepository[User, UserOrm]):
         result = await self.session.execute(stmt)
         model = result.scalar_one_or_none()
         return None if model is None else self.model_mapper.to_entity(model)
-    
+
+    async def search(
+        self,
+        query: str | None = None,
+        *,
+        roles: Collection[UserRole] | None = None,
+        active_only: bool = True,
+        limit: int = 20,
+    ) -> list[User]:
+        stmt = self._apply_user_filters(
+            select(self.model),
+            UserFilters(roles=set(roles) if roles else None),
+        )
+
+        if query:
+            stmt = stmt.where(
+                or_(
+                    self.model.full_name.icontains(query, autoescape=True),
+                    self.model.email.icontains(query, autoescape=True),
+                    self.model.username.icontains(query, autoescape=True),
+                )
+            )
+
+        if active_only:
+            stmt = stmt.where(self.model.is_active.is_(True))
+
+        stmt = (
+            stmt
+            .order_by(self.model.full_name.asc().nulls_last())
+            .limit(limit)
+        )
+        models = (await self.session.execute(stmt)).scalars().all()
+
+        return [
+            self.model_mapper.to_entity(model)
+            for model in models
+        ]
+
     async def get_customer_admins(self, counterparty_id: UUID) -> list[User]:
         stmt = select(self.model).where(
             self.model.counterparty_id == counterparty_id,
-            type_coerce(self.model.roles, JSONB).op('?|')(
+            type_coerce(self.model.roles, JSONB).op("?|")(
                 cast(literal([UserRole.CUSTOMER_ADMIN.value]), ARRAY(VARCHAR))
             ),
         )

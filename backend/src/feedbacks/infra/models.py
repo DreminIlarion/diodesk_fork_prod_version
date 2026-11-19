@@ -1,12 +1,11 @@
 from uuid import UUID
 
+from ddf.infra.database.sqlalchemy import Base, EntityMixin
 from sqlalchemy import CheckConstraint, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.core.database import Base
 
-
-class FeedbackOrm(Base):
+class FeedbackOrm(EntityMixin, Base):
     """
     ORM-модель клиенткого отзыва по тикету.
     """
