@@ -919,15 +919,14 @@ export default function NewCounterpartyPage() {
     !includeContacts ||
     contactPersons.every(
       (contact) =>
-        !!contact.last_name?.trim() &&
-        !!contact.first_name?.trim() &&
-        !!contact.middle_name?.trim() &&
-        isPhoneValid(
-          contact.phone ?? '',
-        ) &&
-        isEmailValid(
-          contact.email ?? '',
-        ),
+        // хотя бы одно из ФИО заполнено
+        (!!contact.last_name?.trim() ||
+         !!contact.first_name?.trim() ||
+         !!contact.middle_name?.trim()) &&
+        // телефон либо пустой, либо полный
+        isPhoneValid(contact.phone ?? '') &&
+        // email либо пустой, либо валидный
+        isEmailValid(contact.email ?? ''),
     );
 
   const areBranchesValid =
@@ -1027,11 +1026,9 @@ export default function NewCounterpartyPage() {
         payload.contact_persons =
           contactPersons.map(
             (contact) => {
-              const result: any = {
-                first_name:
-                  contact.first_name.trim(),
-                last_name:
-                  contact.last_name.trim(),
+               const result: any = {
+                first_name: contact.first_name.trim() || undefined,
+                last_name: contact.last_name.trim() || undefined,
               };
 
               if (
@@ -1719,7 +1716,7 @@ export default function NewCounterpartyPage() {
                                   labelCls
                                 }
                               >
-                                {label} *
+                                {label} 
                               </label>
 
                               <input
