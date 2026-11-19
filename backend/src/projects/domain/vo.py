@@ -10,10 +10,11 @@ from src.shared.domain.vo import ValueObject
 class ProjectStatus(StrEnum):
     """Статус проекта"""
 
-    ACTIVE = auto()
-    ON_HOLD = auto()  # На удержании
-    ARCHIVED = auto()
-    COMPLETED = auto()
+    ACTIVE = "active"
+    ON_HOLD = "on_hold"
+    COMPLETED = "completed"
+    ARCHIVED = "archived"
+    CANCELLED = "cancelled"
 
 
 class ProjectStageStatus(StrEnum):

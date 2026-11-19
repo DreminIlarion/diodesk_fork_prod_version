@@ -78,7 +78,7 @@ class CounterpartyBase(BaseModel):
 
     name: str = Field(..., max_length=255, description="Наименование")
     legal_name: str = Field(..., max_length=255, description="Юридическое наименование")
-    kpp: str = Field(..., max_length=11, description="КПП - код причины постановки на учёт")
+    kpp: str | None = Field(None, max_length=11, description="КПП — только для юрлиц и обособленных подразделений")
     okpo: str | None = Field(
         None,
         max_length=10,

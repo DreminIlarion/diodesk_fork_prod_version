@@ -1001,13 +1001,8 @@ export default function NewCounterpartyPage() {
           formData.email.trim();
       }
 
-      if (
-        formData.counterparty_type ===
-        'Юридическое лицо'
-      ) {
+        if (formData.counterparty_type === 'Юридическое лицо') {
         payload.kpp = formData.kpp;
-      } else {
-        payload.kpp = 0;
       }
 
       if (formData.okpo) {
