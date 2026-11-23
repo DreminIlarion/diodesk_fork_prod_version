@@ -8,9 +8,10 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from src.core.settings import settings
-from src.core.database import Base
+from ddf.infra.database.sqlalchemy import Base
 
 from src.crm.infra.models import CounterpartyOrm
+from src.feedbacks.infra.models import FeedbackOrm
 from src.iam.infra.models import InvitationOrm, UserOrm
 from src.media.infra.models import AttachmentOrm
 from src.notifications.infra.models import NotificationOrm, UserPreferenceOrm

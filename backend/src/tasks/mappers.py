@@ -6,9 +6,9 @@ from src.iam.schemas import UserReference
 from src.media.mappers import map_attachment_to_response
 from src.projects.domain.entities import Project
 from src.projects.schemas import ProjectReference
+from src.shared.domain.vo import Tag
 from src.tickets.domain.entities import Ticket
 from src.tickets.mappers import map_ticket_to_preview
-from src.tickets.schemas import Tag
 
 
 def map_task_to_response(

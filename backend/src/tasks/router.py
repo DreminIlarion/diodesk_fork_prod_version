@@ -6,7 +6,7 @@ from src.iam.dependencies import CurrentSubjectDep, get_current_subject
 from src.shared.dependencies import PaginationDep
 
 from .dependencies import (
-    KanbanFiltersDep,
+    KanbanQueryDep,
     TaskBoardServiceDep,
     TaskServiceDep,
     get_task_or_404,
@@ -15,6 +15,7 @@ from .schemas import (
     AssigneeId,
     KanbanBoard,
     KanbanContextType,
+    KanbanSearchRequest,
     NewStatus,
     ReviewDecision,
     ReviewerId,
@@ -24,6 +25,7 @@ from .schemas import (
 )
 
 router = APIRouter(prefix="/tasks", tags=["Задания сотрудникам"])
+v2_router = APIRouter(prefix="/tasks", tags=["Задания сотрудникам v2"])
 
 
 @router.post(
@@ -145,15 +147,35 @@ async def archive_task(
     summary="Получить канбан доску"
 )
 async def get_kanban_board(
-        context: KanbanContextType,
-        pagination: PaginationDep,
-        filters: KanbanFiltersDep,
-        current_subject: CurrentSubjectDep,
-        service: TaskBoardServiceDep,
+    context: KanbanContextType,
+    pagination: PaginationDep,
+    query: KanbanQueryDep,
+    current_subject: CurrentSubjectDep,
+    service: TaskBoardServiceDep,
 ) -> KanbanBoard:
     return await service.get_kanban_board(
         pagination=pagination,
         context=context,
-        filters=filters,
-        current_user=current_subject,
+        query=query,
+        current_subject=current_subject,
+    )
+
+
+@v2_router.post(
+    path="/kanban",
+    status_code=status.HTTP_200_OK,
+    response_model=KanbanBoard,
+    summary="Получить канбан доску через DDF DSL",
+)
+async def get_kanban_board_v2(
+    request: KanbanSearchRequest,
+    pagination: PaginationDep,
+    current_subject: CurrentSubjectDep,
+    service: TaskBoardServiceDep,
+) -> KanbanBoard:
+    return await service.get_kanban_board(
+        pagination=pagination,
+        context=request.context,
+        query=request.query,
+        current_subject=current_subject,
     )

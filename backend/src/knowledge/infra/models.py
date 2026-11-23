@@ -6,17 +6,17 @@ if TYPE_CHECKING:
 from datetime import datetime
 from uuid import UUID
 
+from ddf.infra.database.sqlalchemy import Base, EntityMixin
 from pgvector.sqlalchemy import VECTOR
 from sqlalchemy import TEXT, Computed, DateTime, Enum, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ...core.database import Base
 from ...core.settings import settings
 from ..domain.vo import ArticleStatus, ArticleVisibility
 
 
-class CategoryOrm(Base):
+class CategoryOrm(EntityMixin, Base):
     __tablename__ = "categories"
 
     name: Mapped[str]
@@ -25,7 +25,7 @@ class CategoryOrm(Base):
     parent_category_id: Mapped[UUID | None] = mapped_column(nullable=True)
 
 
-class ArticleVersionOrm(Base):
+class ArticleVersionOrm(EntityMixin, Base):
     __tablename__ = "article_versions"
 
     article_id: Mapped[UUID] = mapped_column(ForeignKey("articles.id"), nullable=False)
@@ -50,7 +50,7 @@ class ArticleVersionOrm(Base):
     )
 
 
-class ArticleOrm(Base):
+class ArticleOrm(EntityMixin, Base):
     __tablename__ = "articles"
 
     title: Mapped[str]
@@ -87,7 +87,7 @@ class ArticleOrm(Base):
     versions: Mapped[list["ArticleVersionOrm"]] = relationship(back_populates="article")
 
 
-class ArticleChunkOrm(Base):
+class ArticleChunkOrm(EntityMixin, Base):
     __tablename__ = "article_chunks"
 
     version_id: Mapped[UUID] = mapped_column(

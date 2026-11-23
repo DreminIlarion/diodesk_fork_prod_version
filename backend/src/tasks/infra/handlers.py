@@ -1,11 +1,11 @@
-from faststream.rabbit import RabbitQueue
-from faststream.rabbit.fastapi import Logger, RabbitRouter
-from src.core.settings import settings
+from faststream.rabbit import RabbitQueue, RabbitRouter
+from faststream.rabbit.fastapi import Logger
 
 from src.timetracking.domain.events import WorklogApproved
+
 from ..dependencies import TaskServiceDep
 
-router = RabbitRouter(settings.rabbit.url)
+router = RabbitRouter()
 
 
 @router.subscriber(queue=RabbitQueue("worklogs.approve", durable=True))
