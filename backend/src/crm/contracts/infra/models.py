@@ -4,11 +4,11 @@ from uuid import UUID
 
 from sqlalchemy import CheckConstraint, ForeignKey, Index, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
+from ddf.infra.database.sqlalchemy import EntityMixin
 from src.core.database import Base
 
 
-class ContractOrm(Base):
+class ContractOrm(EntityMixin,Base):
     __tablename__ = "contracts"
 
     counterparty_id: Mapped[UUID] = mapped_column(
@@ -40,7 +40,7 @@ class ContractOrm(Base):
     )
 
 
-class ContractRateOrm(Base):
+class ContractRateOrm(EntityMixin,Base):
     __tablename__ = "contract_rates"
 
     contract_id: Mapped[UUID] = mapped_column(
@@ -58,7 +58,7 @@ class ContractRateOrm(Base):
         CheckConstraint("rate >= 0", name="ck_contract_rates_rate_non_negative"),
         Index("ix_contract_rates_contract_id", "contract_id"),
     )
-class ProjectContractOrm(Base):
+class ProjectContractOrm(EntityMixin,Base):
     __tablename__ = "project_contracts"
 
     project_id: Mapped[UUID] = mapped_column(
