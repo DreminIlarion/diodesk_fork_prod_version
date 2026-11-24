@@ -326,11 +326,7 @@ export const counterpartiesApi = {
     return response.data;
   },
 
-  // Создать/обновить контактное лицо
-  updateContactPerson: async (id: string, data: ContactPersonInput): Promise<ContactPerson> => {
-    const response = await api.post<ContactPerson>(`/api/v1/counterparties/${id}/contact-persons`, data);
-    return response.data;
-  },
+ 
 
   // Получить клиентов контрагента
   getCustomers: async (id: string): Promise<CounterpartyCustomer[]> => {
@@ -338,15 +334,7 @@ export const counterpartiesApi = {
     return response.data;
   },
 
-  deleteContactPerson: async (
-    counterpartyId: string,
-    contactPersonId: string,
-  ): Promise<Counterparty> => {
-    const response = await api.delete<Counterparty>(
-      `/api/v1/counterparties/${counterpartyId}/contact-persons/${contactPersonId}`,
-    );
-    return response.data;
-  },
+  
 
   // Получить подразделения — теперь грузим все страницы
   getBranches: async (id: string): Promise<Counterparty[]> => {
@@ -393,6 +381,43 @@ export const counterpartiesApi = {
       data
     );
     return res.data;
+  },
+
+
+    // Добавить контактное лицо
+  createContactPerson: async (
+    counterpartyId: string,
+    data: CreateContactPersonInput,
+  ): Promise<Counterparty> => {
+    const response = await api.post<Counterparty>(
+      `/api/v1/counterparties/${counterpartyId}/contact-persons`,
+      data,
+    );
+    return response.data;
+  },
+
+  // Редактировать контактное лицо
+  updateContactPerson: async (
+    counterpartyId: string,
+    contactPersonId: string,
+    data: UpdateContactPersonInput,
+  ): Promise<Counterparty> => {
+    const response = await api.patch<Counterparty>(
+      `/api/v1/counterparties/${counterpartyId}/contact-persons/${contactPersonId}`,
+      data,
+    );
+    return response.data;
+  },
+
+  // Удалить контактное лицо — этот метод у вас уже был с правильным URL
+  deleteContactPerson: async (
+    counterpartyId: string,
+    contactPersonId: string,
+  ): Promise<Counterparty> => {
+    const response = await api.delete<Counterparty>(
+      `/api/v1/counterparties/${counterpartyId}/contact-persons/${contactPersonId}`,
+    );
+    return response.data;
   },
 };
 

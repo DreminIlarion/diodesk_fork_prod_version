@@ -8,7 +8,7 @@ import {
   Package, Server, Globe, Smartphone, Monitor, Cpu, Code, HelpCircle,
   X, Tag, Link2, Layers, RefreshCcw, AlertTriangle,
   ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search, GitBranch, AlertCircle,
-  FolderOpen,
+  FolderOpen, Pencil 
 } from 'lucide-react';
 import {
   counterpartiesApi,
@@ -699,6 +699,8 @@ function EditCounterpartyModal({
 
 // ─── Вкладка контактных лиц ───────────────────────────────────────────────────
 
+// ─── Вкладка контактных лиц ───────────────────────────────────────────────────
+
 function ContactsTab({
   counterpartyId,
   persons,
@@ -711,6 +713,7 @@ function ContactsTab({
   onRefresh: () => void;
 }) {
   const [showForm, setShowForm] = useState(false);
+  const [editingPerson, setEditingPerson] = useState<ContactPerson | null>(null);
 
   const [form, setForm] = useState({
     last_name: '',
@@ -728,10 +731,10 @@ function ContactsTab({
   const [confirmDelete, setConfirmDelete] = useState<any | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const set = (f: string) => (v: string) =>
-    setForm(p => ({
-      ...p,
-      [f]: v,
+  const set = (field: keyof typeof form) => (value: string) =>
+    setForm((prev) => ({
+      ...prev,
+      [field]: value,
     }));
 
   const resetForm = () => {
@@ -747,7 +750,33 @@ function ContactsTab({
       vk: '',
     });
 
+    setEditingPerson(null);
     setShowForm(false);
+  };
+
+  const startEdit = (person: ContactPerson) => {
+    if (!person.id) return;
+
+    const nameParts = (person.full_name || '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    setForm({
+      last_name: nameParts[0] || '',
+      first_name: nameParts[1] || '',
+      middle_name: nameParts.slice(2).join(' '),
+      phone: person.phone || '',
+      extension: person.extension || '',
+      position: person.position || '',
+      email: person.email || '',
+      telegram: person.messengers?.telegram?.replace(/^@/, '') || '',
+      vk: person.messengers?.vk || '',
+    });
+
+    setConfirmDelete(null);
+    setEditingPerson(person);
+    setShowForm(true);
   };
 
   const handleSave = async () => {
@@ -759,44 +788,58 @@ function ContactsTab({
       return;
     }
 
-      
+    if (editingPerson && !editingPerson.id) {
+      return;
+    }
+
     setSaving(true);
 
     try {
       const messengers: Record<string, string> = {};
 
       if (form.telegram.trim()) {
-        messengers.telegram = form.telegram
-          .trim()
-          .replace('@', '');
+        messengers.telegram = form.telegram.trim().replace('@', '');
       }
 
       if (form.vk.trim()) {
         messengers.vk = form.vk.trim();
       }
 
-      await counterpartiesApi.updateContactPerson(
-        counterpartyId,
-                {
+      if (editingPerson) {
+        const fullName = [
+          form.last_name.trim(),
+          form.first_name.trim(),
+          form.middle_name.trim(),
+        ]
+          .filter(Boolean)
+          .join(' ');
+
+        await counterpartiesApi.updateContactPerson(
+          counterpartyId,
+          editingPerson.id,
+          {
+            full_name: fullName,
+            phone: form.phone.trim() ? phoneToApi(form.phone) : null,
+            extension: form.extension.trim() || null,
+            position: form.position.trim() || null,
+            email: form.email.trim() || null,
+            messengers:
+              Object.keys(messengers).length > 0 ? messengers : null,
+          },
+        );
+      } else {
+        await counterpartiesApi.createContactPerson(counterpartyId, {
           first_name: form.first_name.trim() || undefined,
           last_name: form.last_name.trim() || undefined,
-          middle_name:
-            form.middle_name.trim() || undefined,
-          phone: form.phone.trim()
-            ? phoneToApi(form.phone)
-            : undefined,
-          extension:
-            form.extension.trim() || undefined,
-          position:
-            form.position.trim() || undefined,
-          email:
-            form.email.trim() || undefined,
+          middle_name: form.middle_name.trim() || undefined,
+          phone: form.phone.trim() ? phoneToApi(form.phone) : undefined,
+          extension: form.extension.trim() || undefined,
+          position: form.position.trim() || undefined,
+          email: form.email.trim() || undefined,
           messengers:
-            Object.keys(messengers).length > 0
-              ? messengers
-              : undefined,
-        },
-      );
+            Object.keys(messengers).length > 0 ? messengers : undefined,
+        });
+      }
 
       resetForm();
       onRefresh();
@@ -807,7 +850,7 @@ function ContactsTab({
     }
   };
 
-  const handleDelete = async (person: any) => {
+  const handleDelete = async (person: ContactPerson) => {
     if (!person.id) return;
 
     setDeleting(true);
@@ -826,10 +869,7 @@ function ContactsTab({
 
   return (
     <div className="bg-[var(--hover-2)] rounded-2xl border border-[var(--border-color)] overflow-hidden">
-
-      {/* ============================================================
-        HEADER
-    ============================================================ */}
+      {/* HEADER */}
       <div className="px-6 py-5 border-b border-[var(--border-color)] bg-[var(--hover-1)] flex items-center justify-between gap-4">
         <div className="flex items-center gap-2.5 min-w-0">
           <UserCheck
@@ -855,28 +895,25 @@ function ContactsTab({
               resetForm();
             } else {
               setConfirmDelete(null);
+              setEditingPerson(null);
               setShowForm(true);
             }
           }}
           className={`
-          flex items-center gap-2
-          px-3.5 py-2
-          rounded-xl
-          text-sm font-medium
-          transition-colors
-          shrink-0
-
-          ${showForm
-              ? 'bg-[var(--hover-2)] text-[var(--text-primary)]/70 hover:bg-[var(--hover-3)]'
-              : 'bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 shadow-md'
+            flex items-center gap-2
+            px-3.5 py-2
+            rounded-xl
+            text-sm font-medium
+            transition-colors
+            shrink-0
+            ${
+              showForm
+                ? 'bg-[var(--hover-2)] text-[var(--text-primary)]/70 hover:bg-[var(--hover-3)]'
+                : 'bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 shadow-md'
             }
-        `}
+          `}
         >
-          {showForm ? (
-            <X size={16} />
-          ) : (
-            <Plus size={16} />
-          )}
+          {showForm ? <X size={16} /> : <Plus size={16} />}
 
           <span className="hidden sm:inline">
             {showForm ? 'Отмена' : 'Добавить'}
@@ -884,37 +921,32 @@ function ContactsTab({
         </button>
       </div>
 
-      {/* ============================================================
-        CONTENT
-    ============================================================ */}
+      {/* CONTENT */}
       <div className="p-4 sm:p-6">
-
-        {/* ==========================================================
-          ADD FORM
-      ========================================================== */}
+        {/* FORM */}
         {showForm && (
           <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] p-5 sm:p-6 mb-6">
             <div className="flex items-center gap-2.5 mb-6">
               <div className="w-9 h-9 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center shrink-0">
-                <UserPlus
-                  size={17}
-                  className="text-[var(--accent)]"
-                />
+                <UserPlus size={17} className="text-[var(--accent)]" />
               </div>
 
               <div>
                 <h3 className="text-base font-semibold text-[var(--text-primary)]">
-                  Новое контактное лицо
+                  {editingPerson
+                    ? 'Редактирование контактного лица'
+                    : 'Новое контактное лицо'}
                 </h3>
 
                 <p className="text-xs text-[var(--text-primary)]/35 mt-0.5">
-                  Укажите данные сотрудника
+                  {editingPerson
+                    ? 'Измените данные сотрудника'
+                    : 'Укажите данные сотрудника'}
                 </p>
               </div>
             </div>
 
             <div className="space-y-5">
-
               {/* ФИО */}
               <div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -925,9 +957,7 @@ function ContactsTab({
 
                     <input
                       value={form.last_name}
-                      onChange={(e) =>
-                        set('last_name')(e.target.value)
-                      }
+                      onChange={(e) => set('last_name')(e.target.value)}
                       placeholder="Иванов"
                       autoComplete="family-name"
                       className={inputCls}
@@ -941,9 +971,7 @@ function ContactsTab({
 
                     <input
                       value={form.first_name}
-                      onChange={(e) =>
-                        set('first_name')(e.target.value)
-                      }
+                      onChange={(e) => set('first_name')(e.target.value)}
                       placeholder="Иван"
                       autoComplete="given-name"
                       className={inputCls}
@@ -957,9 +985,7 @@ function ContactsTab({
 
                     <input
                       value={form.middle_name}
-                      onChange={(e) =>
-                        set('middle_name')(e.target.value)
-                      }
+                      onChange={(e) => set('middle_name')(e.target.value)}
                       placeholder="Иванович"
                       className={inputCls}
                     />
@@ -975,9 +1001,7 @@ function ContactsTab({
 
                 <input
                   value={form.position}
-                  onChange={(e) =>
-                    set('position')(e.target.value)
-                  }
+                  onChange={(e) => set('position')(e.target.value)}
                   placeholder="Главный бухгалтер"
                   autoComplete="organization-title"
                   className={inputCls}
@@ -1013,9 +1037,7 @@ function ContactsTab({
                   <input
                     value={form.extension}
                     onChange={(e) =>
-                      set('extension')(
-                        e.target.value.replace(/\D/g, ''),
-                      )
+                      set('extension')(e.target.value.replace(/\D/g, ''))
                     }
                     placeholder="1234"
                     inputMode="numeric"
@@ -1039,9 +1061,7 @@ function ContactsTab({
                   <input
                     type="email"
                     value={form.email}
-                    onChange={(e) =>
-                      set('email')(e.target.value)
-                    }
+                    onChange={(e) => set('email')(e.target.value)}
                     placeholder="contact@company.ru"
                     autoComplete="email"
                     className={inputWithIconCls}
@@ -1064,9 +1084,7 @@ function ContactsTab({
 
                     <input
                       value={form.telegram}
-                      onChange={(e) =>
-                        set('telegram')(e.target.value)
-                      }
+                      onChange={(e) => set('telegram')(e.target.value)}
                       placeholder="username"
                       className={inputWithIconCls}
                     />
@@ -1086,9 +1104,7 @@ function ContactsTab({
 
                     <input
                       value={form.vk}
-                      onChange={(e) =>
-                        set('vk')(e.target.value)
-                      }
+                      onChange={(e) => set('vk')(e.target.value)}
                       placeholder="id или username"
                       className={inputWithIconCls}
                     />
@@ -1104,61 +1120,60 @@ function ContactsTab({
                 onClick={resetForm}
                 disabled={saving}
                 className="
-                px-5 py-2.5
-                rounded-xl
-                bg-[var(--hover-2)]
-                hover:bg-[var(--hover-3)]
-                text-[var(--text-primary)]/70
-                text-sm font-medium
-                transition-colors
-                disabled:opacity-50
-              "
+                  px-5 py-2.5
+                  rounded-xl
+                  bg-[var(--hover-2)]
+                  hover:bg-[var(--hover-3)]
+                  text-[var(--text-primary)]/70
+                  text-sm font-medium
+                  transition-colors
+                  disabled:opacity-50
+                "
               >
                 Отмена
               </button>
 
-                          <button
+              <button
                 type="button"
                 onClick={handleSave}
                 disabled={
                   saving ||
                   (!form.last_name.trim() &&
-                   !form.first_name.trim() &&
-                   !form.middle_name.trim())
+                    !form.first_name.trim() &&
+                    !form.middle_name.trim())
                 }
                 className="
-                min-w-[135px]
-                flex items-center justify-center gap-2
-                px-5 py-2.5
-                rounded-xl
-                bg-[var(--accent)]
-                hover:bg-[var(--accent)]/90
-                text-white
-                text-sm font-medium
-                transition-colors
-                disabled:opacity-40
-                disabled:cursor-not-allowed
-                shadow-md
-              "
+                  min-w-[135px]
+                  flex items-center justify-center gap-2
+                  px-5 py-2.5
+                  rounded-xl
+                  bg-[var(--accent)]
+                  hover:bg-[var(--accent)]/90
+                  text-white
+                  text-sm font-medium
+                  transition-colors
+                  disabled:opacity-40
+                  disabled:cursor-not-allowed
+                  shadow-md
+                "
               >
                 {saving ? (
-                  <Loader2
-                    size={16}
-                    className="animate-spin"
-                  />
+                  <Loader2 size={16} className="animate-spin" />
                 ) : (
                   <CheckCircle2 size={16} />
                 )}
 
-                {saving ? 'Сохранение...' : 'Сохранить'}
+                {saving
+                  ? 'Сохранение...'
+                  : editingPerson
+                    ? 'Сохранить изменения'
+                    : 'Сохранить'}
               </button>
             </div>
           </div>
         )}
 
-        {/* ==========================================================
-          EMPTY
-      ========================================================== */}
+        {/* EMPTY */}
         {persons.length === 0 && !showForm ? (
           <div className="text-center py-14 sm:py-16">
             <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-[var(--hover-1)] flex items-center justify-center">
@@ -1178,7 +1193,11 @@ function ContactsTab({
 
             <button
               type="button"
-              onClick={() => setShowForm(true)}
+              onClick={() => {
+                setEditingPerson(null);
+                setConfirmDelete(null);
+                setShowForm(true);
+              }}
               className="inline-flex items-center gap-1.5 text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors text-sm font-medium"
             >
               <Plus size={15} />
@@ -1186,97 +1205,111 @@ function ContactsTab({
             </button>
           </div>
         ) : (
-          /* ========================================================
-              CONTACT LIST
-          ======================================================== */
+          /* CONTACT LIST */
           persons.length > 0 && (
             <div className="space-y-3">
               {persons.map((person, i) => {
                 const telegram =
                   person.messengers?.telegram?.replace('@', '');
 
-                const isConfirmingDelete =
-                  confirmDelete === person;
+                const isConfirmingDelete = confirmDelete === person;
 
                 return (
                   <div
                     key={person.id || `${person.full_name}-${i}`}
                     className="
-                    rounded-2xl
-                    border border-[var(--border-color)]
-                    bg-[var(--hover-1)]
-                    overflow-hidden
-                  "
+                      rounded-2xl
+                      border border-[var(--border-color)]
+                      bg-[var(--hover-1)]
+                      overflow-hidden
+                    "
                   >
-                    {/* -----------------------------------------------
-                      Person header
-                  ----------------------------------------------- */}
+                    {/* Person header */}
                     <div className="flex items-start justify-between gap-4 px-5 py-4">
                       <div className="flex items-start gap-3.5 min-w-0">
-                        <Avatar
-                          name={person.full_name}
-                          size="md"
-                        />
+                        <Avatar name={person.full_name} size="md" />
 
                         <div className="min-w-0 pt-0.5">
-  <p className="text-base font-semibold text-[var(--text-primary)] break-words">
-    {person.full_name}
-  </p>
+                          <p className="text-base font-semibold text-[var(--text-primary)] break-words">
+                            {person.full_name}
+                          </p>
 
-  {person.user_id && (() => {
-    const linkedUser = customers.find(user => user.id === person.user_id);
-    const linkedUserName = linkedUser?.full_name || linkedUser?.email;
+                          {person.user_id &&
+                            (() => {
+                              const linkedUser = customers.find(
+                                (user) => user.id === person.user_id,
+                              );
+                              const linkedUserName =
+                                linkedUser?.full_name || linkedUser?.email;
 
-    return (
-      <span
-        title={
-          linkedUserName
-            ? `Связанный пользователь: ${linkedUserName}`
-            : 'Пользователь привязан'
-        }
-        className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/10 px-2.5 py-1 text-xs font-medium text-[var(--accent)]"
-      >
-        <UserCheck size={13} className="flex-shrink-0" />
-        <span className="min-w-0 whitespace-normal break-words">
-          {linkedUserName
-            ? `Пользователь: ${linkedUserName}`
-            : 'Пользователь привязан'}
-        </span>
-      </span>
-    );
-  })()}
-</div>
+                              return (
+                                <span
+                                  title={
+                                    linkedUserName
+                                      ? `Связанный пользователь: ${linkedUserName}`
+                                      : 'Пользователь привязан'
+                                  }
+                                  className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/10 px-2.5 py-1 text-xs font-medium text-[var(--accent)]"
+                                >
+                                  <UserCheck
+                                    size={13}
+                                    className="flex-shrink-0"
+                                  />
+                                  <span className="min-w-0 whitespace-normal break-words">
+                                    {linkedUserName
+                                      ? `Пользователь: ${linkedUserName}`
+                                      : 'Пользователь привязан'}
+                                  </span>
+                                </span>
+                              );
+                            })()}
+                        </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setConfirmDelete(
-                            isConfirmingDelete
-                              ? null
-                              : person,
-                          )
-                        }
-                        disabled={deleting}
-                        className="
-                        p-2
-                        rounded-xl
-                        text-[var(--text-primary)]/30
-                        hover:text-[var(--accent)]
-                        hover:bg-[var(--accent)]/10
-                        transition-colors
-                        disabled:opacity-40
-                        shrink-0
-                      "
-                        title="Удалить"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(person)}
+                          disabled={!person.id || deleting || saving}
+                          className="
+                            p-2
+                            rounded-xl
+                            text-[var(--text-primary)]/30
+                            hover:text-[var(--accent)]
+                            hover:bg-[var(--accent)]/10
+                            transition-colors
+                            disabled:opacity-40
+                          "
+                          title="Редактировать"
+                          aria-label="Редактировать контактное лицо"
+                        >
+                          <Pencil size={16} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setConfirmDelete(isConfirmingDelete ? null : person)
+                          }
+                          disabled={deleting || saving}
+                          className="
+                            p-2
+                            rounded-xl
+                            text-[var(--text-primary)]/30
+                            hover:text-[var(--accent)]
+                            hover:bg-[var(--accent)]/10
+                            transition-colors
+                            disabled:opacity-40
+                          "
+                          title="Удалить"
+                          aria-label="Удалить контактное лицо"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
 
-                    {/* -----------------------------------------------
-                      Delete confirmation
-                  ----------------------------------------------- */}
+                    {/* Delete confirmation */}
                     {isConfirmingDelete && (
                       <div className="mx-4 mb-4 rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/5 p-4">
                         <div className="flex items-start gap-3">
@@ -1291,45 +1324,42 @@ function ContactsTab({
                             </p>
 
                             <p className="text-xs text-[var(--text-primary)]/45 mt-1">
-                              {person.full_name} будет удалён из списка контактов.
+                              {person.full_name} будет удалён из списка
+                              контактов.
                             </p>
 
                             <div className="flex items-center gap-2 mt-3">
                               <button
                                 type="button"
-                                onClick={() =>
-                                  setConfirmDelete(null)
-                                }
+                                onClick={() => setConfirmDelete(null)}
                                 disabled={deleting}
                                 className="
-                                px-3 py-2
-                                rounded-lg
-                                bg-[var(--hover-2)]
-                                hover:bg-[var(--hover-3)]
-                                text-xs font-medium
-                                text-[var(--text-primary)]/65
-                                disabled:opacity-50
-                              "
+                                  px-3 py-2
+                                  rounded-lg
+                                  bg-[var(--hover-2)]
+                                  hover:bg-[var(--hover-3)]
+                                  text-xs font-medium
+                                  text-[var(--text-primary)]/65
+                                  disabled:opacity-50
+                                "
                               >
                                 Отмена
                               </button>
 
                               <button
                                 type="button"
-                                onClick={() =>
-                                  handleDelete(person)
-                                }
+                                onClick={() => handleDelete(person)}
                                 disabled={deleting}
                                 className="
-                                inline-flex items-center gap-1.5
-                                px-3 py-2
-                                rounded-lg
-                                bg-[var(--accent)]/15
-                                hover:bg-[var(--accent)]/25
-                                text-xs font-medium
-                                text-[var(--accent)]
-                                disabled:opacity-50
-                              "
+                                  inline-flex items-center gap-1.5
+                                  px-3 py-2
+                                  rounded-lg
+                                  bg-[var(--accent)]/15
+                                  hover:bg-[var(--accent)]/25
+                                  text-xs font-medium
+                                  text-[var(--accent)]
+                                  disabled:opacity-50
+                                "
                               >
                                 {deleting ? (
                                   <Loader2
@@ -1347,12 +1377,8 @@ function ContactsTab({
                       </div>
                     )}
 
-                    {/* -----------------------------------------------
-                      Contact details
-                  ----------------------------------------------- */}
+                    {/* Contact details */}
                     <div className="border-t border-[var(--border-color)] px-5 py-2">
-
-
                       {/* Position */}
                       {person.position && (
                         <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 min-h-[48px] py-2">
@@ -1393,11 +1419,11 @@ function ContactsTab({
                             <a
                               href={`tel:${person.phone}`}
                               className="
-                              text-sm font-medium
-                              text-[var(--text-primary)]
-                              hover:text-[var(--accent)]
-                              transition-colors
-                            "
+                                text-sm font-medium
+                                text-[var(--text-primary)]
+                                hover:text-[var(--accent)]
+                                transition-colors
+                              "
                             >
                               {person.phone}
                             </a>
@@ -1405,14 +1431,14 @@ function ContactsTab({
                             {person.extension && (
                               <span
                                 className="
-                                inline-flex items-center
-                                px-2 py-0.5
-                                rounded-md
-                                border border-[var(--border-color)]
-                                bg-[var(--hover-3)]
-                                text-xs font-semibold
-                                text-[var(--text-primary)]/85
-                              "
+                                  inline-flex items-center
+                                  px-2 py-0.5
+                                  rounded-md
+                                  border border-[var(--border-color)]
+                                  bg-[var(--hover-3)]
+                                  text-xs font-semibold
+                                  text-[var(--text-primary)]/85
+                                "
                               >
                                 доб. {person.extension}
                               </span>
@@ -1439,12 +1465,12 @@ function ContactsTab({
                             <a
                               href={`mailto:${person.email}`}
                               className="
-                              text-sm font-medium
-                              text-[var(--text-primary)]
-                              hover:text-[var(--accent)]
-                              transition-colors
-                              break-all
-                            "
+                                text-sm font-medium
+                                text-[var(--text-primary)]
+                                hover:text-[var(--accent)]
+                                transition-colors
+                                break-all
+                              "
                             >
                               {person.email}
                             </a>
@@ -1472,12 +1498,12 @@ function ContactsTab({
                               target="_blank"
                               rel="noopener noreferrer"
                               className="
-                              inline-flex items-center gap-1.5
-                              text-sm font-medium
-                              text-[var(--text-primary)]
-                              hover:text-[var(--accent)]
-                              transition-colors
-                            "
+                                inline-flex items-center gap-1.5
+                                text-sm font-medium
+                                text-[var(--text-primary)]
+                                hover:text-[var(--accent)]
+                                transition-colors
+                              "
                             >
                               @{telegram}
 
@@ -1510,13 +1536,13 @@ function ContactsTab({
                               target="_blank"
                               rel="noopener noreferrer"
                               className="
-                              inline-flex items-center gap-1.5
-                              text-sm font-medium
-                              text-[var(--text-primary)]
-                              hover:text-[var(--accent)]
-                              transition-colors
-                              break-all
-                            "
+                                inline-flex items-center gap-1.5
+                                text-sm font-medium
+                                text-[var(--text-primary)]
+                                hover:text-[var(--accent)]
+                                transition-colors
+                                break-all
+                              "
                             >
                               {person.messengers.vk}
 
@@ -1550,6 +1576,7 @@ function ContactsTab({
     </div>
   );
 }
+
 
 // ─── Вкладка подразделений ───────────────────────────────────────────────────
 
