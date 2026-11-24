@@ -2,8 +2,7 @@ from typing import Annotated, Any
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Path, Query, status
-from pydantic import EmailStr
+from fastapi import APIRouter, Depends, Path, status
 
 from src.iam.dependencies import get_current_user, require_role
 from src.iam.domain.vo import UserRole
@@ -22,6 +21,7 @@ from .dependencies import (
 from .mappers import map_counterparty_product_to_response
 from .schemas import (
     BranchAdd,
+    ContactPersonEdit,
     ContactPersonIn,
     CounterpartyCreate,
     CounterpartyEdit,
@@ -133,6 +133,22 @@ async def add_contact_person(
         counterparty_id: UUID, data: ContactPersonIn, service: CounterpartyServiceDep
 ) -> CounterpartyResponse:
     return await service.add_contact_person(counterparty_id, data)
+
+
+@router.patch(
+    path="/{counterparty_id}/contact-persons/{contact_person_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=CounterpartyResponse,
+    dependencies=[Depends(require_role(REQUIRED_ROLES))],
+    summary="Редактирование контактного лица",
+)
+async def edit_contact_person(
+    counterparty_id: UUID,
+    contact_person_id: UUID,
+    data: ContactPersonEdit,
+    service: CounterpartyServiceDep,
+) -> CounterpartyResponse:
+    return await service.edit_contact_person(counterparty_id, contact_person_id, data)
 
 
 @router.delete(

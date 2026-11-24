@@ -28,8 +28,8 @@ def test_valid_full_names_are_normalized(input_str: str, expected_normalized: st
     [
         ("", "cannot be empty"),
         ("   ", "cannot be empty"),
-        ("Иван", "at least first and last name"),
-        ("И", "at least first and last name"),
+        ("иван", "at least 2 parts"),
+        ("И", "at least 2 parts"),
         ("Иван123 Иванов", "Invalid characters"),
         ("Иван @ Иванов", "Invalid characters"),
         ("Иван Иванов!", "Invalid characters"),
@@ -88,6 +88,11 @@ def test_minimal_name_two_parts():
     name = FullName("Ли Чжан")
     assert name == "Ли Чжан"
     assert name.middle_name is None
+
+
+def test_single_part_user_name_is_rejected():
+    with pytest.raises(ValueError, match="at least 2 parts"):
+        FullName("Иван")
 
 
 def test_multiple_middle_names():
