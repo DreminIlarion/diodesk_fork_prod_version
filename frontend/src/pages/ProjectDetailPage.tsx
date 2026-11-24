@@ -661,7 +661,7 @@ function ProjectEditModal({
 
                 {canChangeCreator && (
                   <ProjectUserPicker
-                    label="Создатель проекта"
+                    label="Ответственный проекта"
                     value={creatorId}
                     options={users}
                     loading={loadingUsers}
@@ -1646,7 +1646,7 @@ export default function ProjectDetailPage() {
               <div className="min-w-0 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
                 <p className="mb-4 flex items-center gap-2 text-sm text-[var(--text-muted)]">
                   <User className="h-4 w-4" />
-                  Создатель
+                  Ответственный
                 </p>
 
                 {creatorDisplay ? (
