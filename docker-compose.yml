@@ -43,24 +43,7 @@ services:
       options:
         max-size: "1m"
 
-  minio:
-    image: quay.io/minio/minio
-    container_name: minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY_ID}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_ACCESS_KEY}
-    volumes:
-      - ./.docker/minio-data:/data
-    ports:
-      - "9902:9000"
-      - "9903:9001"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+  
 
   languagetool:
     image: erikvl87/languagetool:latest
@@ -105,8 +88,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      MINIO_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY_ID}
-      MINIO_SECRET_ACCESS_KEY: ${MINIO_SECRET_ACCESS_KEY}
+
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
@@ -135,8 +117,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
-        condition: service_healthy
+     
       languagetool:
         condition: service_healthy
       rabbitmq:                          
@@ -162,13 +143,12 @@ services:
       - ./backups:/backups
       - ./scripts/backup_script.sh:/app/backup.sh:ro
       - ./.env:/app/.env:ro
-      - ./.docker/minio-data:/minio_data:ro
+
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
-      - MINIO_ACCESS_KEY_ID=${MINIO_ACCESS_KEY_ID}
-      - MINIO_SECRET_ACCESS_KEY=${MINIO_SECRET_ACCESS_KEY}
+
       - YANDEX_S3_BUCKET=backups
       - YANDEX_S3_ENDPOINT=https://storage.yandexcloud.net
     command: |

@@ -18,10 +18,6 @@ PGPASSWORD="${POSTGRES_PASSWORD}" pg_dump \
     -f "${BACKUP_DIR}/postgres_${TIMESTAMP}.dump"
 log "PostgreSQL dump created: ${BACKUP_DIR}/postgres_${TIMESTAMP}.dump"
 
-# 2. Бэкап MinIO (tar.gz всей папки данных)
-log "Backing up MinIO data..."
-tar -czf "${BACKUP_DIR}/minio_${TIMESTAMP}.tar.gz" -C /minio_data .
-log "MinIO backup created: ${BACKUP_DIR}/minio_${TIMESTAMP}.tar.gz"
 
 # 3. Удаление старых локальных копий
 log "Removing backups older than ${RETENTION_DAYS} days..."
@@ -38,7 +34,6 @@ if [ ! -z "$AWS_ACCESS_KEY_ID" ]; then
     aws --endpoint-url "${YANDEX_S3_ENDPOINT}" s3 sync "${BACKUP_DIR}/" "s3://${YANDEX_S3_BUCKET}/latest/" --delete
     # или загружать каждый файл отдельно с меткой даты
     aws --endpoint-url "${YANDEX_S3_ENDPOINT}" s3 cp "${BACKUP_DIR}/postgres_${TIMESTAMP}.dump" "s3://${YANDEX_S3_BUCKET}/daily/postgres_${TIMESTAMP}.dump"
-    aws --endpoint-url "${YANDEX_S3_ENDPOINT}" s3 cp "${BACKUP_DIR}/minio_${TIMESTAMP}.tar.gz" "s3://${YANDEX_S3_BUCKET}/daily/minio_${TIMESTAMP}.tar.gz"
     log "Upload complete."
 fi
 

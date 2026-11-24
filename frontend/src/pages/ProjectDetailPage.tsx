@@ -52,7 +52,7 @@ type ProjectMember = {
 const PROJECT_ROLES = [
   {
     value: 'owner',
-    label: 'Владелец',
+    label: 'Ответственный',
     color: 'text-[var(--accent)]',
     bg: 'bg-[var(--accent-soft)]',
     border: 'border-[var(--accent)]/20',
@@ -1042,7 +1042,7 @@ export default function ProjectDetailPage() {
                 <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--hover-1)] p-5">
                   <p className="mb-4 flex items-center gap-2 text-sm text-[var(--text-muted)]">
                     <Crown className="h-4 w-4" />
-                    Владелец
+                    Ответственный
                   </p>
 
                   {ownerDisplay ? (
