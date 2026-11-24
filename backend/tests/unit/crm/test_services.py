@@ -146,8 +146,9 @@ async def test_delete_contact_person_success(created_counterparty, counterparty_
 
     assert len(response.contact_persons) == 1 + 1
 
+    contact_id = next(person.id for person in response.contact_persons if person.email == data.email)
     response = await counterparty_service.delete_contact_person(
-        counterparty_id=response.id, phone="88005553535", email="ivanov.ivan@example.com"
+        counterparty_id=response.id, contact_person_id=contact_id
     )
 
     assert len(response.contact_persons) == 1
