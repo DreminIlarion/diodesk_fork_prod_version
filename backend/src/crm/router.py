@@ -31,8 +31,7 @@ from .schemas import (
     CounterpartyResponse,
 )
 
-REQUIRED_ROLES = {UserRole.ADMIN, UserRole.SUPPORT_MANAGER, UserRole.ACCOUNT_MANAGER}
-
+REQUIRED_ROLES = UserRole.staff_roles() | {UserRole.CUSTOMER_ADMIN}
 router = APIRouter(prefix="/counterparties", tags=["Контрагенты"])
 
 

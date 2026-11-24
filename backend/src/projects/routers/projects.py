@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
-
+from src.iam.domain.vo import UserRole
 from src.iam.dependencies import CurrentSubjectDep, get_current_subject, require_role
 from src.iam.domain.constants import SUPPORT_MANAGER_OR_ABOVE
 from src.shared.schemas import Page
@@ -140,7 +140,7 @@ async def get_project(project: ProjectDep) -> ProjectResponse:
     path="",
     status_code=status.HTTP_200_OK,
     response_model=Page[ProjectResponse],
-    dependencies=[Depends(require_role(SUPPORT_MANAGER_OR_ABOVE))],
+    dependencies=[Depends(require_role(UserRole.staff_roles() | {UserRole.CUSTOMER_ADMIN}))],
     summary="Пагинация проектов"
 )
 async def get_projects(page: ProjectsPageDep) -> Page[ProjectResponse]:

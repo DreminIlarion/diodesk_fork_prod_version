@@ -192,7 +192,7 @@ class Phone:
 class ContactPersonFullName(FullName):
     """ФИО контакта: достаточно одной заполненной части"""
     MIN_PARTS: ClassVar[int] = 1
-
+    
 
 @dataclass(kw_only=True)
 class ContactPerson(Entity):

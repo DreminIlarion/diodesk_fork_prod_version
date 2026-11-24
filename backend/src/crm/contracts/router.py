@@ -9,8 +9,7 @@ from src.shared.schemas import Page
 from .dependencies import ContractRepoDep, ContractServiceDep, paginate_contracts
 from .schemas import ContractCreate, ContractResponse, ContractUpdate
 
-REQUIRED_ROLES = {UserRole.ADMIN, UserRole.SUPPORT_MANAGER, UserRole.ACCOUNT_MANAGER}
-
+REQUIRED_ROLES = UserRole.staff_roles() | {UserRole.CUSTOMER_ADMIN}
 router = APIRouter(prefix="/contracts", tags=["Договоры"])
 
 

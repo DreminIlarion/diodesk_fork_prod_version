@@ -1244,8 +1244,7 @@ function parseNotificationStreamData(raw: string): NotificationStreamPayload | n
     return null;
   }
 }
-const NOTIFICATIONS_BASE = 'http://10.1.50.109:8001';
-
+const NOTIFICATIONS_BASE = 'http://10.1.50.109:8001/api/v1';
 export const notificationsApi = {
   getAll: async (page = 1, size = 20, unreadOnly = false) => {
     const response = await api.get(`${NOTIFICATIONS_BASE}/notifications`, {
