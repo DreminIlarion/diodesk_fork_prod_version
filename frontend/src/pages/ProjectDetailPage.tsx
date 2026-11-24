@@ -1230,15 +1230,19 @@ export default function ProjectDetailPage() {
     };
   };
 
-  const ownerMember =
-    members.find(member => member.user_id === project?.owner_id) ??
-    members.find(member => member.project_role === 'owner');
+const ownerMember = project
+  ? members.find(member => member.user_id === project.owner_id) ??
+    members.find(member => member.project_role === 'owner')
+  : undefined;
 
-  const ownerDisplay =
-    resolveUserById(project.owner_id) ??
-    (ownerMember ? resolveDisplay(ownerMember) : null);
+const ownerDisplay = project
+  ? resolveUserById(project.owner_id) ??
+    (ownerMember ? resolveDisplay(ownerMember) : null)
+  : null;
 
-  const creatorDisplay = resolveUserById(project.created_by);
+const creatorDisplay = project
+  ? resolveUserById(project.created_by)
+  : null;
 
   const filteredAvailable = availableUsers.filter(item => {
     const query = searchUser.trim().toLowerCase();
