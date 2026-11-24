@@ -22,8 +22,8 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 PROMPTS_DIR = BASE_DIR / "prompts"
 
 # Имя основного S3 бакета
-S3_BUCKET_NAME = "diocon-tickets-uploads"
-S3_BACKUPS_BUCKET_NAME = "diocon-tickets-backups"
+S3_BUCKET_NAME = "dio-desk-uploads"
+S3_BACKUPS_BUCKET_NAME = "dio-desk-uploads"
 
 
 class PostgresSettings(BaseSettings):
@@ -196,4 +196,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-print(settings.rabbit.url)
