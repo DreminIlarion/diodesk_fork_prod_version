@@ -18,7 +18,9 @@ from ..infra.repos import SqlProjectStageAssigneeRepository
 
 from ..domain.authz import ProjectAuthZService
 from ..domain.entities import Project
-from ..domain.repos import ProjectMemberRepository, ProjectRepository, UserRepository
+from src.iam.domain.repos import UserRepository
+
+from ..domain.repos import ProjectMemberRepository, ProjectRepository
 from ..domain.services import generate_key_suggestions
 from ..domain.vo import MemberRole, ProjectKey, ProjectStatus
 from ..mappers import (
