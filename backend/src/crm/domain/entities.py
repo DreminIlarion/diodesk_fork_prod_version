@@ -113,14 +113,14 @@ class Counterparty(Entity):
         return self.parent_id is not None
 
     def edit(
-            self,
-            *,
-            name: str | None = None,
-            legal_name: str | None = None,
-            okpo: Okpo | None = None,
-            phone: Phone | None = None,
-            email: EmailStr | None = None,
-            address: str | None = None,
+        self,
+        *,
+        name: str | None = None,
+        legal_name: str | None = None,
+        okpo: Okpo | None = None,
+        phone: Phone | None = None,
+        email: EmailStr | None = None,
+        address: str | None = None,
     ) -> None:
         """
         Редактирование основных данных контрагента.
@@ -157,15 +157,15 @@ class Counterparty(Entity):
             self.updated_at = current_datetime()
 
     def create_branch(
-            self,
-            name: str,
-            legal_name: str,
-            kpp: str,
-            phone: str,
-            email: EmailStr,
-            okpo: str | None = None,
-            address: str | None = None,
-    ) -> "Counterparty":
+        self,
+        name: str,
+        legal_name: str,
+        kpp: str,
+        phone: str | None,
+        email: EmailStr,
+        okpo: str | None = None,
+        address: str | None = None,
+    ) -> Counterparty:
         """Создание обособленного подразделения с привязкой к контрагенту"""
 
         if self.counterparty_type != CounterpartyType.LEGAL_ENTITY:
@@ -180,22 +180,22 @@ class Counterparty(Entity):
             inn=self.inn,
             kpp=Kpp(kpp),
             okpo=None if okpo is None else Okpo(okpo),
-            phone=Phone(phone),
+            phone=Phone(phone) if phone is not None else None,
             email=email,
             address=address,
-            parent_id=self.id
+            parent_id=self.id,
         )
 
     def add_contact_person(
-            self,
-            first_name: str | None = None,
-            last_name: str | None = None,
-            phone: str | None = None,
-            email: str | None = None,
-            middle_name: str | None = None,
-            messengers: dict[str, str] | None = None,
-            position: str | None = None,       # ← добавить
-            extension: str | None = None,
+        self,
+        first_name: str | None = None,
+        last_name: str | None = None,
+        phone: str | None = None,
+        email: str | None = None,
+        middle_name: str | None = None,
+        messengers: dict[str, str] | None = None,
+        position: str | None = None,  # ← добавить
+        extension: str | None = None,
     ) -> Self:
         """Добавления контактного лица"""
 
@@ -248,11 +248,15 @@ class Counterparty(Entity):
             messengers=messengers.copy(),
         )
         editable_fields = (
-            "full_name", "phone", "email", "position", "extension", "messengers",
+            "full_name",
+            "phone",
+            "email",
+            "position",
+            "extension",
+            "messengers",
         )
         if all(
-            getattr(candidate, name) == getattr(contact_person, name)
-            for name in editable_fields
+            getattr(candidate, name) == getattr(contact_person, name) for name in editable_fields
         ):
             return False
 
@@ -270,13 +274,9 @@ class Counterparty(Entity):
                 self.updated_at = current_datetime()
                 return
 
-        raise NotFoundError(
-            f"Contact person with ID {contact_person_id} not found"
-        )
+        raise NotFoundError(f"Contact person with ID {contact_person_id} not found")
 
-    def link_contact_person_user(
-        self, contact_person_id: UUID, user_id: UUID
-    ) -> None:
+    def link_contact_person_user(self, contact_person_id: UUID, user_id: UUID) -> None:
         person = next(
             (p for p in self.contact_persons if p.id == contact_person_id),
             None,

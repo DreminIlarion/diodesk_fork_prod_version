@@ -20,7 +20,7 @@ def map_user_to_response(user: User) -> UserResponse:
 def map_user_to_reference(user: User) -> UserReference:
     return UserReference(
         id=user.id,
-        full_name=user.full_name.value if user.full_name else None,
+        full_name=user.full_name.value if user.full_name else "",
         email=user.email.value,
         type=user.type,
     )

@@ -16,13 +16,13 @@ from ..domain.vo import AggregateType, CommentVisibility
 class CommentOrm(EntityMixin, Base):
     __tablename__ = "comments"
 
-    aggregate_type: Mapped[AggregateType | None] = mapped_column(Enum(AggregateType), nullable=True)
+    aggregate_type: Mapped[AggregateType | None] = mapped_column(
+        Enum(AggregateType), nullable=True
+    )
     aggregate_id: Mapped[UUID | None] = mapped_column(nullable=True)
 
-    ticket_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("tickets.id"), nullable=True
-    )
-    ticket: Mapped["TicketOrm | None"] = relationship(
+    ticket_id: Mapped[UUID | None] = mapped_column(ForeignKey("tickets.id"), nullable=True)
+    ticket: Mapped[TicketOrm | None] = relationship(
         "TicketOrm", back_populates="comments", foreign_keys=[ticket_id]
     )
 
@@ -35,13 +35,15 @@ class CommentOrm(EntityMixin, Base):
         ForeignKey("comments.id"), nullable=True
     )
 
-    parent_comment: Mapped["CommentOrm | None"] = relationship(
-        remote_side="CommentOrm.id", back_populates="replies", lazy="selectin",
+    parent_comment: Mapped[CommentOrm | None] = relationship(
+        remote_side="CommentOrm.id",
+        back_populates="replies",
+        lazy="selectin",
     )
-    replies: Mapped[list["CommentOrm"]] = relationship(
+    replies: Mapped[list[CommentOrm]] = relationship(
         back_populates="parent_comment", lazy="selectin"
     )
-    attachments: Mapped[list["AttachmentOrm"]] = relationship(
+    attachments: Mapped[list[AttachmentOrm]] = relationship(
         primaryjoin=(
             "and_(AttachmentOrm.owner_type=='comment', "
             "foreign(AttachmentOrm.owner_id)==CommentOrm.id)"
@@ -49,11 +51,9 @@ class CommentOrm(EntityMixin, Base):
         viewonly=True,
         lazy="selectin",
     )
-    reactions: Mapped[list["ReactionOrm"]] = relationship(back_populates="comment")
+    reactions: Mapped[list[ReactionOrm]] = relationship(back_populates="comment")
 
-    __table_args__ = (
-        Index("ix_comments_parent_comment_id", "parent_comment_id"),
-    )
+    __table_args__ = (Index("ix_comments_parent_comment_id", "parent_comment_id"),)
 
 
 class ReactionOrm(EntityMixin, Base):
@@ -63,11 +63,9 @@ class ReactionOrm(EntityMixin, Base):
     author_id: Mapped[UUID]
     emoji: Mapped[str]
 
-    comment: Mapped["CommentOrm"] = relationship(back_populates="reactions")
+    comment: Mapped[CommentOrm] = relationship(back_populates="reactions")
 
     __table_args__ = (
-        UniqueConstraint(
-            "comment_id", "author_id", "emoji", name="uq_comment_reaction"
-        ),
+        UniqueConstraint("comment_id", "author_id", "emoji", name="uq_comment_reaction"),
         Index("ix_reactions_comment_author", "comment_id", "author_id"),
     )

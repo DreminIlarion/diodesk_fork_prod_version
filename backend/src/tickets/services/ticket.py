@@ -133,7 +133,6 @@ class TicketService:
 
         tags = [Tag(name=tag.name, color=tag.color) for tag in data.tags]
         ticket = Ticket.create(
-
             number=number,
             created_by=current_subject.id,
             reporter_id=data.reporter_id,

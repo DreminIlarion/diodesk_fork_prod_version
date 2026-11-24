@@ -1,3 +1,5 @@
+from ddf.infra.database.sqlalchemy.data_mapper import DataMapper
+
 from src.comments.infra.models import CommentOrm, ReactionOrm
 from src.media.infra.repo import AttachmentMapper
 from src.shared.domain.vo import Tag
@@ -46,41 +48,41 @@ class CommentMapper(ModelMapper[Comment, CommentOrm]):
         )
 
 
-class TicketMapper(ModelMapper[Ticket, TicketOrm]):
-    @staticmethod
-    def to_entity(model: TicketOrm) -> Ticket:
-        return Ticket(
-            id=model.id,
-            created_at=model.created_at,
-            updated_at=model.updated_at,
-            deleted_at=model.deleted_at,
-            project_id=model.project_id,
-            stage_id=model.stage_id,
-            counterparty_id=model.counterparty_id,
-            product_id=model.product_id,
-            created_by=model.created_by,
-            approved_by=model.approved_by,
-            resolved_by=model.resolved_by,
-            closed_by=model.closed_by,
-            reporter_id=model.reporter_id,
-            number=TicketNumber(model.number),
-            title=model.title,
-            description=model.description,
-            type=model.ticket_type,
-            status=model.status,
-            priority=model.priority,
-            assignee_id=model.assignee_id,
-            approved_at=model.approved_at,
-            resolved_at=model.resolved_at,
-            closed_at=model.closed_at,
-            tags=[Tag(name=tag["name"], color=tag["color"]) for tag in model.tags],
-            attachments=[
-                AttachmentMapper.to_entity(attachment) for attachment in model.attachments
-            ],
-        )
+class TicketMapper(DataMapper[Ticket, TicketOrm]):
+    # @staticmethod
+    # def from_model(model: TicketOrm) -> Ticket:
+    #     return Ticket(
+    #         id=model.id,
+    #         created_at=model.created_at,
+    #         updated_at=model.updated_at,
+    #         deleted_at=model.deleted_at,
+    #         project_id=model.project_id,
+    #         stage_id=model.stage_id,
+    #         counterparty_id=model.counterparty_id,
+    #         product_id=model.product_id,
+    #         created_by=model.created_by,
+    #         approved_by=model.approved_by,
+    #         resolved_by=model.resolved_by,
+    #         closed_by=model.closed_by,
+    #         reporter_id=model.reporter_id,
+    #         number=TicketNumber(model.number),
+    #         title=model.title,
+    #         description=model.description,
+    #         type=model.ticket_type,
+    #         status=model.status,
+    #         priority=model.priority,
+    #         assignee_id=model.assignee_id,
+    #         approved_at=model.approved_at,
+    #         resolved_at=model.resolved_at,
+    #         closed_at=model.closed_at,
+    #         tags=[Tag(name=tag["name"], color=tag["color"]) for tag in model.tags],
+    #         attachments=[
+    #             AttachmentMapper.to_entity(attachment) for attachment in model.attachments
+    #         ],
+    #     )
 
     @staticmethod
-    def to_light(model: TicketOrm) -> Ticket:
+    def from_model(model: TicketOrm) -> Ticket:
         return Ticket(
             id=model.id,
             created_at=model.created_at,
@@ -108,11 +110,10 @@ class TicketMapper(ModelMapper[Ticket, TicketOrm]):
             tags=[Tag(name=tag["name"], color=tag["color"]) for tag in model.tags],
             attachments=[],
             has_attachments=bool(model.has_attachments),
-
         )
 
     @staticmethod
-    def from_entity(entity: Ticket) -> TicketOrm:
+    def to_model(entity: Ticket) -> TicketOrm:
         return TicketOrm(
             id=entity.id,
             created_at=entity.created_at,
@@ -143,16 +144,8 @@ class TicketMapper(ModelMapper[Ticket, TicketOrm]):
             ],
         )
 
-    def from_model(self, model: TicketOrm) -> Ticket:
-        """Map list-query rows without loading attachment relationships."""
 
-        return self.to_light(model)
-
-    def to_model(self, entity: Ticket) -> TicketOrm:
-        return self.from_entity(entity)
-
-
-class ReactionMapper(ModelMapper[Reaction, ReactionOrm]):
+class ReactionMapper(DataMapper[Reaction, ReactionOrm]):
     @staticmethod
     def to_entity(model: ReactionOrm) -> Reaction:
         return Reaction(

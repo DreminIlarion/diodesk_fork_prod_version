@@ -48,6 +48,14 @@ class SqlTicketRepository(DdfSqlAlchemyRepository[Ticket, TicketOrm]):
     filter_whitelist: ClassVar[tuple[str, ...]] = TICKET_FILTER_WHITELIST
 
     @override
+    async def create(self, entity: Ticket) -> Ticket:
+        model = self.data_mapper.to_model(entity)
+        self._session.add(model)
+        await self._session.flush()
+        await self._session.refresh(model, attribute_names=["has_attachments"])
+        return self.data_mapper.from_model(model)
+
+    @override
     async def read(self, ticket_id: UUID) -> Ticket | None:
         stmt = (
             select(self.model)
@@ -57,7 +65,7 @@ class SqlTicketRepository(DdfSqlAlchemyRepository[Ticket, TicketOrm]):
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
 
-        return None if model is None else TicketMapper.to_entity(model)
+        return None if model is None else self.data_mapper.from_model(model)
 
     @override
     async def paginate(
