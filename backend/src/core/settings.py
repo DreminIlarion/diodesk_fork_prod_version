@@ -21,10 +21,6 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 # Промпты для AI моделей
 PROMPTS_DIR = BASE_DIR / "prompts"
 
-# Имя основного S3 бакета
-S3_BUCKET_NAME = "dio-desk-uploads"
-S3_BACKUPS_BUCKET_NAME = "dio-desk-uploads"
-
 
 class PostgresSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="POSTGRES_")
@@ -39,6 +35,17 @@ class PostgresSettings(BaseSettings):
     @property
     def sqlalchemy_url(self) -> str:
         return f"postgresql+{self.driver}://{self.user}:{self.password}@{self.host}:{self.port}/{self.db}"
+
+
+class S3Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="S3_")
+
+    service_name: str = "s3"
+    access_key: str = ""
+    secret_key: str = ""
+    backups_bucket_name: str = "diocon-tickets-backups"
+    bucket_name: str = "diocon-tickets-uploads"
+    endpoint_url: str = "https://storage.yandexcloud.net/"
 
 
 class RedisSettings(BaseSettings):
@@ -193,6 +200,7 @@ class Settings(BaseSettings):
     language_tool: LanguageToolSettings = LanguageToolSettings()
     embeddings: EmbeddingsSettings = EmbeddingsSettings()
     admin: AdminSettings = AdminSettings()
+    s3: S3Settings = S3Settings()
 
 
 settings = Settings()
