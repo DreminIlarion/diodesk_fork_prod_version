@@ -46,7 +46,12 @@ class ProjectUpdate(BaseModel):
 
     name: str | None = Field(None, description="Наименование проекта")
     description: str | None = Field(None, description="Описание проекта")
-
+    owner_id: UUID | None = Field(
+        None, description="Новый владелец проекта (admin/support_manager или текущий владелец)"
+    )
+    created_by: UUID | None = Field(
+        None, description="Новый создатель проекта (только admin/support_manager)"
+    )
 
 class ProjectMemberResponse(BaseModel):
     """

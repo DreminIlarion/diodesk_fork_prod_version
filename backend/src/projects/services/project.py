@@ -4,8 +4,13 @@ from sqlalchemy.exc import IntegrityError
 
 from src.iam.domain.authz import Subject
 from src.iam.domain.exceptions import PermissionDeniedError
+from src.iam.domain.vo import UserRole
 from src.shared.domain.events import EventPublisher
-from src.shared.domain.exceptions import AlreadyExistsError, NotFoundError
+from src.shared.domain.exceptions import (
+    AlreadyExistsError,
+    InvariantViolationError,
+    NotFoundError,
+)
 from src.shared.domain.repos import UnitOfWork, finalize, get_or_raise_404
 from src.shared.schemas import Page
 
@@ -13,7 +18,7 @@ from ..infra.repos import SqlProjectStageAssigneeRepository
 
 from ..domain.authz import ProjectAuthZService
 from ..domain.entities import Project
-from ..domain.repos import ProjectMemberRepository, ProjectRepository
+from ..domain.repos import ProjectMemberRepository, ProjectRepository, UserRepository
 from ..domain.services import generate_key_suggestions
 from ..domain.vo import MemberRole, ProjectKey, ProjectStatus
 from ..mappers import (
@@ -43,6 +48,7 @@ class ProjectService:
             member_repo: ProjectMemberRepository,
             stage_assignee_repo: SqlProjectStageAssigneeRepository,
             event_publisher: EventPublisher,
+            user_repo: UserRepository,
     ) -> None:
         self.uow = uow
         self.project_repo = project_repo
@@ -50,15 +56,11 @@ class ProjectService:
         self.stage_assignee_repo = stage_assignee_repo
         self.authz_service = ProjectAuthZService(member_repo)
         self.event_publisher = event_publisher
+        self.user_repo = user_repo
 
     async def generate_key_suggestions(
             self, original_key: str, max_attempts: int = 5, min_key_length: int = 3
     ) -> list[str]:
-        """
-        Генерация списка альтернативных ключей проекта в стиле Jira.
-        Для избежания коллизий при создании проекта.
-        """
-
         candidates = generate_key_suggestions(
             original_key, max_attempts=max_attempts, min_key_length=min_key_length
         )
@@ -66,10 +68,6 @@ class ProjectService:
         return [key for key in candidates if key not in existing][:max_attempts]
 
     async def check_key(self, key: str) -> KeyCheckResult:
-        """
-        Проверяет ключ на уникальность перед созданием.
-        """
-
         key = ProjectKey(key)
         project = await self.project_repo.get_by_key(key)
         if project is None:
@@ -81,10 +79,6 @@ class ProjectService:
     async def create(
             self, data: ProjectCreate, current_subject: Subject, max_attempts: int = 5,
     ) -> ProjectDetailedResponse:
-        """
-        Создать проект с уникальным ключом.
-        """
-
         permission = self.authz_service.can_create_project(current_subject)
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
@@ -148,6 +142,38 @@ class ProjectService:
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
 
+        # created_by может менять только admin/support_manager
+        if data.created_by is not None and data.created_by != project.created_by:
+            if UserRole.ADMIN not in current_subject.roles and \
+                    UserRole.SUPPORT_MANAGER not in current_subject.roles:
+                raise PermissionDeniedError(
+                    "Only admin or support_manager can change created_by"
+                )
+            new_creator = await self.user_repo.read(data.created_by)
+            if new_creator is None:
+                raise NotFoundError(f"User with ID {data.created_by} not found")
+            project.change_created_by(data.created_by)
+
+        # owner_id — проверка user + добавление в project_members
+        if data.owner_id is not None and data.owner_id != project.owner_id:
+            new_owner = await self.user_repo.read(data.owner_id)
+            if new_owner is None:
+                raise NotFoundError(f"User with ID {data.owner_id} not found")
+            if not new_owner.is_active:
+                raise InvariantViolationError(
+                    "Cannot assign inactive user as project owner"
+                )
+            project.change_owner(data.owner_id)
+
+            existing_member = await self.member_repo.find(project.id, data.owner_id)
+            if existing_member is None:
+                new_member = project.create_member(
+                    user_id=data.owner_id,
+                    roles=[MemberRole.OWNER],
+                    created_by=current_subject.id,
+                )
+                await self.member_repo.create(new_member)
+
         project.edit(
             name=data.name,
             description=data.description,
@@ -163,10 +189,6 @@ class ProjectService:
         return map_project_to_response(project)
 
     async def archive(self, project_id: UUID, current_subject: Subject) -> ProjectResponse:
-        """
-        Перенести проект в архив (мягкое удаление).
-        """
-
         project = await get_or_raise_404(self.project_repo.read, project_id, Project)
 
         permission = await self.authz_service.can_archive_project(
@@ -180,7 +202,7 @@ class ProjectService:
         await finalize(self.uow, project, event_publisher=self.event_publisher)
 
         return map_project_to_response(project)
-    
+
     async def change_status(
             self, project_id: UUID, new_status: ProjectStatus, current_subject: Subject,
     ) -> ProjectResponse:
@@ -195,13 +217,8 @@ class ProjectService:
     async def add_stage(
             self, project_id: UUID, data: ProjectStageCreate, current_subject: Subject
     ) -> ProjectResponse:
-        """
-        Добавить новый этап в проект.
-        """
-
         project = await get_or_raise_404(self.project_repo.read, project_id, Project)
 
-        # 🔥 ИСПРАВЛЕНО: project → project_id
         permission = await self.authz_service.can_manage_project(
             subject=current_subject, project_id=project.id
         )
@@ -223,13 +240,8 @@ class ProjectService:
     async def reorder_stages(
             self, project_id: UUID, new_order: list[list[UUID]], current_subject: Subject
     ) -> ProjectResponse:
-        """
-        Изменить порядок проведения этапов.
-        """
-
         project = await get_or_raise_404(self.project_repo.read, project_id, Project)
 
-        # 🔥 ИСПРАВЛЕНО: project → project_id
         permission = await self.authz_service.can_manage_project(
             subject=current_subject, project_id=project.id
         )
@@ -245,13 +257,8 @@ class ProjectService:
     async def start_stage(
             self, project_id: UUID, stage_id: UUID, current_subject: Subject
     ) -> ProjectResponse:
-        """
-        Начать новую стадию проекта.
-        """
-
         project = await get_or_raise_404(self.project_repo.read, project_id, Project)
 
-        # 🔥 ИСПРАВЛЕНО: project → project_id
         permission = await self.authz_service.can_manage_project(
             subject=current_subject, project_id=project.id
         )
@@ -267,13 +274,8 @@ class ProjectService:
     async def complete_stage(
             self, project_id: UUID, stage_id: UUID, current_subject: Subject
     ) -> ProjectResponse:
-        """
-        Успешно завершает стадию проекта.
-        """
-
         project = await get_or_raise_404(self.project_repo.read, project_id, Project)
 
-        # 🔥 ИСПРАВЛЕНО: project → project_id
         permission = await self.authz_service.can_manage_project(
             subject=current_subject, project_id=project.id
         )
@@ -289,13 +291,8 @@ class ProjectService:
     async def skip_stage(
             self, project_id: UUID, stage_id: UUID, current_subject: Subject
     ) -> ProjectResponse:
-        """
-        Пропустить этап проекта.
-        """
-
         project = await get_or_raise_404(self.project_repo.read, project_id, Project)
 
-        # 🔥 ИСПРАВЛЕНО: project → project_id
         permission = await self.authz_service.can_manage_project(
             subject=current_subject, project_id=project.id
         )
@@ -311,7 +308,6 @@ class ProjectService:
     async def pause_stage(
             self, project_id: UUID, stage_id: UUID, current_subject: Subject
     ) -> ProjectResponse:
-        """Приостановить этап."""
         project = await get_or_raise_404(self.project_repo.read, project_id, Project)
 
         permission = await self.authz_service.can_manage_project(
@@ -329,7 +325,6 @@ class ProjectService:
     async def resume_stage(
             self, project_id: UUID, stage_id: UUID, current_subject: Subject
     ) -> ProjectResponse:
-        """Возобновить этап после паузы."""
         project = await get_or_raise_404(self.project_repo.read, project_id, Project)
 
         permission = await self.authz_service.can_manage_project(
@@ -347,13 +342,8 @@ class ProjectService:
     async def remove_stage(
             self, project_id: UUID, stage_id: UUID, current_subject: Subject
     ) -> ProjectResponse:
-        """
-        Удалить этап проекта.
-        """
-
         project = await get_or_raise_404(self.project_repo.read, project_id, Project)
 
-        # 🔥 ИСПРАВЛЕНО: project → project_id
         permission = await self.authz_service.can_manage_project(
             subject=current_subject, project_id=project.id
         )
@@ -373,13 +363,8 @@ class ProjectService:
             data: ProjectStageUpdate,
             current_subject: Subject,
     ) -> ProjectStageResponse:
-        """
-        Отредактировать содержание этапа
-        """
-
         project = await get_or_raise_404(self.project_repo.read, project_id, Project)
 
-        # 🔥 ИСПРАВЛЕНО: project → project_id
         permission = await self.authz_service.can_manage_project(
             subject=current_subject, project_id=project.id
         )
@@ -414,13 +399,8 @@ class ProjectService:
             data: ProjectStagePlan,
             current_subject: Subject,
     ) -> ProjectStageResponse:
-        """
-        Планирование расписания этапа проекта
-        """
-
         project = await get_or_raise_404(self.project_repo.read, project_id, Project)
 
-        # 🔥 ИСПРАВЛЕНО: project → project_id
         permission = await self.authz_service.can_manage_project(
             subject=current_subject, project_id=project.id
         )
@@ -436,8 +416,6 @@ class ProjectService:
         await self.uow.commit()
 
         return map_project_stage_to_response(stage)
-
-
 
     async def set_stage_assignees(
             self,
@@ -467,7 +445,6 @@ class ProjectService:
         )
         await self.uow.commit()
 
-        # Перечитываем, чтобы вернуть актуальные assignee_ids
         project = await get_or_raise_404(self.project_repo.read, project_id, Project)
         stage = project.find_stage(stage_id)
 

@@ -51,6 +51,7 @@ def get_project_service(
         membership_repo: ProjectMemberRepoDep,
         stage_assignee_repo: StageAssigneeRepoDep,
         event_publisher: EventPublisherDep,
+        user_repo: UserRepoDep,
 ) -> ProjectService:
     return ProjectService(
         uow=session,
@@ -58,6 +59,7 @@ def get_project_service(
         member_repo=membership_repo,
         stage_assignee_repo=stage_assignee_repo,
         event_publisher=event_publisher,
+        user_repo=user_repo,
     )
 
 
