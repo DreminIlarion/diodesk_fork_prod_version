@@ -507,6 +507,10 @@ export default function NewTicketPage() {
   const [selectedProject, setSelectedProject] =
     useState<Project | null>(null);
 
+  const [workType, setWorkType] = useState('');
+const [workTypeOptions, setWorkTypeOptions] = useState<string[]>([]);
+const [loadingWorkTypes, setLoadingWorkTypes] = useState(false);
+
   const [projectStages, setProjectStages] =
     useState<ProjectStageResponse[]>([]);
 
@@ -598,6 +602,12 @@ export default function NewTicketPage() {
 
   const canSelectReporter = !isCustomer;
 
+  const workTypeCounterpartyId =
+  selectedProject?.counterparty_id ||
+  (isCustomer && customerCounterparty
+    ? customerCounterparty.id
+    : selectedCounterparty?.id);
+
   const hasDescription = descriptionBlocks.some(
     (block) =>
       (block.type === 'text' && block.value.trim().length > 0) ||
@@ -649,6 +659,10 @@ export default function NewTicketPage() {
 
       setPriority('medium');
       setType('Инцидент');
+
+      setWorkType('');
+setWorkTypeOptions([]);
+setLoadingWorkTypes(false);
       setTags([]);
       setGeneralFiles([]);
 
@@ -971,6 +985,59 @@ export default function NewTicketPage() {
     selectedCounterparty?.id,
     selectedProject?.counterparty_id,
   ]);
+
+  useEffect(() => {
+  setWorkType('');
+  setWorkTypeOptions([]);
+
+  if (!workTypeCounterpartyId) {
+    setLoadingWorkTypes(false);
+    return;
+  }
+
+  let cancelled = false;
+  setLoadingWorkTypes(true);
+
+  contractsApi
+    .list({
+      counterparty_id: workTypeCounterpartyId,
+      page: 1,
+      size: 100,
+    })
+    .then((res) => {
+      if (cancelled) return;
+
+      const activeContracts = (res.items ?? []).filter(
+        (contract) =>
+          contract.status === 'Договор оформлен и подписан' ||
+          contract.status === 'Подписан заказчиком, есть скан копия',
+      );
+
+      const types = new Set<string>();
+
+      activeContracts.forEach((contract) => {
+        (contract.rates ?? []).forEach((rate) => {
+          const type = rate.type_rate?.trim();
+          if (type) types.add(type);
+        });
+      });
+
+      setWorkTypeOptions(
+        Array.from(types).sort((a, b) => a.localeCompare(b, 'ru')),
+      );
+    })
+    .catch((error) => {
+      console.error('Не удалось загрузить виды работ:', error);
+      if (!cancelled) setWorkTypeOptions([]);
+    })
+    .finally(() => {
+      if (!cancelled) setLoadingWorkTypes(false);
+    });
+
+  return () => {
+    cancelled = true;
+  };
+}, [workTypeCounterpartyId]);
 
   // =============================================================================
   // URL project
@@ -1549,6 +1616,10 @@ export default function NewTicketPage() {
     setPriority('medium');
     setType('Инцидент');
     setTags([]);
+
+    setWorkType('');
+setWorkTypeOptions([]);
+setLoadingWorkTypes(false);
     setGeneralFiles([]);
 
     setSelectionType(null);
@@ -1627,6 +1698,12 @@ export default function NewTicketPage() {
 }
 
       const ticket = await ticketsApi.create(data);
+
+      const normalizedWorkType = workType.trim();
+
+if (normalizedWorkType) {
+  data.work_type = normalizedWorkType;
+}
 
       const imageBlocks = descriptionBlocks.filter(
         (
@@ -2598,6 +2675,35 @@ export default function NewTicketPage() {
                   </div>
                 </section>
               )}
+
+              {(loadingWorkTypes || workTypeOptions.length > 0) && (
+  <section>
+    <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
+      Вид работ
+    </label>
+
+    <select
+      value={workType}
+      onChange={(event) => setWorkType(event.target.value)}
+      disabled={loadingWorkTypes}
+      className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-3 text-base text-[var(--text-primary)] outline-none focus:border-[var(--accent)] disabled:opacity-60"
+    >
+      <option value="">— не выбран —</option>
+
+      {workTypeOptions.map((option) => (
+        <option key={option} value={option}>
+          {option}
+        </option>
+      ))}
+    </select>
+
+    {loadingWorkTypes && (
+      <p className="mt-1 text-sm text-[var(--text-primary)]/45">
+        Загружаем виды работ…
+      </p>
+    )}
+  </section>
+)}
 
               <div className="border-t border-[var(--border-color)]" />
 
