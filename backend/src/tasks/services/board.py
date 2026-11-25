@@ -64,6 +64,8 @@ class TaskBoardService:
             for task in page.items
         ]
 
+        links = await self.task_repo.get_links([task.id for task in all_tasks])
+
         ticket_ids = list({
             task.ticket_id
             for task in all_tasks
@@ -114,12 +116,13 @@ class TaskBoardService:
                 if task.project_id is not None
                 else None
             )
-    
+
             return map_task_view_to_response(
                 task,
                 ticket=ticket,
                 reporter=reporter,
                 project=project,
+                links=links.get(task.id),
             )
 
         columns = [
