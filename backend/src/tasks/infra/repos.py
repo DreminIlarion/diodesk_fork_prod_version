@@ -6,8 +6,19 @@ from uuid import UUID
 from ddf.application.dtos import QueryDTO
 from ddf.infra.database.sqlalchemy import SqlAlchemyRepository
 from ddf.infra.database.sqlalchemy.filters import compile_filter
-from sqlalchemy import ColumnElement, and_, func, or_, select
+from sqlalchemy import (
+    BigInteger,
+    ColumnElement,
+    and_,
+    cast,
+    func,
+    literal,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.sql.selectable import CTE
 
 from src.media.infra.repo import AttachmentMapper
 from src.shared.domain.vo import Tag
@@ -15,9 +26,9 @@ from src.shared.infra.repos import ModelMapper
 from src.shared.schemas import Page, Pagination
 
 from ..domain.entities import Task
-from ..domain.repos import TaskView
+from ..domain.repos import RelationKind, TaskBrief, TaskLinks, TaskView
 from ..domain.vo import StoryPoints, TaskNumber, TaskStatus
-from .models import TaskOrm, TaskSequence
+from .models import TaskOrm, TaskRelationOrm, TaskSequence
 
 TASK_FILTER_WHITELIST = (
     "id",
@@ -51,6 +62,28 @@ def compile_task_search(query: str) -> ColumnElement[bool]:
         TaskOrm.number.ilike(pattern),
         TaskOrm.title.ilike(pattern),
         TaskOrm.description.ilike(pattern),
+    )
+
+
+TASK_GRAPH_LOCK_KEY = 0x44494F5441534B
+
+
+def _task_subtree(task_id: UUID) -> CTE:
+    """Построить запрос идентификаторов корня и всех его потомков."""
+
+    nodes = (
+        select(TaskOrm.id.label("id"))
+        .where(TaskOrm.id == task_id)
+        .cte("task_subtree", recursive=True)
+    )
+
+    return nodes.union(
+        select(TaskOrm.id)
+        .select_from(TaskOrm)
+        .join(
+            nodes,
+            TaskOrm.parent_task_id == nodes.c.id,
+        )
     )
 
 
@@ -164,6 +197,251 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
     model = TaskOrm
     data_mapper = TaskMapper()
     filter_whitelist: ClassVar[tuple[str, ...]] = TASK_FILTER_WHITELIST
+
+    async def lock_graph(self) -> None:
+        await self._session.execute(
+            select(
+                func.pg_advisory_xact_lock(
+                    cast(
+                        literal(TASK_GRAPH_LOCK_KEY),
+                        BigInteger,
+                    )
+                )
+            )
+        )
+
+    async def read_for_update(
+        self,
+        task_id: UUID,
+        *,
+        include_deleted: bool = False,
+    ) -> Task | None:
+        stmt = select(self.model).where(
+            self.model.id == task_id,
+        )
+
+        if not include_deleted:
+            stmt = stmt.where(
+                self.model.deleted_at.is_(None),
+            )
+
+        stmt = (
+            stmt
+            .with_for_update(of=self.model)
+            .execution_options(populate_existing=True)
+        )
+
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+
+        return (
+            None
+            if model is None
+            else self.data_mapper.from_model(model)
+        )
+
+    async def subtree_ids(self, task_id: UUID) -> set[UUID]:
+        nodes = _task_subtree(task_id)
+
+        result = await self._session.execute(
+            select(nodes.c.id)
+        )
+
+        return set(result.scalars().all())
+
+    async def subtree_for_update(
+        self,
+        task_id: UUID,
+    ) -> list[Task]:
+        nodes = _task_subtree(task_id)
+
+        stmt = (
+            select(self.model)
+            .where(
+                self.model.id.in_(
+                    select(nodes.c.id)
+                )
+            )
+            .order_by(self.model.id)
+            .with_for_update(of=self.model)
+            .execution_options(populate_existing=True)
+        )
+
+        result = await self._session.execute(stmt)
+        models = result.scalars().all()
+
+        return [
+            self.data_mapper.from_model(model)
+            for model in models
+        ]
+
+    async def get_links(
+        self,
+        task_ids: list[UUID],
+    ) -> dict[UUID, TaskLinks]:
+        links = {
+            task_id: TaskLinks()
+            for task_id in task_ids
+        }
+
+        if not links:
+            return links
+
+        ids = list(links)
+        source = self.model.__table__.alias("source_task")
+        peer = self.model.__table__.alias("peer_task")
+
+        children_stmt = (
+            select(
+                source.c.id,
+                self.model.id,
+            )
+            .select_from(self.model)
+            .join(
+                source,
+                source.c.id == self.model.parent_task_id,
+            )
+            .where(
+                source.c.id.in_(ids),
+                source.c.deleted_at.is_(None),
+                self.model.deleted_at.is_(None),
+            )
+        )
+
+        result = await self._session.execute(children_stmt)
+
+        for parent_id, child_id in result:
+            links[parent_id].subtasks.add(child_id)
+
+        relation = TaskRelationOrm
+
+        edges = (
+            select(
+                relation.left_task_id.label("owner_id"),
+                relation.right_task_id.label("peer_id"),
+            )
+            .where(
+                relation.left_task_id.in_(ids),
+                relation.deleted_at.is_(None),
+            )
+            .union_all(
+                select(
+                    relation.right_task_id.label("owner_id"),
+                    relation.left_task_id.label("peer_id"),
+                )
+                .where(
+                    relation.right_task_id.in_(ids),
+                    relation.deleted_at.is_(None),
+                )
+            )
+            .subquery("task_edges")
+        )
+
+        related_stmt = (
+            select(
+                edges.c.owner_id,
+                edges.c.peer_id,
+            )
+            .select_from(edges)
+            .join(
+                source,
+                source.c.id == edges.c.owner_id,
+            )
+            .join(
+                peer,
+                peer.c.id == edges.c.peer_id,
+            )
+            .where(
+                source.c.deleted_at.is_(None),
+                peer.c.deleted_at.is_(None),
+            )
+        )
+
+        result = await self._session.execute(related_stmt)
+
+        for owner_id, peer_id in result:
+            links[owner_id].related_tasks.add(peer_id)
+
+        return links
+
+    async def list_linked(
+        self,
+        task_id: UUID,
+        kind: RelationKind,
+        pagination: Pagination,
+    ) -> Page[TaskBrief]:
+        stmt = (
+            select(
+                self.model.id,
+                self.model.number,
+                self.model.title,
+                self.model.status,
+            )
+            .where(
+                self.model.deleted_at.is_(None),
+            )
+        )
+
+        if kind == "subtasks":
+            stmt = stmt.where(
+                self.model.parent_task_id == task_id,
+            )
+        else:
+            relation = TaskRelationOrm
+
+            peer_ids = (
+                select(
+                    relation.right_task_id.label("id"),
+                )
+                .where(
+                    relation.left_task_id == task_id,
+                    relation.deleted_at.is_(None),
+                )
+                .union_all(
+                    select(
+                        relation.left_task_id.label("id"),
+                    )
+                    .where(
+                        relation.right_task_id == task_id,
+                        relation.deleted_at.is_(None),
+                    )
+                )
+                .subquery("related_task_ids")
+            )
+
+            stmt = stmt.join(
+                peer_ids,
+                peer_ids.c.id == self.model.id,
+            )
+
+        total_items = await self._session.scalar(
+            select(func.count()).select_from(
+                stmt.subquery()
+            )
+        )
+
+        stmt = (
+            stmt
+            .order_by(
+                self.model.created_at,
+                self.model.id,
+            )
+            .offset(pagination.offset)
+            .limit(pagination.size)
+        )
+
+        result = await self._session.execute(stmt)
+        rows = result.mappings().all()
+
+        return Page.create(
+            items=[
+                TaskBrief(**row)
+                for row in rows
+            ],
+            total_items=total_items or 0,
+            page=pagination.page,
+            size=pagination.size,
+        )
 
     async def get_by_number(self, number: TaskNumber) -> Task | None:
         stmt = select(self.model).where(self.model.number == number.value)
@@ -288,3 +566,58 @@ class SqlTaskRepository(SqlAlchemyRepository[Task, TaskOrm]):
             )
 
         return grouped
+
+    async def set_related(
+        self,
+        task_id: UUID,
+        related_task_id: UUID,
+        *,
+        linked: bool,
+    ) -> bool:
+        left_id, right_id = sorted(
+            (task_id, related_task_id)
+        )
+
+        if linked:
+            stmt = (
+                pg_insert(TaskRelationOrm)
+                .values(
+                    left_task_id=left_id,
+                    right_task_id=right_id,
+                    deleted_at=None,
+                )
+                .on_conflict_do_update(
+                    index_elements=[
+                        TaskRelationOrm.left_task_id,
+                        TaskRelationOrm.right_task_id,
+                    ],
+                    set_={
+                        "deleted_at": None,
+                        "updated_at": func.now(),
+                    },
+                    where=TaskRelationOrm.deleted_at.is_not(None),
+                )
+                .returning(
+                    TaskRelationOrm.left_task_id,
+                )
+            )
+        else:
+            stmt = (
+                update(TaskRelationOrm)
+                .where(
+                    TaskRelationOrm.left_task_id == left_id,
+                    TaskRelationOrm.right_task_id == right_id,
+                    TaskRelationOrm.deleted_at.is_(None),
+                )
+                .values(
+                    deleted_at=func.now(),
+                    updated_at=func.now(),
+                )
+                .returning(
+                    TaskRelationOrm.left_task_id,
+                )
+            )
+
+        result = await self._session.execute(stmt)
+
+        return result.scalar_one_or_none() is not None
