@@ -114,6 +114,9 @@ class TicketBase(BaseModel):
     product_id: UUID | None = Field(
         None, description="Программный продукт к которому привязан тикет"
     )
+    work_type: str | None = Field(
+        None, description="Вид работ (из ставок активных договоров контрагента)"
+    )
     tags: list[Tag] = Field(
         default_factory=list, description="Теги для упрощения поиска и фильтрации"
     )

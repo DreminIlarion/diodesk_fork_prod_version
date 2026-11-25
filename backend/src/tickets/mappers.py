@@ -137,6 +137,7 @@ def map_ticket_to_response(ticket: Ticket) -> TicketResponse:
         stage_id=ticket.stage_id,
         counterparty_id=ticket.counterparty_id,
         product_id=ticket.product_id,
+        work_type=ticket.work_type,
         created_by=ticket.created_by,
         reporter_id=ticket.reporter_id,
         number=ticket.number.value,

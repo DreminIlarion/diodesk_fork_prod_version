@@ -23,7 +23,7 @@ class TicketOrm(EntityMixin, Base):
     )
     counterparty_id: Mapped[UUID | None] = mapped_column(nullable=True)
     product_id: Mapped[UUID | None] = mapped_column(nullable=True)
-
+    work_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_by: Mapped[UUID]
     approved_by: Mapped[UUID | None] = mapped_column(nullable=True)
     resolved_by: Mapped[UUID | None] = mapped_column(nullable=True)

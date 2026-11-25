@@ -144,6 +144,7 @@ class TicketService:
             created_by_role=current_subject.roles[0] if current_subject.roles else None,
             counterparty_id=context.counterparty_id,
             product_id=data.product_id,
+            work_type=data.work_type,
             tags=tags,
             stage_id=context.stage_id,
         )

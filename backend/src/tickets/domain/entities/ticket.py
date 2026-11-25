@@ -47,6 +47,7 @@ class Ticket(AggregateRoot):
     stage_id: UUID | None = None
     counterparty_id: UUID | None = None
     product_id: UUID | None = None
+    work_type: Annotated[str | None, Doc("Вид работ из ставок активных договоров контрагента")] = None
 
     created_by: Annotated[UUID, Doc("Фактический создатель заявки")]
     created_by_role: UserRole | None = None
@@ -128,6 +129,7 @@ class Ticket(AggregateRoot):
         stage_id: UUID | None = None,
         counterparty_id: UUID | None = None,
         product_id: UUID | None = None,
+        work_type: str | None = None,
         created_by_role: UserRole | None = None,
 
         tags: list[Tag] | None = None,
@@ -153,6 +155,7 @@ class Ticket(AggregateRoot):
             project_id=project_id,
             counterparty_id=counterparty_id,
             product_id=product_id,
+            work_type=work_type,
             tags=[] if tags is None else tags,
         )
         ticket.register_event(
