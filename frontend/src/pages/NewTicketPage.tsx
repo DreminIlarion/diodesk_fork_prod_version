@@ -1024,10 +1024,8 @@ setLoadingWorkTypes(false);
       const types = new Set<string>();
 
       activeContracts.forEach((contract) => {
-        (contract.rates ?? []).forEach((rate) => {
-          const type = rate.type_rate?.trim();
-          if (type) types.add(type);
-        });
+        const type = contract.type?.trim(); // вид договора, например «Сервис»
+        if (type) types.add(type);
       });
 
       setWorkTypeOptions(
