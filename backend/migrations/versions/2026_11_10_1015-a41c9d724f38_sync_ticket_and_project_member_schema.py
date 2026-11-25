@@ -19,26 +19,42 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Bring the database schema in line with the current ORM models."""
-    op.add_column(
-        "tickets",
-        sa.Column("resolved_by", sa.Uuid(), nullable=True),
-    )
-    op.add_column(
-        "tickets",
-        sa.Column("approved_at", sa.DateTime(timezone=True), nullable=True),
-    )
-    op.add_column(
-        "tickets",
-        sa.Column("resolved_at", sa.DateTime(timezone=True), nullable=True),
-    )
-    op.alter_column(
-        "project_members",
-        "author_id",
-        new_column_name="user_id",
-        existing_type=sa.Uuid(),
-        existing_nullable=False,
-    )
+    """Bring the database schema in line with the current ORM models (idempotent)."""
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+
+    ticket_columns = {col["name"] for col in inspector.get_columns("tickets")}
+
+    if "resolved_by" not in ticket_columns:
+        op.add_column(
+            "tickets",
+            sa.Column("resolved_by", sa.Uuid(), nullable=True),
+        )
+
+    if "approved_at" not in ticket_columns:
+        op.add_column(
+            "tickets",
+            sa.Column("approved_at", sa.DateTime(timezone=True), nullable=True),
+        )
+
+    if "resolved_at" not in ticket_columns:
+        op.add_column(
+            "tickets",
+            sa.Column("resolved_at", sa.DateTime(timezone=True), nullable=True),
+        )
+
+    member_columns = {
+        col["name"] for col in inspector.get_columns("project_members")
+    }
+
+    if "author_id" in member_columns and "user_id" not in member_columns:
+        op.alter_column(
+            "project_members",
+            "author_id",
+            new_column_name="user_id",
+            existing_type=sa.Uuid(),
+            existing_nullable=False,
+        )
 
 
 def downgrade() -> None:
