@@ -1210,7 +1210,7 @@ export interface NotificationStreamPayload {
 function getNotificationStreamUrl() {
   return (
     import.meta.env.VITE_NOTIFICATIONS_STREAM_URL ||
-    'http://10.1.50.109:8001/notifications/stream'
+    `${import.meta.env.VITE_API_URL}/api/v1/notifications/stream`
   );
 }
 
