@@ -65,6 +65,7 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
             ticket_id=model.ticket_id,
             project_id=model.project_id,
             stage_id=model.stage_id,
+            parent_task_id=model.parent_task_id,
             number=TaskNumber(model.number),
             title=model.title,
             description=model.description,
@@ -98,6 +99,7 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
             ticket_id=entity.ticket_id,
             project_id=entity.project_id,
             stage_id=entity.stage_id,
+            parent_task_id=entity.parent_task_id,
             number=entity.number.value,
             title=entity.title,
             description=entity.description,
@@ -152,6 +154,7 @@ class TaskMapper(ModelMapper[Task, TaskOrm]):
             project_id=model.project_id,
             stage_id=model.stage_id,
             ticket_id=model.ticket_id,
+            parent_task_id=model.parent_task_id,
             attachments=[AttachmentMapper.to_entity(a) for a in model.attachments],
             tags={Tag(name=tag["name"], color=tag["color"]) for tag in model.tags},
         )
