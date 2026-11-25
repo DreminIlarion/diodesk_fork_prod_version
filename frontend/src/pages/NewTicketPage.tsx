@@ -37,9 +37,11 @@ import {
   counterpartiesApi,
   projectsApi,
   ticketsApi,
+  contractsApi,
   usersApi,
 } from '../api/client';
 import { attachmentsApi } from '../api/attachments';
+
 
 import type {
   Counterparty,
@@ -602,11 +604,13 @@ const [loadingWorkTypes, setLoadingWorkTypes] = useState(false);
 
   const canSelectReporter = !isCustomer;
 
-  const workTypeCounterpartyId =
+const workTypeCounterpartyId =
   selectedProject?.counterparty_id ||
-  (isCustomer && customerCounterparty
-    ? customerCounterparty.id
-    : selectedCounterparty?.id);
+  (ticketViewType === 'company'
+    ? DIO_COMPANY_ID
+    : isCustomer
+      ? customerCounterparty?.id
+      : selectedCounterparty?.id);
 
   const hasDescription = descriptionBlocks.some(
     (block) =>
@@ -2700,6 +2704,42 @@ if (normalizedWorkType) {
     {loadingWorkTypes && (
       <p className="mt-1 text-sm text-[var(--text-primary)]/45">
         Загружаем виды работ…
+      </p>
+    )}
+  </section>
+)}
+
+
+{workTypeCounterpartyId && (
+  <section>
+    <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
+      Вид работ
+    </label>
+
+    <select
+      value={workType}
+      onChange={(event) => setWorkType(event.target.value)}
+      disabled={loadingWorkTypes || workTypeOptions.length === 0}
+      className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-3 text-base text-[var(--text-primary)] outline-none focus:border-[var(--accent)] disabled:opacity-60"
+    >
+      <option value="">
+        {loadingWorkTypes
+          ? 'Загружаем виды работ…'
+          : workTypeOptions.length > 0
+            ? '— выберите вид работ —'
+            : 'Нет доступных видов работ'}
+      </option>
+
+      {workTypeOptions.map((option) => (
+        <option key={option} value={option}>
+          {option}
+        </option>
+      ))}
+    </select>
+
+    {!loadingWorkTypes && workTypeOptions.length === 0 && (
+      <p className="mt-1 text-sm text-[var(--text-primary)]/45">
+        В подписанных договорах контрагента не найдены виды работ.
       </p>
     )}
   </section>
