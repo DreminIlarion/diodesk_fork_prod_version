@@ -513,6 +513,10 @@ export default function NewTicketPage() {
 const [workTypeOptions, setWorkTypeOptions] = useState<string[]>([]);
 const [loadingWorkTypes, setLoadingWorkTypes] = useState(false);
 
+
+const [showWorkTypeDropdown, setShowWorkTypeDropdown] = useState(false);
+
+
   const [projectStages, setProjectStages] =
     useState<ProjectStageResponse[]>([]);
 
@@ -2680,62 +2684,75 @@ if (normalizedWorkType) {
                 </section>
               )}
 
-              {(loadingWorkTypes || workTypeOptions.length > 0) && (
-  <section>
-    <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
-      Вид работ
-    </label>
-
-    <select
-      value={workType}
-      onChange={(event) => setWorkType(event.target.value)}
-      disabled={loadingWorkTypes}
-      className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-3 text-base text-[var(--text-primary)] outline-none focus:border-[var(--accent)] disabled:opacity-60"
-    >
-      <option value="">— не выбран —</option>
-
-      {workTypeOptions.map((option) => (
-        <option key={option} value={option}>
-          {option}
-        </option>
-      ))}
-    </select>
-
-    {loadingWorkTypes && (
-      <p className="mt-1 text-sm text-[var(--text-primary)]/45">
-        Загружаем виды работ…
-      </p>
-    )}
-  </section>
-)}
-
-
 {workTypeCounterpartyId && (
   <section>
     <label className="mb-2 block text-base font-medium text-[var(--text-primary)]">
       Вид работ
     </label>
 
-    <select
-      value={workType}
-      onChange={(event) => setWorkType(event.target.value)}
-      disabled={loadingWorkTypes || workTypeOptions.length === 0}
-      className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-3 text-base text-[var(--text-primary)] outline-none focus:border-[var(--accent)] disabled:opacity-60"
-    >
-      <option value="">
-        {loadingWorkTypes
-          ? 'Загружаем виды работ…'
-          : workTypeOptions.length > 0
-            ? '— выберите вид работ —'
-            : 'Нет доступных видов работ'}
-      </option>
+    <div className="relative">
+      <button
+        type="button"
+        disabled={loadingWorkTypes || workTypeOptions.length === 0}
+        aria-expanded={showWorkTypeDropdown}
+        onClick={() => setShowWorkTypeDropdown((open) => !open)}
+        className="flex w-full items-center justify-between rounded-xl border border-[var(--border-color)] bg-[var(--hover-1)] px-4 py-3 text-left text-base text-[var(--text-primary)] transition-colors hover:bg-[var(--hover-2)] disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <span
+          className={`min-w-0 flex-1 truncate ${
+            workType ? '' : 'text-[var(--text-primary)]/45'
+          }`}
+        >
+          {loadingWorkTypes
+            ? 'Загружаем виды работ…'
+            : workType ||
+              (workTypeOptions.length > 0
+                ? '— выберите вид работ —'
+                : 'Нет доступных видов работ')}
+        </span>
 
-      {workTypeOptions.map((option) => (
-        <option key={option} value={option}>
-          {option}
-        </option>
-      ))}
-    </select>
+        <svg
+          aria-hidden="true"
+          className="ml-3 h-4 w-4 shrink-0 text-[var(--text-primary)]/45"
+          viewBox="0 0 24 24"
+          fill="none"
+        >
+          <path
+            d="m6 9 6 6 6-6"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+
+      {showWorkTypeDropdown &&
+        !loadingWorkTypes &&
+        workTypeOptions.length > 0 && (
+          <Dropdown>
+            {workTypeOptions.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => {
+                  setWorkType(option);
+                  setShowWorkTypeDropdown(false);
+                }}
+                className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--hover-2)]"
+              >
+                <span className="min-w-0 truncate text-base text-[var(--text-primary)]">
+                  {option}
+                </span>
+
+                {workType === option && (
+                  <Check className="h-5 w-5 shrink-0 text-emerald-400" />
+                )}
+              </button>
+            ))}
+          </Dropdown>
+        )}
+    </div>
 
     {!loadingWorkTypes && workTypeOptions.length === 0 && (
       <p className="mt-1 text-sm text-[var(--text-primary)]/45">
