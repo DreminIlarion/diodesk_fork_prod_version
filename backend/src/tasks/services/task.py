@@ -12,15 +12,24 @@ from src.shared.domain.events import EventPublisher
 from src.shared.domain.exceptions import InvalidStateError, NotFoundError
 from src.shared.domain.repos import UnitOfWork, finalize, get_or_raise_404
 from src.shared.domain.vo import Priority, Tag
+from src.shared.schemas import Page, Pagination
+from src.shared.utils.time import current_datetime
 from src.tickets.domain.entities import Ticket
 from src.tickets.domain.repos import TicketRepository
 
 from ..domain.authz import TaskAuthZService
 from ..domain.entities import Task
-from ..domain.repos import TaskRepository
+from ..domain.events import TaskRelationChanged
+from ..domain.repos import RelationKind, TaskRepository
 from ..domain.vo import TaskNumber, TaskStatus
-from ..mappers import map_task_to_response
-from ..schemas import ReviewDecision, TaskCreate, TaskResponse, TaskUpdate
+from ..mappers import map_task_brief_to_response, map_task_to_response
+from ..schemas import (
+    ReviewDecision,
+    TaskBriefResponse,
+    TaskCreate,
+    TaskResponse,
+    TaskUpdate,
+)
 from ..validators import inherit_parent_context, validate_parent_target
 
 
@@ -521,25 +530,60 @@ class TaskService:
 
         await self.task_repo.lock_graph()
 
-        task = await get_or_raise_404(
-            self.task_repo.read_for_update,
-            task_id,
-            Task,
+        subtree = await self.task_repo.subtree_for_update(task_id)
+
+        task = next(
+            (item for item in subtree if item.id == task_id),
+            None,
         )
 
+        if task is None:
+            raise NotFoundError(
+                f"Task with ID {task_id} not found"
+            )
+
         permission = await self.task_authz_service.can_archive_task(
-            subject=current_subject, task=task
+            subject=current_subject,
+            task=task,
         )
         if not permission.allowed:
             raise PermissionDeniedError(permission.reason)
 
-        task.archive(archived_by=current_subject.id)
-        await self.task_repo.update(task)
+        changed_tasks = []
+
+        if not task.is_deleted:
+            for descendant in subtree:
+                if (
+                    descendant.id == task.id
+                    or descendant.is_deleted
+                    or not descendant.status.is_open
+                ):
+                    continue
+
+                descendant.change_status(
+                    TaskStatus.CANCELLED,
+                    current_subject.id,
+                    reason="Удаление вышестоящей задачи",
+                    caused_by_task_id=task.id,
+                )
+
+                await self.task_repo.update(descendant)
+                changed_tasks.append(descendant)
+
+            task.archive(
+                archived_by=current_subject.id,
+            )
+
+            await self.task_repo.update(task)
+            changed_tasks.append(task)
+
+            await self.uow.flush()
 
         await finalize(
-            self.uow, task,
+            self.uow,
+            *changed_tasks,
             event_publisher=self.event_publisher,
-            activity_recorder=self.activity_log_recorder
+            activity_recorder=self.activity_log_recorder,
         )
 
         return await self._map_response(task)
@@ -595,4 +639,113 @@ class TaskService:
             Task,
         )
 
+        if task.is_deleted:
+            raise NotFoundError(f"Task with ID {task_id} not found")
+
         return await self._map_response(task)
+
+    async def set_related(
+        self,
+        task_id: UUID,
+        related_task_id: UUID,
+        *,
+        linked: bool,
+        current_subject: Subject,
+    ) -> None:
+        if task_id == related_task_id:
+            raise InvalidStateError(
+                "Task cannot be related to itself"
+            )
+
+        await self.task_repo.lock_graph()
+
+        tasks = {}
+
+        for current_id in sorted((task_id, related_task_id)):
+            task = await self.task_repo.read_for_update(
+                current_id,
+                include_deleted=(
+                    not linked
+                    and current_id == related_task_id
+                ),
+            )
+
+            if task is None:
+                raise NotFoundError(
+                    f"Task with ID {current_id} not found"
+                )
+
+            tasks[current_id] = task
+
+        task = tasks[task_id]
+        related_task = tasks[related_task_id]
+
+        await _require_edit(
+            self.task_authz_service,
+            current_subject,
+            task,
+            related_task,
+        )
+
+        changed = await self.task_repo.set_related(
+            task_id,
+            related_task_id,
+            linked=linked,
+        )
+
+        if changed:
+            changed_at = current_datetime()
+
+            for owner, peer in (
+                (task, related_task),
+                (related_task, task),
+            ):
+                owner.updated_at = changed_at
+
+                owner.register_event(
+                    TaskRelationChanged(
+                        task_id=owner.id,
+                        related_task_id=peer.id,
+                        linked=linked,
+                        changed_by=current_subject.id,
+                    )
+                )
+
+                await self.task_repo.update(owner)
+
+            await self.uow.flush()
+
+        await finalize(
+            self.uow,
+            task,
+            related_task,
+            event_publisher=self.event_publisher,
+            activity_recorder=self.activity_log_recorder,
+        )
+
+    async def list_linked(
+        self,
+        task_id: UUID,
+        kind: RelationKind,
+        pagination: Pagination,
+    ) -> Page[TaskBriefResponse]:
+        task = await get_or_raise_404(
+            self.task_repo.read,
+            task_id,
+            Task,
+        )
+
+        if task.is_deleted:
+            raise NotFoundError(
+                f"Task with ID {task_id} not found"
+            )
+
+        page = await self.task_repo.list_linked(
+            task_id,
+            kind,
+            pagination,
+        )
+
+        return page.to_response(
+            map_task_brief_to_response
+        )

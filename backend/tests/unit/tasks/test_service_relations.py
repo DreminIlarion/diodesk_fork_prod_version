@@ -71,17 +71,30 @@ def env() -> SimpleNamespace:
         return task
 
     def get_links(task_ids):
-        return {task_id: links.get(task_id, TaskLinks()) for task_id in task_ids}
+        return {
+            task_id: (
+                TaskLinks()
+                if task_id in tasks and tasks[task_id].is_deleted
+                else links.get(task_id, TaskLinks())
+            )
+            for task_id in task_ids
+        }
 
     def subtree_ids(task_id):
         return subtrees.get(task_id, {task_id})
+
+    def subtree_for_update(task_id):
+        ids = subtrees.get(task_id, {task_id})
+        return [tasks[item_id] for item_id in sorted(ids) if item_id in tasks]
 
     repo.read.side_effect = read
     repo.read_for_update.side_effect = read_for_update
     repo.create.side_effect = create
     repo.get_links.side_effect = get_links
     repo.subtree_ids.side_effect = subtree_ids
+    repo.subtree_for_update.side_effect = subtree_for_update
     repo.get_next_sequence.return_value = 1
+    repo.set_related.return_value = True
 
     authz = AsyncMock(spec=TaskAuthZService)
     for name in {"can_create_task", *AUTHORIZATION_METHODS.values()}:
@@ -158,17 +171,19 @@ async def test_mutations_load_task_with_row_lock(env: SimpleNamespace, method: s
 
     await invoke_mutation(env, method, task.id)
 
-    env.repo.read_for_update.assert_awaited_once_with(task.id)
     env.repo.read.assert_not_awaited()
     env.repo.update.assert_awaited_once_with(task)
     env.uow.commit.assert_awaited_once()
     if method == "archive":
+        env.repo.read_for_update.assert_not_awaited()
+        env.repo.subtree_for_update.assert_awaited_once_with(task.id)
         assert env.repo.method_calls[:2] == [
             call.lock_graph(),
-            call.read_for_update(task.id),
+            call.subtree_for_update(task.id),
         ]
         assert task.is_deleted
     else:
+        env.repo.read_for_update.assert_awaited_once_with(task.id)
         env.repo.lock_graph.assert_not_awaited()
 
 
@@ -180,8 +195,12 @@ async def test_mutations_reject_task_missing_from_locked_read(
 ) -> None:
     task = mutation_task(method)
     env.tasks[task.id] = task
-    env.repo.read_for_update.side_effect = None
-    env.repo.read_for_update.return_value = None
+    if method == "archive":
+        env.repo.subtree_for_update.side_effect = None
+        env.repo.subtree_for_update.return_value = []
+    else:
+        env.repo.read_for_update.side_effect = None
+        env.repo.read_for_update.return_value = None
 
     with pytest.raises(NotFoundError):
         await invoke_mutation(env, method, task.id)
@@ -203,7 +222,10 @@ async def test_mutations_keep_authorization_checks(env: SimpleNamespace, method:
     with pytest.raises(PermissionDeniedError, match="Forbidden"):
         await invoke_mutation(env, method, task.id)
 
-    env.repo.read_for_update.assert_awaited_once_with(task.id)
+    if method == "archive":
+        env.repo.subtree_for_update.assert_awaited_once_with(task.id)
+    else:
+        env.repo.read_for_update.assert_awaited_once_with(task.id)
     permission.assert_awaited_once()
     env.repo.update.assert_not_awaited()
     env.uow.commit.assert_not_awaited()
