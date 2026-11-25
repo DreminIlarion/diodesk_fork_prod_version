@@ -1860,124 +1860,106 @@ export default function TicketDetailPage() {
             <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-5 flex items-center gap-3">
               <FileText className="w-5 h-5 text-[var(--text-primary)]/60" /> Информация
             </h3>
-            <div className="space-y-4">
-              {[
-                {
-                  label: 'Номер',
-                  value: (
-                    <span className="font-mono">
-                      {ticket.number || '—'}
-                    </span>
-                  ),
-                },
-                {
-                  label: 'Тип',
-                  value: (
-                    <span
-                      className={`px-3 py-1 rounded-lg text-base font-medium border ${getTypeColor(
-                        ticket.type,
-                      )}`}
-                    >
-                      {ticket.type}
-                    </span>
-                  ),
-                },
-                {
-  label: 'Тип',
-  value: (
-    <span
-      className={`px-3 py-1 rounded-lg text-base font-medium border ${getTypeColor(
-        ticket.type,
-      )}`}
+           <div className="space-y-4">
+  {[
+    {
+      label: 'Номер',
+      value: (
+        <span className="font-mono">
+          {ticket.number || '—'}
+        </span>
+      ),
+    },
+    {
+      label: 'Тип',
+      value: (
+        <span
+          className={`px-3 py-1 rounded-lg text-base font-medium border ${getTypeColor(
+            ticket.type,
+          )}`}
+        >
+          {ticket.type}
+        </span>
+      ),
+    },
+    ...(ticket.work_type?.trim()
+      ? [
+          {
+            label: 'Вид работ',
+            value: (
+              <span className="max-w-[60%] break-words text-right text-base text-[var(--text-primary)]">
+                {ticket.work_type.trim()}
+              </span>
+            ),
+          },
+        ]
+      : []),
+    {
+      label: 'Статус',
+      value: (
+        <span
+          className={`px-3 py-1 rounded-lg text-base font-medium border ${getStatusColor(
+            ticket.status || '',
+          )}`}
+        >
+          {STATUS_LABELS[ticket.status || ''] || ticket.status}
+        </span>
+      ),
+    },
+    {
+      label: 'Приоритет',
+      value: (
+        <span
+          className={`px-3 py-1 rounded-lg text-base font-medium border ${getPriorityColor(
+            ticket.priority,
+          )}`}
+        >
+          {PRIORITY_LABELS[ticket.priority] || ticket.priority}
+        </span>
+      ),
+    },
+  ].map((r) => (
+    <div
+      key={r.label}
+      className="flex justify-between items-center py-2 border-b border-[var(--border-color)]"
     >
-      {ticket.type}
-    </span>
-  ),
-},
-...(ticket.work_type?.trim()
-  ? [
-      {
-        label: 'Вид работ',
-        value: (
-          <span className="max-w-[60%] break-words text-right text-base text-[var(--text-primary)]">
-            {ticket.work_type.trim()}
-          </span>
-        ),
-      },
-    ]
-  : []),
-{
-  label: 'Статус',
-  value: (
-    // текущая разметка статуса без изменений
-  ),
-},
-                {
-                  label: 'Статус',
-                  value: (
-                    <span
-                      className={`px-3 py-1 rounded-lg text-base font-medium border ${getStatusColor(
-                        ticket.status || '',
-                      )}`}
-                    >
-                      {STATUS_LABELS[ticket.status || ''] || ticket.status}
-                    </span>
-                  ),
-                },
-                {
-                  label: 'Приоритет',
-                  value: (
-                    <span
-                      className={`px-3 py-1 rounded-lg text-base font-medium border ${getPriorityColor(
-                        ticket.priority,
-                      )}`}
-                    >
-                      {PRIORITY_LABELS[ticket.priority] || ticket.priority}
-                    </span>
-                  ),
-                },
-              ].map((r) => (
-                <div
-                  key={r.label}
-                  className="flex justify-between items-center py-2 border-b border-[var(--border-color)]"
-                >
-                  <span className="text-[var(--text-primary)]/50 text-base">
-                    {r.label}
-                  </span>
-                  {r.value}
-                </div>
-              ))}
+      <span className="text-[var(--text-primary)]/50 text-base">
+        {r.label}
+      </span>
+      {r.value}
+    </div>
+  ))}
 
-              {ticket.is_archived && (
-                <div className="flex justify-between items-center py-2 border-b border-[var(--border-color)]">
-                  <span className="text-[var(--text-primary)]/50 text-base">
-                    Архив
-                  </span>
-                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-base font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                    <Archive className="w-3.5 h-3.5" /> Да
-                  </span>
-                </div>
-              )}
+  {ticket.is_archived && (
+    <div className="flex justify-between items-center py-2 border-b border-[var(--border-color)]">
+      <span className="text-[var(--text-primary)]/50 text-base">
+        Архив
+      </span>
+      <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-base font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
+        <Archive className="w-3.5 h-3.5" /> Да
+      </span>
+    </div>
+  )}
 
-              <div className="pt-3 space-y-3">
-                {[
-                  { label: 'Создана', value: formatDate(ticket.created_at) },
-                  ...(ticket.closed_at
-                    ? [{ label: 'Закрыта', value: formatDate(ticket.closed_at) }]
-                    : []),
-                  { label: 'Обновлена', value: formatDate(ticket.updated_at) },
-                ].map((r) => (
-                  <div key={r.label}>
-                    <span className="text-[var(--text-primary)]/50 text-base block mb-1">
-                      {r.label}
-                    </span>
-                    <span className="text-[var(--text-primary)] text-base">
-                      {r.value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+  <div className="pt-3 space-y-3">
+    {[
+      { label: 'Создана', value: formatDate(ticket.created_at) },
+      ...(ticket.closed_at
+        ? [{ label: 'Закрыта', value: formatDate(ticket.closed_at) }]
+        : []),
+      { label: 'Обновлена', value: formatDate(ticket.updated_at) },
+    ].map((r) => (
+      <div key={r.label}>
+        <span className="text-[var(--text-primary)]/50 text-base block mb-1">
+          {r.label}
+        </span>
+        <span className="text-[var(--text-primary)] text-base">
+          {r.value}
+        </span>
+      </div>
+    ))}
+  </div>
+</div>
           </div>
 
           {/* Проект */}
