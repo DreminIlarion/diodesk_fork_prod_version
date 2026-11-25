@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState,useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
@@ -503,6 +503,28 @@ export default function NewTicketPage() {
 
   const [loadingCounterparties, setLoadingCounterparties] =
     useState(false);
+
+    const filteredCounterparties = useMemo(() => {
+  const query = counterpartySearch.trim().toLowerCase();
+
+  return counterparties
+    .filter((cp) => {
+      if (!query) return true;
+
+      return [
+        cp.name,
+        cp.legal_name,
+        cp.inn,
+        cp.kpp,
+        cp.email,
+        cp.phone,
+      ].some((value) => value?.toLowerCase().includes(query));
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+}, [counterparties, counterpartySearch]);
+
+
+
 
   const [projects, setProjects] = useState<Project[]>([]);
 
@@ -1196,46 +1218,47 @@ setLoadingWorkTypes(false);
     }
   }
 
-  async function loadCounterparties(search?: string) {
-    setLoadingCounterparties(true);
+  async function loadCounterparties() {
+  setLoadingCounterparties(true);
 
-    try {
-      let items = (await counterpartiesApi.getAll(1, 50)).items;
+  try {
+    const itemsById = new Map<string, Counterparty>();
+    let currentPage = 1;
+    let totalPages = 1;
 
-      if (search) {
-        const query = search.toLowerCase();
+    while (currentPage <= totalPages) {
+      const response = await counterpartiesApi.getAll(currentPage, 100);
 
-        items = items.filter(
-          (cp) =>
-            cp.name?.toLowerCase().includes(query) ||
-            cp.legal_name?.toLowerCase().includes(query) ||
-            cp.inn?.includes(search),
-        );
-      }
+      totalPages = response.total_pages || 1;
 
-      setCounterparties(items);
+      (response.items ?? []).forEach((cp) => {
+        itemsById.set(cp.id, cp);
+      });
 
-      if (
-        !search &&
-        preselectedCounterpartyId &&
-        !selectedCounterparty
-      ) {
-        const found = items.find(
-          (cp) => cp.id === preselectedCounterpartyId,
-        );
-
-        if (found) {
-          setSelectionType('counterparty');
-          setSelectedCounterparty(found);
-          setCounterpartySearch(cpName(found));
-        }
-      }
-    } catch {
-      // noop
-    } finally {
-      setLoadingCounterparties(false);
+      currentPage += 1;
     }
+
+    const items = Array.from(itemsById.values());
+    setCounterparties(items);
+
+    if (preselectedCounterpartyId && !selectedCounterparty) {
+      const found = items.find(
+        (cp) => cp.id === preselectedCounterpartyId,
+      );
+
+      if (found) {
+        setSelectionType('counterparty');
+        setSelectedCounterparty(found);
+        setCounterpartySearch(cpName(found));
+      }
+    }
+  } catch (error) {
+    console.error('Не удалось загрузить контрагентов:', error);
+    setCounterparties([]);
+  } finally {
+    setLoadingCounterparties(false);
   }
+}
 
   async function loadProjects(cpId: string) {
     setLoadingProjects(true);
@@ -2174,7 +2197,6 @@ if (normalizedWorkType) {
                               setCounterpartySearch(value);
                               if (selectedCounterparty) setSelectedCounterparty(null);
                               setShowCounterpartyDropdown(true);
-                              loadCounterparties(value);
                             }}
                             onFocus={() => {
                               setShowCounterpartyDropdown(true);
@@ -2186,10 +2208,14 @@ if (normalizedWorkType) {
                             <Dropdown>
                               {loadingCounterparties ? (
                                 <DropdownEmpty>Загружаем контрагентов...</DropdownEmpty>
-                              ) : counterparties.length === 0 ? (
-                                <DropdownEmpty>Контрагенты не найдены</DropdownEmpty>
-                              ) : (
-                                counterparties.map((cp) => (
+                              ) : filteredCounterparties.length === 0 ? (
+  <DropdownEmpty>
+    {counterpartySearch.trim()
+      ? 'По запросу ничего не найдено'
+      : 'Контрагенты не найдены'}
+  </DropdownEmpty>
+) : (
+  filteredCounterparties.map((cp) => (
                                   <button
                                     key={cp.id}
                                     type="button"
@@ -3789,3 +3815,4 @@ if (normalizedWorkType) {
     </div>
   );
 }
+

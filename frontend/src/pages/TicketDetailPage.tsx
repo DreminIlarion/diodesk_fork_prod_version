@@ -1883,6 +1883,36 @@ export default function TicketDetailPage() {
                   ),
                 },
                 {
+  label: 'Тип',
+  value: (
+    <span
+      className={`px-3 py-1 rounded-lg text-base font-medium border ${getTypeColor(
+        ticket.type,
+      )}`}
+    >
+      {ticket.type}
+    </span>
+  ),
+},
+...(ticket.work_type?.trim()
+  ? [
+      {
+        label: 'Вид работ',
+        value: (
+          <span className="max-w-[60%] break-words text-right text-base text-[var(--text-primary)]">
+            {ticket.work_type.trim()}
+          </span>
+        ),
+      },
+    ]
+  : []),
+{
+  label: 'Статус',
+  value: (
+    // текущая разметка статуса без изменений
+  ),
+},
+                {
                   label: 'Статус',
                   value: (
                     <span
