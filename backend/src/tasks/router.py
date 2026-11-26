@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, status
 
 from src.iam.dependencies import CurrentSubjectDep, get_current_subject
 from src.shared.dependencies import PaginationDep
+from src.shared.schemas import Page
 
 from .dependencies import (
     KanbanQueryDep,
@@ -19,7 +20,9 @@ from .schemas import (
     NewStatus,
     ReviewDecision,
     ReviewerId,
+    TaskBriefResponse,
     TaskCreate,
+    TaskParentUpdate,
     TaskResponse,
     TaskUpdate,
 )
@@ -66,6 +69,81 @@ async def update_task(
         service: TaskServiceDep,
 ) -> TaskResponse:
     return await service.edit(task_id, data, current_subject)
+
+
+@router.patch(
+    path="/{task_id}/parent",
+    status_code=status.HTTP_200_OK,
+    response_model=TaskResponse,
+    summary="Изменить родительскую задачу",
+)
+async def update_task_parent(
+    task_id: UUID,
+    data: TaskParentUpdate,
+    current_subject: CurrentSubjectDep,
+    service: TaskServiceDep,
+) -> TaskResponse:
+    return await service.set_parent(task_id, data.parent_task_id, current_subject)
+
+
+@router.get(
+    path="/{task_id}/subtasks",
+    response_model=Page[TaskBriefResponse],
+    dependencies=[Depends(get_current_subject)],
+    summary="Получить непосредственные подзадачи",
+)
+async def get_subtasks(
+    task_id: UUID,
+    pagination: PaginationDep,
+    service: TaskServiceDep,
+) -> Page[TaskBriefResponse]:
+    return await service.list_linked(task_id, "subtasks", pagination)
+
+
+@router.get(
+    path="/{task_id}/related",
+    response_model=Page[TaskBriefResponse],
+    dependencies=[Depends(get_current_subject)],
+    summary="Получить связанные задачи",
+)
+async def get_related_tasks(
+    task_id: UUID,
+    pagination: PaginationDep,
+    service: TaskServiceDep,
+) -> Page[TaskBriefResponse]:
+    return await service.list_linked(task_id, "related", pagination)
+
+
+@router.put(
+    path="/{task_id}/related/{related_task_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Связать задачи",
+)
+async def link_related_task(
+    task_id: UUID,
+    related_task_id: UUID,
+    current_subject: CurrentSubjectDep,
+    service: TaskServiceDep,
+) -> None:
+    await service.set_related(
+        task_id, related_task_id, linked=True, current_subject=current_subject,
+    )
+
+
+@router.delete(
+    path="/{task_id}/related/{related_task_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Удалить связь между задачами",
+)
+async def unlink_related_task(
+    task_id: UUID,
+    related_task_id: UUID,
+    current_subject: CurrentSubjectDep,
+    service: TaskServiceDep,
+) -> None:
+    await service.set_related(
+        task_id, related_task_id, linked=False, current_subject=current_subject,
+    )
 
 
 @router.post(

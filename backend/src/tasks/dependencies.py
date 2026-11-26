@@ -10,16 +10,13 @@ from src.activity_logs.dependencies import ActivityLogRecorderDep
 from src.iam.dependencies import UserRepoDep
 from src.projects.dependencies import ProjectRepoDep
 from src.shared.dependencies import EventPublisherDep, SessionDep
-from src.shared.domain.repos import get_or_raise_404
 from src.shared.domain.vo import Priority
 from src.tickets.dependencies import TicketRepoDep
 
 from .domain.authz import TaskAuthZService
-from .domain.entities import Task
 from .domain.repos import TaskRepository
 from .dsl import legacy_kanban_filters_to_expression
 from .infra.repos import SqlTaskRepository
-from .mappers import map_task_to_response
 from .schemas import TaskResponse
 from .services import TaskBoardService, TaskService
 
@@ -29,14 +26,6 @@ def get_task_repo(session: SessionDep) -> SqlTaskRepository:
 
 
 TaskRepoDep = Annotated[TaskRepository, Depends(get_task_repo)]
-
-
-async def get_task_or_404(
-        task_id: UUID,
-        task_repo: TaskRepoDep,
-) -> TaskResponse:
-    task = await get_or_raise_404(task_repo.read, task_id, Task)
-    return map_task_to_response(task)
 
 
 def get_task_service(
@@ -76,6 +65,13 @@ def get_task_board_service(
 
 TaskServiceDep = Annotated[TaskService, Depends(get_task_service)]
 TaskBoardServiceDep = Annotated[TaskBoardService, Depends(get_task_board_service)]
+
+
+async def get_task_or_404(
+        task_id: UUID,
+        service: TaskServiceDep,
+) -> TaskResponse:
+    return await service.get(task_id)
 
 
 def get_kanban_query(

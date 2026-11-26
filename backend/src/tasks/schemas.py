@@ -6,7 +6,7 @@ from uuid import UUID
 
 from ddf.application.dtos import QueryDTO
 from fastapi import Body
-from pydantic import BaseModel, Field, NonNegativeFloat, NonNegativeInt
+from pydantic import AliasChoices, BaseModel, Field, NonNegativeFloat, NonNegativeInt
 
 from src.iam.schemas import UserReference
 from src.media.schemas import AttachmentResponse
@@ -31,6 +31,35 @@ ReviewerId = Annotated[
 ReviewDecision = Annotated[
     ReviewDecision, Body(..., embed=True, description="Принятое решение на ревью")
 ]
+
+
+class TaskRelationFields(BaseModel):
+    parent_task_id: UUID | None = Field(
+        None,
+        validation_alias=AliasChoices("parentTaskId", "parent_task_id"),
+        serialization_alias="parentTaskId",
+    )
+    subtasks: list[UUID] = Field(default_factory=list)
+    related_tasks: list[UUID] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("relatedTasks", "related_tasks"),
+        serialization_alias="relatedTasks",
+    )
+
+
+class TaskParentUpdate(BaseModel):
+    parent_task_id: UUID | None = Field(
+        ...,
+        validation_alias=AliasChoices("parentTaskId", "parent_task_id"),
+        serialization_alias="parentTaskId",
+    )
+
+
+class TaskBriefResponse(BaseModel):
+    id: UUID
+    number: str
+    title: str
+    status: TaskStatus
 
 
 class TaskBase(BaseModel):
@@ -64,9 +93,14 @@ class TaskCreate(TaskBase):
     """
 
     mark_as_todo: bool = Field(False, description="Готова ли задача к выполнению")
+    parent_task_id: UUID | None = Field(
+        None,
+        validation_alias=AliasChoices("parentTaskId", "parent_task_id"),
+        serialization_alias="parentTaskId",
+    )
 
 
-class TaskResponse(TaskBase):
+class TaskResponse(TaskBase, TaskRelationFields):
     """
     Представление задачи.
     """
@@ -126,7 +160,7 @@ class TaskUpdate(BaseModel):
     due_date: date | None = Field(None, description="Срок выполнения (deadline)")
 
 
-class TaskViewResponse(BaseModel):
+class TaskViewResponse(TaskRelationFields):
     """
     Облегчённая модель для представления задачи.
     """

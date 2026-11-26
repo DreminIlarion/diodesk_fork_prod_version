@@ -24,6 +24,7 @@ from .events import (
     TaskAssigned,
     TaskCompleted,
     TaskCreated,
+    TaskParentChanged,
     TaskReviewRequested,
     TaskStatusChanged,
     TaskUnassigned,
@@ -45,6 +46,7 @@ class Task(AggregateRoot):
     ticket_id: UUID | None = None
     project_id: UUID | None = None
     stage_id: UUID | None = None
+    parent_task_id: UUID | None = None
 
     number: TaskNumber
     title: str
@@ -92,6 +94,9 @@ class Task(AggregateRoot):
         # Завершённая задача должна иметь дату завершения
         if self.status == TaskStatus.DONE and self.completed_at is None:
             raise InvariantViolationError("Task in 'DONE' status must have completed_at")
+
+        if self.parent_task_id == self.id:
+            raise InvariantViolationError("Task cannot be its own parent")
 
     @classmethod
     def create(
@@ -141,12 +146,22 @@ class Task(AggregateRoot):
         )
         return task
 
-    def change_status(self, new_status: TaskStatus, changed_by: UUID) -> None:
+    def change_status(
+        self,
+        new_status: TaskStatus,
+        changed_by: UUID,
+        *,
+        reason: str | None = None,
+        caused_by_task_id: UUID | None = None,
+    ) -> None:
         """
-        Изменение статуса задачи.
+        Изменить статус задачи и зарегистрировать событие.
         """
 
         from .workflow import task_workflow
+
+        if self.is_deleted:
+            raise InvalidStateError("Cannot change status of deleted task")
 
         if new_status == self.status:
             return
@@ -160,10 +175,12 @@ class Task(AggregateRoot):
             )
 
         transition = task_workflow.resolve(self.status, new_status)
+
         for action in transition.actions:
             action(self, changed_by)
 
         old_status = self.status
+
         self.status = new_status
         self.updated_at = current_datetime()
 
@@ -174,6 +191,8 @@ class Task(AggregateRoot):
                 old_status=old_status,
                 new_status=new_status,
                 changed_by=changed_by,
+                reason=reason,
+                caused_by_task_id=caused_by_task_id,
             )
         )
 
@@ -443,5 +462,35 @@ class Task(AggregateRoot):
                 number=self.number,
                 old_assignee=old_assignee,
                 unassigned_by=unassigned_by,
+            )
+        )
+
+    def change_parent(
+        self,
+        parent_task_id: UUID | None,
+        changed_by: UUID,
+    ) -> None:
+        "Назначить, изменить или снять родительскую задачу."
+
+        if self.is_deleted:
+            raise InvalidStateError("Cannot change parent of deleted task")
+
+        if parent_task_id == self.id:
+            raise InvariantViolationError("Task cannot be its own parent")
+
+        if parent_task_id == self.parent_task_id:
+            return
+
+        old_parent_task_id = self.parent_task_id
+
+        self.parent_task_id = parent_task_id
+        self.updated_at = current_datetime()
+
+        self.register_event(
+            TaskParentChanged(
+                task_id=self.id,
+                old_parent_task_id=old_parent_task_id,
+                new_parent_task_id=parent_task_id,
+                changed_by=changed_by,
             )
         )

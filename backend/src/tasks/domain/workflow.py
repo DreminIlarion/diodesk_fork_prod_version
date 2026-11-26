@@ -165,6 +165,13 @@ task_workflow = (
         TaskStatus.PAUSED, TaskStatus.CANCELLED,
         Task.unassign, Task.reset_reviewer,
     )
+    .allow(
+        TaskStatus.BLOCKED,
+        TaskStatus.CANCELLED,
+        Task.finish_work,
+        Task.unassign,
+        Task.reset_reviewer,
+    )
     # ===============================
     # Переходы из на ревью
     # ===============================

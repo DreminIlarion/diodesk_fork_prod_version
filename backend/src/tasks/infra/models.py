@@ -7,7 +7,16 @@ from datetime import date, datetime
 from uuid import UUID
 
 from ddf.infra.database.sqlalchemy import Base, EntityMixin
-from sqlalchemy import Date, DateTime, Enum, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    UniqueConstraint,
+    column,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -63,6 +72,19 @@ class TaskOrm(EntityMixin, Base):
         viewonly=True,
     )
 
+    parent_task_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("tasks.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            column("parent_task_id") != column("id"),
+            name="ck_tasks_parent_not_self",
+        ),
+    )
+
 
 class TaskSequence(EntityMixin, Base):
     __tablename__ = "tasks_sequences"
@@ -74,5 +96,41 @@ class TaskSequence(EntityMixin, Base):
     __table_args__ = (
         UniqueConstraint(
             "project_id", "ticket_id", name="uq_task_sequences", postgresql_nulls_not_distinct=True
+        ),
+    )
+
+
+class TaskRelationOrm(Base):
+    __tablename__ = "task_relations"
+
+    left_task_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tasks.id", ondelete="RESTRICT"),
+        primary_key=True,
+    )
+    right_task_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tasks.id", ondelete="RESTRICT"),
+        primary_key=True,
+        index=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            column("left_task_id") < column("right_task_id"),
+            name="ck_task_relations_ordered_pair",
         ),
     )

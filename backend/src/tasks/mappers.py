@@ -1,6 +1,3 @@
-from .domain.entities import Task
-from .domain.repos import TaskView
-from .schemas import TaskResponse, TaskViewResponse
 from src.iam.domain.entities import User
 from src.iam.schemas import UserReference
 from src.media.mappers import map_attachment_to_response
@@ -10,6 +7,10 @@ from src.shared.domain.vo import Tag
 from src.tickets.domain.entities import Ticket
 from src.tickets.mappers import map_ticket_to_preview
 
+from .domain.entities import Task
+from .domain.repos import TaskBrief, TaskLinks, TaskView
+from .schemas import TaskBriefResponse, TaskResponse, TaskViewResponse
+
 
 def map_task_to_response(
         task: Task,
@@ -17,11 +18,13 @@ def map_task_to_response(
         ticket: Ticket | None = None,
         reporter: User | None = None,
         project: Project | None = None,
+        links: TaskLinks | None = None,
 ) -> TaskResponse:
     story_points = None if task.story_points is None else task.story_points.value
     estimated_hours = None if task.estimated_hours is None else float(task.estimated_hours)
     tags = [Tag(name=tag.name, color=tag.color) for tag in task.tags]
     attachments = [map_attachment_to_response(attachment) for attachment in task.attachments]
+    links = links if links is not None else TaskLinks()
 
     return TaskResponse(
         id=task.id,
@@ -55,6 +58,9 @@ def map_task_to_response(
         ),
         source_ticket_reporter=map_task_reporter_to_reference(reporter),
         project=map_task_project_to_reference(project),
+        parent_task_id=task.parent_task_id,
+        subtasks=sorted(links.subtasks),
+        related_tasks=sorted(links.related_tasks),
     )
 
 
@@ -64,9 +70,11 @@ def map_task_view_to_response(
         ticket: Ticket | None = None,
         reporter: User | None = None,
         project: Project | None = None,
+        links: TaskLinks | None = None,
 ) -> TaskViewResponse:
     tags = [Tag(name=tag.name, color=tag.color) for tag in task.tags]
     attachments = [map_attachment_to_response(a) for a in task.attachments]
+    links = links if links is not None else TaskLinks()
 
     return TaskViewResponse(
         id=task.id,
@@ -81,7 +89,7 @@ def map_task_view_to_response(
         reviewer_id=task.reviewer_id,
         due_date=task.due_date,
         story_points=task.story_points,
-        estimated_hours=float(task.estimated_hours) if task.estimated_hours else None,  
+        estimated_hours=float(task.estimated_hours) if task.estimated_hours else None,
         actual_hours=float(task.actual_hours) if task.actual_hours else None,
         started_at=task.started_at,
         completed_at=task.completed_at,
@@ -98,6 +106,9 @@ def map_task_view_to_response(
         ),
         source_ticket_reporter=map_task_reporter_to_reference(reporter),
         project=map_task_project_to_reference(project),
+        parent_task_id=task.parent_task_id,
+        subtasks=sorted(links.subtasks),
+        related_tasks=sorted(links.related_tasks),
     )
 
 
@@ -127,3 +138,13 @@ def map_task_project_to_reference(
         name=project.name,
     )
 
+
+def map_task_brief_to_response(
+    task: TaskBrief,
+) -> TaskBriefResponse:
+    return TaskBriefResponse(
+        id=task.id,
+        number=task.number,
+        title=task.title,
+        status=task.status,
+    )
